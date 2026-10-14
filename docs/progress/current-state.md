@@ -21,6 +21,10 @@
 
 ## Issue #4の判定
 
-状態: In progress。[PR #36](https://github.com/KingYoSun/koujou-san/pull/36)、Scope revision 1。[計画](2026-10-15-issue-4-plan.md)のAC-1〜6を実装し、実PostgreSQLでの局所確認と[独立検品](2026-10-15-issue-4-inspection.md)を通過した。[ADR 0003](../adr/0003-postgresql-persistence.md)に契約と保持・cursorの判断、[検証記録](2026-10-15-issue-4-evidence.md)に成功・修正前の失敗を記録した。実際のCI、マージ後照合が残る。
+状態: Complete。[PR #36](https://github.com/KingYoSun/koujou-san/pull/36)をCI全成功後にマージした。main `89982324415fecbe5339874e198f5058ca5d07ac` と最新検証対象のtree差分は0。AC-1〜6、維持条件、[独立検品](2026-10-15-issue-4-inspection.md)、CI、マージ後照合が揃い、#4をCloseした。[ADR 0003](../adr/0003-postgresql-persistence.md)、[検証記録](2026-10-15-issue-4-evidence.md)、[保存と復旧](../runbooks/persistence.md)を参照する。
 
-#5〜#34は未着手。業務API、ログイン、Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #5の判定
+
+状態: Blocked（初期登録・MFA方針のユーザー判断待ち）。Scope revision 1。[計画](2026-10-15-issue-5-plan.md)を整理し、判断に依存する実装は始めていない。OSとClaude Code認証の判断待ちは#3で解消済み。
+
+#6〜#34は未着手。業務API、ログイン、Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
