@@ -21,6 +21,6 @@
 
 ## Issue #4の判定
 
-状態: Inspection pending。Scope revision 1。[計画](2026-10-15-issue-4-plan.md)のAC-1〜6を実装し、実PostgreSQLでの局所確認を通過した。[ADR 0003](../adr/0003-postgresql-persistence.md)に契約と保持・cursorの判断、[検証記録](2026-10-15-issue-4-evidence.md)に成功・修正前の失敗を記録した。固定成果物の独立検品、実際のCI、マージ後照合が残る。
+状態: In progress。[PR #36](https://github.com/KingYoSun/koujou-san/pull/36)、Scope revision 1。[計画](2026-10-15-issue-4-plan.md)のAC-1〜6を実装し、実PostgreSQLでの局所確認と[独立検品](2026-10-15-issue-4-inspection.md)を通過した。[ADR 0003](../adr/0003-postgresql-persistence.md)に契約と保持・cursorの判断、[検証記録](2026-10-15-issue-4-evidence.md)に成功・修正前の失敗を記録した。実際のCI、マージ後照合が残る。
 
 #5〜#34は未着手。業務API、ログイン、Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
