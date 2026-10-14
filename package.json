@@ -13,6 +13,7 @@
     "doctor": "node scripts/dev.mjs doctor",
     "check": "node scripts/dev.mjs check",
     "test": "node scripts/dev.mjs test",
+    "test:database": "node scripts/dev.mjs test:database",
     "build": "node scripts/dev.mjs build",
     "dev": "node scripts/dev.mjs dev:web",
     "dev:api": "node scripts/dev.mjs dev:api",

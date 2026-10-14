@@ -1,14 +1,16 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
 
 func TestHealthz(t *testing.T) {
-	server := httptest.NewServer(NewHandler())
+	server := httptest.NewServer(NewHandler(nil))
 	defer server.Close()
 
 	response, err := server.Client().Get(server.URL + "/healthz")
@@ -39,7 +41,7 @@ func TestHealthzDoesNotExposeApplicationRoutes(t *testing.T) {
 	for _, path := range []string{"/", "/workspaces", "/runs", "/healthz/other"} {
 		t.Run(path, func(t *testing.T) {
 			response := httptest.NewRecorder()
-			NewHandler().ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+			NewHandler(nil).ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
 			if response.Code != http.StatusNotFound {
 				t.Fatalf("%s status = %d, want 404", path, response.Code)
 			}
@@ -49,7 +51,7 @@ func TestHealthzDoesNotExposeApplicationRoutes(t *testing.T) {
 
 func TestHealthzRejectsWriteMethods(t *testing.T) {
 	response := httptest.NewRecorder()
-	NewHandler().ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/healthz", nil))
+	NewHandler(nil).ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/healthz", nil))
 	if response.Code != http.StatusMethodNotAllowed || response.Header().Get("Allow") != "GET, HEAD" {
 		t.Fatalf("unexpected method response: status=%d allow=%q", response.Code, response.Header().Get("Allow"))
 	}
@@ -61,13 +63,40 @@ func TestHealthzCorsRemainsLocal(t *testing.T) {
 			request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 			request.Header.Set("Origin", origin)
 			response := httptest.NewRecorder()
-			NewHandler().ServeHTTP(response, request)
+			NewHandler(nil).ServeHTTP(response, request)
 			allowed := response.Header().Get("Access-Control-Allow-Origin")
 			if origin == "https://example.com" && allowed != "" {
 				t.Fatalf("external origin was allowed: %q", allowed)
 			}
 			if origin != "https://example.com" && allowed != origin {
 				t.Fatalf("local origin was not allowed: %q", allowed)
+			}
+		})
+	}
+}
+
+func TestReadinessDoesNotChangeLiveness(t *testing.T) {
+	for _, test := range []struct {
+		name   string
+		ready  func(context.Context) error
+		status int
+	}{
+		{"unconfigured", nil, http.StatusServiceUnavailable},
+		{"database stopped", func(context.Context) error { return errors.New("database stopped") }, http.StatusServiceUnavailable},
+		{"database ready", func(context.Context) error { return nil }, http.StatusOK},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			handler := NewHandler(test.ready)
+			for _, path := range []string{"/healthz", "/readyz"} {
+				response := httptest.NewRecorder()
+				handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+				want := test.status
+				if path == "/healthz" {
+					want = http.StatusOK
+				}
+				if response.Code != want {
+					t.Fatalf("%s status=%d want=%d", path, response.Code, want)
+				}
 			}
 		})
 	}
