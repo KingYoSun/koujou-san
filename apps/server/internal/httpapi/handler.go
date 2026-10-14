@@ -1,14 +1,25 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 )
 
-// NewHandler serves development liveness only. Application readiness, login and
-// domain routes are added with their own implementations in later Issues.
-func NewHandler() http.Handler {
+// NewHandler preserves liveness and checks configured PostgreSQL readiness.
+// Login and domain routes are added by their owning Issues.
+func NewHandler(ready func(context.Context) error) http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /readyz", func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		writer.Header().Set("Cache-Control", "no-store")
+		if ready == nil || ready(request.Context()) != nil {
+			writer.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = writer.Write([]byte(`{"status":"unavailable"}`))
+			return
+		}
+		_, _ = writer.Write([]byte(`{"status":"ok"}`))
+	})
 	mux.HandleFunc("/healthz", func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodGet && request.Method != http.MethodHead {
 			writer.Header().Set("Allow", "GET, HEAD")

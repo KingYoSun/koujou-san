@@ -3,6 +3,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -217,9 +218,96 @@ async function infra(command) {
   await run(`docker${exe}`, [...args, ...actions[command]]);
 }
 
+async function testDatabase() {
+  await resolveGo();
+  if (!env.KOUJOU_DB_PASSWORD) throw new Error("Run pnpm run setup first.");
+  const project = `koujou-san-db-test-${randomBytes(6).toString("hex")}`;
+  const reservation = createServer();
+  await new Promise((resolve, reject) => {
+    reservation.once("error", reject);
+    reservation.listen(0, "127.0.0.1", resolve);
+  });
+  env.KOUJOU_TEST_PG_PORT = String(reservation.address().port);
+  await new Promise((resolve, reject) =>
+    reservation.close((error) => (error ? reject(error) : resolve())),
+  );
+  const compose = [
+    "compose",
+    "--env-file",
+    path.join(root, ".env"),
+    "-p",
+    project,
+    "-f",
+    path.join(root, "infra/compose.yaml"),
+    "-f",
+    path.join(root, "infra/compose.test.yaml"),
+  ];
+  console.log(
+    "Creating isolated PostgreSQL fixtures; only this test container is stopped and restored.",
+  );
+  try {
+    await run(`docker${exe}`, [
+      ...compose,
+      "up",
+      "-d",
+      "--wait",
+      "--wait-timeout",
+      "60",
+      "postgres",
+    ]);
+    const container = (
+      await run(`docker${exe}`, [...compose, "ps", "-q", "postgres"], {
+        capture: true,
+      })
+    ).trim();
+    const port = (
+      await run(`docker${exe}`, ["port", container, "5432/tcp"], {
+        capture: true,
+      })
+    ).match(/^127\.0\.0\.1:(\d+)$/m)?.[1];
+    if (!port)
+      throw new Error("Test PostgreSQL loopback port was not published.");
+    env.KOUJOU_TEST_DATABASE_URL = `postgresql://koujou:${encodeURIComponent(env.KOUJOU_DB_PASSWORD)}@127.0.0.1:${port}/koujou?sslmode=disable&connect_timeout=2`;
+    env.KOUJOU_TEST_CONTAINER = container;
+    env.KOUJOU_TEST_PROJECT = project;
+    await goRun([
+      "test",
+      "./internal/persistence",
+      "-run",
+      "^TestPostgres$",
+      "-count=1",
+      "-v",
+    ]);
+  } finally {
+    const owned = await run(
+      `docker${exe}`,
+      [...compose, "ps", "-a", "-q", "postgres"],
+      { capture: true, optional: true },
+    );
+    if (owned) {
+      const label = await run(
+        `docker${exe}`,
+        [
+          "inspect",
+          "--format",
+          '{{index .Config.Labels "com.docker.compose.project"}}',
+          owned.trim(),
+        ],
+        { capture: true },
+      );
+      if (label !== project)
+        throw new Error(
+          "Refusing cleanup of a PostgreSQL container from another project.",
+        );
+      await run(`docker${exe}`, [...compose, "down", "--volumes"]);
+    }
+  }
+}
+
 const tasks = {
   setup,
   doctor,
+  "test:database": testDatabase,
   check: async () => {
     await resolveGo();
     const unformatted = await run(
@@ -262,6 +350,9 @@ const tasks = {
   "build:desktop": () => client("tauri:build"),
   "dev:api": async () => {
     await resolveGo();
+    if (!env.KOUJOU_DATABASE_URL && env.KOUJOU_DB_PASSWORD) {
+      env.KOUJOU_DATABASE_URL = `postgresql://koujou:${encodeURIComponent(env.KOUJOU_DB_PASSWORD)}@127.0.0.1:15432/koujou?sslmode=disable`;
+    }
     await goRun(["run", "./cmd/api"]);
   },
   "dev:web": () => client("dev"),

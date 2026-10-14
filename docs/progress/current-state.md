@@ -15,14 +15,12 @@
 | INVAR-ENV-1 | 既存の設計書とkukuriを変更しない       | Git差分・対象pathの確認                       |
 | INVAR-ENV-2 | 個人設定・秘密値・既存権限を複製しない | ignoreと新規.env生成、設定の確認              |
 
-## Issue #3の判定
+## Issue #3の完了
 
-状態: In progress。Scope revision 1を維持。契約と境界は[ADR 0002](../adr/0002-shared-api-contract.md)、対象と条件は[計画](2026-10-15-issue-3-plan.md)、CLI・native試作の観測結果は[検証記録](2026-10-15-issue-3-evidence.md)に置く。
+[PR #35](https://github.com/KingYoSun/koujou-san/pull/35)をCI全成功後にマージした。main `c478dd901a3414d9ce824ba9586fe98fa997ae84` と検証対象のtree差分は0。全AC・独立検品・マージ後照合が揃い、#3をCloseした。契約と採用OSは[ADR 0002](../adr/0002-shared-api-contract.md)、先行結果は[検証記録](2026-10-15-issue-3-evidence.md)、検品は[独立検品記録](2026-10-15-issue-3-inspection.md)を参照する。
 
-| 条件       | 現在の結果                                                                                                                          | 残作業                         |
-| ---------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| AC-1〜AC-3 | 共通契約、Go/TypeScript fixture、UIとnativeの境界を実装し、局所テストと独立検品を通過                                               | PRのCIとマージ後の照合         |
-| AC-4       | 担当表を作成。独立検品で見つかった#29の重複を修正し、再検品を通過                                                                   | CIとマージ後の照合             |
-| AC-5       | WindowsデスクトップとWSL内CLIを採用。WindowsのCodex/Claude Code、WSL入出力、Tauri callback・PKCE・DPAPI保存を確認し、独立検品を通過 | 最新commitのCIとマージ後の照合 |
+## Issue #4の判定
 
-#3の判断待ちは解消した。全条件、独立検品、必須CI、マージ後の照合が揃ったらCloseし、#4へ進む。#4〜#34は未着手。業務API、ログイン、Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
+状態: Inspection pending。Scope revision 1。[計画](2026-10-15-issue-4-plan.md)のAC-1〜6を実装し、実PostgreSQLでの局所確認を通過した。[ADR 0003](../adr/0003-postgresql-persistence.md)に契約と保持・cursorの判断、[検証記録](2026-10-15-issue-4-evidence.md)に成功・修正前の失敗を記録した。固定成果物の独立検品、実際のCI、マージ後照合が残る。
+
+#5〜#34は未着手。業務API、ログイン、Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。

@@ -55,6 +55,9 @@ jobs:
       - name: Test
         run: pnpm run test
 
+      - name: Test PostgreSQL persistence and recovery
+        run: pnpm run test:database
+
       - name: Build
         run: pnpm run build
 
