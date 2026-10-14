@@ -21,6 +21,14 @@ Goが生成した9種類のfixtureをTypeScriptで読み、同じ更新・再送
 
 Codex 0.162.1は `.tools/codex` に導入し、アプリ同梱CLIや個人設定を変更していない。既定モデルはユーザーの接続設定を使った。raw出力と失敗記録はGit管理外のtest-resultsに保存した。CLIの対話、復元、継続、停止、詳細な利用量の対応範囲は #18・#24 で実際の採用構成を検証する。
 
+## ユーザー判断後のCLI再確認
+
+2026-10-15に、ユーザーが「Windowsデスクトップから開始し、WSL内CLIも接続対象にする」「Windows側のClaude Codeで認証を復旧する」を選択し、続けて認証復旧済みと回答した。WindowsのClaude Codeは2.1.300でログイン済みとなっていた。
+
+Claude Code 2.1.300を `-p --safe-mode --tools "" --strict-mcp-config --no-session-persistence --output-format json` で起動し、stdinへ固定入力を送った。JSONのresultはKOUJOU_PROBE_OK、is_errorはfalse、終了コードは0だった。認証・モデルはユーザーの既存接続を使い、ツール・MCP・独自hookを無効にした。この試験で個人の認証設定を変更していない。以前の失敗は上表に残した。
+
+WindowsのNodeプロセスから `wsl.exe -d Ubuntu-22.04 -- python3 -c <固定試験>` を起動し、stdinのKOUJOU_WSL_PROBE_OKがstdoutのJSONに一致すること、stderrのWSL_STDERR_OK、終了コード0を確認した。WindowsからWSL内CLIへ入力・原出力・終了状態を渡せる証拠であり、Pauseや復旧やWSL内Claudeのモデル応答の確認ではない。生出力はGit管理外のtest-resultsに保存した。
+
 ## TauriのWindows試作
 
 Goの合成issuerとTauriのnative loopback callbackを別プロセスに置き、システムブラウザのChromeから認証要求を送った。実際のOryや個人アカウント・実トークンは使っていない。
@@ -47,7 +55,7 @@ Windowsで確認したブラウザの固定結果文は、Git管理外の `test-
 
 Ubuntu 22.04 on WSLではGTK 3.24.33、WebKitGTK 2.50.4、DISPLAY、Rust、Claude Codeの所在を確認した。Linux native callbackとSecret Service等の保存は未検証。macOSの実機・CI確認も未実施。
 
-初期デスクトップ対応OSの範囲をユーザーへ提示した。合意した範囲と、その対象の追加試験が揃うまでは #3 AC-5を完了扱いしない。Claude Codeの認証復旧についても、既存のアカウント認証を勝手に差し替えず、ユーザーの環境選択を待つ。
+初期対応はWindowsデスクトップとWSL内CLIに確定した。CLI入出力とWindows native認証境界の先行検証は揃った。Linux/macOSのデスクトップを初期対応済みとは扱わない。Oryの正常/拒否/失効は #5、実Runnerの対話/停止/復旧は #18以降で検証し、#3ではそれらの完成を前提にしない。
 
 ## 参照
 

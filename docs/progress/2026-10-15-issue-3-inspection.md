@@ -30,3 +30,11 @@ digestは、対象pathをPowerShellの `Sort-Object` 順に並べ、各行を `p
 native実機フローとCLIのモデル応答は、独立検品で再実行していない。コードと実装者の観測記録の一致を確認した。Credential Manager正常保存、Linux/macOS、本番Ory接続は未確認であり、試作やCI成功から補完しない。
 
 今回のAC-1〜4に残るblockerは0件。Issue全体の完了、CI、マージ後の照合はこの検品だけでは判定しない。現在の判定は[現在状態](current-state.md)を参照。
+
+## 採用判断後の再検品
+
+同日にユーザーがWindowsデスクトップ・WSL内CLIを初期対象に選び、WindowsのClaude Code認証を復旧した。独立検品者は判断の回答、変更文書4件、Windows ClaudeとWSL接続の試験要約を追加で照合した。実認証raw出力を読まず、モデル呼出しも再実行していない。
+
+Windows Claudeの終了0・期待応答・エラーなし・tools無効、WSLのstdin/stdout一致・stderr一致・終了0と記録が一致した。WSL内Claudeのモデル応答、Linux/macOSデスクトップ、本番Ory、製品Runnerを成功へ補完していない。コード・fixture・設定17ファイルのhashは前回と同じだった。
+
+追加文書の固定digestは `89566DB010EBA1321D0877892004BDB2B712412B6562096CC6E8E9A2586D6316`（上記と同じ方法）。この追記と検品後のcurrent-state更新は含まない。AC-1〜5、INVAR-1〜2の具体的blockerは0件。PR #35のcommit `a2a609bda36f78507170853446a7296cb982375b` の共通UI/server・Windows native CI成功も確認した。追加文書を含む最新commitのCIとマージ後確認は別に実施する。

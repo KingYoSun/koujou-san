@@ -1,6 +1,6 @@
 # ADR 0002: 共通API契約とクライアントの境界
 
-- 状態: Accepted（共通契約）。初期対応OSの採用判断は未決。
+- 状態: Accepted。
 - 対象: [Issue #3](https://github.com/KingYoSun/koujou-san/issues/3)
 - 根拠: 設計書§1.1、4.1、4.2、6.1、6.3、6.7、11.1、12.1、18
 
@@ -50,6 +50,8 @@ Goの `cmd/contract-fixtures` が読取、更新、再送、版競合、操作ID
 fixtureはPostgreSQLや本番認証の実装ではない。JSONで合意する境界と、クライアントが版・失敗・不完全性を保つことを検証する。ID/版の数値精度が失われる変換、dataとerrorの混在、異なるWorkspaceのdata、理由のないpartialは拒否する。
 
 ## 各Issueで決めること
+
+2026-10-15のユーザー判断で、初期デスクトップはWindowsから開始し、WSL内CLIも接続対象とした。Linux/macOSのデスクトップ対応は初期対象に含めない。WindowsのCodex・Claude Code、WindowsからWSLへ渡す標準入力と出力、Tauri callback・PKCE・DPAPI保存の先行結果は[検証記録](../progress/2026-10-15-issue-3-evidence.md)を参照する。これは本番RunnerやOry認証の完成を意味せず、具体的な能力・保存先・復旧は担当Issueで検証する。
 
 | 担当                         | 残る判断と終了条件                                                                   |
 | ---------------------------- | ------------------------------------------------------------------------------------ |
