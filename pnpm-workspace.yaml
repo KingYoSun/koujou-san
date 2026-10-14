@@ -1,0 +1,6 @@
+packages:
+  - apps/client
+
+onlyBuiltDependencies:
+  - "@tailwindcss/oxide"
+  - esbuild

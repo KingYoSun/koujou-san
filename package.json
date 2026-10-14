@@ -1,0 +1,33 @@
+{
+  "name": "koujou-san",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.16.1",
+  "engines": {
+    "node": ">=22.14.0 <23",
+    "pnpm": "10.16.1"
+  },
+  "scripts": {
+    "setup": "node scripts/dev.mjs setup",
+    "doctor": "node scripts/dev.mjs doctor",
+    "check": "node scripts/dev.mjs check",
+    "test": "node scripts/dev.mjs test",
+    "build": "node scripts/dev.mjs build",
+    "dev": "node scripts/dev.mjs dev:web",
+    "dev:api": "node scripts/dev.mjs dev:api",
+    "dev:web": "node scripts/dev.mjs dev:web",
+    "dev:desktop": "node scripts/dev.mjs dev:desktop",
+    "check:desktop": "node scripts/dev.mjs check:desktop",
+    "test:desktop": "node scripts/dev.mjs test:desktop",
+    "build:desktop": "node scripts/dev.mjs build:desktop",
+    "infra:up": "node scripts/dev.mjs infra:up",
+    "infra:down": "node scripts/dev.mjs infra:down",
+    "infra:status": "node scripts/dev.mjs infra:status",
+    "format": "prettier --write package.json pnpm-workspace.yaml scripts .github infra apps/client",
+    "format:check": "prettier --check package.json pnpm-workspace.yaml scripts .github infra apps/client"
+  },
+  "devDependencies": {
+    "prettier": "3.9.10"
+  }
+}

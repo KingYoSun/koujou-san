@@ -1,0 +1,28 @@
+{
+  "$id": "https://koujou-san.local/schemas/development-identity.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Development identity",
+  "type": "object",
+  "properties": {
+    "traits": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "ory.sh/kratos": {
+            "credentials": {
+              "password": {
+                "identifier": true
+              }
+            }
+          }
+        }
+      },
+      "required": ["email"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["traits"],
+  "additionalProperties": false
+}

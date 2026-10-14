@@ -1,0 +1,49 @@
+version: v0.13.0
+
+serve:
+  public:
+    base_url: http://127.0.0.1:4433/
+    cors:
+      enabled: true
+      allowed_origins:
+        - http://127.0.0.1:1420
+  admin:
+    base_url: http://kratos:4434/
+
+selfservice:
+  default_browser_return_url: http://127.0.0.1:1420/
+  allowed_return_urls:
+    - http://127.0.0.1:1420/
+  methods:
+    password:
+      enabled: true
+  flows:
+    error:
+      ui_url: http://127.0.0.1:1420/auth/error
+    login:
+      ui_url: http://127.0.0.1:1420/auth/login
+    registration:
+      ui_url: http://127.0.0.1:1420/auth/registration
+    settings:
+      ui_url: http://127.0.0.1:1420/auth/settings
+    recovery:
+      enabled: false
+    verification:
+      enabled: false
+    logout:
+      after:
+        default_browser_return_url: http://127.0.0.1:1420/
+
+identity:
+  default_schema_id: default
+  schemas:
+    - id: default
+      url: file:///etc/config/identity.schema.json
+
+log:
+  level: info
+  format: json
+  leak_sensitive_values: false
+
+ciphers:
+  algorithm: xchacha20-poly1305

@@ -1,0 +1,121 @@
+name: Koujou-san CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  shared-and-server:
+    name: Shared UI and server
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.16.1
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.98.1
+          components: clippy,rustfmt
+
+      - name: Setup repository toolchains
+        run: pnpm run setup
+
+      - name: Validate development services
+        run: docker compose --env-file .env.example -f infra/compose.yaml config --quiet
+
+      - name: Check
+        run: pnpm run check
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Keep verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-and-server-evidence
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  windows-native:
+    name: Windows native client
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.16.1
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.98.1
+          components: clippy,rustfmt
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/client/src-tauri
+          save-if: ${{ github.event_name != 'pull_request' }}
+
+      - name: Setup repository toolchains
+        run: pnpm run setup
+
+      - name: Build shared UI and server
+        run: pnpm run build
+
+      - name: Check native client
+        run: pnpm run check:desktop
+
+      - name: Test native client
+        run: pnpm run test:desktop
+
+      - name: Keep verification evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-native-evidence
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 14
