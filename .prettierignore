@@ -1,0 +1,9 @@
+node_modules/
+dist/
+**/dist/
+target/
+.tools/
+.cache/
+test-results/
+apps/client/src-tauri/gen/
+koujou-san-design-doc.md

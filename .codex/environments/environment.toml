@@ -1,0 +1,5 @@
+version = 1
+name = "koujou-san"
+
+[setup]
+script = "pnpm run setup"

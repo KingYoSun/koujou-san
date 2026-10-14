@@ -1,0 +1,126 @@
+name: 実装・不具合修正
+description: 目的、有限な受入条件、検証方法を固定して変更を進めます。
+title: ""
+labels: []
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        `AGENTS.md` と `docs/runbooks/issue-lifecycle.md` を参照してください。
+        Issue と直接のユーザー指示は、どちらも作業の入口です。このフォームの利用は、直接指示を実装するための前提ではありません。
+        条件や証拠が既存の計画にある場合は参照し、同じ情報を複製しないでください。
+
+  - type: dropdown
+    id: change_type
+    attributes:
+      label: 変更の種類
+      options:
+        - 機能追加
+        - 不具合修正
+        - 文書・開発環境
+        - リファクタリング
+        - 依存更新
+    validations:
+      required: true
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal と現在の問題
+      description: 何ができれば終了するかを、利用者が確認できる結果で示してください。不具合なら同じ条件で再現できる手順を添えてください。
+      placeholder: |
+        Goal:
+        現在の挙動:
+        期待する挙動:
+        再現手順・環境（不具合の場合）:
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_status
+    attributes:
+      label: Current status と対象範囲
+      description: 現在判定は一か所に集約し、親子項目がある場合は条件の所有者を一つにしてください。
+      placeholder: |
+        - 判定: Planned / In progress / Inspection pending / Ready / Complete / Blocked / Reopened
+        - Scope revision: 1
+        - 基準 commit:
+        - In scope:
+        - Non-goals:
+        - 親子項目の所有境界（該当時）:
+        - 未決事項・調査の終了条件:
+    validations:
+      required: true
+
+  - type: dropdown
+    id: risk_lane
+    attributes:
+      label: リスク区分
+      description: ファイル数ではなく、変更する挙動と利用者への影響で選びます。
+      options:
+        - "A: 軽微（挙動を変えない文書・文言・機械的保守）"
+        - "B: 挙動変更（機能追加・不具合修正）"
+        - "C: 境界重要（認証・秘密値・永続化・migration・CLI実行・外部書き込み）"
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: 正本と根拠
+      description: DesignDoc の合意済み方針と提案を区別し、対象の仕様・実装・検証を示してください。
+      placeholder: |
+        - koujou-san-design-doc.md の対象節:
+        - ADR / 契約 / 計画:
+        - 現行実装 / test / scenario:
+        - ユーザー指示（該当時）:
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: Acceptance Criteria と維持する挙動
+      description: 有限個の AC-* に対象・期待結果・判定方法を記し、維持する合意済みの挙動を INVAR-* として示してください。判定できない条件は実装前に末端条件まで分解してください。
+      placeholder: |
+        - [ ] AC-1: 対象 / 期待結果 / 判定方法
+        - [ ] AC-2: 対象 / 期待結果 / 判定方法
+        - [ ] INVAR-1: 維持する挙動 / 判定方法
+    validations:
+      required: true
+
+  - type: textarea
+    id: paths_and_transitions
+    attributes:
+      label: 対象経路と状態遷移（B / C）
+      description: 合意した条件の入口から結果・副作用までと、変更する共通処理の呼出元を記録します。A は省略できます。
+      placeholder: |
+        | ID | AC / INVAR | 入口・事前状態・操作 | 期待結果 / 禁止副作用 | 実装 path / 検証 |
+        | --- | --- | --- | --- | --- |
+        | T1 | AC-1 | | | |
+    validations:
+      required: false
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: 検証と完了条件
+      description: 条件ごとの確認方法と必要な証拠を定めます。未実行・失敗と成功を区別し、CI の成功だけで受入条件を達成したことにしないでください。
+      placeholder: |
+        - AC-1 / INVAR-1 -> 対応する作業・予定 PR / test / evidence:
+        - 関連するローカル command / CI:
+        - 変更前の再現・観測（不具合の場合）:
+        - UI の操作・表示確認（該当時）:
+        - 独立監査: 必要 / 不要、理由（C は必要、B は着手前に決定）:
+        - 完了条件:
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: scope_acknowledgement
+    attributes:
+      label: 対象範囲の確認
+      options:
+        - label: 未依頼のエッジケース・将来要件を受入条件へ追加せず、目的や利用条件を変える必要がある場合は、該当作業の前にユーザーの判断を得ます。
+          required: true

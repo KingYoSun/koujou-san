@@ -1,0 +1,21 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { renderToStaticMarkup } from "react-dom/server";
+import { expect, it } from "vitest";
+import { App } from "./App";
+
+it.each([false, true])(
+  "renders the shared bootstrap shell for native=%s",
+  (native) => {
+    const queryClient = new QueryClient();
+    const html = renderToStaticMarkup(
+      <QueryClientProvider client={queryClient}>
+        <App apiBaseUrl="http://127.0.0.1:8080" native={native} />
+      </QueryClientProvider>,
+    );
+
+    expect(html).toContain("<h1>koujou-san</h1>");
+    expect(html).toContain(native ? "Tauri ネイティブ" : "Web");
+    expect(html).toContain("段階Aの認証・共有状態・検索・観測機能は");
+    queryClient.clear();
+  },
+);
