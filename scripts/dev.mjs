@@ -237,6 +237,13 @@ const tasks = {
   test: async () => {
     await resolveGo();
     await goRun(["test", "./..."]);
+    const fixturePath = path.join(root, "test-results/contracts.json");
+    await mkdir(path.dirname(fixturePath), { recursive: true });
+    await writeFile(
+      fixturePath,
+      await goRun(["run", "./cmd/contract-fixtures"], { capture: true }),
+    );
+    env.KOUJOU_CONTRACT_FIXTURES = fixturePath;
     await client("test");
   },
   build: async () => {
