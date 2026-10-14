@@ -1650,8 +1650,13 @@ dependencies = [
 name = "koujou-san-desktop"
 version = "0.0.0"
 dependencies = [
+ "base64 0.23.1",
+ "serde_json",
+ "sha2",
  "tauri",
  "tauri-build",
+ "uuid",
+ "windows",
 ]
 
 [[package]]

@@ -24,8 +24,8 @@
     "infra:up": "node scripts/dev.mjs infra:up",
     "infra:down": "node scripts/dev.mjs infra:down",
     "infra:status": "node scripts/dev.mjs infra:status",
-    "format": "prettier --write package.json pnpm-workspace.yaml scripts .github infra apps/client",
-    "format:check": "prettier --check package.json pnpm-workspace.yaml scripts .github infra apps/client"
+    "format": "prettier --write package.json pnpm-workspace.yaml contracts scripts .github infra apps/client",
+    "format:check": "prettier --check package.json pnpm-workspace.yaml contracts scripts .github infra apps/client"
   },
   "devDependencies": {
     "prettier": "3.9.10"

@@ -1,0 +1,180 @@
+[
+  {
+    "name": "read",
+    "response": {
+      "data": {
+        "workspace_id": "workspace-a",
+        "id": "fixture-a",
+        "version": "9007199254740993"
+      },
+      "meta": {
+        "workspace_id": "workspace-a",
+        "position": "position-a",
+        "next_cursor": null,
+        "completeness": {
+          "state": "complete"
+        }
+      }
+    }
+  },
+  {
+    "name": "update",
+    "request": {
+      "operation_id": "operation-a",
+      "expected_version": "9007199254740993"
+    },
+    "response": {
+      "data": {
+        "workspace_id": "workspace-a",
+        "id": "fixture-a",
+        "version": "9007199254740994"
+      },
+      "meta": {
+        "workspace_id": "workspace-a",
+        "operation_id": "operation-a",
+        "position": "position-b",
+        "next_cursor": null,
+        "completeness": {
+          "state": "complete"
+        }
+      }
+    }
+  },
+  {
+    "name": "replay",
+    "request": {
+      "operation_id": "operation-a",
+      "expected_version": "9007199254740993"
+    },
+    "response": {
+      "data": {
+        "workspace_id": "workspace-a",
+        "id": "fixture-a",
+        "version": "9007199254740994"
+      },
+      "meta": {
+        "workspace_id": "workspace-a",
+        "operation_id": "operation-a",
+        "position": "position-b",
+        "next_cursor": null,
+        "completeness": {
+          "state": "complete"
+        }
+      }
+    }
+  },
+  {
+    "name": "version-conflict",
+    "request": {
+      "operation_id": "operation-b",
+      "expected_version": "9007199254740993"
+    },
+    "response": {
+      "error": {
+        "code": "version_conflict",
+        "current_version": "9007199254740994"
+      },
+      "meta": {
+        "workspace_id": "workspace-a",
+        "operation_id": "operation-b",
+        "position": "position-b",
+        "next_cursor": null,
+        "completeness": {
+          "state": "complete"
+        }
+      }
+    }
+  },
+  {
+    "name": "operation-conflict",
+    "request": {
+      "operation_id": "operation-a",
+      "expected_version": "9007199254740993"
+    },
+    "response": {
+      "error": {
+        "code": "operation_conflict"
+      },
+      "meta": {
+        "workspace_id": "workspace-a",
+        "operation_id": "operation-a",
+        "position": "position-b",
+        "next_cursor": null,
+        "completeness": {
+          "state": "complete"
+        }
+      }
+    }
+  },
+  {
+    "name": "workspace-denied",
+    "response": {
+      "error": {
+        "code": "forbidden"
+      },
+      "meta": {
+        "workspace_id": "workspace-b",
+        "position": null,
+        "next_cursor": null,
+        "completeness": {
+          "state": "pending",
+          "reason": "not_accessed"
+        }
+      }
+    }
+  },
+  {
+    "name": "update-denied",
+    "response": {
+      "error": {
+        "code": "forbidden"
+      },
+      "meta": {
+        "workspace_id": "workspace-a",
+        "position": "position-a",
+        "next_cursor": null,
+        "completeness": {
+          "state": "complete"
+        }
+      }
+    }
+  },
+  {
+    "name": "partial",
+    "response": {
+      "data": {
+        "workspace_id": "workspace-a",
+        "id": "fixture-a",
+        "version": "9007199254740993"
+      },
+      "meta": {
+        "workspace_id": "workspace-a",
+        "position": "position-a",
+        "next_cursor": "opaque-page-a",
+        "completeness": {
+          "state": "partial",
+          "reason": "limit_reached"
+        }
+      }
+    }
+  },
+  {
+    "name": "pending",
+    "response": {
+      "data": {
+        "workspace_id": "workspace-a",
+        "id": "fixture-a",
+        "version": "9007199254740993"
+      },
+      "meta": {
+        "workspace_id": "workspace-a",
+        "position": "position-a",
+        "next_cursor": null,
+        "completeness": {
+          "state": "pending",
+          "reason": "projection_lag"
+        }
+      }
+    }
+  }
+]
