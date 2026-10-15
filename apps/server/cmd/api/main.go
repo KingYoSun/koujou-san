@@ -13,6 +13,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/auth"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
@@ -54,6 +55,23 @@ func main() {
 			searchService.Start(ctx, os.Getenv("KOUJOU_SEARCH_REBUILD") == "1")
 			defer searchService.Close()
 			routes = append(routes, searchService.Register)
+			graphLimits, err := graphindex.EnvironmentLimits()
+			if err != nil {
+				slog.Error("graph configuration invalid")
+				os.Exit(1)
+			}
+			var remote *graphindex.Remote
+			if address := os.Getenv("KOUJOU_GRAPH_URL"); address != "" {
+				remote, err = graphindex.NewRemote(address, os.Getenv("KOUJOU_GRAPH_USER"), os.Getenv("KOUJOU_GRAPH_PASSWORD"), os.Getenv("KOUJOU_GRAPH_DATABASE"))
+				if err != nil {
+					slog.Error("graph connection configuration invalid")
+					os.Exit(1)
+				}
+			}
+			graphService := graphindex.New(store, accessService, contextService, remote, graphLimits, service.Config.Key)
+			graphService.Start(ctx)
+			defer graphService.Close()
+			routes = append(routes, graphService.Register)
 			routes = append(routes, contextService.Register, sharedsync.New(store, accessService, contextService, service.Config.Key).Register)
 		}
 	}

@@ -2,10 +2,7 @@ package searchindex
 
 import (
 	"context"
-	"crypto/aes"
-	"crypto/cipher"
 	"crypto/rand"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -30,7 +27,7 @@ type Service struct {
 	Access     *access.Service
 	Contexts   *contexts.Service
 	dir        string
-	crypt      cipher.AEAD
+	crypt      *apicontract.CursorCodec
 	mu         sync.RWMutex
 	update     sync.Mutex
 	index      bleve.Index
@@ -44,9 +41,7 @@ func New(store *persistence.Store, a *access.Service, c *contexts.Service, dir s
 	if dir == "" {
 		dir = ".cache/search"
 	}
-	sum := sha256.Sum256(append([]byte("koujou-search-cursor-v1:"), key...))
-	block, _ := aes.NewCipher(sum[:])
-	crypt, _ := cipher.NewGCM(block)
+	crypt := apicontract.NewCursorCodec(key, "koujou-search-cursor-v1")
 	s := &Service{Store: store, Access: a, Contexts: c, dir: dir, crypt: crypt}
 	raw, err := os.ReadFile(filepath.Join(dir, "active.json"))
 	var active generation
@@ -103,21 +98,11 @@ func (s *Service) Close() error {
 	return nil
 }
 func (s *Service) seal(c cursor) string {
-	nonce := make([]byte, s.crypt.NonceSize())
-	_, _ = rand.Read(nonce)
-	return base64.RawURLEncoding.EncodeToString(s.crypt.Seal(nonce, nonce, encode(c), []byte(schema)))
+	return s.crypt.Seal(c, schema)
 }
 func (s *Service) open(raw string) (cursor, error) {
 	var c cursor
-	data, err := base64.RawURLEncoding.DecodeString(raw)
-	n := s.crypt.NonceSize()
-	if err != nil || len(data) < n {
-		return c, errors.New("invalid cursor")
-	}
-	plain, err := s.crypt.Open(nil, data[:n], data[n:], []byte(schema))
-	if err == nil {
-		err = json.Unmarshal(plain, &c)
-	}
+	err := s.crypt.Open(raw, schema, &c)
 	return c, err
 }
 func (s *Service) workspaces(ctx context.Context, db database, after string) ([]string, error) {

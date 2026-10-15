@@ -57,3 +57,7 @@ Windows 11 Pro 10.0.26200、Ryzen 7 7800X3D（8コア16論理プロセッサ）�
 CodeGraphを先に使い、当初未索引だったsearchindexだけ実ファイルへ切り替えた。後の固定commitでは索引からも確認できた。新しいCodeGraph索引の作成は行っていない。
 
 仕様は[ADR 0008](../adr/0008-bleve-search.md)、操作は[検索手順](../runbooks/search.md)、固定commitの判定は[独立検品](2026-10-15-issue-9-inspection.md)を参照する。CIとマージ後照合は別に追跡する。
+
+## CIとマージ後照合
+
+[PR #41](https://github.com/KingYoSun/koujou-san/pull/41)のCI [38728826980](https://github.com/KingYoSun/koujou-san/actions/runs/38728826980)は、共通UI・サーバー、Windows native、GitGuardianが全て成功した。検証済みhead `9d9c9a4eb0c8013df15afc039970c642d2d932de`とマージ後main `730f20ff9ae3c0bf4dcf2dc1d12270796c4a93e3`のtreeは、ともに`8c56cb3e65008fcbec85922a8c216a21475efd1c`で差分0。標準APIのreadyzも成功し、#9をCloseした。

@@ -36,9 +36,12 @@ services:
   arcadedb:
     image: arcadedata/arcadedb:26.10.1
     environment:
+      JAVA_OPTS: "-Xmx512m"
       ARCADEDB_SETTINGS: >-
         -Darcadedb.server.rootPassword=${ARCADEDB_ROOT_PASSWORD:?Run pnpm run setup first}
         -Darcadedb.server.defaultDatabases=koujou[root]
+        -Darcadedb.maxPageRAM=16
+        -Darcadedb.txWalFlush=1
       ARCADEDB_JMX: ""
     ports:
       - "127.0.0.1:2480:2480"

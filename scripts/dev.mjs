@@ -180,6 +180,10 @@ async function prepareAuth() {
   env.KOUJOU_TLS_KEY ??= path.join(root, ".cache/tls/key.pem");
   env.KOUJOU_DEV_CA_FILE ??= env.KOUJOU_TLS_CERT;
   env.KOUJOU_DATABASE_URL ??= `postgresql://koujou:${encodeURIComponent(env.KOUJOU_DB_PASSWORD)}@127.0.0.1:15432/koujou?sslmode=disable`;
+  env.KOUJOU_GRAPH_URL ??= "http://127.0.0.1:2480";
+  env.KOUJOU_GRAPH_USER ??= "root";
+  env.KOUJOU_GRAPH_PASSWORD ??= env.ARCADEDB_ROOT_PASSWORD;
+  env.KOUJOU_GRAPH_DATABASE ??= "koujou_graph";
   env.KOUJOU_SEARCH_DIR = path.resolve(
     root,
     env.KOUJOU_SEARCH_DIR || ".cache/search",
@@ -249,6 +253,7 @@ async function infra(command) {
 
 async function testDatabase(suite = "persistence", testName) {
   const authentication = suite === "auth";
+  const graph = suite === "graphindex";
   await resolveGo();
   if (!env.KOUJOU_DB_PASSWORD) throw new Error("Run pnpm run setup first.");
   const project = `koujou-san-db-test-${randomBytes(6).toString("hex")}`;
@@ -261,15 +266,10 @@ async function testDatabase(suite = "persistence", testName) {
   await new Promise((resolve, reject) =>
     reservation.close((error) => (error ? reject(error) : resolve())),
   );
-  if (authentication) {
-    for (const name of [
-      "HYDRA",
-      "HYDRA_ADMIN",
-      "KRATOS",
-      "KRATOS_ADMIN",
-      "MAILPIT",
-      "API",
-    ]) {
+  if (authentication || graph) {
+    for (const name of authentication
+      ? ["HYDRA", "HYDRA_ADMIN", "KRATOS", "KRATOS_ADMIN", "MAILPIT", "API"]
+      : ["ARCADE"]) {
       const server = createServer();
       await new Promise((resolve, reject) => {
         server.once("error", reject);
@@ -293,7 +293,9 @@ async function testDatabase(suite = "persistence", testName) {
       root,
       authentication
         ? "infra/compose.auth-test.yaml"
-        : "infra/compose.test.yaml",
+        : graph
+          ? "infra/compose.graph-test.yaml"
+          : "infra/compose.test.yaml",
     ),
   ];
   console.log(
@@ -306,14 +308,42 @@ async function testDatabase(suite = "persistence", testName) {
       "-d",
       "--wait",
       "--wait-timeout",
-      "60",
-      ...(authentication ? ["kratos", "hydra", "mailpit"] : ["postgres"]),
+      "180",
+      ...(authentication
+        ? ["kratos", "hydra", "mailpit"]
+        : graph
+          ? ["postgres", "arcadedb"]
+          : ["postgres"]),
     ]);
     const container = (
       await run(`docker${exe}`, [...compose, "ps", "-q", "postgres"], {
         capture: true,
       })
     ).trim();
+    // initdb's temporary server is followed by a shutdown/restart. Wait for
+    // the final PID 1 and TCP listener before opening the test database.
+    const deadline = Date.now() + 180_000;
+    let databaseReady = false;
+    while (Date.now() < deadline) {
+      const probe = await run(
+        `docker${exe}`,
+        [
+          "exec",
+          container,
+          "sh",
+          "-c",
+          'test "$(cat /proc/1/comm)" = postgres && pg_isready -h 127.0.0.1 -U postgres -d postgres',
+        ],
+        { capture: true, optional: true },
+      );
+      if (probe !== null) {
+        databaseReady = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    if (!databaseReady)
+      throw new Error("Test PostgreSQL did not finish initialization.");
     const port = (
       await run(`docker${exe}`, ["port", container, "5432/tcp"], {
         capture: true,
@@ -324,11 +354,20 @@ async function testDatabase(suite = "persistence", testName) {
     env.KOUJOU_TEST_DATABASE_URL = `postgresql://koujou:${encodeURIComponent(env.KOUJOU_DB_PASSWORD)}@127.0.0.1:${port}/koujou?sslmode=disable&connect_timeout=2`;
     env.KOUJOU_TEST_CONTAINER = container;
     env.KOUJOU_TEST_PROJECT = project;
+    if (graph) {
+      env.KOUJOU_TEST_GRAPH_CONTAINER = (
+        await run(`docker${exe}`, [...compose, "ps", "-q", "arcadedb"], {
+          capture: true,
+        })
+      ).trim();
+      env.KOUJOU_TEST_GRAPH_URL = `http://127.0.0.1:${env.KOUJOU_TEST_ARCADE_PORT}`;
+      env.KOUJOU_TEST_GRAPH_PASSWORD = env.ARCADEDB_ROOT_PASSWORD;
+    }
     await goRun([
       "test",
       `./internal/${suite}`,
       "-run",
-      `^${testName ?? { auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", sharedsync: "TestSyncPostgres", searchindex: "TestSearchPostgres", persistence: "TestPostgres" }[suite]}$`,
+      `^${testName ?? { auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", sharedsync: "TestSyncPostgres", searchindex: "TestSearchPostgres", graphindex: "TestGraphPostgres", persistence: "TestPostgres" }[suite]}$`,
       "-count=1",
       "-v",
     ]);
@@ -359,6 +398,14 @@ async function testDatabase(suite = "persistence", testName) {
 }
 
 const tasks = {
+  "test:graph": () => testDatabase("graphindex"),
+  "test:graph-load": () => {
+    env.KOUJOU_GRAPH_LOAD_REPORT = path.join(
+      root,
+      "test-results/graph-load.json",
+    );
+    return testDatabase("graphindex", "TestGraphLoad");
+  },
   "test:search": () => testDatabase("searchindex"),
   "test:search-load": () => {
     env.KOUJOU_SEARCH_LOAD_REPORT = path.join(

@@ -1,0 +1,15 @@
+# Dedicated project and volumes; no data from the running development graph.
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:${KOUJOU_TEST_PG_PORT:?Run pnpm run test:graph}:5432"
+  arcadedb:
+    ports: !override
+      - "127.0.0.1:${KOUJOU_TEST_ARCADE_PORT:?Run pnpm run test:graph}:2480"
+    environment:
+      JAVA_OPTS: "-Xmx512m"
+      ARCADEDB_SETTINGS: >-
+        -Darcadedb.server.rootPassword=${ARCADEDB_ROOT_PASSWORD:?Run pnpm run setup}
+        -Darcadedb.maxPageRAM=16
+        -Darcadedb.txWalFlush=1
+        -Darcadedb.server.restoreImportAllowLocalUrls=true
