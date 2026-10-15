@@ -230,6 +230,7 @@ func (s *Service) apply(ctx context.Context, b *builder, i bleve.Index, w string
 		return errHistory
 	}
 	cp.Sequence = sequence
+	batch := i.NewBatch()
 	resource := event.ID
 	if strings.HasPrefix(resource, "membership:") {
 		var raw []byte
@@ -250,12 +251,11 @@ func (s *Service) apply(ctx context.Context, b *builder, i bleve.Index, w string
 				return err
 			}
 		}
-		if err = b.project(ctx, i, w, resource, cp.Sequence, deleted); err != nil {
+		if err = b.project(ctx, i, batch, w, resource, cp.Sequence, deleted); err != nil {
 			return err
 		}
 	}
 	cp.Position = event.Position
-	batch := i.NewBatch()
 	batch.SetInternal(checkpointKey(w), encode(cp))
 	if err = i.Batch(batch); err != nil {
 		return err
@@ -379,6 +379,7 @@ func (s *Service) snapshot(ctx context.Context, i bleve.Index) error {
 }
 func (s *Service) snapshotWorkspace(ctx context.Context, db database, i bleve.Index, w string, cp checkpoint) error {
 	b := builder{db, map[string]contexts.Unit{}}
+	batch := i.NewBatch()
 	after := ""
 	for {
 		rows, err := db.Query(ctx, `SELECT DISTINCT r.resource_id,v.deleted FROM context_records r JOIN shared_versions v USING(workspace_id,resource_id) WHERE r.workspace_id=$1 AND r.kind IN ('sentence','paragraph','section','document') AND r.resource_id>$2 ORDER BY r.resource_id LIMIT 100`, w, after)
@@ -405,16 +406,21 @@ func (s *Service) snapshotWorkspace(ctx context.Context, db database, i bleve.In
 			return err
 		}
 		for _, r := range page {
-			if err = b.project(ctx, i, w, r.id, cp.Sequence, r.deleted); err != nil {
+			if err = b.project(ctx, i, batch, w, r.id, cp.Sequence, r.deleted); err != nil {
 				return err
 			}
+		}
+		if batch.Size() > 0 {
+			if err = i.Batch(batch); err != nil {
+				return err
+			}
+			batch.Reset()
 		}
 		if len(page) < 100 {
 			break
 		}
 		after = page[len(page)-1].id
 	}
-	batch := i.NewBatch()
 	batch.SetInternal(checkpointKey(w), encode(cp))
 	return i.Batch(batch)
 }

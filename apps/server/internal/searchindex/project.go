@@ -95,7 +95,7 @@ func scopes(ctx context.Context, db database, w, id string, through int64) ([]st
 	}
 	return result, rows.Err()
 }
-func (b *builder) project(ctx context.Context, i bleve.Index, w, resource string, through int64, deleted bool) error {
+func (b *builder) project(ctx context.Context, i bleve.Index, batch *bleve.Batch, w, resource string, through int64, deleted bool) error {
 	if !strings.HasPrefix(resource, "context:") {
 		return nil
 	}
@@ -141,7 +141,6 @@ func (b *builder) project(ctx context.Context, i bleve.Index, w, resource string
 		if len(page) == 0 {
 			return nil
 		}
-		batch := i.NewBatch()
 		for _, r := range page {
 			key := docID(w, r.ref)
 			if deleted {
@@ -157,8 +156,11 @@ func (b *builder) project(ctx context.Context, i bleve.Index, w, resource string
 				return err
 			}
 		}
-		if err = i.Batch(batch); err != nil {
-			return err
+		if batch.Size() >= 1000 {
+			if err = i.Batch(batch); err != nil {
+				return err
+			}
+			batch.Reset()
 		}
 		after = page[len(page)-1].ref.Revision
 		if len(page) < 100 {
