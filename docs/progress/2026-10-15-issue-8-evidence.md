@@ -42,3 +42,7 @@
 検証専用Workspaceと報告対象を使い、既存Workspaceや元管理者の資格情報を変更していない。検証用Deviceは権限失効で無効になった。検証用ブラウザはサインアウトし、新規作成した検証用Ory identityと私有資格情報ファイルを削除した。監査履歴は残した。TLS中継を停止し、APIを標準の8080へ戻した。
 
 仕様は[ADR 0007](../adr/0007-shared-sync.md)、操作と接続境界は[同期手順](../runbooks/shared-sync.md)を参照する。固定commitの[独立検品](2026-10-15-issue-8-inspection.md)とCI・マージ後照合は別に記録する。
+
+## CIとマージ後照合
+
+[PR #40](https://github.com/KingYoSun/koujou-san/pull/40)のCI [38721764597](https://github.com/KingYoSun/koujou-san/actions/runs/38721764597)は、共通UI・サーバー、Windows native、GitGuardianが全て成功した。検証済みhead `80ed2ce545e17f89a17ea139377da9906e6981ba`とマージ後main `a744639ee4aa7084e20a031fb114e4dd072c385b`のtreeは、ともに`048f52bf54e9afc19f64f508d4d7475922e00515`で差分0。標準APIのreadyzも成功し、#8をCloseした。

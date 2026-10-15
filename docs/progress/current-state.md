@@ -37,6 +37,10 @@
 
 ## Issue #8の判定
 
-状態: In progress。Scope revision 1。[計画](2026-10-15-issue-8-plan.md)の失効時削除・再接続後の手動送信をユーザーが採用した。同期API、保存、共通画面を実装し、実PG・2アカウントのWeb/TauriでAC-1〜6を照合した。[検証記録](2026-10-15-issue-8-evidence.md)と[独立検品](2026-10-15-issue-8-inspection.md)は全条件PASS、blockerなし。CIとマージ後照合は未完了。
+状態: Complete。Scope revision 1。[PR #40](https://github.com/KingYoSun/koujou-san/pull/40)を全CI成功後にマージした。main `a744639ee4aa7084e20a031fb114e4dd072c385b`と検証済みheadのtree差分は0。[検証記録](2026-10-15-issue-8-evidence.md)の実PG・2アカウントWeb/Tauri、[独立検品](2026-10-15-issue-8-inspection.md)、マージ後照合が揃い、#8をCloseした。
 
-#9〜#34は未着手。Context編集GUI、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #9の判定
+
+状態: In progress。Scope revision 1。ユーザーが採用した検索品質・負荷目標を[計画](2026-10-15-issue-9-plan.md)へ固定した。Bleveの公式資料と小さなAnalyzer比較を確認し、検索・投影・再構築の実装を進める。
+
+#10〜#34は未着手。Context編集GUI、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
