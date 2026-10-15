@@ -251,59 +251,62 @@ func TestOryIntegration(t *testing.T) {
 		}
 		return value
 	}
-	completed := false
-	for range 12 {
-		target, err := url.Parse(next)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if target.Path == "/auth/login" {
-			challenge := target.Query().Get("login_challenge")
-			value := broker("login", challenge)
-			if value["required"] == "login" {
-				login, fields := flow("login", "login_challenge="+url.QueryEscape(challenge))
-				fields.Set("method", "password")
-				fields.Set("identifier", email)
-				fields.Set("password", password)
-				response, _ = submit("login", login, fields)
-				next = response.Header.Get("Location")
+	authorize := func(next string) {
+		completed := false
+		for range 12 {
+			target, err := url.Parse(next)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if target.Path == "/auth/login" {
+				challenge := target.Query().Get("login_challenge")
+				value := broker("login", challenge)
+				if value["required"] == "login" {
+					login, fields := flow("login", "login_challenge="+url.QueryEscape(challenge))
+					fields.Set("method", "password")
+					fields.Set("identifier", email)
+					fields.Set("password", password)
+					response, _ = submit("login", login, fields)
+					next = response.Header.Get("Location")
+					continue
+				}
+				if value["required"] != "" {
+					t.Fatalf("unexpected login requirement: %v", value)
+				}
+				next = value["redirect"]
 				continue
 			}
-			if value["required"] != "" {
-				t.Fatalf("unexpected login requirement: %v", value)
+			if target.Path == "/auth/consent" {
+				next = broker("consent", target.Query().Get("consent_challenge"))["redirect"]
+				continue
 			}
-			next = value["redirect"]
-			continue
-		}
-		if target.Path == "/auth/consent" {
-			next = broker("consent", target.Query().Get("consent_challenge"))["redirect"]
-			continue
-		}
-		response, raw = request("GET", next, nil)
-		next = response.Header.Get("Location")
-		if target.Path == "/auth/callback" {
-			if response.StatusCode != 303 {
-				t.Fatalf("callback status=%d %s", response.StatusCode, raw)
-			}
-			secureCookie := false
-			for _, value := range response.Cookies() {
-				if value.Name == "__Host-koujou-session" {
-					secureCookie = value.Secure && value.HttpOnly && value.Path == "/" && value.SameSite == http.SameSiteLaxMode
+			response, raw = request("GET", next, nil)
+			next = response.Header.Get("Location")
+			if target.Path == "/auth/callback" {
+				if response.StatusCode != 303 {
+					t.Fatalf("callback status=%d %s", response.StatusCode, raw)
 				}
+				secureCookie := false
+				for _, value := range response.Cookies() {
+					if value.Name == "__Host-koujou-session" {
+						secureCookie = value.Secure && value.HttpOnly && value.Path == "/" && value.SameSite == http.SameSiteLaxMode
+					}
+				}
+				if !secureCookie {
+					t.Fatal("BFF cookie security attributes missing")
+				}
+				completed = true
+				break
 			}
-			if !secureCookie {
-				t.Fatal("BFF cookie security attributes missing")
+			if next == "" {
+				t.Fatalf("authorization ended at %s status=%d body=%s", target.Path, response.StatusCode, raw)
 			}
-			completed = true
-			break
 		}
-		if next == "" {
-			t.Fatalf("authorization ended at %s status=%d body=%s", target.Path, response.StatusCode, raw)
+		if !completed {
+			t.Fatal("authorization code flow did not complete")
 		}
 	}
-	if !completed {
-		t.Fatal("authorization code flow did not complete")
-	}
+	authorize(next)
 	var issuedEncrypted []byte
 	if err = store.Database().QueryRow(ctx, "SELECT tokens FROM auth_sessions LIMIT 1").Scan(&issuedEncrypted); err != nil {
 		t.Fatal(err)
@@ -587,7 +590,13 @@ func TestOryIntegration(t *testing.T) {
 	if err != nil || status != 200 || session.AAL != "aal2" {
 		t.Fatal("TOTP did not elevate Kratos session")
 	}
-	t.Log("optional TOTP enrollment, AAL1 API denial and second-factor login passed")
+	response, _ = request("GET", cfg.Site+"/auth/start", nil)
+	authorize(response.Header.Get("Location"))
+	response, _ = request("GET", cfg.Site+"/auth/me", nil)
+	if response.StatusCode != 200 {
+		t.Fatal("TOTP login did not return to authenticated app")
+	}
+	t.Log("optional TOTP enrollment, AAL1 API denial, second factor and authenticated app return passed")
 }
 
 func totp(t *testing.T, secret string) string {
