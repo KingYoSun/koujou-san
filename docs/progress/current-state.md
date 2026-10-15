@@ -25,6 +25,10 @@
 
 ## Issue #5の判定
 
-状態: In progress（最新headのCI・マージ後照合待ち）。Scope revision 1。採用した自己登録＋メール確認必須、メール＋パスワードと任意TOTPを実装し、AC-1〜6とINVAR-1〜4は[独立検品](2026-10-15-issue-5-inspection.md)で適合した。[PR #37](https://github.com/KingYoSun/koujou-san/pull/37)、[検証記録](2026-10-15-issue-5-evidence.md)を参照する。Windows経由のChromeのURL判定は未解消だが、Chrome拡張とWindowsアプリの正規経路で画面検証を進められることを確認した。[操作手順](../runbooks/computer-use.md)を参照する。
+状態: Complete。Scope revision 1。[PR #37](https://github.com/KingYoSun/koujou-san/pull/37)を全CI成功後にマージした。main `0eeee997d5365ad9db1b7af35452102b2f3b12fa`と検品済みheadのtree差分は0で、AC-1〜6・INVAR-1〜4、[独立検品](2026-10-15-issue-5-inspection.md)、マージ後照合が揃い、#5をCloseした。[検証記録](2026-10-15-issue-5-evidence.md)を参照する。Windows経由のChromeのURL判定は未解消だが、Chrome拡張とWindowsアプリの正規経路で画面検証を進められることを確認した。[操作手順](../runbooks/computer-use.md)を参照する。
 
-#6〜#34は未着手。Workspace・業務API、Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #6の判定
+
+状態: Blocked（利用者に見える権限方針の判断待ち）。Scope revision 1。[計画](2026-10-15-issue-6-plan.md)で既存AC-1〜6と確認方法を整理した。初期Workspaceの作成者、招待受諾条件、役割と実行許可、登録者離脱時の共有端末について選択肢を提示している。AGENTS.md §4に従い、依存するschema・UIの実装は始めていない。
+
+#7〜#34は未着手。Workspace・業務API、Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。

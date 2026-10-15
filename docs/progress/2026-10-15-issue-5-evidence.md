@@ -35,6 +35,10 @@ Windows画面操作は最初にcua_replからskyを呼び出して接続でき�
 
 `pnpm run check / test / build / check:desktop / test:desktop / build:desktop`は成功した。通常UI試験は3ファイル12件、通常native試験は2件成功・対話試験1件ignore。上記の対話試験は明示的に実行して成功した。`dev:desktop`と既存`dev:web`の1420番ポート競合は起動を中止し、buildしたWindowsアプリで確認した。
 
-## 残作業
+## CIとマージ後照合
 
-最終観測と検証ページの独立検品、最新headのPR CI、マージ後照合を終えてから#5をCloseする。Windows経由のChromeのURL判定の問題を、製品の認証不具合や未検証の成功へ置き換えない。
+固定`1383bda0f00b58d7f1207f8b8b7c16e11b07ab83`の[CI](https://github.com/KingYoSun/koujou-san/actions/runs/38689480302)は全成功した。共通UI・サーバーは1分48秒、Windowsは5分49秒で完了し、GitGuardianも成功した。
+
+PR #37のmerge commitは`0eeee997d5365ad9db1b7af35452102b2f3b12fa`。検品済みheadとのtree差分は0で、treeは`24a60180fe07da80c34fb381c847b603b4a9506b`だった。全AC・INVAR、独立検品、CI、マージ後照合を確認して#5をCloseした。追加ブラウザ確認用のfixtureはログアウト後に自身のIdentity・User行・ローカルのパスワードとコードを削除し、元の管理者は保持した。
+
+Windows経由のChromeのURL判定の問題は未解消である。製品の認証不具合や、未検証の成功として扱わず、正常に操作できる経路と区別して記録した。
