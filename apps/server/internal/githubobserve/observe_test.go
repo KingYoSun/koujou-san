@@ -162,6 +162,10 @@ func (f *githubFixture) serve(w http.ResponseWriter, r *http.Request) {
 	case strings.Contains(r.URL.Path, "/pulls/"):
 		value.Head.SHA = fixtureSHA
 		value.MergeCommit = strings.Repeat("b", 40)
+		if f.complete {
+			value.State = "closed"
+		}
+		value.Merged = f.complete
 	}
 	raw, _ := json.Marshal(value)
 	hash := sha256.Sum256(raw)
@@ -188,6 +192,10 @@ func TestGithubRemote(t *testing.T) {
 	f.attempt = 2
 	f.complete = true
 	f.mu.Unlock()
+	merged, mergeErr := r.observe(context.Background(), c.Targets[3])
+	if mergeErr != nil || merged.State != "merged" {
+		t.Fatal("merged PR was displayed as an unmerged closed PR")
+	}
 	v, err := r.observe(context.Background(), c.Targets[0])
 	if err != nil || v.Attempt != 2 || v.Conclusion != "success" || v.Jobs[0].Conclusion != "skipped" || v.Commit != fixtureSHA {
 		t.Fatalf("attempt result: %+v %v", v, err)

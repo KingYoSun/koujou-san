@@ -52,6 +52,7 @@ type source struct {
 	WorkflowID  int64  `json:"workflow_id"`
 	Attempt     int    `json:"run_attempt"`
 	MergeCommit string `json:"merge_commit_sha"`
+	Merged      bool   `json:"merged"`
 	Head        struct {
 		SHA string `json:"sha"`
 	} `json:"head"`
@@ -240,6 +241,9 @@ func (r *Remote) observe(ctx context.Context, t Target) (Snapshot, error) {
 	case "pr":
 		s.Commit = v.Head.SHA
 		s.MergeCommit = v.MergeCommit
+		if v.Merged {
+			s.State = "merged"
+		}
 	case "commit":
 		s.Commit = v.SHA
 		s.Title = strings.Split(v.Commit.Message, "\n")[0]

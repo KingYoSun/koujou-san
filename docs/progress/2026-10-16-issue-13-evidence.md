@@ -33,6 +33,8 @@ App「koujou-san-kukuri-observer」をkukuri-app所有で非公開登録し、ku
 
 AC-6のrepo IDと名前の対応には、修正前に`repository ID/name mismatch accepted`で失敗する試験を追加した。token発行応答のrepository IDとfull_nameを照合し、token再利用時も名前を照合する修正後に同じ試験が成功した。範囲外repoの403が後続の中断試験をrate limit待機で代替しないよう、拒否試験のRemoteを分け、2ページ目の失敗理由もassertした。
 
+PRの現在状態には、GitHubの`merged:true`を受けても`closed`だけを返す不足があった。修正前に`merged PR was displayed as an unmerged closed PR`で失敗する試験を置き、`merged`を区別する修正後に成功した。`merge_commit_sha`はマージ前には検証用の値となるため、その意味も共通UIへ明記した。
+
 ## 残る検証
 
 明示したAppによる実GitHub取得・要求記録、Web/Tauriの操作、固定成果物の独立検品、実PRのCI、マージ後照合を残す。通常CIは固定応答と専用DBを使用し、実Appの秘密鍵を要求しない。未実行を成功に含めない。

@@ -96,7 +96,8 @@ export function GithubSnapshot({
       )}
       {value.merge_commit && (
         <p>
-          merge commit: <code>{value.merge_commit}</code>
+          GitHubのmerge_commit_sha（マージ前は検証用）:{" "}
+          <code>{value.merge_commit}</code>
         </p>
       )}
       {value.run_id && (
