@@ -49,6 +49,10 @@
 
 ## Issue #11の判定
 
-状態: In progress（独立検品PASS・PR CI待ち）。Scope revision 1。送信禁止分類・操作境界・実Ory/SDKによるMCP・共通認可・操作履歴・管理UIを実装した。1万Context×3版、共通UIの実操作、既存の認証・検索・関係探索の回帰は[検証記録](2026-10-16-issue-11-evidence.md)を参照。[独立検品](2026-10-16-issue-11-inspection.md)は全AC・INVARをPASS、blocker 0件。実PR CI・マージ後確認は未完了。
+状態: Complete。Scope revision 1。[PR #43](https://github.com/KingYoSun/koujou-san/pull/43)を全CI成功後にマージした。main `4d3f16dc42dfa85d2432e82067b4f1768b553f40`と検証済みheadのtree差分は0。AC-1〜6・INVAR-1〜5、[検証記録](2026-10-16-issue-11-evidence.md)、[独立検品](2026-10-16-issue-11-inspection.md)、マージ後照合が揃い、#11をCloseした。
 
-#12〜#34は未着手。Context編集GUI、Runner、グラフ探索GUI、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #12の判定
+
+状態: In progress（調査・互換性の判断待ち）。Scope revision 1。[計画](2026-10-16-issue-12-plan.md)へ四粒度編集・Grouping・候補探索・プレビュー・同期の有限fixtureを整理した。大量Contextを扱うためローカル保存をContext単位にする方針で、既存下書きを移行するか、旧データを保管して新形式へ進むかをユーザーへ確認している。回答に依存する保存・移行の実装は未着手。
+
+#13〜#34は未着手。Contextの本編集GUI、Runner、グラフ探索GUI、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
