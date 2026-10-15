@@ -49,6 +49,14 @@ pub struct Auth {
 }
 
 impl Auth {
+    pub(crate) fn sync_binding(&self, user: &str, workspace: &str) -> (PathBuf, String) {
+        let prefix = hex_name(&format!("{}\0{}", self.api, user));
+        let name = format!("{prefix}-{}.dpapi", hex_name(workspace));
+        (
+            self.file.parent().unwrap().join("sync").join(name),
+            self.api.to_string(),
+        )
+    }
     pub fn new(api: &str, file: PathBuf) -> Result<Self, String> {
         let api = Url::parse(api).map_err(|_| "invalid_api_url")?;
         if api.scheme() != "https"
@@ -169,7 +177,12 @@ impl Auth {
         *tokens = refreshed;
         Ok(tokens.access_token.clone())
     }
-    pub fn request(&self, path: &str, method: &str, body: Value) -> Result<Value, String> {
+    pub(crate) fn request_response(
+        &self,
+        path: &str,
+        method: &str,
+        body: Value,
+    ) -> Result<reqwest::blocking::Response, String> {
         if !path.starts_with('/') || path.starts_with("//") {
             return Err("relative_API_path_required".into());
         }
@@ -186,6 +199,10 @@ impl Auth {
             request = request.json(&body)
         }
         let response = request.send().map_err(|_| "api_unavailable")?;
+        Ok(response)
+    }
+    pub fn request(&self, path: &str, method: &str, body: Value) -> Result<Value, String> {
+        let response = self.request_response(path, method, body)?;
         if !response.status().is_success() {
             return Err(if response.status() == 401 {
                 "authentication_required"
@@ -560,19 +577,19 @@ fn crypt(data: &[u8], encrypt: bool) -> Result<Vec<u8>, String> {
     }
 }
 #[cfg(windows)]
-fn protect(data: &[u8]) -> Result<Vec<u8>, String> {
+pub(crate) fn protect(data: &[u8]) -> Result<Vec<u8>, String> {
     crypt(data, true)
 }
 #[cfg(windows)]
-fn unprotect(data: &[u8]) -> Result<Vec<u8>, String> {
+pub(crate) fn unprotect(data: &[u8]) -> Result<Vec<u8>, String> {
     crypt(data, false)
 }
 #[cfg(not(windows))]
-fn protect(_: &[u8]) -> Result<Vec<u8>, String> {
+pub(crate) fn protect(_: &[u8]) -> Result<Vec<u8>, String> {
     Err("Windows credential storage required".into())
 }
 #[cfg(not(windows))]
-fn unprotect(_: &[u8]) -> Result<Vec<u8>, String> {
+pub(crate) fn unprotect(_: &[u8]) -> Result<Vec<u8>, String> {
     Err("Windows credential storage required".into())
 }
 
@@ -620,7 +637,7 @@ pub async fn api_request(
     .await
     .map_err(|_| "request_task_failed")?
 }
-fn public_response(value: Value) -> Result<Value, String> {
+pub(crate) fn public_response(value: Value) -> Result<Value, String> {
     if value.get("credential").is_some() {
         Err("private_native_operation_required".into())
     } else {

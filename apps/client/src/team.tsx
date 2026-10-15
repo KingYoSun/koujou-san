@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { apiRequest } from "./auth";
+import { SyncPanel } from "./sync-panel";
+import { discardSyncWorkspace } from "./sync-engine";
+import { syncStorage } from "./sync-store";
 
 type Workspace = {
   id: string;
@@ -80,6 +83,7 @@ export function Team({ native }: { native: boolean }) {
   const [inviteRole, setInviteRole] = useState("viewer");
   const [link, setLink] = useState("");
   const [publicSite, setPublicSite] = useState("");
+  const [apiIdentity, setApiIdentity] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [invitation, setInvitation] = useState("");
   const pending = useRef(new Map<string, Record<string, unknown>>());
@@ -124,9 +128,11 @@ export function Team({ native }: { native: boolean }) {
           setStatus("ready");
           const config = (await apiRequest("/auth/config", native)) as {
             site_url: string;
+            api_url: string;
           };
           if (!active) return;
           setPublicSite(config.site_url);
+          setApiIdentity(config.api_url);
           if (native) setIdentifier(await invoke<string>("device_identifier"));
           await root();
         })
@@ -209,6 +215,17 @@ export function Team({ native }: { native: boolean }) {
         { method: "POST", body: request },
       )) as { invitation?: string };
       pending.current.delete(key);
+      if (
+        (kind === "leave" ||
+          (kind === "member-update" &&
+            id === me?.id &&
+            body.active === false)) &&
+        me
+      ) {
+        const namespace = { api: apiIdentity, user: me.id, workspace };
+        await discardSyncWorkspace(namespace);
+        await syncStorage(native).remove(namespace);
+      }
       if (result.invitation)
         setLink(`${publicSite}/#join=${result.invitation}`);
       if (kind === "invite-accept") {
@@ -636,6 +653,20 @@ export function Team({ native }: { native: boolean }) {
             >
               さらに端末を表示
             </button>
+          )}
+          {apiIdentity && me && (
+            <SyncPanel
+              native={native}
+              api={apiIdentity}
+              workspace={selected}
+              user={me.id}
+              onRevoked={() => {
+                setNotice(
+                  "Workspaceの取得権限が失効しました。本文キャッシュと下書きを削除しました。",
+                );
+                void root().catch(() => {});
+              }}
+            />
           )}
         </>
       )}

@@ -183,7 +183,7 @@ func (s *Service) Put(ctx context.Context, p access.Principal, w string, i Ident
 		if err != nil {
 			return nil, err
 		}
-		if _, err = tx.Exec(ctx, "INSERT INTO context_records VALUES($1,$2,$3,$4,$5)", w, resource(i), i.Kind, version.Version, value); err != nil {
+		if _, err = tx.Exec(ctx, "INSERT INTO context_records SELECT $1,$2,$3,$4,$5,sequence+1 FROM shared_streams WHERE workspace_id=$1", w, resource(i), i.Kind, version.Version, value); err != nil {
 			return nil, err
 		}
 		// Existing resource policy belongs to access. A content edit must not replace

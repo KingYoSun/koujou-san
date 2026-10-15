@@ -33,6 +33,10 @@
 
 ## Issue #7の判定
 
-状態: Inspection pending。Scope revision 1。四段階Context・所属履歴・基準版・Manifestと追加情報を共通業務APIへ実装した。初期公開範囲はWorkspace共有、解決上限はユーザー採用の16 MiB・10万配置。[検証記録](2026-10-15-issue-7-evidence.md)と[独立検品](2026-10-15-issue-7-inspection.md)は成功し、PR CIとマージ後照合を残す。
+状態: Complete。Scope revision 1。[PR #39](https://github.com/KingYoSun/koujou-san/pull/39)を全CI成功後にマージした。main `70996e6669d8f85ef23b9e0f71337f6d74111e02`と検証済みheadのtree差分は0。AC-1〜8、INVAR-1〜5、[独立検品](2026-10-15-issue-7-inspection.md)、マージ後照合が揃い、#7をCloseした。[検証記録](2026-10-15-issue-7-evidence.md)を参照する。
 
-#8〜#34は未着手。Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #8の判定
+
+状態: In progress。Scope revision 1。[計画](2026-10-15-issue-8-plan.md)の失効時削除・再接続後の手動送信をユーザーが採用した。同期API、保存、共通画面を実装し、実PG・2アカウントのWeb/TauriでAC-1〜6を照合した。[検証記録](2026-10-15-issue-8-evidence.md)と[独立検品](2026-10-15-issue-8-inspection.md)は全条件PASS、blockerなし。CIとマージ後照合は未完了。
+
+#9〜#34は未着手。Context編集GUI、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
