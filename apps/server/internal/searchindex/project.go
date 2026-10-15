@@ -76,7 +76,7 @@ func (b *builder) text(ctx context.Context, w string, r contexts.Ref) (string, [
 	return strings.Join(text, " "), dependencies, err
 }
 func scopes(ctx context.Context, db database, w, id string, through int64) ([]string, error) {
-	rows, err := db.Query(ctx, `SELECT payload FROM (SELECT DISTINCT ON(resource_id) resource_id,payload FROM context_records WHERE workspace_id=$1 AND kind='membership' AND stream_sequence<=$3 AND resource_id IN (SELECT resource_id FROM context_records WHERE workspace_id=$1 AND kind='membership' AND payload->'context'->>'id'=$2) ORDER BY resource_id,stream_sequence DESC) r WHERE (payload->>'present')::boolean AND payload->'context'->>'id'=$2`, w, id, through)
+	rows, err := db.Query(ctx, `SELECT latest.payload FROM (SELECT DISTINCT resource_id FROM context_records WHERE workspace_id=$1 AND kind='membership' AND payload->'context'->>'id'=$2) targets CROSS JOIN LATERAL (SELECT payload FROM context_records WHERE workspace_id=$1 AND resource_id=targets.resource_id AND kind='membership' AND stream_sequence<=$3 ORDER BY stream_sequence DESC LIMIT 1) latest WHERE (latest.payload->>'present')::boolean AND latest.payload->'context'->>'id'=$2`, w, id, through)
 	if err != nil {
 		return nil, err
 	}
