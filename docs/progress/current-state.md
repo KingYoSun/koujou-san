@@ -25,6 +25,6 @@
 
 ## Issue #5の判定
 
-状態: In progress。Scope revision 1。ユーザーが自己登録＋メール確認必須、メール＋パスワードと任意TOTPを採用した。[計画](2026-10-15-issue-5-plan.md)に従って実装・検証中。OSとClaude Code認証の判断待ちは#3で解消済み。
+状態: In progress（最新headのCI・マージ後照合待ち）。Scope revision 1。採用した自己登録＋メール確認必須、メール＋パスワードと任意TOTPを実装し、AC-1〜6とINVAR-1〜4は[独立検品](2026-10-15-issue-5-inspection.md)で適合した。[PR #37](https://github.com/KingYoSun/koujou-san/pull/37)、[検証記録](2026-10-15-issue-5-evidence.md)を参照する。Windows経由のChromeのURL判定は未解消だが、Chrome拡張とWindowsアプリの正規経路で画面検証を進められることを確認した。[操作手順](../runbooks/computer-use.md)を参照する。
 
-#6〜#34は未着手。業務API、ログイン、Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
+#6〜#34は未着手。Workspace・業務API、Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
