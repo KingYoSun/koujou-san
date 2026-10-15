@@ -9,7 +9,7 @@ const root = document.getElementById("root");
 if (!root) throw new Error("Missing root element");
 
 const queryClient = new QueryClient();
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8080";
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
 const native =
   clientCapabilities("__TAURI_INTERNALS__" in window).surface === "native";
 

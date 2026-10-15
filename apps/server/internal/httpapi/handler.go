@@ -8,8 +8,11 @@ import (
 
 // NewHandler preserves liveness and checks configured PostgreSQL readiness.
 // Login and domain routes are added by their owning Issues.
-func NewHandler(ready func(context.Context) error) http.Handler {
+func NewHandler(ready func(context.Context) error, register ...func(*http.ServeMux)) http.Handler {
 	mux := http.NewServeMux()
+	for _, routes := range register {
+		routes(mux)
+	}
 	mux.HandleFunc("GET /readyz", func(writer http.ResponseWriter, request *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
 		writer.Header().Set("Cache-Control", "no-store")

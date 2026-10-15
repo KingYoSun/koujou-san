@@ -8,10 +8,11 @@
 | ArcadeDB              | `http://127.0.0.1:2480`                           | `arcadedata/arcadedb:26.10.1` |
 | Kratos public / admin | `http://127.0.0.1:4433` / `http://127.0.0.1:4434` | `oryd/kratos:v26.2.0`         |
 | Hydra public / admin  | `http://127.0.0.1:4444` / `http://127.0.0.1:4445` | `oryd/hydra:v26.2.0`          |
+| Mailpit               | `http://127.0.0.1:18025`                          | `axllent/mailpit:v1.31.5`     |
 
 `pnpm run infra:status` で状態を確認し、`pnpm run infra:down` で停止する。通常の停止は named volume を保持する。PostgreSQL は `koujou`、`kratos`、`hydra` を別の role・database に分け、Ory の migration が成功してから各サービスを起動する。
 
-この段階の確認対象はサービスの起動と readiness である。ログイン・同意画面、OIDC client 登録、API の認可、Workspace 権限、製品データの migration は今後の実装で扱う。Ory の UI URL は共通クライアントの `127.0.0.1:1420/auth/*` を予定する設定であり、画面はまだ実装されていない。Bleve は Go に組み込む検索ライブラリなので、Compose のサービスには含めない。
+Oryの画面は共通UIの`https://localhost:1420/auth/*`で扱う。client登録・明示管理者・メール確認・ログインの手順は[認証の開発手順](../docs/runbooks/authentication.md)を参照する。Workspace権限は別のIssueで実装する。BleveはGoに組み込む検索ライブラリなので、Composeのサービスには含めない。
 
 `.env` は setup が初回に秘密値を生成し、既存ファイルを保持する。PostgreSQL の初期化スクリプトは空の volume に対して一度だけ動く。データを保持したまま `.env` の database password や Ory の暗号鍵を書き換えると既存の保存内容と一致しなくなるため、変更時は対応するサービスの移行手順を先に定める。volume の削除は通常の停止に含めない。
 

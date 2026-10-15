@@ -14,9 +14,18 @@
             "credentials": {
               "password": {
                 "identifier": true
+              },
+              "totp": {
+                "account_name": true
               }
-            }
+            },
+            "recovery": { "via": "email" },
+            "verification": { "via": "email" }
           }
+        },
+        "name": {
+          "type": "string",
+          "title": "表示名"
         }
       },
       "required": ["email"],

@@ -29,6 +29,7 @@ Codexのworktree向けに `.codex/environments/environment.toml` のsetupにも 
 | `pnpm run check`         | Goと共通UIの静的検査                           |
 | `pnpm run test`          | Goと共通UIのテスト                             |
 | `pnpm run test:database` | 試験専用PostgreSQLの保存・並列更新・停止・復元 |
+| `pnpm run test:auth` | 試験専用Ory・DB・メール配送による認証・復旧・失効 |
 | `pnpm run build`         | GoとWebのbuild                                 |
 | `pnpm run check:desktop` | Tauri側のコンパイル確認                        |
 | `pnpm run test:desktop`  | Tauri側のテスト                                |
@@ -48,7 +49,7 @@ pnpm run dev:api
 pnpm run dev:web
 ```
 
-既定のAPIは `http://127.0.0.1:8080`、共通UIは `http://127.0.0.1:1420` で起動する。ネイティブ側を確認するときは `pnpm run dev:desktop` を使う。各開発プロセスはターミナルの `Ctrl+C` で停止する。設定を変更した場合は起動ログで接続先を確認する。
+既定のAPIは `https://localhost:8080`、共通UIは `https://localhost:1420` で起動する。認証の初期化、開発用TLS、メール確認は[認証の開発手順](authentication.md)に従う。ネイティブ側を確認するときは `pnpm run dev:desktop` を使う。各開発プロセスはターミナルの `Ctrl+C` で停止する。設定を変更した場合は起動ログで接続先を確認する。
 
 Go APIは起動時にDBへ接続してmigrationを実行する。標準PostgreSQLを先に起動する。接続先・readiness・実DB試験・backupの手順は[保存と復旧](persistence.md)を参照する。
 

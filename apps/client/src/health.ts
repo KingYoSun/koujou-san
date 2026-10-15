@@ -7,10 +7,13 @@ export type ApiHealth = {
 export async function fetchHealth(
   apiBaseUrl: string,
   signal?: AbortSignal,
+  native = false,
 ): Promise<ApiHealth> {
-  const response = await fetch(`${apiBaseUrl.replace(/\/$/, "")}/healthz`, {
-    signal,
-  });
+  const response = native
+    ? Response.json(await apiRequest("/healthz", true))
+    : await fetch(`${apiBaseUrl.replace(/\/$/, "")}/healthz`, {
+        signal,
+      });
   if (!response.ok) {
     throw new Error(`API health returned ${response.status}`);
   }
@@ -29,3 +32,4 @@ export async function fetchHealth(
   }
   return body as ApiHealth;
 }
+import { apiRequest } from "./auth";

@@ -25,6 +25,6 @@
 
 ## Issue #5の判定
 
-状態: Blocked（初期登録・MFA方針のユーザー判断待ち）。Scope revision 1。[計画](2026-10-15-issue-5-plan.md)を整理し、判断に依存する実装は始めていない。OSとClaude Code認証の判断待ちは#3で解消済み。
+状態: In progress。Scope revision 1。ユーザーが自己登録＋メール確認必須、メール＋パスワードと任意TOTPを採用した。[計画](2026-10-15-issue-5-plan.md)に従って実装・検証中。OSとClaude Code認証の判断待ちは#3で解消済み。
 
 #6〜#34は未着手。業務API、ログイン、Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。

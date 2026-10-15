@@ -11,9 +11,11 @@
   "scripts": {
     "setup": "node scripts/dev.mjs setup",
     "doctor": "node scripts/dev.mjs doctor",
+    "auth:bootstrap": "node scripts/dev.mjs auth:bootstrap",
     "check": "node scripts/dev.mjs check",
     "test": "node scripts/dev.mjs test",
     "test:database": "node scripts/dev.mjs test:database",
+    "test:auth": "node scripts/dev.mjs test:auth",
     "build": "node scripts/dev.mjs build",
     "dev": "node scripts/dev.mjs dev:web",
     "dev:api": "node scripts/dev.mjs dev:api",
