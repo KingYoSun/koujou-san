@@ -37,4 +37,10 @@ PRの現在状態には、GitHubの`merged:true`を受けても`closed`だけを
 
 ## 残る検証
 
-明示したAppによる実GitHub取得・要求記録、Web/Tauriの操作、固定成果物の独立検品、実PRのCI、マージ後照合を残す。通常CIは固定応答と専用DBを使用し、実Appの秘密鍵を要求しない。未実行を成功に含めない。
+明示したAppによる実GitHub取得・要求記録、Web/Tauriの操作、独立検品の最終判定、マージ後照合を残す。通常CIは固定応答と専用DBを使用し、実Appの秘密鍵を要求しない。未実行を成功に含めない。
+
+## CIと先行の独立検品
+
+コード対象は`18c26e7bb8157fce88cdd605e8de26514137f2ce`。[CI 38803132388](https://github.com/KingYoSun/koujou-san/actions/runs/38803132388)はLinux 4分43秒、Windows 7分32秒、GitGuardianが全て成功した。同じコードからWindowsアプリを再ビルドし、25.85秒で成功した。
+
+[先行の独立検品](2026-10-16-issue-13-inspection.md)では具体的blockerは0件。実Appの接続と実画面の証拠がない条件はINCONCLUSIVEのまま残し、マージ可能とは判定していない。Appの秘密鍵ファイルが所定のGit管理外パスへ保存された後、準備済みのlive/UI検証を実行して最終判定する。

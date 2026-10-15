@@ -57,6 +57,6 @@
 
 ## Issue #13の判定
 
-状態: In progress。Scope revision 1。[計画](2026-10-16-issue-13-plan.md)と[先行調査](2026-10-16-issue-13-research.md)を参照する。GitHub App、定期照合の初期値60秒（変更可能）、変更観測履歴の期限なし保持が承認済み。実装・検証へ進む。
+状態: Blocked（実Appの秘密鍵ファイル待ち）。Scope revision 1。[PR #45](https://github.com/KingYoSun/koujou-san/pull/45)はdraft。[計画](2026-10-16-issue-13-plan.md)、[検証記録](2026-10-16-issue-13-evidence.md)、[独立検品](2026-10-16-issue-13-inspection.md)を参照する。先行検品の具体的blockerは0件。コード対象`18c26e7`のCIは全成功。Appの作成・kukuri限定Read-onlyインストールは完了したが、秘密鍵のダウンロードを本人へ引き継いでいる。実接続・Web/Tauri実操作、独立検品の最終判定、マージ後照合を残す。コード検証後の記録更新は文書だけである。
 
 #14〜#34は未着手。Runner、実行・検品の詳細画面、LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
