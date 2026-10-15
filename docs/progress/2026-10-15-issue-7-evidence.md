@@ -30,4 +30,10 @@ CodeGraphを先に使って既存の保存・共通認可・起動経路を確�
 
 正式schemaと扱いは[ADR 0006](../adr/0006-context-manifest.md)、入口は[手順](../runbooks/contexts.md)を参照する。直接値の由来は提供者が明示した値を保存する。実Runの生成元照合・配送、実検索エンジン、編集GUIを実装済みとは扱わない。
 
-[独立検品](2026-10-15-issue-7-inspection.md)は全条件が適合、blockerなし。PR CIとマージ後照合を残す。#7ではネイティブ実装・通常画面の挙動を変更していないため、ローカルでdesktopコマンドは再実行していない。PRで発生するWindows CIは確認する。
+[独立検品](2026-10-15-issue-7-inspection.md)は全条件が適合、blockerなし。#7ではネイティブ実装・通常画面の挙動を変更していないため、ローカルでdesktopコマンドは再実行していない。
+
+## CIとマージ後の照合
+
+[PR #39](https://github.com/KingYoSun/koujou-san/pull/39)のCI [38707259948](https://github.com/KingYoSun/koujou-san/actions/runs/38707259948)は、共通UI・Goサーバー、Windows native、秘密値検査がすべて成功した。検証済みhead `cb2dfa9fe330c15dbf448bd8742e0e98b2abc33a`とマージ後main `70996e6669d8f85ef23b9e0f71337f6d74111e02`のtreeは、ともに`629c8039e9dc85821027520e373ff83047aef3f0`で差分0だった。
+
+標準の開発DBでも追加migrationを適用してAPIを再起動し、readyzが成功した。API直結・Web proxy経由とも、未認証のContext取得を401で拒否した。認可済みの保存・取得・解決は分離PGのHTTP試験で確認した。
