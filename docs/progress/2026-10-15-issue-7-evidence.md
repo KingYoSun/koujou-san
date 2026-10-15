@@ -18,7 +18,7 @@
 | AC-8 | 直接値・元outputの版/digest/箇所と原内容を保持。pause追加情報は元Manifestへの別記録で、開始時inputを変更せず読了はunobserved |
 | INVAR-1〜5 | 文書・所属・入力の保存先と操作を分離。公開親でも権限のない子を取得・解決できず、その子を含むManifestも拒否。本文編集で制限付き権限を共有へ戻さず、所属取消後の取得も拒否 |
 
-実DB試験は`pnpm run test:contexts`で成功した。GoとTypeScriptの契約fixtureは同じ入力文字列とdigestを照合する。Context UIは本Issueの対象ではなく、共通業務APIをHTTPから実操作した。
+実DB試験は`pnpm run test:contexts`で成功した。`pnpm run check / test / build`、`test:database / test:access / test:auth`も成功した。通常UI/契約は4ファイル14件。既存PGの停止・復元と実Oryの登録・復旧・TOTP・失効を維持した。GoとTypeScriptの契約fixtureは同じ入力文字列とdigestを照合する。Context UIは本Issueの対象ではなく、共通業務APIをHTTPから実操作した。
 
 ## 調査・失敗と修正
 
@@ -30,4 +30,4 @@ CodeGraphを先に使って既存の保存・共通認可・起動経路を確�
 
 正式schemaと扱いは[ADR 0006](../adr/0006-context-manifest.md)、入口は[手順](../runbooks/contexts.md)を参照する。直接値の由来は提供者が明示した値を保存する。実Runの生成元照合・配送、実検索エンジン、編集GUIを実装済みとは扱わない。
 
-既存保存・認証・認可の回帰確認、固定成果物の独立検品、PR CI、マージ後照合を進める。
+[独立検品](2026-10-15-issue-7-inspection.md)は全条件が適合、blockerなし。PR CIとマージ後照合を残す。#7ではネイティブ実装・通常画面の挙動を変更していないため、ローカルでdesktopコマンドは再実行していない。PRで発生するWindows CIは確認する。

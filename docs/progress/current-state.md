@@ -33,6 +33,6 @@
 
 ## Issue #7の判定
 
-状態: In progress。Scope revision 1。[計画](2026-10-15-issue-7-plan.md)の初期公開範囲はWorkspace共有、解決上限は16 MiB・10万配置とユーザーが決定した。四段階Context・所属履歴・基準版・Manifestと追加情報の保存、共通認可、Go/TS fixtureを実装・検証する。
+状態: Inspection pending。Scope revision 1。四段階Context・所属履歴・基準版・Manifestと追加情報を共通業務APIへ実装した。初期公開範囲はWorkspace共有、解決上限はユーザー採用の16 MiB・10万配置。[検証記録](2026-10-15-issue-7-evidence.md)と[独立検品](2026-10-15-issue-7-inspection.md)は成功し、PR CIとマージ後照合を残す。
 
 #8〜#34は未着手。Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
