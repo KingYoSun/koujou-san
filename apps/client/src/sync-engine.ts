@@ -118,6 +118,7 @@ export class SyncEngine {
   get available() {
     return this.state.available;
   }
+  accessEpoch = 0;
   notice = "";
   busy = false;
   sending = new Set<string>();
@@ -137,20 +138,36 @@ export class SyncEngine {
   private emit() {
     if (this.alive) this.changed();
   }
-  private persist() {
-    const snapshot = structuredClone(this.state);
+  private persist(keys: string[] = []) {
+    const snapshot: SavedSync = {
+      ...this.state,
+      items: {},
+      drafts: {},
+      receipts: {},
+    };
+    for (const key of new Set(keys)) {
+      if (this.state.items[key])
+        snapshot.items[key] = structuredClone(this.state.items[key]!);
+      if (this.state.drafts[key])
+        snapshot.drafts[key] = structuredClone(this.state.drafts[key]!);
+      if (this.state.receipts[key])
+        snapshot.receipts[key] = structuredClone(this.state.receipts[key]!);
+    }
     this.writes = this.writes
       .catch(() => {})
       .then(async () => {
-        if (!this.revoked) await this.storage.save(this.namespace, snapshot);
+        if (!this.revoked)
+          await this.storage.save(this.namespace, snapshot, keys);
       });
     return this.writes;
   }
   async start() {
     try {
       const saved = await this.storage.load(this.namespace);
-      if (!this.alive) return;
-      if (saved) this.state = saved;
+      if (!this.alive || this.revoked) return;
+      if (saved) {
+        this.state = saved;
+      }
       this.emit();
       await this.refresh();
     } catch {
@@ -176,41 +193,84 @@ export class SyncEngine {
     await this.writes.catch(() => {});
     await this.storage.remove(this.namespace);
   }
+  private watched = new Map<string, ContextIdentity<string>>();
   private known() {
-    const records = Object.values(this.state.items).map((i) => i.record.ref);
-    for (const d of Object.values(this.state.drafts))
-      records.push(d.base.record.ref);
+    const records = [
+      ...Object.values(this.state.items),
+      ...Object.values(this.state.drafts).map((d) => d.base),
+    ];
     return [
       ...new Map(
-        records.map((r) => [syncKey(r), { kind: r.kind, id: r.id }]),
+        records
+          .filter((i) => i.record.ref.revision !== "0")
+          .map((i) => [syncKey(i.record.ref), i.record.ref]),
       ).values(),
     ];
   }
-  private async applyPolicy(
-    result: SyncFrame,
-    staging: Record<string, SyncItem>,
-  ) {
-    for (const r of result.removed) {
-      const key = syncKey(r);
-      delete staging[key];
-      delete this.state.items[key];
-      delete this.state.drafts[key];
-      delete this.state.receipts[key];
+  async open(identity: ContextIdentity<string>, keepCurrent = false) {
+    const key = syncKey(identity);
+    if (!keepCurrent) this.watched.clear();
+    this.watched.set(key, identity);
+    for (const cached of Object.keys(this.state.items))
+      if (!keepCurrent && cached !== key && !this.state.drafts[cached]) {
+        delete this.state.items[cached];
+        delete this.state.receipts[cached];
+      }
+    const epoch = this.epoch;
+    if (!this.state.items[key] && !this.state.drafts[key]) {
+      const stored = await this.storage.read(this.namespace, key);
+      if (!this.alive || this.revoked || epoch !== this.epoch) return;
+      if (stored?.item) this.state.items[key] = stored.item;
+      if (stored?.draft) this.state.drafts[key] = stored.draft;
+      if (stored?.receipt) this.state.receipts[key] = stored.receipt;
     }
-    for (const p of result.permissions) {
-      const key = syncKey(p.identity);
-      if (staging[key])
-        staging[key] = { ...staging[key]!, editable: p.editable };
-      if (this.state.items[key])
-        this.state.items[key] = {
-          ...this.state.items[key]!,
-          editable: p.editable,
-        };
-      if (this.state.drafts[key])
-        this.state.drafts[key]!.base.editable = p.editable;
-    }
+    await this.refresh(
+      this.state.drafts[key]?.base.record.ref.revision === "0"
+        ? undefined
+        : identity,
+    );
     this.emit();
-    if (result.removed.length) await this.persist();
+  }
+  async create(kind: string, value: Record<string, unknown>) {
+    const id = this.uuid();
+    const key = syncKey({ kind, id });
+    this.watched.set(key, { kind, id });
+    this.state.drafts[key] = {
+      base: {
+        record: { ref: { kind, id, revision: "0" }, value },
+        editable: true,
+      },
+      value: structuredClone(value),
+    };
+    await this.persist([key]);
+    this.emit();
+    return key;
+  }
+  async draftPage(after?: string) {
+    const epoch = this.epoch;
+    await this.writes;
+    const page = await this.storage.page(this.namespace, after, true);
+    if (!this.alive || this.revoked || epoch !== this.epoch)
+      return { entries: [], next: null };
+    const visible = new Set([
+      ...page.entries.map((entry) => entry.key),
+      ...this.watched.keys(),
+      ...this.sending,
+    ]);
+    for (const key of Object.keys(this.state.drafts))
+      if (!visible.has(key)) {
+        delete this.state.drafts[key];
+        delete this.state.items[key];
+        delete this.state.receipts[key];
+      }
+    for (const entry of page.entries) {
+      if (entry.item) this.state.items[entry.key] = entry.item;
+      if (entry.draft) this.state.drafts[entry.key] ??= entry.draft;
+      if (entry.receipt) this.state.receipts[entry.key] = entry.receipt;
+    }
+    await this.refresh();
+    this.emit();
+    return page;
   }
   private async pull(
     request: Record<string, unknown>,
@@ -222,126 +282,80 @@ export class SyncEngine {
     );
     return decodeResponse(value, frame, this.namespace.workspace);
   }
-  async refresh(snapshot = false) {
+  async refresh(extra?: ContextIdentity<string>) {
     if (this.busy || !this.alive || this.revoked) return;
     this.busy = true;
     const reconnecting = this.status === "offline";
     const epoch = this.epoch;
-    this.emit();
     const current = () => this.alive && !this.revoked && epoch === this.epoch;
+    this.emit();
     try {
-      let position = this.state.position;
-      let staging = structuredClone(this.state.items);
-      let nextCursor = this.state.nextCursor;
-      let reset = snapshot || !position;
-      let attempts = 0;
-      while (attempts++ < 2) {
-        if (reset) {
-          this.state.available = false;
-          staging = {};
-          let cursor: string | undefined;
-          for (let page = 0; page < this.state.pages; page++) {
-            const response = await this.pull({ mode: "snapshot", cursor });
-            if (!current()) return;
-            if (response.error)
-              throw new Error(
-                response.meta.completeness.state === "complete"
-                  ? "snapshot unavailable"
-                  : response.meta.completeness.reason,
-              );
-            for (const i of response.data.items)
-              staging[syncKey(i.record.ref)] = i;
-            position = response.meta.position;
-            nextCursor = response.meta.next_cursor;
-            cursor = nextCursor ?? undefined;
-            if (!cursor) break;
+      const known = new Map(this.known().map((ref) => [syncKey(ref), ref]));
+      for (const [key, identity] of this.watched)
+        if (
+          !known.has(key) &&
+          this.state.drafts[key]?.base.record.ref.revision !== "0"
+        )
+          known.set(key, { ...identity, revision: "" });
+      if (extra && !known.has(syncKey(extra)))
+        known.set(syncKey(extra), { ...extra, revision: "" });
+      const refs = [...known.values()];
+      const changed = new Set<string>();
+      for (let offset = 0; offset < Math.max(1, refs.length); offset += 100) {
+        const chunk = refs.slice(offset, offset + 100);
+        const response = await this.pull({
+          mode: "watch",
+          known: chunk.map(({ kind, id }) => ({ kind, id })),
+          versions: chunk.filter((ref) => ref.revision),
+        });
+        if (!current()) return;
+        if (response.error || response.meta.completeness.state !== "complete")
+          throw new Error("同期を確認できません。");
+        if (response.data.removed.length) this.accessEpoch++;
+        for (const ref of response.data.removed) {
+          const key = syncKey(ref);
+          delete this.state.items[key];
+          delete this.state.drafts[key];
+          delete this.state.receipts[key];
+          changed.add(key);
+        }
+        // Persist confirmed removals before another network request can fail.
+        if (response.data.removed.length)
+          await this.persist(response.data.removed.map(syncKey));
+        if (!current()) return;
+        for (const permission of response.data.permissions) {
+          const key = syncKey(permission.identity);
+          const item = this.state.items[key];
+          const draft = this.state.drafts[key];
+          if (item && item.editable !== permission.editable) {
+            item.editable = permission.editable;
+            changed.add(key);
+          }
+          if (draft && draft.base.editable !== permission.editable) {
+            draft.base.editable = permission.editable;
+            changed.add(key);
           }
         }
-        const known = new Map(this.known().map((i) => [syncKey(i), i]));
-        for (const i of Object.values(staging))
-          known.set(syncKey(i.record.ref), {
-            kind: i.record.ref.kind,
-            id: i.record.ref.id,
-          });
-        const identities = [...known.values()];
-        const chunks: ContextIdentity<string>[][] = [];
-        for (let i = 0; i < identities.length; i += 100)
-          chunks.push(identities.slice(i, i + 100));
-        if (!chunks.length) chunks.push([]);
-        let invalidHistory = false;
-        let through = position;
-        let fixedThrough: string | null = null;
-        for (const chunk of chunks) {
-          let cursor: string | undefined;
-          do {
-            const response = await this.pull({
-              mode: "changes",
-              position,
-              through: fixedThrough ?? undefined,
-              cursor,
-              known: chunk,
-            });
-            if (!current()) return;
-            if (response.error) {
-              const reason =
-                response.meta.completeness.state === "complete"
-                  ? ""
-                  : response.meta.completeness.reason;
-              if (
-                reason === "history_unavailable" ||
-                reason === "invalid_cursor"
-              ) {
-                invalidHistory = true;
-                break;
-              }
-              throw new Error("同期を確認できません。");
-            }
-            await this.applyPolicy(response.data, staging);
-            if (!current()) return;
-            for (const i of response.data.items)
-              staging[syncKey(i.record.ref)] = i;
-            this.state.available ||= response.data.offered.some(
-              (r) => !known.has(syncKey(r)),
-            );
-            fixedThrough ??= response.meta.position;
-            through = response.meta.position;
-            cursor = response.meta.next_cursor ?? undefined;
-          } while (cursor);
-          if (invalidHistory) break;
-        }
-        if (invalidHistory) {
-          reset = true;
-          continue;
-        }
-        this.state.items = staging;
-        this.state.position = through;
-        this.state.nextCursor = nextCursor;
-        for (const [key, draft] of Object.entries(this.state.drafts)) {
-          const latest = staging[key];
+        for (const item of response.data.items) {
+          const key = syncKey(item.record.ref);
+          this.state.items[key] = item;
+          const draft = this.state.drafts[key];
           if (
+            draft &&
             !draft.pending &&
-            latest &&
-            latest.record.ref.revision !== draft.base.record.ref.revision
+            item.record.ref.revision !== draft.base.record.ref.revision
           )
-            draft.latest = structuredClone(latest);
+            draft.latest = structuredClone(item);
+          changed.add(key);
         }
-        this.state.confirmedAt = new Date().toISOString();
-        this.status = "current";
-        if (reconnecting) {
-          const drafts = Object.values(this.state.drafts);
-          this.notice = drafts.some((d) => d.pending)
-            ? "接続を確認しました。保存結果が未確認の要求は、同じ内容で再送してください。"
-            : drafts.some((d) => d.latest)
-              ? "接続を確認しました。最新内容と下書きを確認してください。"
-              : drafts.length
-                ? "接続を確認しました。未送信の下書きがあります。"
-                : "接続を確認しました。";
-        }
-        await this.persist();
-        this.emit();
-        return;
+        this.state.position = response.meta.position;
       }
-      throw new Error("同期の基準を取得し直してください。");
+      this.state.confirmedAt = new Date().toISOString();
+      this.status = "current";
+      if (reconnecting)
+        this.notice =
+          "接続を確認しました。未送信の下書き・最新内容を確認してから送信してください。";
+      await this.persist([...changed]);
     } catch (error) {
       if (!current()) return;
       if (authFailure(error)) await this.discard();
@@ -349,7 +363,6 @@ export class SyncEngine {
         this.status = "offline";
         this.notice =
           "接続を確認できません。最後に確認したキャッシュを表示しています。";
-        this.emit();
       }
     } finally {
       if (current()) {
@@ -357,11 +370,6 @@ export class SyncEngine {
         this.emit();
       }
     }
-  }
-  async more() {
-    if (this.busy || this.status !== "current") return;
-    this.state.pages++;
-    await this.refresh(true);
   }
   async edit(key: string, value: Record<string, unknown>) {
     const base = this.state.items[key] ?? this.state.drafts[key]?.base;
@@ -379,7 +387,7 @@ export class SyncEngine {
       latest: previous?.latest,
     };
     this.emit();
-    await this.persist();
+    await this.persist([key]);
   }
   async send(key: string, reapply = false) {
     const draft = this.state.drafts[key];
@@ -413,7 +421,7 @@ export class SyncEngine {
     this.emit();
     let attempted = false;
     try {
-      await this.persist();
+      await this.persist([key]);
       if (!this.alive || this.revoked || epoch !== this.epoch) return;
       attempted = true;
       const result = (await this.api(path, "POST", pending)) as {
@@ -430,7 +438,7 @@ export class SyncEngine {
       delete this.state.drafts[key];
       this.notice =
         "保存要求が受け付けられました。確定した内容を再取得します。";
-      await this.persist();
+      await this.persist([key]);
       await this.refresh();
     } catch (error) {
       if (!this.alive || this.revoked || epoch !== this.epoch) return;
@@ -464,7 +472,7 @@ export class SyncEngine {
         this.status = "offline";
         this.notice = "保存結果は未確認です。同じ内容と操作IDで再送できます。";
       }
-      await this.persist();
+      await this.persist([key]);
     } finally {
       this.sending.delete(key);
       this.emit();

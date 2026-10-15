@@ -103,6 +103,12 @@ export type ContextManifest = {
   read_status: "unobserved";
 };
 export type ContextResolution = {
+  sources?: {
+    ref: ContextRef<string>;
+    origin?: ContextOrigin;
+    external?: FixedContextSource;
+    attachments?: FixedContextSource[];
+  }[];
   ready: boolean;
   missing: { code: string; ref?: ContextRef<string>; source?: string }[];
   manifest?: ContextManifest;

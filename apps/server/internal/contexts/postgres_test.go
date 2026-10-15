@@ -162,6 +162,30 @@ func TestContextsPostgres(t *testing.T) {
 			}
 		}
 	}
+	for i := 0; i < 101; i++ {
+		put("two", "scope", fmt.Sprintf("catalog-%03d", i), "0", Scope{Kind: "issue", Name: fmt.Sprintf("Scope %03d", i)})
+	}
+	catalog := func(actor, workspace string, requestBody CatalogRequest, status int) apicontract.Response[CatalogPage] {
+		t.Helper()
+		raw := request(actor, "POST", "/contexts/workspaces/"+workspace+"/catalog", requestBody, status)
+		var value apicontract.Response[CatalogPage]
+		_ = json.Unmarshal(raw, &value)
+		return value
+	}
+	firstCatalog := catalog("alice", "two", CatalogRequest{Kind: "scope"}, 200)
+	if firstCatalog.Data == nil || len(firstCatalog.Data.Items) != 100 || firstCatalog.Meta.NextCursor == nil {
+		t.Fatalf("Scope catalog did not return bounded metadata: %+v %+v", firstCatalog.Data, firstCatalog.Meta)
+	}
+	lastCatalog := catalog("alice", "two", CatalogRequest{Kind: "scope", After: *firstCatalog.Meta.NextCursor}, 200)
+	if lastCatalog.Data == nil || len(lastCatalog.Data.Items) != 1 || lastCatalog.Meta.NextCursor != nil {
+		t.Fatal("Scope catalog continuation repeated or lost Scope")
+	}
+	catalog("bob", "two", CatalogRequest{Kind: "scope"}, 403)
+	memberHistory := catalog("bob", "one", CatalogRequest{Kind: "membership", ID: documentMembership.ID}, 200)
+	if memberHistory.Data == nil || len(memberHistory.Data.Items) != 1 || memberHistory.Data.Items[0].Ref != documentMembership {
+		t.Fatal("per-identity history did not preserve fixed version")
+	}
+
 	var dm Membership
 	_ = json.Unmarshal(read("alice", "one", documentMembership).Value, &dm)
 	dm.Present = false

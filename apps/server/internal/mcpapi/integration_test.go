@@ -150,36 +150,41 @@ func TestMCPIntegration(t *testing.T) {
 
 	// The dedicated test identity has a verified address; normal registration and
 	// email delivery are covered by test:auth, not bypassed for real users.
-	email := "mcp-" + strings.ToLower(rand.Text()) + "@koujou.test"
-	password := "Fixture-" + rand.Text() + "aA1!"
-	resp, raw := request("POST", cfg.KratosAdmin+"/admin/identities", map[string]any{"schema_id": "default", "state": "active", "traits": map[string]string{"email": email}, "credentials": map[string]any{"password": map[string]any{"config": map[string]string{"password": password}}}, "verifiable_addresses": []any{map[string]any{"value": email, "verified": true, "via": "email", "status": "completed"}}}, nil)
-	if resp.StatusCode != 201 {
-		t.Fatal("fixture identity creation", resp.StatusCode)
-	}
-	_, raw = request("GET", cfg.Site+"/auth/flow/login", nil, nil)
-	var flow auth.Flow
-	if json.Unmarshal(raw, &flow) != nil || flow.ID == "" {
-		t.Fatal("login flow missing")
-	}
-	form := url.Values{"method": {"password"}, "identifier": {email}, "password": {password}}
-	for _, rawNode := range flow.UI.Nodes {
-		var node struct {
-			Attributes struct {
-				Name, Type string
-				Value      any
+	var resp *http.Response
+	var raw []byte
+	loginFixture := func() {
+		email := "mcp-" + strings.ToLower(rand.Text()) + "@koujou.test"
+		password := "Fixture-" + rand.Text() + "aA1!"
+		resp, raw = request("POST", cfg.KratosAdmin+"/admin/identities", map[string]any{"schema_id": "default", "state": "active", "traits": map[string]string{"email": email}, "credentials": map[string]any{"password": map[string]any{"config": map[string]string{"password": password}}}, "verifiable_addresses": []any{map[string]any{"value": email, "verified": true, "via": "email", "status": "completed"}}}, nil)
+		if resp.StatusCode != 201 {
+			t.Fatal("fixture identity creation", resp.StatusCode)
+		}
+		_, raw = request("GET", cfg.Site+"/auth/flow/login", nil, nil)
+		var flow auth.Flow
+		if json.Unmarshal(raw, &flow) != nil || flow.ID == "" {
+			t.Fatal("login flow missing")
+		}
+		form := url.Values{"method": {"password"}, "identifier": {email}, "password": {password}}
+		for _, rawNode := range flow.UI.Nodes {
+			var node struct {
+				Attributes struct {
+					Name, Type string
+					Value      any
+				}
+			}
+			_ = json.Unmarshal(rawNode, &node)
+			if node.Attributes.Type == "hidden" {
+				if v, ok := node.Attributes.Value.(string); ok {
+					form.Set(node.Attributes.Name, v)
+				}
 			}
 		}
-		_ = json.Unmarshal(rawNode, &node)
-		if node.Attributes.Type == "hidden" {
-			if v, ok := node.Attributes.Value.(string); ok {
-				form.Set(node.Attributes.Name, v)
-			}
+		resp, _ = request("POST", cfg.Site+"/auth/flow/login?flow="+url.QueryEscape(flow.ID), form, nil)
+		if resp.StatusCode != 303 {
+			t.Fatal("fixture login failed", resp.StatusCode)
 		}
 	}
-	resp, _ = request("POST", cfg.Site+"/auth/flow/login?flow="+url.QueryEscape(flow.ID), form, nil)
-	if resp.StatusCode != 303 {
-		t.Fatal("fixture login failed", resp.StatusCode)
-	}
+	loginFixture()
 	csrf := func() string {
 		_, raw := request("GET", cfg.Site+"/auth/csrf", nil, nil)
 		var value map[string]string
@@ -247,7 +252,7 @@ func TestMCPIntegration(t *testing.T) {
 		t.Fatal("MCP token accepted by ordinary API")
 	}
 	t.Log("real Ory preregistration, browser login, PKCE, broker, resource indicator, scope and live identity passed")
-	ordinary := issue("", "koujou")
+	ordinary := issue("", "koujou offline_access")
 	if _, _, err = identity.MCPUser(ctx, ordinary.Access); err == nil {
 		t.Fatal("ordinary API token accepted by MCP")
 	}
@@ -599,7 +604,29 @@ func TestMCPIntegration(t *testing.T) {
 		}
 	}
 	t.Logf("10,000 Contexts x three versions: one prohibition rule, first 100 permitted candidates in %s, opaque continuation present=%v", time.Since(started), bulk.Meta.NextCursor != nil)
-	inspectUI(t, client, cfg.Site, ordinary.Access)
+	if os.Getenv("KOUJOU_TEST_MCP_UI") == "1" {
+		webTokens := issue("", "koujou offline_access")
+		originalJar := client.Jar
+		client.Jar, _ = cookiejar.New(nil)
+		loginFixture()
+		bobTokens := issue("", "koujou offline_access")
+		client.Jar = originalJar
+		bob, err := identity.User(ctx, bobTokens.Access)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = store.Database().Exec(ctx, "INSERT INTO access_members(workspace_id,user_id,role,active) VALUES('mcp-one',$1,'editor',true)", bob.ID); err != nil {
+			t.Fatal(err)
+		}
+		inspectUI(t, client, cfg.Site, ordinary, bobTokens, webTokens, server.Certificate().Raw, cfg, s)
+		_ = session.Close()
+		tokens = issue(cfg.MCPResource(), "koujou.mcp")
+		session, err = connect(tokens.Access, "mcp-one", handle)
+		if err != nil {
+			t.Fatal("MCP reconnect after interactive inspection", err)
+		}
+		defer session.Close()
+	}
 	if err = search.Close(); err != nil {
 		t.Fatal(err)
 	}

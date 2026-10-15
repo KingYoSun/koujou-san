@@ -702,6 +702,33 @@ mod tests {
     }
     #[cfg(windows)]
     #[test]
+    #[ignore = "requires the owned Context UI fixture and an unused native OAuth path"]
+    fn live_context_ui_prepare() {
+        let fixture: Value = serde_json::from_slice(
+            &fs::read(std::env::var("KOUJOU_CONTEXT_UI_FIXTURE").unwrap()).unwrap(),
+        )
+        .unwrap();
+        let file = PathBuf::from(std::env::var("KOUJOU_NATIVE_TEST_FILE").unwrap());
+        assert!(!file.exists(), "select the unused fixture API namespace");
+        let auth = Auth::new(fixture["api"].as_str().unwrap(), file).unwrap();
+        let config = auth.config().unwrap();
+        assert_eq!(config.issuer, fixture["issuer"]);
+        let refresh = fixture["native_refresh"].as_str().unwrap();
+        assert!(!refresh.is_empty());
+        auth.persist(
+            &config,
+            &Tokens {
+                refresh_token: refresh.into(),
+                ..Tokens::default()
+            },
+        )
+        .unwrap();
+        let user = auth.request("/auth/me", "GET", Value::Null).unwrap();
+        assert!(user["user"]["id"].is_string());
+        println!("Owned native fixture authenticated; refresh credential remains DPAPI-protected.");
+    }
+    #[cfg(windows)]
+    #[test]
     #[ignore = "requires the development API/Ory and an explicitly selected fixture OAuth file; close the development app first"]
     fn live_workspace_device_lifecycle() {
         let file = PathBuf::from(

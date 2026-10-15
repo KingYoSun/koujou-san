@@ -1,0 +1,25 @@
+{
+  "membership": {
+    "ref": {
+      "kind": "membership",
+      "id": "ui-membership-1",
+      "revision": "KFMFGRCONXRWLFJ5PD2MJEZPHO"
+    },
+    "value": {
+      "scope": {
+        "id": "ui-scope-001",
+        "kind": "issue"
+      },
+      "context": {
+        "id": "ui-document",
+        "kind": "document"
+      },
+      "present": false
+    }
+  },
+  "document": {
+    "kind": "document",
+    "id": "ui-document",
+    "revision": "FPB5TCAAV4RWXKPYFKUEDDGGKO"
+  }
+}

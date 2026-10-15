@@ -1,6 +1,6 @@
 # 0007: 同期・下書き・再送の境界
 
-- 状態: Accepted
+- 状態: Accepted（共通GUIの取得・保存方式は[ADR 0011](0011-context-record-cache.md)で更新）
 - 日付: 2026-10-15
 - 対象: Issue #8、設計書§11、[計画](../progress/2026-10-15-issue-8-plan.md)
 

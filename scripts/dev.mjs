@@ -374,6 +374,7 @@ async function testDatabase(suite = "persistence", testName) {
       "-run",
       `^${testName ?? { auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", sharedsync: "TestSyncPostgres", searchindex: "TestSearchPostgres", graphindex: "TestGraphPostgres", mcpapi: "TestMCPIntegration", persistence: "TestPostgres" }[suite]}$`,
       "-count=1",
+      ...(env.KOUJOU_TEST_MCP_UI === "1" ? ["-timeout=35m"] : []),
       "-v",
     ]);
   } finally {

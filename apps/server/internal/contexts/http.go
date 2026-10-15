@@ -46,6 +46,7 @@ func sendError(w http.ResponseWriter, workspace string, err error) {
 }
 func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /contexts/workspaces/{workspace}/resolve", s.previewHTTP)
+	mux.HandleFunc("POST /contexts/workspaces/{workspace}/catalog", s.catalogHTTP)
 	mux.HandleFunc("GET /contexts/workspaces/{workspace}/{kind}/{id}", s.readHTTP)
 	mux.HandleFunc("POST /contexts/workspaces/{workspace}/{kind}/{id}", s.writeHTTP)
 }

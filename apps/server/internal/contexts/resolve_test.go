@@ -13,6 +13,10 @@ import (
 func TestResolutionContract(t *testing.T) {
 	fixtures := Fixtures()
 	m := fixtures["normal"].Manifest
+	if len(fixtures["normal"].Sources) != 1 || len(fixtures["normal"].Sources[0].Attachments) != 1 || fixtures["normal"].Sources[0].Attachments[0].URI != "fixture://code" {
+		t.Fatal("preview omitted fixed source/attachment metadata")
+	}
+
 	if m == nil || len(m.Placements) != 7 || len(m.Duplicates) != 2 || strings.Count(*m.InputUTF8, "共有の原文。") != 2 {
 		t.Fatalf("structure/placement lost: %+v", m)
 	}

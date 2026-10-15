@@ -184,6 +184,19 @@ func TestSyncPostgres(t *testing.T) {
 	if changes.Data == nil || len(changes.Data.Items) != 1 || changes.Data.Items[0].Record.Ref.Revision != newer.Revision {
 		t.Fatal("delta did not reconcile paged snapshot")
 	}
+	watched := pull("bob", Request{Mode: "watch", Known: []contexts.Identity{refs[0].Identity()}, Versions: []contexts.Ref{refs[0]}})
+	if watched.Data == nil || len(watched.Data.Items) != 1 || watched.Data.Items[0].Record.Ref != newer || watched.Meta.NextCursor != nil {
+		t.Fatal("targeted watch did not return the changed head")
+	}
+	unchanged := pull("bob", Request{Mode: "watch", Known: []contexts.Identity{refs[0].Identity()}, Versions: []contexts.Ref{newer}})
+	if unchanged.Data == nil || len(unchanged.Data.Items) != 0 || len(unchanged.Data.Permissions) != 1 || unchanged.Data.Permissions[0].Editable {
+		t.Fatal("watch repeated unchanged body or lost viewer permission")
+	}
+	absent := pull("alice", Request{Mode: "watch", Known: []contexts.Identity{{Kind: "sentence", ID: "absent"}}})
+	if absent.Data == nil || len(absent.Data.Removed) != 1 {
+		t.Fatal("watch did not remove missing cached identity")
+	}
+
 	duplicate := pull("bob", Request{Mode: "changes", Position: *first.Meta.Position, Known: known})
 	if duplicate.Data == nil || duplicate.Data.Items[0].Record.Ref.Revision != newer.Revision {
 		t.Fatal("notification/retrieval replay changed revision")
@@ -338,6 +351,15 @@ func TestSyncPostgres(t *testing.T) {
 	_ = json.Unmarshal(complete.Value, &summary)
 	if summary.Missing || summary.Contiguous != "3" || summary.ResultState != "unconfirmed" {
 		t.Fatal("late report not reconciled independently of real result")
+	}
+
+	reportWatch := pull("bob", Request{Mode: "watch", Known: []contexts.Identity{{Kind: "report", ID: streamID}}, Versions: []contexts.Ref{record.Ref}})
+	if reportWatch.Data == nil || len(reportWatch.Data.Items) != 1 || reportWatch.Data.Items[0].Record.Ref != complete.Ref || reportWatch.Data.Items[0].Editable {
+		t.Fatal("targeted report watch did not preserve report summary semantics")
+	}
+	reportUnchanged := pull("bob", Request{Mode: "watch", Known: []contexts.Identity{{Kind: "report", ID: streamID}}, Versions: []contexts.Ref{complete.Ref}})
+	if reportUnchanged.Data == nil || len(reportUnchanged.Data.Items) != 0 || len(reportUnchanged.Data.Removed) != 0 {
+		t.Fatal("unchanged readable report was removed or retransferred")
 	}
 	prior, err := s.readReport(ctx, access.Principal{UserID: "bob"}, "one", streamID, record.Ref.Revision)
 	if err != nil || !bytes.Equal(prior.Value, record.Value) {

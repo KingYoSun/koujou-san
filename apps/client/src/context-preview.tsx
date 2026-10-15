@@ -1,0 +1,301 @@
+import { useEffect, useState } from "react";
+import { useStore } from "zustand";
+import type { CandidateEvidence, ContextResolution } from "./context-contract";
+import type { UI, Ref, Envelope, CandidatePage } from "./context-ui";
+import { refKey, refLabel, resultData } from "./context-ui";
+import { Completeness, reasonText } from "./context-status";
+export function ContextPreview({ ui }: { ui: UI }) {
+  const state = useStore(ui.store);
+  const [result, setResult] = useState<Envelope<ContextResolution>>();
+  const [basis, setBasis] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    setResult(undefined);
+    setError("");
+  }, [state.permissionEpoch]);
+  const signature = JSON.stringify([
+    state.permissionEpoch,
+    state.mode,
+    state.include,
+    state.exclude,
+  ]);
+  function update(field: "include" | "exclude", values: Ref[]) {
+    ui.store.setState({ [field]: values });
+  }
+  async function preview() {
+    setBusy(true);
+    setError("");
+    setResult(undefined);
+    setBasis(signature);
+    try {
+      if (state.mode === "select" && !state.include.length) {
+        setResult({
+          meta: {
+            position: null,
+            completeness: { state: "pending", reason: "empty_selection" },
+          },
+          data: { ready: false, missing: [{ code: "empty_selection" }] },
+        });
+        return;
+      }
+      const refs = [
+        ...new Map(
+          [...state.include, ...state.exclude].map((ref) => [refKey(ref), ref]),
+        ).values(),
+      ];
+      const evidence: CandidateEvidence[] = [];
+      // The user explicitly confirms the fixed references, not every candidate in
+      // the original broad search. Every bounded batch is rechecked at the source.
+      if (state.mode !== "none")
+        for (let i = 0; i < refs.length; i += 100) {
+          const chunk = refs.slice(i, i + 100);
+          const found = await ui.request<CandidatePage>(
+            `/search/workspaces/${encodeURIComponent(ui.workspace)}/candidates`,
+            {
+              refs: chunk,
+              limit: 100,
+            },
+          );
+          if (
+            found.error ||
+            !found.data ||
+            found.meta.completeness.state !== "complete"
+          ) {
+            setResult({
+              meta: found.meta,
+              data: {
+                ready: false,
+                missing: [
+                  {
+                    code: "incomplete_candidates",
+                    source: found.meta.completeness.reason ?? found.error?.code,
+                  },
+                ],
+              },
+            });
+            return;
+          }
+          const available = new Set(
+            found.data.items.map((candidate) => refKey(candidate.ref)),
+          );
+          if (chunk.some((ref) => !available.has(refKey(ref)))) {
+            setResult({
+              meta: found.meta,
+              data: {
+                ready: false,
+                missing: chunk
+                  .filter((ref) => !available.has(refKey(ref)))
+                  .map((ref) => ({ code: "missing_reference", ref })),
+              },
+            });
+            return;
+          }
+          evidence.push(found.data.evidence);
+        }
+      const value = await ui.request<ContextResolution>(
+        `/contexts/workspaces/${encodeURIComponent(ui.workspace)}/resolve`,
+        {
+          run_id: "",
+          selection: {
+            mode: state.mode,
+            include: state.include,
+            exclude: state.exclude,
+          },
+          evidence,
+        },
+      );
+      if (
+        value.data?.manifest?.state === "ready" &&
+        !value.data.manifest.placements.length
+      )
+        value.data = { ready: false, missing: [{ code: "empty_selection" }] };
+      if (ui.store.getState().permissionEpoch !== state.permissionEpoch) return;
+      setResult(value);
+    } catch (error) {
+      setError(String(error));
+      ui.fail(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+  const current = basis === signature;
+  const manifest = current ? result?.data?.manifest : undefined;
+  return (
+    <aside className="context-preview" aria-label="注入プレビュー">
+      <h3>注入プレビュー</h3>
+      <p className="context-meta">
+        固定した版を確認します。保存・実行は始まりません。
+      </p>
+      <label>
+        注入方法
+        <select
+          aria-label="注入方法"
+          value={state.mode}
+          onChange={(event) =>
+            ui.store.setState({ mode: event.target.value as "none" | "select" })
+          }
+        >
+          <option value="select">Contextを選ぶ</option>
+          <option value="none">注入なし（明示）</option>
+        </select>
+      </label>
+      {(["include", "exclude"] as const).map((field) => (
+        <section
+          key={field}
+          aria-label={field === "include" ? "注入する順序" : "除外する固定版"}
+        >
+          <h4>
+            {field === "include" ? "注入する順序" : "除外する固定版"} (
+            {state[field].length})
+          </h4>
+          {!state[field].length && <p className="context-meta">未選択</p>}
+          <ol className="context-ref-list">
+            {state[field].map((ref, index) => (
+              <li key={`${refKey(ref)}:${index}`}>
+                <span>{refLabel(ref)}</span>
+                <div className="context-actions">
+                  <button
+                    disabled={index === 0}
+                    aria-label={`${field} ${index + 1}を上へ`}
+                    onClick={() => {
+                      const values = [...state[field]];
+                      [values[index - 1], values[index]] = [
+                        values[index]!,
+                        values[index - 1]!,
+                      ];
+                      update(field, values);
+                    }}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    disabled={index === state[field].length - 1}
+                    aria-label={`${field} ${index + 1}を下へ`}
+                    onClick={() => {
+                      const values = [...state[field]];
+                      [values[index + 1], values[index]] = [
+                        values[index]!,
+                        values[index + 1]!,
+                      ];
+                      update(field, values);
+                    }}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    onClick={() =>
+                      update(
+                        field,
+                        state[field].filter((_, i) => i !== index),
+                      )
+                    }
+                  >
+                    選択を外す
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))}
+      <button onClick={() => ui.store.setState({ include: [], exclude: [] })}>
+        選択をクリア
+      </button>
+      <button
+        className="primary"
+        disabled={busy}
+        onClick={() => void preview()}
+      >
+        {busy ? "確認中…" : "選択した固定版を確認してプレビュー"}
+      </button>
+      {!current && result && (
+        <p className="context-warning">
+          選択または閲覧権限の確認状態が変わりました。もう一度プレビューしてください。
+        </p>
+      )}
+      {error && <p role="alert">{error}</p>}
+      {current && result && (
+        <>
+          <Completeness meta={result.meta} />
+          {!result.data?.ready && (
+            <div role="alert">
+              <strong>入力は未確定です</strong>
+              <ul>
+                {result.data?.missing.map((gap, index) => (
+                  <li key={index}>
+                    {reasonText(gap.code)}{" "}
+                    {gap.source && reasonText(gap.source)}{" "}
+                    {gap.ref && refLabel(gap.ref)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {manifest && (
+            <>
+              <p className="context-success">
+                {manifest.state === "none"
+                  ? "注入なしを確認しました。"
+                  : "選択した固定版の入力を確認しました。"}{" "}
+                読取状態: {manifest.read_status}
+              </p>
+              <h4>構造・順序・抜粋</h4>
+              <ol>
+                {manifest.placements.map((placement, index) => (
+                  <li key={index}>
+                    {placement.path.join(" / ")} · {refLabel(placement.ref)}{" "}
+                    {placement.excerpt ? "（抜粋）" : "（元の構造）"}
+                  </li>
+                ))}
+              </ol>
+              <h4>由来・固定参照・取得状態</h4>
+              {result.data?.sources?.length ? (
+                <ul>
+                  {result.data.sources.map((source, index) => (
+                    <li key={index}>
+                      {refLabel(source.ref)}
+                      <pre>{JSON.stringify(source, null, 2)}</pre>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p>外部参照・添付・由来の指定はありません。</p>
+              )}
+              <h4>まとめた重複</h4>
+              {manifest.duplicates.length ? (
+                <ul>
+                  {manifest.duplicates.map((ref, index) => (
+                    <li key={index}>{refLabel(ref)}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>なし</p>
+              )}
+              <h4>除外した項目</h4>
+              {manifest.excluded.length ? (
+                <ul>
+                  {manifest.excluded.map((ref, index) => (
+                    <li key={index}>{refLabel(ref)}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>なし</p>
+              )}
+              <details open>
+                <summary>実入力・添付（固定した内容）</summary>
+                <pre>{manifest.input_utf8 ?? "入力なし"}</pre>
+              </details>
+              <details>
+                <summary>版・由来の記録</summary>
+                <pre>
+                  {JSON.stringify(resultData(result).manifest, null, 2)}
+                </pre>
+              </details>
+            </>
+          )}
+        </>
+      )}
+    </aside>
+  );
+}

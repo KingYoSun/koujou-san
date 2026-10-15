@@ -1,0 +1,8 @@
+        kind        | count 
+--------------------+-------
+ context-document   |     1
+ context-membership |     1
+ context-paragraph  |     1
+ context-sentence   |     4
+(4 rows)
+

@@ -109,7 +109,26 @@
         }
       ],
       "read_status": "unobserved"
-    }
+    },
+    "sources": [
+      {
+        "ref": {
+          "kind": "section",
+          "id": "sec",
+          "revision": "r1"
+        },
+        "attachments": [
+          {
+            "uri": "fixture://code",
+            "revision": "code-v1",
+            "range": "lines:1-2",
+            "digest": "1e593baef0f15f695aced807adff35b4726b4f2c494dede531473d4fe41a1b03",
+            "delivery": "reference",
+            "state": "ready"
+          }
+        ]
+      }
+    ]
   },
   "external-unfetched": {
     "ready": false,
@@ -254,7 +273,26 @@
         }
       ],
       "read_status": "unobserved"
-    }
+    },
+    "sources": [
+      {
+        "ref": {
+          "kind": "section",
+          "id": "sec",
+          "revision": "r1"
+        },
+        "attachments": [
+          {
+            "uri": "fixture://code",
+            "revision": "code-v1",
+            "range": "lines:1-2",
+            "digest": "1e593baef0f15f695aced807adff35b4726b4f2c494dede531473d4fe41a1b03",
+            "delivery": "reference",
+            "state": "ready"
+          }
+        ]
+      }
+    ]
   },
   "output": {
     "ready": true,

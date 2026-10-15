@@ -32,40 +32,196 @@ struct Saved {
     workspace: String,
     payload: Value,
 }
-fn load(auth: &Auth, user: &str, workspace: &str) -> Result<Option<Value>, String> {
-    let _lock = CACHE_LOCK.lock().map_err(|_| "sync_storage_failed")?;
-    let (path, api) = auth.sync_binding(user, workspace);
-    if !path.exists() {
-        return Ok(None);
-    }
-    let encrypted = fs::read(path).map_err(|_| "sync_storage_failed")?;
-    let value: Saved =
-        serde_json::from_slice(&unprotect(&encrypted)?).map_err(|_| "sync_storage_invalid")?;
-    if value.api != api || value.user != user || value.workspace != workspace {
+fn storage_error(_: impl std::fmt::Debug) -> String {
+    "sync_storage_failed".into()
+}
+fn encrypted(api: &str, user: &str, workspace: &str, value: Value) -> Result<Vec<u8>, String> {
+    protect(
+        &serde_json::to_vec(&Saved {
+            api: api.into(),
+            user: user.into(),
+            workspace: workspace.into(),
+            payload: value,
+        })
+        .map_err(storage_error)?,
+    )
+}
+fn decoded(api: &str, user: &str, workspace: &str, raw: Vec<u8>) -> Result<Value, String> {
+    let saved: Saved = serde_json::from_slice(&unprotect(&raw)?).map_err(storage_error)?;
+    if saved.api != api || saved.user != user || saved.workspace != workspace {
         return Err("sync_storage_binding_mismatch".into());
     }
-    Ok(Some(value.payload))
+    Ok(saved.payload)
 }
-fn save(auth: &Auth, user: &str, workspace: &str, payload: Value) -> Result<(), String> {
-    let _lock = CACHE_LOCK.lock().map_err(|_| "sync_storage_failed")?;
-    let (path, api) = auth.sync_binding(user, workspace);
-    fs::create_dir_all(path.parent().unwrap()).map_err(|_| "sync_storage_failed")?;
-    let raw = serde_json::to_vec(&Saved {
-        api,
-        user: user.into(),
-        workspace: workspace.into(),
-        payload,
-    })
-    .map_err(|_| "sync_storage_invalid")?;
-    let temporary = path.with_extension("tmp");
-    fs::write(&temporary, protect(&raw)?).map_err(|_| "sync_storage_failed")?;
-    fs::rename(temporary, path).map_err(|_| "sync_storage_failed".into())
+fn open(auth: &Auth, user: &str, workspace: &str) -> Result<rusqlite::Connection, String> {
+    use rusqlite::{OptionalExtension, params};
+    let (legacy, api) = auth.sync_binding(user, workspace);
+    fs::create_dir_all(legacy.parent().unwrap()).map_err(storage_error)?;
+    let mut db =
+        rusqlite::Connection::open(legacy.with_extension("sqlite")).map_err(storage_error)?;
+    db.execute_batch("PRAGMA secure_delete=ON; CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value BLOB NOT NULL); CREATE TABLE IF NOT EXISTS records(key TEXT PRIMARY KEY,payload BLOB NOT NULL,dirty INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS record_drafts ON records(dirty,key);").map_err(storage_error)?;
+    let initialized = db
+        .query_row("SELECT 1 FROM meta WHERE key='format'", [], |_| Ok(true))
+        .optional()
+        .map_err(storage_error)?
+        .unwrap_or(false);
+    if !initialized {
+        let tx = db.transaction().map_err(storage_error)?;
+        if legacy.exists() {
+            let mut value = decoded(
+                &api,
+                user,
+                workspace,
+                fs::read(&legacy).map_err(storage_error)?,
+            )?;
+            let header = value.as_object_mut().ok_or("sync_storage_invalid")?;
+            let items = header.remove("items").ok_or("sync_storage_invalid")?;
+            let drafts = header.remove("drafts").ok_or("sync_storage_invalid")?;
+            let receipts = header.remove("receipts").ok_or("sync_storage_invalid")?;
+            let maps = [items, drafts, receipts];
+            let mut keys = std::collections::BTreeSet::new();
+            for map in &maps {
+                keys.extend(
+                    map.as_object()
+                        .ok_or("sync_storage_invalid")?
+                        .keys()
+                        .cloned(),
+                );
+            }
+            for key in keys {
+                let entry = serde_json::json!({"key": key, "item": maps[0].get(&key), "draft": maps[1].get(&key), "receipt": maps[2].get(&key)});
+                tx.execute(
+                    "INSERT INTO records VALUES(?1,?2,?3)",
+                    params![
+                        key,
+                        encrypted(&api, user, workspace, entry)?,
+                        i64::from(maps[1].get(&key).is_some())
+                    ],
+                )
+                .map_err(storage_error)?;
+            }
+            tx.execute(
+                "INSERT INTO meta VALUES('header',?1)",
+                [encrypted(&api, user, workspace, value)?],
+            )
+            .map_err(storage_error)?;
+        }
+        tx.execute("INSERT INTO meta VALUES('format',X'02')", [])
+            .map_err(storage_error)?;
+        tx.commit().map_err(storage_error)?;
+    }
+    // A crash after commit can only leave a redundant legacy file. Never import
+    // it again over newer drafts. Old and new applications must not be mixed.
+    if legacy.exists() {
+        fs::remove_file(legacy).map_err(storage_error)?;
+    }
+    Ok(db)
+}
+fn load(auth: &Auth, user: &str, workspace: &str) -> Result<Option<Value>, String> {
+    use rusqlite::OptionalExtension;
+    let _lock = CACHE_LOCK.lock().map_err(storage_error)?;
+    let db = open(auth, user, workspace)?;
+    let (_, api) = auth.sync_binding(user, workspace);
+    let raw = db
+        .query_row("SELECT value FROM meta WHERE key='header'", [], |row| {
+            row.get::<_, Vec<u8>>(0)
+        })
+        .optional()
+        .map_err(storage_error)?;
+    raw.map(|bytes| decoded(&api, user, workspace, bytes))
+        .transpose()
+}
+fn save(
+    auth: &Auth,
+    user: &str,
+    workspace: &str,
+    header: Value,
+    entries: Vec<Value>,
+) -> Result<(), String> {
+    use rusqlite::params;
+    let _lock = CACHE_LOCK.lock().map_err(storage_error)?;
+    let mut db = open(auth, user, workspace)?;
+    let (_, api) = auth.sync_binding(user, workspace);
+    let tx = db.transaction().map_err(storage_error)?;
+    tx.execute(
+        "INSERT OR REPLACE INTO meta VALUES('header',?1)",
+        [encrypted(&api, user, workspace, header)?],
+    )
+    .map_err(storage_error)?;
+    for entry in entries {
+        let key = entry["key"].as_str().ok_or("sync_storage_invalid")?;
+        if ["item", "draft", "receipt"]
+            .iter()
+            .any(|field| !entry[*field].is_null())
+        {
+            tx.execute(
+                "INSERT OR REPLACE INTO records VALUES(?1,?2,?3)",
+                params![
+                    key,
+                    encrypted(&api, user, workspace, entry.clone())?,
+                    i64::from(!entry["draft"].is_null())
+                ],
+            )
+            .map_err(storage_error)?;
+        } else {
+            tx.execute("DELETE FROM records WHERE key=?1", [key])
+                .map_err(storage_error)?;
+        }
+    }
+    tx.commit().map_err(storage_error)
+}
+fn page(
+    auth: &Auth,
+    user: &str,
+    workspace: &str,
+    after: &str,
+    drafts_only: bool,
+) -> Result<Value, String> {
+    let _lock = CACHE_LOCK.lock().map_err(storage_error)?;
+    let db = open(auth, user, workspace)?;
+    let (_, api) = auth.sync_binding(user, workspace);
+    let sql = if drafts_only {
+        "SELECT payload FROM records WHERE dirty=1 AND key>?1 ORDER BY key LIMIT 101"
+    } else {
+        "SELECT payload FROM records WHERE key>?1 ORDER BY key LIMIT 101"
+    };
+    let mut query = db.prepare(sql).map_err(storage_error)?;
+    let rows = query
+        .query_map([after], |row| row.get::<_, Vec<u8>>(0))
+        .map_err(storage_error)?;
+    let mut entries = Vec::new();
+    for row in rows {
+        entries.push(decoded(&api, user, workspace, row.map_err(storage_error)?)?);
+    }
+    let next = if entries.len() > 100 {
+        Some(entries[99]["key"].clone())
+    } else {
+        None
+    };
+    entries.truncate(100);
+    Ok(serde_json::json!({"entries":entries,"next":next}))
+}
+fn read(auth: &Auth, user: &str, workspace: &str, key: &str) -> Result<Option<Value>, String> {
+    use rusqlite::OptionalExtension;
+    let _lock = CACHE_LOCK.lock().map_err(storage_error)?;
+    let db = open(auth, user, workspace)?;
+    let (_, api) = auth.sync_binding(user, workspace);
+    let raw = db
+        .query_row("SELECT payload FROM records WHERE key=?1", [key], |row| {
+            row.get::<_, Vec<u8>>(0)
+        })
+        .optional()
+        .map_err(storage_error)?;
+    raw.map(|bytes| decoded(&api, user, workspace, bytes))
+        .transpose()
 }
 fn remove(auth: &Auth, user: &str, workspace: &str) -> Result<(), String> {
     let _lock = CACHE_LOCK.lock().map_err(|_| "sync_storage_failed")?;
     let (path, _) = auth.sync_binding(user, workspace);
-    if path.exists() {
-        fs::remove_file(path).map_err(|_| "sync_storage_failed")?;
+    for target in [path.with_extension("sqlite"), path] {
+        if target.exists() {
+            fs::remove_file(target).map_err(storage_error)?;
+        }
     }
     Ok(())
 }
@@ -108,13 +264,41 @@ pub async fn sync_save(
     app: tauri::AppHandle,
     user: String,
     workspace: String,
-    payload: Value,
+    header: Value,
+    entries: Vec<Value>,
 ) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || {
-        save(&app.state::<Auth>(), &user, &workspace, payload)
+        save(&app.state::<Auth>(), &user, &workspace, header, entries)
     })
     .await
     .map_err(|_| "sync_task_failed")?
+}
+#[tauri::command]
+pub async fn sync_page(
+    app: tauri::AppHandle,
+    user: String,
+    workspace: String,
+    after: String,
+    drafts_only: bool,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        page(&app.state::<Auth>(), &user, &workspace, &after, drafts_only)
+    })
+    .await
+    .map_err(storage_error)?
+}
+#[tauri::command]
+pub async fn sync_read(
+    app: tauri::AppHandle,
+    user: String,
+    workspace: String,
+    key: String,
+) -> Result<Option<Value>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        read(&app.state::<Auth>(), &user, &workspace, &key)
+    })
+    .await
+    .map_err(storage_error)?
 }
 #[tauri::command]
 pub async fn sync_remove(
@@ -236,36 +420,103 @@ mod tests {
         println!("Owned fixture report accepted; execution result remains unconfirmed.");
     }
     #[test]
-    fn scoped_dpapi_cache_restart_replace_and_purge() {
+    fn scoped_dpapi_records_migrate_restart_page_replace_and_purge() {
         let root = std::env::temp_dir().join(format!("koujou-sync-{}", uuid::Uuid::new_v4()));
         let auth = Auth::new("https://localhost:8080/", root.join("oauth.dpapi")).unwrap();
-        let first =
-            json!({"cache":{"s":"confirmed"},"drafts":{"s":"unsent draft"},"position":"opaque"});
-        save(&auth, "alice", "one", first.clone()).unwrap();
-        save(&auth, "alice", "two", first.clone()).unwrap();
-        save(&auth, "bob", "one", first.clone()).unwrap();
-        let (path, _) = auth.sync_binding("alice", "one");
-        assert!(!String::from_utf8_lossy(&fs::read(&path).unwrap()).contains("unsent draft"));
+        let mut old = json!({"items":{},"drafts":{},"receipts":{},"position":"opaque","confirmedAt":null,"nextCursor":null,"pages":1,"available":false});
+        for i in 0..205 {
+            let key = format!("sentence:s{i:03}");
+            old["items"][&key] = json!({"record":{"ref":{"kind":"sentence","id":format!("s{i:03}"),"revision":"old"},"value":{"text":"cached"}},"editable":true});
+            old["drafts"][&key] = json!({"base":old["items"][&key],"value":{"text":"unsent draft"},"pending":{"operation_id":format!("op-{i}"),"expected_version":"old","value":{"text":"unsent draft"}},"latest":{"record":{"ref":{"revision":"new"}}},"error":"unconfirmed"});
+            old["receipts"][&key] = json!({"operationID":format!("prior-{i}"),"revision":"old"});
+        }
+        let (legacy, api) = auth.sync_binding("alice", "one");
+        fs::create_dir_all(legacy.parent().unwrap()).unwrap();
+        fs::write(
+            &legacy,
+            encrypted(&api, "alice", "one", old.clone()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            load(&auth, "alice", "one").unwrap().unwrap()["position"],
+            "opaque"
+        );
+        assert!(!legacy.exists());
+        assert_eq!(
+            page(&auth, "alice", "one", "", true).unwrap()["entries"]
+                .as_array()
+                .unwrap()
+                .len(),
+            100
+        );
+        assert_eq!(
+            page(&auth, "alice", "one", "sentence:s099", true).unwrap()["next"],
+            "sentence:s199"
+        );
+        assert_eq!(
+            page(&auth, "alice", "one", "sentence:s199", true).unwrap()["entries"]
+                .as_array()
+                .unwrap()
+                .len(),
+            5
+        );
+        let entry = read(&auth, "alice", "one", "sentence:s204")
+            .unwrap()
+            .unwrap();
+        assert_eq!(entry["draft"], old["drafts"]["sentence:s204"]);
+        assert_eq!(entry["receipt"], old["receipts"]["sentence:s204"]);
+        assert!(
+            !String::from_utf8_lossy(&fs::read(legacy.with_extension("sqlite")).unwrap())
+                .contains("unsent draft")
+        );
         let restarted = Auth::new("https://localhost:8080/", root.join("oauth.dpapi")).unwrap();
+        let changed = json!({"key":"sentence:s204","draft":{"value":{"text":"changed"}}});
+        save(
+            &restarted,
+            "alice",
+            "one",
+            json!({"position":"fresh"}),
+            vec![changed.clone()],
+        )
+        .unwrap();
         assert_eq!(
-            load(&restarted, "alice", "one").unwrap(),
-            Some(first.clone())
+            read(&restarted, "alice", "one", "sentence:s204").unwrap(),
+            Some(changed)
         );
-        let changed = json!({"drafts":{"s":"new local draft"}});
-        save(&restarted, "alice", "one", changed.clone()).unwrap();
-        assert_eq!(load(&restarted, "alice", "one").unwrap(), Some(changed));
+        assert_eq!(
+            read(&restarted, "alice", "one", "sentence:s203")
+                .unwrap()
+                .unwrap()["draft"],
+            old["drafts"]["sentence:s203"]
+        );
+        assert!(load(&restarted, "bob", "one").unwrap().is_none());
         let other = Auth::new("https://localhost:8081/", root.join("oauth.dpapi")).unwrap();
-        assert!(load(&other, "alice", "one").unwrap().is_none());
-        remove(&restarted, "alice", "one").unwrap();
-        assert!(load(&restarted, "alice", "one").unwrap().is_none());
-        assert_eq!(
-            load(&restarted, "alice", "two").unwrap(),
-            Some(first.clone())
+        assert!(
+            read(&other, "alice", "one", "sentence:s204")
+                .unwrap()
+                .is_none()
         );
-        purge(&restarted, "alice").unwrap();
-        assert!(load(&restarted, "alice", "two").unwrap().is_none());
-        assert_eq!(load(&restarted, "bob", "one").unwrap(), Some(first));
-        purge(&restarted, "bob").unwrap();
+        // Invalid legacy data aborts migration without deleting the source. A
+        // corrected legacy value can be imported on the next application start.
+        let (broken, api) = auth.sync_binding("alice", "broken");
+        fs::write(
+            &broken,
+            encrypted(&api, "alice", "broken", json!({"drafts":42})).unwrap(),
+        )
+        .unwrap();
+        assert!(load(&auth, "alice", "broken").is_err());
+        assert!(broken.exists());
+        fs::write(&broken, encrypted(&api, "alice", "broken", old).unwrap()).unwrap();
+        assert!(load(&auth, "alice", "broken").unwrap().is_some());
+        remove(&auth, "alice", "one").unwrap();
+        assert!(
+            read(&auth, "alice", "one", "sentence:s204")
+                .unwrap()
+                .is_none()
+        );
+        purge(&auth, "alice").unwrap();
+        purge(&auth, "bob").unwrap();
+        purge(&other, "alice").unwrap();
         fs::remove_dir(root.join("sync")).unwrap();
         fs::remove_dir(root).unwrap();
     }

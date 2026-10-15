@@ -12,6 +12,8 @@ pub fn run() {
             auth::device_contact,
             sync_store::sync_load,
             sync_store::sync_save,
+            sync_store::sync_page,
+            sync_store::sync_read,
             sync_store::sync_remove,
             sync_store::sync_purge_actor,
             sync_store::sync_request

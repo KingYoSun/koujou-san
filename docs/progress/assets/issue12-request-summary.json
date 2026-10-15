@@ -1,0 +1,22 @@
+[
+  {
+    "round": 3,
+    "requests": 1094,
+    "pulls": 429,
+    "modes": {
+      "watch": 429
+    },
+    "max_known": 6,
+    "execution_paths": []
+  },
+  {
+    "round": 4,
+    "requests": 1623,
+    "pulls": 688,
+    "modes": {
+      "watch": 688
+    },
+    "max_known": 1,
+    "execution_paths": []
+  }
+]

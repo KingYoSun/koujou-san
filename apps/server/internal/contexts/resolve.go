@@ -241,5 +241,18 @@ func Resolve(ctx context.Context, load Loader, w string, request ResolveRequest,
 	text := string(encoded)
 	m.InputUTF8 = &text
 	m.Digest = digest(encoded)
-	return Resolution{Ready: true, Missing: []Gap{}, Manifest: m}
+	sources := []ResolvedSource{}
+	seen := map[string]bool{}
+	for _, placement := range m.Placements {
+		ref := placement.Ref
+		if seen[ref.key()] {
+			continue
+		}
+		seen[ref.key()] = true
+		unit := g.units[ref.key()]
+		if unit.Origin != nil || unit.External != nil || len(unit.Attachments) > 0 {
+			sources = append(sources, ResolvedSource{Ref: ref, Origin: unit.Origin, External: unit.External, Attachments: unit.Attachments})
+		}
+	}
+	return Resolution{Ready: true, Missing: []Gap{}, Manifest: m, Sources: sources}
 }
