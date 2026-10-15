@@ -46,3 +46,10 @@ Go全体テスト、`pnpm run check / pnpm run test / pnpm run build`は成功�
 CodeGraphで既存のContext解決・認可・API入口・検索利用側を確認した。新規graphindexは未索引だったため、その範囲は直接読んだ。新しい索引は作成していない。日本語文書はyomiyasuで推敲し、製品内で使う「正本」「固定版」などの用語は保持した。
 
 試験用PGの初期化が60秒を超え、最終serverへの切替前に接続した失敗も記録した。試験用の起動期限を標準と同じ180秒へ合わせ、最終PID 1がpostgresになりTCPで応答するまで待つよう共通runnerを修正した。設定や耐久性を弱めず、実PGの認可試験を再実行して成功した。Context・検索の実PG回帰も同じ入口で成功した。
+
+
+## CIとマージ後の確認
+
+[PR #42](https://github.com/KingYoSun/koujou-san/pull/42)の[CI 38754273370](https://github.com/KingYoSun/koujou-san/actions/runs/38754273370)はLinuxの全試験・build、Windows native、GitGuardianがすべて成功した。検証済みhead `aabf9f8addd637ded0c0f3026769d9124a6ca272`をマージし、main `1f9acedb7cd091ef9da10c5bb8c4fd665b991305`とのtree差分0を確認した。treeは双方`39c4e7f2444fe5bdf3b87be7ea676706b1d848eb`。#10をCloseした。
+
+標準ArcadeDBは既存volumeを維持して検証済み設定へ更新し、healthyを確認した。標準PGへmigration 007を適用した期限付きprobeで、4 Workspaceの投影がreadyになり、正本の位置と一致した。既存dev APIへの停止シグナルはツールの承認ポリシーで拒否されたため送信せず、旧プロセスは維持した。元のOAuthファイルを使わず、通常コードと別の期限付きprobeで確認した。localhost:8080の既存プロセスを最新コードへ切り替えたとは扱わない。

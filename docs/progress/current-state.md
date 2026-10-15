@@ -45,6 +45,10 @@
 
 ## Issue #10の判定
 
-状態: In progress（CI・マージ後照合待ち）。Scope revision 1。[PR #42](https://github.com/KingYoSun/koujou-san/pull/42)で、ユーザー採用済みの[計画](2026-10-15-issue-10-plan.md)を実装した。[検証記録](2026-10-15-issue-10-evidence.md)と[独立検品](2026-10-15-issue-10-inspection.md)は全AC/INVARに適合。CIの確認後にマージとtree照合を行う。
+状態: Complete。Scope revision 1。[PR #42](https://github.com/KingYoSun/koujou-san/pull/42)を全CI成功後にマージした。main `1f9acedb7cd091ef9da10c5bb8c4fd665b991305`と検証済みheadのtree差分は0。[検証記録](2026-10-15-issue-10-evidence.md)、[独立検品](2026-10-15-issue-10-inspection.md)、独立負荷再実行とマージ後照合が揃い、#10をCloseした。
 
-#11〜#34は未着手。Context編集GUI、Runner、グラフ探索GUI、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #11の判定
+
+状態: Planned（判断待ち）。Scope revision 1。[計画](2026-10-15-issue-11-plan.md)へ既存ACと有限fixtureを対応付けた。接続アプリの登録方式と外部送信範囲の許可者をユーザーへ提示し、判断を待つ。仕様とSDKの読取り調査を進め、製品実装はまだ行っていない。
+
+#12〜#34は未着手。Context編集GUI、Runner、グラフ探索GUI、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
