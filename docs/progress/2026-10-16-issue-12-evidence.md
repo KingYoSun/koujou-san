@@ -66,3 +66,9 @@ Resource権限の失効で本文と未送信下書きが消え、以前の入力
 実操作環境の長時間利用では、Goテストの既定10分と既存の短いaccess token期限にも達した。前者は実操作コマンドだけ35分へ延ばし、後者は専用gatewayで正規のrefreshを使うようにした。製品の認証期限や証明書検証は変更していない。実操作後のMCP試験も新しい正規tokenで再接続するようにした。修正前のtimeout・期限切れによる実行は成功に数えない。
 
 Windowsの既存所属解除を修正後に再確認し、所属の前提版を更新しても表示中の文書の基準版は失われなかった。同期・Context・DBの実PG試験も最終差分で再実行して成功した。探索Nodeから選んだ参照の実入力プレビューは最終環境で成功した。
+
+## PR・CIとマージ後照合
+
+[PR #44](https://github.com/KingYoSun/koujou-san/pull/44)の最終headは `7f98829799fb9539735074972976d5ac8be80f95`。[CI 38797022556](https://github.com/KingYoSun/koujou-san/actions/runs/38797022556)でLinux 4分20秒、Windows 6分37秒、GitGuardianが全て成功した。独立検品後の差分は検品記録・計画・現在状態の3文書のみ。
+
+2026-10-16（JST）にマージし、main `bb0c5cbb26250f2bb56b41193de91a20b32d7505`と最終headのtreeがともに`1ab3eff13af6798ad756922068d1e943872f9dbe`であること、`git diff <head> main --exit-code`が0であることを確認した。全受入条件・独立検品・実CI・マージ後照合が揃った後にIssueを手動Closeした。

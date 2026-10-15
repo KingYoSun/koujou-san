@@ -53,6 +53,10 @@
 
 ## Issue #12の判定
 
-状態: In progress。Scope revision 1。四粒度の編集・固定参照・版履歴、Scope整理、実検索/探索、入力プレビュー、Context単位の保存と旧下書きの移行を実装した。[計画](2026-10-16-issue-12-plan.md)、[検証記録](2026-10-16-issue-12-evidence.md)、[独立検品](2026-10-16-issue-12-inspection.md)を参照する。全AC・INVARはPASS、blockerは0件。CI、マージ後照合を残す。
+状態: Complete。Scope revision 1。[PR #44](https://github.com/KingYoSun/koujou-san/pull/44)を全CI成功後にマージした。main `bb0c5cbb26250f2bb56b41193de91a20b32d7505`と最終head `7f98829799fb9539735074972976d5ac8be80f95`のtreeは`1ab3eff13af6798ad756922068d1e943872f9dbe`で一致し、差分0。[検証記録](2026-10-16-issue-12-evidence.md)、[独立検品](2026-10-16-issue-12-inspection.md)、マージ後照合が揃い、#12をCloseした。
 
-#13〜#34は未着手。Runner、実行・検品の詳細画面、LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #13の判定
+
+状態: In progress。Scope revision 1。[計画](2026-10-16-issue-13-plan.md)と[先行調査](2026-10-16-issue-13-research.md)を参照する。GitHub App、定期照合の初期値60秒（変更可能）、変更観測履歴の期限なし保持が承認済み。実装・検証へ進む。
+
+#14〜#34は未着手。Runner、実行・検品の詳細画面、LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
