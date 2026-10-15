@@ -47,6 +47,24 @@ func (s *Service) csrf(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+// RequestUser applies the same identity and browser CSRF boundary to domain APIs.
+func (s *Service) RequestUser(w http.ResponseWriter, r *http.Request) (User, bool) {
+	if r.Method != "GET" && r.Method != "HEAD" && !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") && !s.csrf(w, r) {
+		return User{}, false
+	}
+	tokens, err := s.requestTokens(r)
+	if err != nil {
+		failure(w, err)
+		return User{}, false
+	}
+	user, err := s.User(r.Context(), tokens.Access)
+	if err != nil {
+		failure(w, err)
+		return User{}, false
+	}
+	return user, true
+}
+
 func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /auth/config", func(w http.ResponseWriter, r *http.Request) {
 		reply(w, 200, map[string]string{"issuer": s.Config.Issuer, "client_id": s.Config.NativeClient, "redirect_uri": s.Config.NativeRedirect, "api_url": s.Config.API, "site_url": s.Config.Site, "audience": s.Config.Audience})

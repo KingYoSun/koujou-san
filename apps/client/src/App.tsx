@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchHealth } from "./health";
 import { Account } from "./auth";
+import { Team } from "./team";
 
 type AppProps = {
   apiBaseUrl: string;
@@ -50,6 +51,7 @@ export function App({ apiBaseUrl, native }: AppProps) {
         </p>
       </section>
       <Account native={native} />
+      <Team native={native} />
       <footer>
         <p>Issueの受入条件と設計書を元に、ここから実装を始めます。</p>
         <p>

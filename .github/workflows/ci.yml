@@ -61,6 +61,9 @@ jobs:
       - name: Test Ory authentication
         run: pnpm run test:auth
 
+      - name: Test Workspace and device authorization
+        run: pnpm run test:access
+
       - name: Build
         run: pnpm run build
 

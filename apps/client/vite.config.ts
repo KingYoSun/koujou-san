@@ -31,6 +31,7 @@ export default defineConfig({
       "^/auth/(config|csrf|start|callback|me|logout|broker/|flow/)": apiProxy,
       "/healthz": apiProxy,
       "/readyz": apiProxy,
+      "/access/": apiProxy,
     },
     watch: { ignored: ["**/src-tauri/**"] },
   },

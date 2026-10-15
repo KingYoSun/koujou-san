@@ -45,6 +45,7 @@ pub struct Auth {
     file: PathBuf,
     tokens: Mutex<Tokens>,
     login_lock: Mutex<()>,
+    device_lock: Mutex<()>,
 }
 
 impl Auth {
@@ -75,6 +76,7 @@ impl Auth {
             file,
             tokens: Mutex::new(Tokens::default()),
             login_lock: Mutex::new(()),
+            device_lock: Mutex::new(()),
         })
     }
     fn config(&self) -> Result<Config, String> {
@@ -187,6 +189,10 @@ impl Auth {
         if !response.status().is_success() {
             return Err(if response.status() == 401 {
                 "authentication_required"
+            } else if response.status() == 403 {
+                "forbidden"
+            } else if response.status() == 409 {
+                "version_conflict"
             } else {
                 "api_request_failed"
             }
@@ -332,6 +338,180 @@ fn now() -> u64 {
         .unwrap_or_default()
         .as_secs()
 }
+
+#[derive(Default, Deserialize, Serialize)]
+struct DeviceSaved {
+    api: String,
+    token: String,
+    pending: Option<DevicePending>,
+}
+#[derive(Deserialize, Serialize)]
+struct DevicePending {
+    kind: String,
+    body: Value,
+}
+impl Auth {
+    fn device_file(&self, workspace: &str, user: &str) -> PathBuf {
+        self.file.with_file_name(format!(
+            "device-{}.dpapi",
+            hex_name(&format!("{}\0{workspace}\0{user}", self.api))
+        ))
+    }
+    pub fn device_identifier(&self) -> Result<String, String> {
+        let path = self.file.with_file_name("device-identifier.txt");
+        if let Ok(value) = fs::read_to_string(&path) {
+            return Ok(value);
+        }
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).map_err(|_| "credential_directory_failed")?
+        }
+        let value = Uuid::new_v4().to_string();
+        fs::write(path, &value).map_err(|_| "device_identifier_failed")?;
+        Ok(value)
+    }
+    fn save_device(&self, path: &std::path::Path, record: &DeviceSaved) -> Result<(), String> {
+        let bytes = serde_json::to_vec(record).map_err(|_| "encoding_failed")?;
+        fs::write(path, protect(&bytes)?).map_err(|_| "credential_storage_failed".into())
+    }
+    fn load_device(&self, path: &std::path::Path) -> Result<DeviceSaved, String> {
+        if !path.exists() {
+            return Ok(DeviceSaved {
+                api: self.api.to_string(),
+                ..Default::default()
+            });
+        }
+        let bytes = fs::read(path).map_err(|_| "credential_storage_failed")?;
+        let record: DeviceSaved = serde_json::from_slice(&unprotect(&bytes)?)
+            .map_err(|_| "invalid_device_credentials")?;
+        if record.api != self.api.as_str() {
+            return Err("credential_server_mismatch".into());
+        };
+        Ok(record)
+    }
+    pub fn device_enroll(&self, workspace: &str, name: &str) -> Result<Value, String> {
+        let _guard = self.device_lock.lock().map_err(|_| "device_state_failed")?;
+        let profile = self.request("/auth/me", "GET", Value::Null)?;
+        let user = profile["user"]["id"]
+            .as_str()
+            .ok_or("authentication_required")?;
+        let file = self.device_file(workspace, user);
+        let mut record = self.load_device(&file)?;
+        if record.pending.is_none() {
+            let identifier = self.device_identifier()?;
+            let mine = self.request(
+                &format!("/access/workspaces/{workspace}/mine?identifier={identifier}"),
+                "GET",
+                Value::Null,
+            )?;
+            let device = &mine["device"];
+            let (kind, id, version) = if device.is_null() {
+                (
+                    "device-register".to_owned(),
+                    Uuid::new_v4().to_string(),
+                    "0".to_owned(),
+                )
+            } else {
+                (
+                    "device-rotate".to_owned(),
+                    device["id"]
+                        .as_str()
+                        .ok_or("invalid_device_response")?
+                        .to_owned(),
+                    device["version"]
+                        .as_str()
+                        .ok_or("invalid_device_response")?
+                        .to_owned(),
+                )
+            };
+            record.pending = Some(DevicePending {
+                kind,
+                body: json!({"id":id,"identifier":identifier,"name":name,"operation_id":Uuid::new_v4().to_string(),"expected_version":version}),
+            });
+            self.save_device(&file, &record)?;
+        }
+        let pending = record.pending.as_ref().unwrap();
+        let result = self.request(
+            &format!("/access/workspaces/{workspace}/{}", pending.kind),
+            "POST",
+            pending.body.clone(),
+        );
+        let value = match result {
+            Ok(v) => v,
+            Err(e) => {
+                if e == "version_conflict" {
+                    record.pending = None;
+                    self.save_device(&file, &record)?
+                };
+                return Err(e);
+            }
+        };
+        record.token = value["credential"]
+            .as_str()
+            .ok_or("invalid_device_response")?
+            .to_owned();
+        record.pending = None;
+        self.save_device(&file, &record)?;
+        Ok(value["device"].clone())
+    }
+    pub fn device_contact(&self, workspace: &str, user: &str) -> Result<Value, String> {
+        let _guard = self.device_lock.lock().map_err(|_| "device_state_failed")?;
+        let record = self.load_device(&self.device_file(workspace, user))?;
+        if record.token.is_empty() {
+            return Err("device_not_registered".into());
+        }
+        let state = self
+            .client
+            .get(
+                self.api
+                    .join(&format!("access/workspaces/{workspace}/device-state"))
+                    .map_err(|_| "invalid_API_path")?,
+            )
+            .bearer_auth(&record.token)
+            .send()
+            .map_err(|_| "api_unavailable")?;
+        if !state.status().is_success() {
+            return Err("device_access_revoked".into());
+        }
+        let state: Value = state.json().map_err(|_| "invalid_device_response")?;
+        let response=self.client.post(self.api.join(&format!("access/workspaces/{workspace}/contact")).map_err(|_|"invalid_API_path")?).bearer_auth(&record.token)
+            .json(&json!({"operation_id":Uuid::new_v4().to_string(),"expected_version":state["device"]["version"]})).send().map_err(|_|"api_unavailable")?;
+        if !response.status().is_success() {
+            return Err("device_contact_failed".into());
+        }
+        Ok(json!({"contact":"confirmed"}))
+    }
+}
+
+#[tauri::command]
+pub async fn device_identifier(app: tauri::AppHandle) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || app.state::<Auth>().device_identifier())
+        .await
+        .map_err(|_| "device_task_failed")?
+}
+#[tauri::command]
+pub async fn device_enroll(
+    app: tauri::AppHandle,
+    workspace: String,
+    name: String,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<Auth>().device_enroll(&workspace, &name)
+    })
+    .await
+    .map_err(|_| "device_task_failed")?
+}
+#[tauri::command]
+pub async fn device_contact(
+    app: tauri::AppHandle,
+    workspace: String,
+    user: String,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<Auth>().device_contact(&workspace, &user)
+    })
+    .await
+    .map_err(|_| "device_task_failed")?
+}
 fn respond(stream: &mut TcpStream, status: &str, text: &str) {
     let _ = write!(
         stream,
@@ -433,9 +613,19 @@ pub async fn api_request(
     method: String,
     body: Value,
 ) -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || app.state::<Auth>().request(&path, &method, body))
-        .await
-        .map_err(|_| "request_task_failed")?
+    tauri::async_runtime::spawn_blocking(move || {
+        let result = app.state::<Auth>().request(&path, &method, body)?;
+        public_response(result)
+    })
+    .await
+    .map_err(|_| "request_task_failed")?
+}
+fn public_response(value: Value) -> Result<Value, String> {
+    if value.get("credential").is_some() {
+        Err("private_native_operation_required".into())
+    } else {
+        Ok(value)
+    }
 }
 #[tauri::command]
 pub async fn open_account(app: tauri::AppHandle, path: String) -> Result<(), String> {
@@ -492,6 +682,83 @@ mod tests {
         let encrypted = protect(value).unwrap();
         assert_ne!(encrypted, value);
         assert_eq!(unprotect(&encrypted).unwrap(), value);
+    }
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "requires the development API/Ory and an explicitly selected fixture OAuth file; close the development app first"]
+    fn live_workspace_device_lifecycle() {
+        let file = PathBuf::from(
+            std::env::var("KOUJOU_NATIVE_TEST_FILE").expect("explicit fixture OAuth file required"),
+        );
+        let api = "https://localhost:8080/";
+        let auth = Auth::new(api, file.clone()).unwrap();
+        let profile = auth.request("/auth/me", "GET", Value::Null).unwrap();
+        let user = profile["user"]["id"].as_str().unwrap();
+        let workspace = Uuid::new_v4().to_string();
+        auth.request(&format!("/access/workspaces/{workspace}/create"),"POST",json!({"name":"Windows device fixture","operation_id":Uuid::new_v4().to_string(),"expected_version":"0"})).unwrap();
+        let first = auth.device_enroll(&workspace, "Windows fixture").unwrap();
+        assert!(first["enabled"].as_bool().unwrap());
+        assert_eq!(first["can_input"], false);
+        assert_eq!(first["can_report"], false);
+        assert!(first.get("credential").is_none());
+        let path = auth.device_file(&workspace, user);
+        let encrypted = fs::read(&path).unwrap();
+        let saved = auth.load_device(&path).unwrap();
+        assert!(!String::from_utf8_lossy(&encrypted).contains(&saved.token));
+        assert!(saved.pending.is_none());
+        auth.device_contact(&workspace, user).unwrap();
+        let original = saved.token;
+        drop(auth);
+        let restarted = Auth::new(api, file).unwrap();
+        restarted.device_contact(&workspace, user).unwrap();
+        let second = restarted
+            .device_enroll(&workspace, "Windows fixture")
+            .unwrap();
+        let current = restarted.load_device(&path).unwrap();
+        assert!(original != current.token);
+        let endpoint = restarted
+            .api
+            .join(&format!("access/workspaces/{workspace}/device-state"))
+            .unwrap();
+        assert_eq!(
+            restarted
+                .client
+                .get(endpoint)
+                .bearer_auth(original)
+                .send()
+                .unwrap()
+                .status()
+                .as_u16(),
+            403
+        );
+        let id = second["id"].as_str().unwrap();
+        let private=restarted.request(&format!("/access/workspaces/{workspace}/device-rotate"),"POST",json!({"id":id,"operation_id":Uuid::new_v4().to_string(),"expected_version":second["version"]})).unwrap();
+        assert!(
+            matches!(public_response(private),Err(e) if e=="private_native_operation_required")
+        );
+        restarted
+            .device_enroll(&workspace, "Windows fixture")
+            .unwrap();
+        restarted.device_contact(&workspace, user).unwrap();
+        let members = restarted
+            .request(
+                &format!("/access/workspaces/{workspace}/members"),
+                "GET",
+                Value::Null,
+            )
+            .unwrap();
+        let member = members["data"]["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|m| m["id"] == user)
+            .unwrap();
+        restarted.request(&format!("/access/workspaces/{workspace}/leave"),"POST",json!({"operation_id":Uuid::new_v4().to_string(),"expected_version":member["version"]})).unwrap();
+        assert_eq!(
+            restarted.device_contact(&workspace, user),
+            Err("device_access_revoked".into())
+        );
+        fs::remove_file(path).unwrap();
     }
     #[cfg(windows)]
     #[test]

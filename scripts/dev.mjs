@@ -243,7 +243,7 @@ async function infra(command) {
   await run(`docker${exe}`, [...args, ...actions[command]]);
 }
 
-async function testDatabase(authentication = false) {
+async function testDatabase(authentication = false, access = false) {
   await resolveGo();
   if (!env.KOUJOU_DB_PASSWORD) throw new Error("Run pnpm run setup first.");
   const project = `koujou-san-db-test-${randomBytes(6).toString("hex")}`;
@@ -321,9 +321,17 @@ async function testDatabase(authentication = false) {
     env.KOUJOU_TEST_PROJECT = project;
     await goRun([
       "test",
-      authentication ? "./internal/auth" : "./internal/persistence",
+      authentication
+        ? "./internal/auth"
+        : access
+          ? "./internal/access"
+          : "./internal/persistence",
       "-run",
-      authentication ? "^TestOryIntegration$" : "^TestPostgres$",
+      authentication
+        ? "^TestOryIntegration$"
+        : access
+          ? "^TestAccessPostgres$"
+          : "^TestPostgres$",
       "-count=1",
       "-v",
     ]);
@@ -358,6 +366,7 @@ const tasks = {
   doctor,
   "test:database": () => testDatabase(false),
   "test:auth": () => testDatabase(true),
+  "test:access": () => testDatabase(false, true),
   check: async () => {
     await resolveGo();
     const unformatted = await run(

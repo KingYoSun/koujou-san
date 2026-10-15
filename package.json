@@ -16,6 +16,7 @@
     "test": "node scripts/dev.mjs test",
     "test:database": "node scripts/dev.mjs test:database",
     "test:auth": "node scripts/dev.mjs test:auth",
+    "test:access": "node scripts/dev.mjs test:access",
     "build": "node scripts/dev.mjs build",
     "dev": "node scripts/dev.mjs dev:web",
     "dev:api": "node scripts/dev.mjs dev:api",
