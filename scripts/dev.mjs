@@ -180,6 +180,10 @@ async function prepareAuth() {
   env.KOUJOU_TLS_KEY ??= path.join(root, ".cache/tls/key.pem");
   env.KOUJOU_DEV_CA_FILE ??= env.KOUJOU_TLS_CERT;
   env.KOUJOU_DATABASE_URL ??= `postgresql://koujou:${encodeURIComponent(env.KOUJOU_DB_PASSWORD)}@127.0.0.1:15432/koujou?sslmode=disable`;
+  env.KOUJOU_SEARCH_DIR = path.resolve(
+    root,
+    env.KOUJOU_SEARCH_DIR || ".cache/search",
+  );
 }
 
 function checkNode() {
@@ -243,7 +247,7 @@ async function infra(command) {
   await run(`docker${exe}`, [...args, ...actions[command]]);
 }
 
-async function testDatabase(suite = "persistence") {
+async function testDatabase(suite = "persistence", testName) {
   const authentication = suite === "auth";
   await resolveGo();
   if (!env.KOUJOU_DB_PASSWORD) throw new Error("Run pnpm run setup first.");
@@ -324,7 +328,7 @@ async function testDatabase(suite = "persistence") {
       "test",
       `./internal/${suite}`,
       "-run",
-      `^${{ auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", sharedsync: "TestSyncPostgres", persistence: "TestPostgres" }[suite]}$`,
+      `^${testName ?? { auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", sharedsync: "TestSyncPostgres", searchindex: "TestSearchPostgres", persistence: "TestPostgres" }[suite]}$`,
       "-count=1",
       "-v",
     ]);
@@ -355,6 +359,14 @@ async function testDatabase(suite = "persistence") {
 }
 
 const tasks = {
+  "test:search": () => testDatabase("searchindex"),
+  "test:search-load": () => {
+    env.KOUJOU_SEARCH_LOAD_REPORT = path.join(
+      root,
+      "test-results/search-load.json",
+    );
+    return testDatabase("searchindex", "TestSearchLoad");
+  },
   setup,
   doctor,
   "test:database": () => testDatabase(),

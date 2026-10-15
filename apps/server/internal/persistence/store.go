@@ -33,6 +33,9 @@ var contextSchema string
 //go:embed 005_sync.sql
 var syncSchema string
 
+//go:embed 006_search.sql
+var searchSchema string
+
 type Store struct{ pool *pgxpool.Pool }
 
 func Open(ctx context.Context, url string) (*Store, error) {
@@ -41,7 +44,7 @@ func Open(ctx context.Context, url string) (*Store, error) {
 		return nil, errors.New("invalid PostgreSQL configuration")
 	}
 	if err = pool.Ping(ctx); err == nil {
-		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema, contextSchema, syncSchema})
+		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema, contextSchema, syncSchema, searchSchema})
 	}
 	if err != nil {
 		pool.Close()
