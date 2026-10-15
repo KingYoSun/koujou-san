@@ -41,6 +41,6 @@
 
 ## Issue #9の判定
 
-状態: In progress。Scope revision 1。ユーザーが採用した検索品質・負荷目標を[計画](2026-10-15-issue-9-plan.md)へ固定した。Bleveの公式資料と小さなAnalyzer比較を確認し、検索・投影・再構築の実装を進める。
+状態: In progress。Scope revision 1。ユーザーが採用した[品質・負荷目標](2026-10-15-issue-9-plan.md)を満たし、検索・投影・再構築を実装した。[検証記録](2026-10-15-issue-9-evidence.md)と[独立検品](2026-10-15-issue-9-inspection.md)は全条件PASS、blockerなし。CIとマージ後照合は未完了。
 
 #10〜#34は未着手。Context編集GUI、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。

@@ -1,12 +1,12 @@
 # 0008: Bleve検索の投影と再構築
 
-- 状態: Proposed
+- 状態: Accepted
 - 日付: 2026-10-15
 - 対象: Issue #9、[計画と評価基準](../progress/2026-10-15-issue-9-plan.md)
 
 ## 配置と索引
 
-Bleve 2.6.1をGo API内の専用コンポーネントへ置く案を検証する。索引・反映処理・世代切替の所有者を一つにし、通常のAPI処理から分離する。別サービスに必要な通信・認証・運用の追加を避け、この配置で合意負荷とAPIの応答時間を測る。配置は測定後に確定する。
+Bleve 2.6.1をGo API内の専用コンポーネントへ置く。索引・反映処理・世代切替の所有者を一つにし、通常のAPI処理から分離する。別サービスに必要な通信・認証・運用の追加を避け、この配置で合意した品質・負荷目標を満たしたため採用する。別サービスの性能を測定済みとは扱わない。
 
 本文はCJK Analyzer、ID・種別・版・Workspace・直接Scope所属・タグは完全一致のフィールドへ分ける。Contextの各不変版を索引へ保持し、通常検索と指定版を区別する。文書の固定子参照から検索する場合も、子へScope所属を複製しない。本文候補に含まれる参照先の現在認可を、返却前にPostgreSQLで確認する。
 
@@ -24,4 +24,6 @@ Bleve 2.6.1をGo API内の専用コンポーネントへ置く案を検証する
 
 ## 根拠と終了条件
 
-[公式リリース](https://github.com/blevesearch/bleve/releases/tag/v2.6.1)と[Analyzer資料](https://blevesearch.com/docs/Analyzers/)、[採用版のCJK実装](https://github.com/blevesearch/bleve/blob/v2.6.1/analysis/lang/cjk/analyzer_cjk.go)を確認した。日本語、英語、コード識別子を含む小さな比較fixtureはstandard/CJKとも検索できた。品質の採否は合意した40検索と負荷試験で判定し、その結果を得るまでAcceptedにしない。
+[公式リリース](https://github.com/blevesearch/bleve/releases/tag/v2.6.1)と[Analyzer資料](https://blevesearch.com/docs/Analyzers/)、[採用版のCJK実装](https://github.com/blevesearch/bleve/blob/v2.6.1/analysis/lang/cjk/analyzer_cjk.go)を確認した。日本語、英語、コード識別子を含む小さな比較fixtureはstandard/CJKとも検索できた。CJKの幅・小文字・bigramの処理を採用し、四粒度の正解40検索を全件上位10件以内で取得した。
+
+合意した負荷でp95 23.5 ms、反映遅延1.013秒、再構築48.877秒、最大RSS138.6 MiBとなった。初回とbatch化だけの試験では再構築目標に未達だった。件数・データ・目標を変えず、索引書込みをまとめ、所属対象から最新版を取得するSQLへ変更して達成した。[検証記録](../progress/2026-10-15-issue-9-evidence.md)を参照する。
