@@ -21,9 +21,10 @@ export function App({ apiBaseUrl, native }: AppProps) {
       <header>
         <p className="eyebrow">Software Factory Orchestra</p>
         <h1>koujou-san</h1>
-        <p className="introduction">開発環境の起動確認</p>
+        <p className="introduction">Contextを整理し、必要な情報をつなぐ</p>
       </header>
-      <section className="panel" aria-labelledby="environment-title">
+      <details className="panel" aria-labelledby="environment-title">
+        <summary>接続の状態</summary>
         <h2 id="environment-title">環境の状態</h2>
         <dl className="status-list">
           <div>
@@ -41,19 +42,19 @@ export function App({ apiBaseUrl, native }: AppProps) {
             </dd>
           </div>
           <div>
-            <dt>実装段階</dt>
-            <dd>環境構築</dd>
+            <dt>共有状態</dt>
+            <dd>Go API・PostgreSQLで確定</dd>
           </div>
         </dl>
         <p className="note">
-          段階Aの認証・共有状態・検索・観測機能は、これから実装します。
+          Contextの取得・保存・入力選択と、対象作業の実行は別の操作です。
           APIの表示はプロセスの起動確認です。
         </p>
-      </section>
+      </details>
       <Account native={native} />
       <Team native={native} />
       <footer>
-        <p>Issueの受入条件と設計書を元に、ここから実装を始めます。</p>
+        <p>Contextの編集・所属変更・プレビューから実行は始まりません。</p>
         <p>
           {native
             ? "ネイティブの実行機構は未実装です。"

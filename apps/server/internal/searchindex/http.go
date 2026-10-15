@@ -17,6 +17,7 @@ func send(w http.ResponseWriter, status int, v any) {
 }
 func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /search/workspaces/{workspace}/query", s.queryHTTP)
+	mux.HandleFunc("POST /search/workspaces/{workspace}/candidates", s.candidatesHTTP)
 	mux.HandleFunc("POST /search/workspaces/{workspace}/resolve", s.resolveHTTP)
 }
 func (s *Service) principal(w http.ResponseWriter, r *http.Request) (access.Principal, bool) {
@@ -108,4 +109,32 @@ func (s *Service) resolveHTTP(w http.ResponseWriter, r *http.Request) {
 		status = 409
 	}
 	send(w, status, result)
+}
+
+func (s *Service) candidatesHTTP(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.principal(w, r)
+	if !ok {
+		return
+	}
+	workspace := r.PathValue("workspace")
+	var request Request
+	if decode(r, &request) != nil {
+		send(w, 400, failed(workspace, "invalid_request", "invalid_search"))
+		return
+	}
+	result, _ := s.Query(r.Context(), p, workspace, request)
+	type page struct {
+		Items    []contexts.Candidate       `json:"items"`
+		Count    int                        `json:"count"`
+		Evidence contexts.CandidateEvidence `json:"evidence"`
+	}
+	response := apicontract.Response[page]{Meta: result.Meta, Error: result.Error}
+	if result.Data != nil {
+		value := page{Items: []contexts.Candidate{}, Count: result.Data.Count, Evidence: result.Data.Evidence}
+		for _, record := range result.Data.Items {
+			value.Items = append(value.Items, contexts.CandidateOf(record))
+		}
+		response.Data = &value
+	}
+	send(w, searchStatus(result), response)
 }

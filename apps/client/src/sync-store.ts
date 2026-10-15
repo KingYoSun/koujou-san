@@ -1,76 +1,283 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { SavedSync } from "./sync-engine";
+import type { Draft, SavedSync, SyncItem } from "./sync-engine";
 
 export type SyncNamespace = { api: string; user: string; workspace: string };
+export type LocalEntry = {
+  key: string;
+  item?: SyncItem;
+  draft?: Draft;
+  receipt?: SavedSync["receipts"][string];
+};
+export type LocalPage = { entries: LocalEntry[]; next: string | null };
+export type SyncHeader = Omit<SavedSync, "items" | "drafts" | "receipts">;
 export interface SyncStorage {
   load(namespace: SyncNamespace): Promise<SavedSync | undefined>;
-  save(namespace: SyncNamespace, value: SavedSync): Promise<void>;
+  save(
+    namespace: SyncNamespace,
+    value: SavedSync,
+    keys: string[],
+  ): Promise<void>;
+  page(
+    namespace: SyncNamespace,
+    after?: string,
+    draftsOnly?: boolean,
+  ): Promise<LocalPage>;
+  read(namespace: SyncNamespace, key: string): Promise<LocalEntry | undefined>;
   remove(namespace: SyncNamespace): Promise<void>;
 }
-const key = (n: SyncNamespace) => JSON.stringify([n.api, n.user, n.workspace]);
+const namespace = (n: SyncNamespace) => [n.api, n.user, n.workspace];
+const legacyKey = (n: SyncNamespace) => JSON.stringify(namespace(n));
+export function localEntry(value: SavedSync, key: string): LocalEntry {
+  return {
+    key,
+    item: value.items[key],
+    draft: value.drafts[key],
+    receipt: value.receipts[key],
+  };
+}
+export function syncHeader(value: SavedSync): SyncHeader {
+  const {
+    items: _items,
+    drafts: _drafts,
+    receipts: _receipts,
+    ...header
+  } = value;
+  return header;
+}
 async function database(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open("koujou-sync-v1", 1);
-    request.onupgradeneeded = () => request.result.createObjectStore("states");
+    const request = indexedDB.open("koujou-sync-v1", 2);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains("states"))
+        db.createObjectStore("states");
+      db.createObjectStore("meta");
+      const records = db.createObjectStore("records", {
+        keyPath: ["api", "user", "workspace", "key"],
+      });
+      records.createIndex("actor", "user");
+      records.createIndex("drafts", [
+        "api",
+        "user",
+        "workspace",
+        "dirty",
+        "key",
+      ]);
+    };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(new Error("下書きの保存領域を開けません。"));
   });
 }
+function row(n: SyncNamespace, entry: LocalEntry) {
+  return { ...n, ...entry, dirty: entry.draft ? 1 : 0 };
+}
 async function transaction<T>(
+  stores: string[],
   write: boolean,
-  run: (store: IDBObjectStore) => IDBRequest<T>,
+  run: (tx: IDBTransaction, done: (value: T) => void) => void,
 ): Promise<T> {
   const db = await database();
   try {
     return await new Promise<T>((resolve, reject) => {
-      const tx = db.transaction("states", write ? "readwrite" : "readonly");
-      const request = run(tx.objectStore("states"));
-      tx.oncomplete = () => resolve(request.result);
-      tx.onerror = () => reject(new Error("下書きの保存を確認できません。"));
-      tx.onabort = () => reject(new Error("下書きの保存を確認できません。"));
+      const tx = db.transaction(stores, write ? "readwrite" : "readonly");
+      let value: T;
+      tx.oncomplete = () => resolve(value);
+      tx.onerror = tx.onabort = () =>
+        reject(new Error("下書きの保存を確認できません。"));
+      run(tx, (result) => {
+        value = result;
+      });
     });
   } finally {
     db.close();
   }
 }
+async function migrate(n: SyncNamespace) {
+  // Removing the legacy value and committing every entry are atomic. An aborted
+  // transaction leaves the original Workspace blob available for the next try.
+  await transaction<void>(["states", "records", "meta"], true, (tx, done) => {
+    const old = tx.objectStore("states").get(legacyKey(n));
+    old.onsuccess = () => {
+      try {
+        const value = old.result as SavedSync | undefined;
+        if (value) {
+          for (const key of new Set([
+            ...Object.keys(value.items),
+            ...Object.keys(value.drafts),
+            ...Object.keys(value.receipts),
+          ]))
+            tx.objectStore("records").put(row(n, localEntry(value, key)));
+          tx.objectStore("meta").put(syncHeader(value), namespace(n));
+          tx.objectStore("states").delete(legacyKey(n));
+        }
+        done();
+      } catch {
+        tx.abort();
+      }
+    };
+  });
+}
+function range(n: SyncNamespace, after = "", draftsOnly = false) {
+  const prefix = draftsOnly ? [...namespace(n), 1] : namespace(n);
+  return IDBKeyRange.bound([...prefix, after], [...prefix, []], true, true);
+}
 export function syncStorage(native: boolean): SyncStorage {
-  return {
+  const migrations = new Map<string, Promise<void>>();
+  const ensure = (n: SyncNamespace) => {
+    const key = legacyKey(n);
+    let pending = migrations.get(key);
+    if (!pending) {
+      pending = migrate(n).catch((error) => {
+        migrations.delete(key);
+        throw error;
+      });
+      migrations.set(key, pending);
+    }
+    return pending;
+  };
+  const args = (n: SyncNamespace) => ({ user: n.user, workspace: n.workspace });
+  const storage: SyncStorage = {
     async load(n) {
-      const value = native
-        ? await invoke<SavedSync | null>("sync_load", {
-            user: n.user,
-            workspace: n.workspace,
-          })
-        : ((await transaction(false, (store) => store.get(key(n)))) as
-            SavedSync | undefined);
-      return value ?? undefined;
-    },
-    async save(n, value) {
+      let header: SyncHeader | undefined;
       if (native)
-        await invoke("sync_save", {
-          user: n.user,
-          workspace: n.workspace,
-          payload: value,
+        header =
+          (await invoke<SyncHeader | null>("sync_load", args(n))) ?? undefined;
+      else {
+        await ensure(n);
+        header = await transaction<SyncHeader | undefined>(
+          ["meta"],
+          false,
+          (tx, done) => {
+            const request = tx.objectStore("meta").get(namespace(n));
+            request.onsuccess = () =>
+              done(request.result as SyncHeader | undefined);
+          },
+        );
+      }
+      if (!header) return;
+      const value: SavedSync = {
+        ...header,
+        items: {},
+        drafts: {},
+        receipts: {},
+      };
+      // Startup is bounded even if migration preserved millions of records.
+      const [cached, drafts] = await Promise.all([
+        storage.page(n),
+        storage.page(n, undefined, true),
+      ]);
+      for (const entry of [...cached.entries, ...drafts.entries]) {
+        if (entry.item) value.items[entry.key] = entry.item;
+        if (entry.draft) value.drafts[entry.key] = entry.draft;
+        if (entry.receipt) value.receipts[entry.key] = entry.receipt;
+      }
+      return value;
+    },
+    async save(n, value, keys) {
+      if (!native) await ensure(n);
+      const header = syncHeader(value);
+      const entries = keys.map((key) => localEntry(value, key));
+      if (native) await invoke("sync_save", { ...args(n), header, entries });
+      else
+        await transaction<void>(["records", "meta"], true, (tx, done) => {
+          tx.objectStore("meta").put(header, namespace(n));
+          for (const entry of entries) {
+            if (entry.item || entry.draft || entry.receipt)
+              tx.objectStore("records").put(row(n, entry));
+            else tx.objectStore("records").delete([...namespace(n), entry.key]);
+          }
+          done();
         });
-      else await transaction(true, (store) => store.put(value, key(n)));
+    },
+    async page(n, after = "", draftsOnly = false) {
+      if (!native) await ensure(n);
+      if (native)
+        return invoke<LocalPage>("sync_page", {
+          ...args(n),
+          after,
+          draftsOnly,
+        });
+      return transaction<LocalPage>(["records"], false, (tx, done) => {
+        const records = tx.objectStore("records");
+        const request = draftsOnly
+          ? records.index("drafts").getAll(range(n, after, true), 101)
+          : records.getAll(range(n, after), 101);
+        request.onsuccess = () => {
+          const entries = request.result as LocalEntry[];
+          const more = entries.length > 100;
+          done({
+            entries: entries.slice(0, 100),
+            next: more ? entries[99]!.key : null,
+          });
+        };
+      });
+    },
+    async read(n, key) {
+      if (!native) await ensure(n);
+      if (native)
+        return (
+          (await invoke<LocalEntry | null>("sync_read", { ...args(n), key })) ??
+          undefined
+        );
+      return transaction<LocalEntry | undefined>(
+        ["records"],
+        false,
+        (tx, done) => {
+          const request = tx.objectStore("records").get([...namespace(n), key]);
+          request.onsuccess = () =>
+            done(request.result as LocalEntry | undefined);
+        },
+      );
     },
     async remove(n) {
-      if (native)
-        await invoke("sync_remove", { user: n.user, workspace: n.workspace });
-      else await transaction(true, (store) => store.delete(key(n)));
+      if (native) {
+        await invoke("sync_remove", args(n));
+        return;
+      }
+      await transaction<void>(
+        ["states", "records", "meta"],
+        true,
+        (tx, done) => {
+          tx.objectStore("states").delete(legacyKey(n));
+          tx.objectStore("meta").delete(namespace(n));
+          tx.objectStore("records").delete(range(n));
+          done();
+        },
+      );
     },
   };
+  return storage;
 }
 export async function purgeStoredActor(native: boolean, user: string) {
   if (native) {
     await invoke("sync_purge_actor", { user });
     return;
   }
-  const keys = await transaction(false, (store) => store.getAllKeys());
-  for (const candidate of keys) {
-    if (typeof candidate !== "string") continue;
-    const namespace = JSON.parse(candidate) as [string, string, string];
-    if (namespace[1] === user)
-      await transaction(true, (store) => store.delete(candidate));
-  }
+  await transaction<void>(["states", "records", "meta"], true, (tx, done) => {
+    const records = tx
+      .objectStore("records")
+      .index("actor")
+      .openCursor(IDBKeyRange.only(user));
+    records.onsuccess = () => {
+      const cursor = records.result;
+      if (cursor) {
+        cursor.delete();
+        cursor.continue();
+      }
+    };
+    for (const name of ["states", "meta"]) {
+      const request = tx.objectStore(name).openKeyCursor();
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (!cursor) return;
+        const key =
+          typeof cursor.key === "string"
+            ? (JSON.parse(cursor.key) as unknown[])
+            : (cursor.key as unknown[]);
+        if (key[1] === user) tx.objectStore(name).delete(cursor.primaryKey);
+        cursor.continue();
+      };
+    }
+    done();
+  });
 }

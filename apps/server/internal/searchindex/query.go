@@ -142,7 +142,7 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 			if deleted {
 				continue
 			}
-			if len(r.Revisions) == 0 && version != src.Ref.Revision {
+			if len(r.Revisions) == 0 && len(r.Refs) == 0 && version != src.Ref.Revision {
 				stale = true
 				continue
 			}
@@ -231,6 +231,21 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 		}
 		if err = rows.Err(); err != nil {
 			return failed(w, "unavailable", "storage_unavailable"), err
+		}
+	}
+	for _, ref := range r.Refs {
+		if _, err := s.Contexts.Read(ctx, p, w, ref); err != nil {
+			if permissionError(err) {
+				continue
+			}
+			return failed(w, "unavailable", "required_version_pending"), err
+		}
+		doc, err := s.index.Document(docID(w, ref))
+		if err != nil {
+			return failed(w, "unavailable", "search_unavailable"), err
+		}
+		if doc == nil {
+			stale = true
 		}
 	}
 	state, reason := "complete", ""

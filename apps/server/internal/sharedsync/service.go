@@ -36,6 +36,7 @@ type Request struct {
 	Position string              `json:"position,omitempty"`
 	Through  string              `json:"through,omitempty"`
 	Known    []contexts.Identity `json:"known,omitempty"`
+	Versions []contexts.Ref      `json:"versions,omitempty"`
 }
 type Item struct {
 	Record   contexts.Record `json:"record"`
@@ -122,6 +123,9 @@ func (s *Service) item(ctx context.Context, p access.Principal, w string, r cont
 func (s *Service) Pull(ctx context.Context, p access.Principal, w string, request Request) (apicontract.Response[Frame], error) {
 	if err := s.Access.Check(ctx, p, w, "", "read"); err != nil {
 		return apicontract.Response[Frame]{}, err
+	}
+	if request.Mode == "watch" {
+		return s.watch(ctx, p, w, request)
 	}
 	if len(request.Known) > pageSize || (request.Mode != "snapshot" && request.Mode != "changes") {
 		return apicontract.Response[Frame]{}, errInput

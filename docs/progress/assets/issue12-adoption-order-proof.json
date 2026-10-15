@@ -1,0 +1,48 @@
+{
+  "old": {
+    "ref": {
+      "kind": "paragraph",
+      "id": "ui-p1",
+      "revision": "5V3FFK3KWQDLDMYZYBMOILTK6A"
+    },
+    "value": {
+      "kind": "paragraph",
+      "name": "受入: 一つ目の段落",
+      "children": [
+        {
+          "id": "ui-shared",
+          "kind": "sentence",
+          "revision": "5RBDATRXX3GBUAMBETEKKRG7L7"
+        },
+        {
+          "id": "ui-origin",
+          "kind": "sentence",
+          "revision": "H7CAMBQ76V5554SIXE5MUAXT7G"
+        }
+      ]
+    }
+  },
+  "current": {
+    "ref": {
+      "kind": "paragraph",
+      "id": "ui-p1",
+      "revision": "QYICNPW72E667LL2NDQ6JWSFCF"
+    },
+    "value": {
+      "kind": "paragraph",
+      "name": "受入: 一つ目の段落",
+      "children": [
+        {
+          "id": "ui-shared",
+          "kind": "sentence",
+          "revision": "RWH7BGMIZW7VQIT3CEP7NT6MB2"
+        },
+        {
+          "id": "ui-origin",
+          "kind": "sentence",
+          "revision": "H7CAMBQ76V5554SIXE5MUAXT7G"
+        }
+      ]
+    }
+  }
+}

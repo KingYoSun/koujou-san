@@ -115,10 +115,17 @@ type Manifest struct {
 	Duplicates  []Ref       `json:"duplicates"`
 	ReadStatus  string      `json:"read_status"`
 }
+type ResolvedSource struct {
+	Ref         Ref     `json:"ref"`
+	Origin      *Origin `json:"origin,omitempty"`
+	External    *Fixed  `json:"external,omitempty"`
+	Attachments []Fixed `json:"attachments,omitempty"`
+}
 type Resolution struct {
-	Ready    bool      `json:"ready"`
-	Missing  []Gap     `json:"missing"`
-	Manifest *Manifest `json:"manifest,omitempty"`
+	Ready    bool             `json:"ready"`
+	Missing  []Gap            `json:"missing"`
+	Manifest *Manifest        `json:"manifest,omitempty"`
+	Sources  []ResolvedSource `json:"sources,omitempty"`
 }
 type ResolveRequest struct {
 	RunID     string    `json:"run_id"`

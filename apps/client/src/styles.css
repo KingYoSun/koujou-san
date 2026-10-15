@@ -247,34 +247,217 @@ button:disabled {
   display: block;
   width: 100%;
 }
-.shared-sync {
-  margin-top: 2rem;
-  padding-top: 1.5rem;
-  border-top: 1px solid #d1d5db;
+/* Context pages share the same layout and interaction in Web and Tauri. */
+.shell {
+  max-width: 1540px;
+  padding: 32px 24px;
 }
-.shared-sync label {
+.context-workspace {
+  margin-top: 28px;
+  border-top: 1px solid var(--border);
+  padding-top: 28px;
+}
+.context-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.context-heading h2 {
+  font-size: 26px;
+  margin: 0;
+}
+.context-heading p {
+  margin-top: 8px;
+}
+.context-connection {
   display: grid;
-  gap: 0.5rem;
-  margin: 1rem 0;
+  gap: 6px;
+  align-content: start;
 }
-.shared-sync select,
-.shared-sync textarea {
+.context-layout {
+  display: grid;
+  grid-template-columns: minmax(230px, 0.85fr) minmax(320px, 1.3fr) minmax(
+      260px,
+      1fr
+    );
+  gap: 24px;
+  align-items: start;
+}
+.context-layout > * {
+  min-width: 0;
+}
+.context-explorer,
+.context-editor,
+.context-preview {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+.context-explorer {
+  background: #f8faff;
+}
+.context-preview {
+  background: #fbfcfe;
+}
+.context-layout h3 {
+  margin: 0 0 18px;
+  font-size: 20px;
+}
+.context-layout h4 {
+  margin: 24px 0 10px;
+  font-weight: 650;
+}
+.context-layout h5 {
+  font-weight: 600;
+}
+.context-layout label {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  font-size: 14px;
+}
+.context-layout label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+}
+.context-layout input:not([type="checkbox"]),
+.context-layout textarea,
+.context-layout select {
   width: 100%;
   min-width: 0;
-  padding: 0.75rem;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
   font: inherit;
-  border: 1px solid #d1d5db;
-  border-radius: 0.5rem;
-  background: white;
-  color: inherit;
+  box-sizing: border-box;
 }
-.shared-sync code,
-.synced-content {
-  overflow-wrap: anywhere;
+.context-layout textarea {
+  min-height: 70px;
+  resize: vertical;
+}
+.context-layout button {
+  padding: 7px 10px;
+  font-size: 13px;
+  background: #fff;
+  color: var(--primary);
+  border-color: #cbd5e1;
+  margin: 3px 0;
+}
+.context-layout button.primary {
+  background: var(--primary);
+  color: white;
+}
+.context-layout button:disabled {
+  cursor: not-allowed;
+}
+.context-layout pre {
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  background: #f1f4f8;
+  border-radius: 6px;
+  max-height: 420px;
+  overflow: auto;
+  font-size: 12px;
 }
-.sync-draft {
-  border-left: 3px solid #253767;
-  padding: 0.5rem 1rem;
-  margin: 1rem 0;
+.context-layout summary,
+.workspace-management > summary {
+  cursor: pointer;
+  font-weight: 600;
+  margin: 16px 0;
+}
+.context-tabs,
+.context-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.context-tabs button[aria-pressed="true"] {
+  background: var(--primary);
+  color: #fff;
+}
+.context-meta,
+.context-layout small {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  display: block;
+}
+.context-warning {
+  color: #854d0e;
+  padding: 10px;
+  border-left: 3px solid #d97706;
+  background: #fffbeb;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.context-success {
+  color: #166534;
+  background: #f0fdf4;
+  padding: 10px;
+  font-size: 13px;
+}
+.context-candidates,
+.context-ref-list {
+  list-style: none;
+  margin: 12px 0;
+  padding: 0 !important;
+}
+.context-candidates li,
+.context-ref-list li {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.context-layout .link-button {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  display: grid;
+  gap: 5px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.context-layout .link-button:hover {
+  text-decoration: underline;
+}
+.context-diff {
+  display: grid;
+  gap: 8px;
+}
+.context-grouping {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 1120px) {
+  .context-layout {
+    grid-template-columns: minmax(220px, 0.8fr) minmax(300px, 1.2fr);
+  }
+  .context-preview {
+    grid-column: 1/-1;
+  }
+}
+@media (max-width: 720px) {
+  .shell {
+    padding: 20px 12px;
+  }
+  .panel {
+    padding: 18px;
+  }
+  .context-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .context-preview {
+    grid-column: auto;
+  }
+}
+
+.context-candidates {
+  max-height: 65vh;
+  overflow: auto;
 }

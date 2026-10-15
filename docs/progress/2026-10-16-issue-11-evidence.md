@@ -62,3 +62,7 @@ UI用fixtureのbuild参照path誤りと、失効で閉じられたSDK接続を�
 検索・探索の候補と選択の対応確認は`contexts.CandidateInput`へ集約し、HTTPとMCPの両方から使う。既存のHTTP応答・競合・cursor形式を維持した。最終差分でも`test:search`、`test:graph`、`test:mcp`を再実行してPASSした。
 
 [独立検品](2026-10-16-issue-11-inspection.md)は固定commit `941c611969a7c5a56575c181ed9d75984eebe88a`のAC-1〜6・INVAR-1〜5を全てPASS、blocker 0件と判定した。実装セッションを継承しない別コンテキストで、check・通常テスト・実認証/DB/検索/探索/MCPを再実行した。検品後の追加は記録とADR状態のみで、製品コードを変更していない。PRは[#43](https://github.com/KingYoSun/koujou-san/pull/43)。
+
+## マージ後の照合
+
+PR #43をCI run `38769802783`のLinux・Windows・GitGuardian全成功後にマージした。最終head `0c4a7f99caa3266ae149c4202df27b269a9626a0`とmainのmerge commit `4d3f16dc42dfa85d2432e82067b4f1768b553f40`の差分は0。treeはいずれも`bd79cc5d577813ee01bb4a17c05cb36f2b9f23bb`で一致した。区分C検品・全条件・CI・マージ後照合が揃い、Issue #11をCloseした。

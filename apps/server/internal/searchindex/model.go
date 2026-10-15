@@ -19,6 +19,7 @@ const schema = "koujou-search-v1-cjk-bleve-2.6.1"
 const pageSize = 100
 
 type Request struct {
+	Refs      []contexts.Ref      `json:"refs,omitempty"`
 	Text      string              `json:"text,omitempty"`
 	Kinds     []string            `json:"kinds,omitempty"`
 	IDs       []string            `json:"ids,omitempty"`
@@ -128,7 +129,7 @@ func makeQuery(w string, r Request) (query.Query, error) {
 			parts = append(parts, bleve.NewDisjunctionQuery(alternatives...))
 		}
 	}
-	if len(r.Revisions) == 0 {
+	if len(r.Revisions) == 0 && len(r.Refs) == 0 {
 		q := bleve.NewBoolFieldQuery(true)
 		q.SetField("current")
 		parts = append(parts, q)
@@ -141,6 +142,16 @@ func makeQuery(w string, r Request) (query.Query, error) {
 	}
 	for _, v := range r.Tags {
 		parts = append(parts, term("tags", v))
+	}
+	if len(r.Refs) > 0 {
+		alternatives := []query.Query{}
+		for _, ref := range r.Refs {
+			if !unitKind(ref.Kind) || ref.ID == "" || ref.Revision == "" || ref.Revision == "head" {
+				return nil, fmt.Errorf("invalid fixed reference")
+			}
+			alternatives = append(alternatives, bleve.NewConjunctionQuery(term("kind", ref.Kind), term("id", ref.ID), term("revision", ref.Revision)))
+		}
+		parts = append(parts, bleve.NewDisjunctionQuery(alternatives...))
 	}
 	if r.Text != "" {
 		q := bleve.NewMatchQuery(r.Text)

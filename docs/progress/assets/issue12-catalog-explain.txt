@@ -1,0 +1,32 @@
+                                                                       QUERY PLAN                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=0.55..16.61 rows=1 width=154) (actual time=0.072..0.419 rows=100 loops=1)
+   Buffers: shared hit=403
+   ->  Nested Loop  (cost=0.55..16.61 rows=1 width=154) (actual time=0.072..0.413 rows=100 loops=1)
+         Buffers: shared hit=403
+         ->  Index Scan using shared_scope_catalog on shared_versions v  (cost=0.14..8.16 rows=1 width=33) (actual time=0.028..0.047 rows=100 loops=1)
+               Index Cond: ((workspace_id = 'mcp-one'::text) AND (resource_id > 'scope:'::text))
+               Filter: (NOT deleted)
+               Buffers: shared hit=3
+         ->  Index Scan using context_records_pkey on context_records r  (cost=0.41..8.43 rows=1 width=122) (actual time=0.003..0.003 rows=1 loops=100)
+               Index Cond: ((workspace_id = 'mcp-one'::text) AND (resource_id = v.resource_id) AND (revision = v.version))
+               Buffers: shared hit=400
+ Planning:
+   Buffers: shared hit=294
+ Planning Time: 0.774 ms
+ Execution Time: 0.467 ms
+(15 rows)
+
+        kind        | count 
+--------------------+-------
+ context-document   |     2
+ context-manifest   |     2
+ context-membership |     3
+ context-paragraph  |     4
+ context-scope      |   100
+ context-section    |     1
+ context-sentence   | 30014
+ delivery-policy    |     1
+ llm-operation      |     7
+(9 rows)
+

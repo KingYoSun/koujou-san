@@ -158,6 +158,19 @@ func TestSearchPostgres(t *testing.T) {
 	if err = s.Rebuild(ctx); err != nil {
 		t.Fatal(err)
 	}
+	exactRefs := []contexts.Ref{saved["q00-sentence"][0], saved["q01-sentence"][2]}
+	exact := search("alice", "one", Request{Refs: exactRefs, Limit: 100})
+	if exact.Data.Count != 2 || exact.Meta.Completeness.State != "complete" {
+		t.Fatal("exact fixed range did not preserve selected versions")
+	}
+	rawCandidates := request("alice", "/search/workspaces/one/candidates", Request{Refs: exactRefs, Limit: 100}, 200)
+	var candidates apicontract.Response[struct {
+		Items []contexts.Candidate `json:"items"`
+	}]
+	if json.Unmarshal(rawCandidates, &candidates) != nil || candidates.Data == nil || len(candidates.Data.Items) != 2 || bytes.Contains(rawCandidates, []byte(`"value"`)) {
+		t.Fatal("candidate metadata transferred fixed bodies")
+	}
+
 	for _, example := range cases {
 		result := search("alice", "one", example.request)
 		found := false

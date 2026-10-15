@@ -63,8 +63,30 @@ function memory() {
       const value = data.get(key(n));
       return value ? structuredClone(value) : undefined;
     },
-    async save(n, value) {
-      data.set(key(n), structuredClone(value));
+    async save(n, value, keys) {
+      const old = data.get(key(n));
+      const merged = {
+        ...value,
+        items: { ...old?.items },
+        drafts: { ...old?.drafts },
+        receipts: { ...old?.receipts },
+      };
+      for (const k of keys) {
+        for (const field of ["items", "drafts", "receipts"] as const) {
+          delete merged[field][k];
+          Object.assign(
+            merged[field],
+            value[field][k] ? { [k]: structuredClone(value[field][k]) } : {},
+          );
+        }
+      }
+      data.set(key(n), structuredClone(merged));
+    },
+    async page() {
+      return { entries: [], next: null };
+    },
+    async read() {
+      return undefined;
     },
     async remove(n) {
       data.delete(key(n));
@@ -95,17 +117,6 @@ function response(
       completeness: next
         ? { state: "partial", reason: "page_remaining" }
         : { state: "complete" },
-    },
-  };
-}
-function errorFrame(reason: string) {
-  return {
-    error: { code: "unavailable" },
-    meta: {
-      workspace_id: "one",
-      position: null,
-      next_cursor: null,
-      completeness: { state: "pending", reason },
     },
   };
 }
@@ -173,6 +184,7 @@ class Server {
         position?: string;
         through?: string;
         known?: { kind: string; id: string }[];
+        versions?: { kind: string; id: string; revision: string }[];
       };
       const frame = noFrame();
       for (const r of request.known ?? []) {
@@ -180,59 +192,25 @@ class Server {
         if (this.hidden.has(key)) frame.removed.push(r);
         else frame.permissions.push({ identity: r, editable: this.editable });
       }
-      if (request.mode === "snapshot") {
-        let id: string;
-        let offset = 0;
-        if (request.cursor)
-          [id, offset] = [
-            request.cursor.split(":")[0]!,
-            Number(request.cursor.split(":")[1]),
-          ];
-        else {
-          id = `snapshot-${this.snapshots.size}`;
-          this.snapshots.set(id, {
-            items: structuredClone(
-              [...this.items.values()].filter(
-                (i) => !this.hidden.has(syncKey(i.record.ref)),
-              ),
-            ),
-            position: this.positions.at(-1)!,
-          });
+      expect(request.mode).toBe("watch");
+      const versions = new Map(
+        (request.versions ?? []).map((r) => [syncKey(r), r.revision]),
+      );
+      for (const ref of request.known ?? []) {
+        const key = syncKey(ref);
+        const item = this.items.get(key);
+        if (!item || this.hidden.has(key)) {
+          if (!frame.removed.some((r) => syncKey(r) === key))
+            frame.removed.push(ref);
+          continue;
         }
-        const snapshot = this.snapshots.get(id)!;
-        frame.items = snapshot.items
-          .slice(offset, offset + 100)
-          .map((i) => ({ ...i, editable: this.editable }));
-        return response(
-          frame,
-          snapshot.position,
-          offset + 100 < snapshot.items.length ? `${id}:${offset + 100}` : null,
-        );
-      }
-      if (this.historyLost) {
-        this.historyLost = false;
-        return errorFrame("history_unavailable");
-      }
-      const begin = this.positions.indexOf(request.position!);
-      const end = request.through
-        ? this.positions.indexOf(request.through)
-        : this.journal.length;
-      const known = new Set((request.known ?? []).map(syncKey));
-      for (const item of this.journal.slice(begin, end)) {
-        const key = syncKey(item.record.ref);
-        if (this.hidden.has(key)) continue;
-        if (known.has(key))
+        if (versions.get(key) !== item.record.ref.revision)
           frame.items.push({
             ...structuredClone(item),
             editable: this.editable,
           });
-        else frame.offered.push(item.record.ref);
       }
-      const value = response(frame, this.positions[end]!);
-      const hook = this.afterChunk;
-      this.afterChunk = undefined;
-      hook?.();
-      return value;
+      return response(frame, this.positions.at(-1)!);
     }
     const id = path.split("/").at(-1)!;
     const key = `sentence:${id}`;
@@ -270,6 +248,7 @@ async function start(
   );
   live.push(engine);
   await engine.start();
+  await engine.open({ kind: "sentence", id: "s000" });
   return engine;
 }
 
@@ -362,7 +341,7 @@ it("persists an unconfirmed request before send and retries the same operation a
   );
 });
 
-it("replaces incomplete history with a new snapshot without discarding local drafts", async () => {
+it("checks current targets after journal loss without discarding local drafts", async () => {
   const server = new Server();
   const engine = await start(server);
   await engine.edit("sentence:s000", { kind: "sentence", text: "my unsent" });
@@ -377,30 +356,27 @@ it("replaces incomplete history with a new snapshot without discarding local dra
   expect(server.posts).toHaveLength(0);
 });
 
-it("loads pages on demand and freezes the delta range across multiple authorization batches", async () => {
-  const server = new Server(201);
-  const engine = await start(server);
-  expect(Object.keys(engine.state.items)).toHaveLength(100);
-  await engine.more();
-  expect(Object.keys(engine.state.items)).toHaveLength(200);
-  server.update("s000", "first update");
-  server.afterChunk = () =>
-    server.update("s000", "second update during another batch");
+it("checks displayed identities without reading unrelated journal pages or bodies", async () => {
+  const server = new Server(10_000);
+  const requests: Record<string, unknown>[] = [];
+  const api: Transport = (path, method, body) => {
+    if (path.endsWith("/pull")) requests.push(body as Record<string, unknown>);
+    return server.api(path, method, body);
+  };
+  const engine = await start(server, memory(), namespace(), api);
+  expect(Object.keys(engine.state.items)).toHaveLength(1);
+  for (let i = 0; i < 1000; i++) server.update("s9999", `unrelated-${i}`);
+  const before = requests.length;
+  await engine.refresh();
+  expect(requests.length - before).toBe(1);
+  expect(requests.at(-1)?.mode).toBe("watch");
+  expect(requests.at(-1)?.known).toEqual([{ kind: "sentence", id: "s000" }]);
+  expect(Object.keys(engine.state.items)).toHaveLength(1);
+  server.update("s000", "changed current target");
   await engine.refresh();
   expect(engine.state.items["sentence:s000"]?.record.value.text).toBe(
-    "first update",
+    "changed current target",
   );
-  await engine.refresh();
-  expect(engine.state.items["sentence:s000"]?.record.value.text).toBe(
-    "second update during another batch",
-  );
-  expect(engine.available).toBe(false);
-  server.update("s200", "new unrequested item");
-  await engine.refresh();
-  expect(engine.available).toBe(true);
-  expect(Object.keys(engine.state.items)).toHaveLength(200);
-  await engine.refresh();
-  expect(engine.available).toBe(true);
 });
 
 it("isolates actors and servers, removes revoked caches/drafts, and rejects a late response", async () => {
@@ -422,9 +398,10 @@ it("isolates actors and servers, removes revoked caches/drafts, and rejects a la
   server.hidden.add("sentence:s000");
   await alice.refresh();
   expect(alice.state.items).toEqual({});
+  expect(alice.accessEpoch).toBeGreaterThan(0);
   expect(store.saved()?.drafts).toEqual({});
   server.hidden.clear();
-  await alice.refresh(true);
+  await alice.open({ kind: "sentence", id: "s000" });
   let release!: (value: unknown) => void;
   const delayed = new SyncEngine(
     namespace("delayed"),
@@ -456,7 +433,7 @@ it("isolates actors and servers, removes revoked caches/drafts, and rejects a la
   ).toBeUndefined();
 });
 
-it("persists a confirmed revocation even when a later page cannot be fetched", async () => {
+it("persists confirmed revocations before a later target batch fails", async () => {
   const server = new Server();
   const store = memory();
   const engine = await start(server, store);
@@ -464,20 +441,29 @@ it("persists a confirmed revocation even when a later page cannot be fetched", a
     kind: "sentence",
     text: "to be purged",
   });
-  const api: Transport = async (_path, _method, body) => {
-    const request = body as { cursor?: string };
-    if (request.cursor) throw new Error("disconnected during next page");
+  for (let i = 1; i < 101; i++)
+    engine.state.items[`sentence:s${i}`] = fixtureItem(`s${i}`);
+  await store.storage.save(
+    namespace(),
+    engine.state,
+    Object.keys(engine.state.items),
+  );
+  await engine.stop();
+  let requests = 0;
+  const api: Transport = async () => {
+    if (requests++ > 0)
+      throw new Error("disconnected during next target batch");
     return response(
       { ...noFrame(), removed: [{ kind: "sentence", id: "s000" }] },
       "policy-position",
-      "next-page",
     );
   };
-  await engine.stop();
-  const disconnected = await start(server, store, namespace(), api);
+  const disconnected = new SyncEngine(namespace(), store.storage, api);
+  live.push(disconnected);
+  await disconnected.start();
   expect(disconnected.status).toBe("offline");
-  expect(store.saved()?.items).toEqual({});
-  expect(store.saved()?.drafts).toEqual({});
+  expect(store.saved()?.items["sentence:s000"]).toBeUndefined();
+  expect(store.saved()?.drafts["sentence:s000"]).toBeUndefined();
 });
 
 it("changes editability after role loss without converting a draft into an execution request", async () => {
@@ -490,4 +476,55 @@ it("changes editability after role loss without converting a draft into an execu
   expect(engine.state.items["sentence:s000"]?.editable).toBe(false);
   expect(server.posts).toHaveLength(0);
   expect(engine.state.drafts["sentence:s000"]?.value.text).toBe("local");
+});
+
+it("keeps a newly created unsent Context when it is opened before first publication", async () => {
+  const server = new Server();
+  const engine = await start(server);
+  const key = await engine.create("sentence", {
+    kind: "sentence",
+    name: "new",
+    text: "new local text",
+  });
+  const identity = { kind: "sentence", id: key.slice("sentence:".length) };
+  await engine.open(identity);
+  await engine.refresh();
+  expect(engine.state.drafts[key]?.value.text).toBe("new local text");
+  expect(engine.state.drafts[key]?.base.record.ref.revision).toBe("0");
+  expect(server.posts).toHaveLength(0);
+});
+
+it("keeps the displayed editing basis while a related membership is opened for an explicit change", async () => {
+  const server = new Server(2);
+  const engine = await start(server);
+  await engine.open({ kind: "sentence", id: "s001" }, true);
+  expect(engine.state.items["sentence:s000"]?.record.ref.revision).toBe("v1");
+  expect(engine.state.items["sentence:s001"]?.record.ref.revision).toBe("v1");
+});
+
+it("does not restore a late local-cache load after sign-out has purged the actor", async () => {
+  const server = new Server();
+  const store = memory();
+  const original = await start(server, store);
+  await original.edit("sentence:s000", {
+    kind: "sentence",
+    text: "private draft",
+  });
+  await original.stop();
+  const saved = structuredClone(store.saved()!);
+  let release!: (value: SavedSync) => void;
+  store.storage.load = async () =>
+    new Promise((resolve) => {
+      release = resolve;
+    });
+  const restarting = new SyncEngine(namespace(), store.storage, server.api);
+  live.push(restarting);
+  const starting = restarting.start();
+  await Promise.resolve();
+  await restarting.discard();
+  release(saved);
+  await starting;
+  expect(restarting.state.items).toEqual({});
+  expect(restarting.state.drafts).toEqual({});
+  expect(restarting.status).toBe("revoked");
 });
