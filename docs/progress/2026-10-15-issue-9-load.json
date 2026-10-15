@@ -1,0 +1,22 @@
+{
+  "concurrency": 4,
+  "contexts": 10000,
+  "go": "go1.27.2",
+  "load_elapsed_ms": 665,
+  "membership_revisions": 7500,
+  "os": "windows",
+  "p95_ms": 23.5,
+  "peak_process_rss_bytes": 145309696,
+  "process_read_transfer_bytes": 0,
+  "process_write_transfer_bytes": 78922531,
+  "quality_passed": 40,
+  "quality_total": 40,
+  "rebuild_ms": 48877,
+  "reflection_lag_ms": 1013,
+  "requests": 160,
+  "requests_per_second": 240.55209110429348,
+  "revisions_per_context": 3,
+  "schema": "koujou-search-v1-cjk-bleve-2.6.1",
+  "scopes": 100,
+  "warmup": 40
+}

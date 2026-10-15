@@ -43,14 +43,15 @@ type Fixed struct {
 	Snapshot  json.RawMessage `json:"snapshot,omitempty"`
 }
 type Unit struct {
-	Kind        string  `json:"kind"`
-	Name        string  `json:"name,omitempty"`
-	Text        *string `json:"text,omitempty"`
-	Title       string  `json:"title,omitempty"`
-	Children    []Ref   `json:"children,omitempty"`
-	Attachments []Fixed `json:"attachments,omitempty"`
-	External    *Fixed  `json:"external,omitempty"`
-	Origin      *Origin `json:"origin,omitempty"`
+	Kind        string   `json:"kind"`
+	Tags        []string `json:"tags,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	Text        *string  `json:"text,omitempty"`
+	Title       string   `json:"title,omitempty"`
+	Children    []Ref    `json:"children,omitempty"`
+	Attachments []Fixed  `json:"attachments,omitempty"`
+	External    *Fixed   `json:"external,omitempty"`
+	Origin      *Origin  `json:"origin,omitempty"`
 }
 type Scope struct {
 	Kind   string    `json:"kind"`

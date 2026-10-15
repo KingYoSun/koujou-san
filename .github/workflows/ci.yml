@@ -70,6 +70,9 @@ jobs:
       - name: Test shared synchronization and report ordering
         run: pnpm run test:sync
 
+      - name: Test Bleve projection and Context search
+        run: pnpm run test:search
+
       - name: Build
         run: pnpm run build
 

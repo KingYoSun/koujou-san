@@ -9,6 +9,8 @@
     "pnpm": "10.16.1"
   },
   "scripts": {
+    "test:search": "node scripts/dev.mjs test:search",
+    "test:search-load": "node scripts/dev.mjs test:search-load",
     "setup": "node scripts/dev.mjs setup",
     "doctor": "node scripts/dev.mjs doctor",
     "auth:bootstrap": "node scripts/dev.mjs auth:bootstrap",

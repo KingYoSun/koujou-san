@@ -27,6 +27,7 @@ export type FixedContextSource = {
 };
 export type ContextUnit = {
   kind: ContextKind;
+  tags?: string[];
   name?: string;
   text?: string;
   title?: string;

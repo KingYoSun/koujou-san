@@ -15,6 +15,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/sharedsync"
 )
 
@@ -49,6 +50,10 @@ func main() {
 				os.Exit(1)
 			}
 			contextService := contexts.New(store, accessService, limits)
+			searchService := searchindex.New(store, accessService, contextService, os.Getenv("KOUJOU_SEARCH_DIR"), service.Config.Key)
+			searchService.Start(ctx, os.Getenv("KOUJOU_SEARCH_REBUILD") == "1")
+			defer searchService.Close()
+			routes = append(routes, searchService.Register)
 			routes = append(routes, contextService.Register, sharedsync.New(store, accessService, contextService, service.Config.Key).Register)
 		}
 	}
