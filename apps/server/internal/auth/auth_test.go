@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 )
@@ -66,7 +67,11 @@ func TestOryIntegration(t *testing.T) {
 	if err != nil || status >= 400 {
 		t.Fatal("fixture access token lifetime setup failed")
 	}
-	server := httptest.NewUnstartedServer(httpapi.NewHandler(store.Ready, service.Register))
+	accessService := access.New(store, cfg.Key, func(w http.ResponseWriter, r *http.Request) (string, bool) {
+		user, ok := service.RequestUser(w, r)
+		return user.ID, ok
+	})
+	server := httptest.NewUnstartedServer(httpapi.NewHandler(store.Ready, service.Register, accessService.Register))
 	_ = server.Listener.Close()
 	server.Listener, err = net.Listen("tcp", "127.0.0.1:"+os.Getenv("KOUJOU_TEST_API_PORT"))
 	if err != nil {
@@ -597,6 +602,32 @@ func TestOryIntegration(t *testing.T) {
 		t.Fatal("TOTP login did not return to authenticated app")
 	}
 	t.Log("optional TOTP enrollment, AAL1 API denial, second factor and authenticated app return passed")
+	response, raw = request("GET", cfg.Site+"/access/workspaces", nil)
+	if response.StatusCode != 200 || !bytes.Contains(raw, []byte(`"items":[]`)) {
+		t.Fatal("Ory login granted Workspace membership")
+	}
+	workspaceBody := `{"name":"Ory integration Workspace","operation_id":"ory-workspace-create","expected_version":"0"}`
+	for _, validCSRF := range []bool{false, true} {
+		req, _ := http.NewRequest("POST", cfg.Site+"/access/workspaces/ory-workspace/create", strings.NewReader(workspaceBody))
+		req.Header.Set("Origin", cfg.Site)
+		req.Header.Set("Content-Type", "application/json")
+		if validCSRF {
+			req.Header.Set("X-CSRF-Token", csrf())
+		}
+		response, err = client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = response.Body.Close()
+		want := 403
+		if validCSRF {
+			want = 200
+		}
+		if response.StatusCode != want {
+			t.Fatalf("Ory+Workspace CSRF boundary: got %d want %d", response.StatusCode, want)
+		}
+	}
+	t.Log("real Ory identity, no implicit membership, BFF CSRF and Workspace creation passed")
 }
 
 func totp(t *testing.T, secret string) string {

@@ -6,7 +6,10 @@ pub fn run() {
             auth::login,
             auth::logout,
             auth::api_request,
-            auth::open_account
+            auth::open_account,
+            auth::device_identifier,
+            auth::device_enroll,
+            auth::device_contact
         ])
         .run(tauri::generate_context!())
         .expect("failed to run koujou-san desktop");

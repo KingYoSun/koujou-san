@@ -77,7 +77,11 @@ export async function apiRequest(
     throw new Error(
       response.status === 401
         ? "ログインが必要です。"
-        : "認証サービスに接続できません。",
+        : response.status === 403
+          ? "この操作の権限がありません。"
+          : response.status === 409
+            ? "状態が更新されています。再読み込みして確認してください。"
+            : "認証サービスに接続できません。",
     );
   return response.json() as Promise<unknown>;
 }
@@ -305,6 +309,7 @@ export function Account({ native }: { native: boolean }) {
         const value = (await apiRequest("/auth/me", true)) as { user: User };
         setUser(value.user);
         setStatus("ready");
+        window.dispatchEvent(new Event("koujou-auth-changed"));
       } else {
         window.location.assign("/auth/start");
       }
@@ -326,6 +331,7 @@ export function Account({ native }: { native: boolean }) {
           })) as Record<string, string>);
       setUser(undefined);
       setStatus("signed_out");
+      window.dispatchEvent(new Event("koujou-auth-changed"));
       setNotice(
         `この端末のアプリからログアウトしました。OAuth: ${result.oauth_tokens} / ブラウザSSO: ${result.kratos_session}`,
       );

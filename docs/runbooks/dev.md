@@ -30,6 +30,7 @@ Codexのworktree向けに `.codex/environments/environment.toml` のsetupにも 
 | `pnpm run test`          | Goと共通UIのテスト                             |
 | `pnpm run test:database` | 試験専用PostgreSQLの保存・並列更新・停止・復元 |
 | `pnpm run test:auth` | 試験専用Ory・DB・メール配送による認証・復旧・失効 |
+| `pnpm run test:access` | 試験専用DBによるWorkspace・端末の認可と失効 |
 | `pnpm run build`         | GoとWebのbuild                                 |
 | `pnpm run check:desktop` | Tauri側のコンパイル確認                        |
 | `pnpm run test:desktop`  | Tauri側のテスト                                |

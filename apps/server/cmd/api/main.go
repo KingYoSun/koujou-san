@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/auth"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
@@ -35,6 +36,11 @@ func main() {
 				os.Exit(1)
 			}
 			routes = append(routes, service.Register)
+			accessService := access.New(store, service.Config.Key, func(w http.ResponseWriter, r *http.Request) (string, bool) {
+				user, ok := service.RequestUser(w, r)
+				return user.ID, ok
+			})
+			routes = append(routes, accessService.Register)
 		}
 	}
 	address := os.Getenv("KOUJOU_API_ADDR")

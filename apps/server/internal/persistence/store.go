@@ -24,6 +24,9 @@ var initialSchema string
 //go:embed 002_auth.sql
 var authSchema string
 
+//go:embed 003_access.sql
+var accessSchema string
+
 type Store struct{ pool *pgxpool.Pool }
 
 func Open(ctx context.Context, url string) (*Store, error) {
@@ -32,7 +35,7 @@ func Open(ctx context.Context, url string) (*Store, error) {
 		return nil, errors.New("invalid PostgreSQL configuration")
 	}
 	if err = pool.Ping(ctx); err == nil {
-		err = migrate(ctx, pool, []string{initialSchema, authSchema})
+		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema})
 	}
 	if err != nil {
 		pool.Close()
@@ -84,6 +87,8 @@ func migrate(ctx context.Context, pool *pgxpool.Pool, scripts []string) error {
 type Scope struct {
 	ActorID string
 	Grant   apicontract.Grant
+	// Recheck runs under the Workspace stream lock, before receipt replay.
+	Recheck func(pgx.Tx) *apicontract.Problem
 }
 
 type Command struct {
@@ -142,6 +147,12 @@ func (s *Store) Apply(ctx context.Context, scope Scope, command Command, apply f
 		var sequence int64
 		if err := tx.QueryRow(ctx, "SELECT position,sequence FROM shared_streams WHERE workspace_id=$1 FOR UPDATE", command.WorkspaceID).Scan(&position, &sequence); err != nil {
 			return err
+		}
+		if scope.Recheck != nil {
+			if problem := scope.Recheck(tx); problem != nil {
+				response = rejected[apicontract.Reference](command.WorkspaceID, problem.Code, "not_accessed")
+				return nil
+			}
 		}
 		var savedDigest string
 		var saved json.RawMessage
