@@ -15,6 +15,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/mcpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/sharedsync"
@@ -73,6 +74,7 @@ func main() {
 			defer graphService.Close()
 			routes = append(routes, graphService.Register)
 			routes = append(routes, contextService.Register, sharedsync.New(store, accessService, contextService, service.Config.Key).Register)
+			routes = append(routes, (&mcpapi.Service{Auth: service, Access: accessService, Contexts: contextService, Search: searchService, Graph: graphService}).Register)
 		}
 	}
 	address := os.Getenv("KOUJOU_API_ADDR")

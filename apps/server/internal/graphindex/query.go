@@ -152,9 +152,20 @@ func (x *exploration) vertices(keys []string) (map[string]vertex, error) {
 	if err = rows.Err(); err != nil {
 		return found, err
 	}
+	refs := []access.VersionRef{}
+	for _, v := range values {
+		refs = append(refs, access.VersionRef{ID: resource(contexts.Ref{Kind: v.Kind, ID: v.ID}), Version: v.Rev})
+	}
+	versions, err := x.s.Access.Versions(x.ctx, x.p, x.w, refs)
+	if err != nil {
+		return found, err
+	}
 	for _, v := range values {
 		x.checked[v.K] = true
 		if !x.grants[resource(contexts.Ref{Kind: v.Kind, ID: v.ID})] {
+			continue
+		}
+		if !versions[access.VersionRef{ID: resource(contexts.Ref{Kind: v.Kind, ID: v.ID}), Version: v.Rev}] {
 			continue
 		}
 		if !valid[v.K] {
@@ -323,6 +334,19 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 	if err := s.Access.Check(ctx, p, w, resource(r.Root), "get"); err != nil {
 		return failed(w, "forbidden", "not_accessed"), err
 	}
+	subject, err := s.Access.CursorSubject(ctx, p, w)
+	if err != nil {
+		return failed(w, "forbidden", "not_accessed"), err
+	}
+	if p.OperationID != "" {
+		op, err := s.Access.Operation(ctx, p, w, p.OperationID)
+		if err != nil {
+			return failed(w, "forbidden", "not_accessed"), err
+		}
+		if op.Bounded {
+			r.History = true
+		}
+	}
 	r, err = s.request(r)
 	if err != nil {
 		return failed(w, "invalid_request", "invalid_graph"), err
@@ -352,7 +376,7 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 	position := cursor{}
 	codec := apicontract.NewCursorCodec(s.Key, "koujou-graph-cursor-v1")
 	if r.Cursor != "" {
-		if codec.Open(r.Cursor, graphSchema, &position) != nil || position.User != p.UserID || position.Workspace != w || position.Query != signature || position.Generation != active.Active || position.Position != cp.Position {
+		if codec.Open(r.Cursor, graphSchema, &position) != nil || position.User != subject || position.Workspace != w || position.Query != signature || position.Generation != active.Active || position.Position != cp.Position {
 			return failed(w, "invalid_request", "invalid_cursor"), nil
 		}
 	}
@@ -467,7 +491,7 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 	}
 	result = apicontract.Response[Result]{Data: &Result{Items: items, Unexplored: reasons, Evidence: contexts.CandidateEvidence{Engine: "arcadedb", Position: cp.Position, RequiredPosition: required.Position, State: state, Reason: reason}}, Meta: meta(w, cp.Position, state, reason)}
 	if more {
-		next := codec.Seal(cursor{p.UserID, w, signature, active.Active, cp.Position, pageEnd}, graphSchema)
+		next := codec.Seal(cursor{subject, w, signature, active.Active, cp.Position, pageEnd}, graphSchema)
 		result.Meta.NextCursor = &next
 	}
 	return result, nil

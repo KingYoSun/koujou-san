@@ -36,6 +36,8 @@ export default defineConfig({
       "/sync/": apiProxy,
       "/search/": apiProxy,
       "/graph/": apiProxy,
+      "/mcp": apiProxy,
+      "/.well-known/oauth-protected-resource/": apiProxy,
     },
     watch: { ignored: ["**/src-tauri/**"] },
   },

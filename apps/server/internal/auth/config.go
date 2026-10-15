@@ -1,6 +1,11 @@
 package auth
 
-import "os"
+import (
+	"os"
+	"strings"
+)
+
+func (c Config) MCPResource() string { return strings.TrimRight(c.Site, "/") + "/mcp" }
 
 func Environment() Config {
 	get := func(name, fallback string) string {

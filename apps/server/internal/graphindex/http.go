@@ -81,19 +81,18 @@ func (s *Service) resolveHTTP(w http.ResponseWriter, r *http.Request) {
 		send(w, 200, apicontract.Response[contexts.Resolution]{Data: &contexts.Resolution{Missing: []contexts.Gap{{Code: "incomplete_candidates", Source: "arcadedb:" + found.Meta.Completeness.Reason}}}, Meta: found.Meta})
 		return
 	}
-	allowed := map[contexts.Ref]bool{}
+	candidates := []contexts.Ref{}
 	for _, item := range found.Data.Items {
 		if item.Node != nil && item.Node.Revision != "" && unitKind(item.Node.Kind) {
-			allowed[item.Node.Ref()] = true
+			candidates = append(candidates, item.Node.Ref())
 		}
 	}
-	for _, ref := range append(append([]contexts.Ref{}, request.Resolve.Selection.Include...), request.Resolve.Selection.Exclude...) {
-		if !allowed[ref] {
-			send(w, 200, apicontract.Response[contexts.Resolution]{Data: &contexts.Resolution{Missing: []contexts.Gap{{Code: "outside_graph", Ref: &ref}}}, Meta: found.Meta})
-			return
-		}
+	prepared, gap := contexts.CandidateInput(request.Resolve, candidates, found.Data.Evidence, "outside_graph")
+	if gap != nil {
+		send(w, 200, apicontract.Response[contexts.Resolution]{Data: &contexts.Resolution{Missing: []contexts.Gap{*gap}}, Meta: found.Meta})
+		return
 	}
-	request.Resolve.Evidence = append(request.Resolve.Evidence, found.Data.Evidence)
+	request.Resolve = prepared
 	if request.Mutation == nil {
 		resolution := s.Contexts.Preview(r.Context(), p, workspace, request.Resolve)
 		send(w, 200, apicontract.Response[contexts.Resolution]{Data: &resolution, Meta: found.Meta})

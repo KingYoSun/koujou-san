@@ -188,6 +188,10 @@ func (s *Service) exchange(ctx context.Context, form url.Values, web bool) (Toke
 }
 
 func (s *Service) Inspect(ctx context.Context, token string) (tokenInfo, error) {
+	return s.inspect(ctx, token, s.Config.Audience, "koujou")
+}
+
+func (s *Service) inspect(ctx context.Context, token, resource, requiredScope string) (tokenInfo, error) {
 	var info tokenInfo
 	request, err := http.NewRequestWithContext(ctx, "POST", s.Config.HydraAdmin+"/admin/oauth2/introspect", strings.NewReader(url.Values{"token": {token}, "token_type_hint": {"access_token"}}.Encode()))
 	if err != nil {
@@ -204,13 +208,13 @@ func (s *Service) Inspect(ctx context.Context, token string) (tokenInfo, error) 
 	}
 	audience := false
 	for _, value := range info.Audience {
-		if value == s.Config.Audience {
+		if value == resource {
 			audience = true
 		}
 	}
 	scope := false
 	for _, value := range strings.Fields(info.Scope) {
-		if value == "koujou" {
+		if value == requiredScope {
 			scope = true
 		}
 	}
@@ -228,6 +232,18 @@ func (s *Service) mapUser(ctx context.Context, issuer, subject, email, name stri
 
 func (s *Service) User(ctx context.Context, token string) (User, error) {
 	info, err := s.Inspect(ctx, token)
+	return s.identityUser(ctx, info, err)
+}
+
+// MCPUser validates a resource-bound access token and the same live identity
+// state, verified email and MFA level as the ordinary API.
+func (s *Service) MCPUser(ctx context.Context, token string) (User, time.Time, error) {
+	info, err := s.inspect(ctx, token, s.Config.MCPResource(), "koujou.mcp")
+	user, err := s.identityUser(ctx, info, err)
+	return user, time.Unix(info.Expires, 0), err
+}
+
+func (s *Service) identityUser(ctx context.Context, info tokenInfo, err error) (User, error) {
 	if err != nil {
 		return User{}, err
 	}
@@ -286,14 +302,22 @@ func (s *Service) Bootstrap(ctx context.Context, email, password string) error {
 	if email == "" || password == "" {
 		return errors.New("explicit administrator email and password are required")
 	}
+	if err := s.ProvisionClients(ctx); err != nil {
+		return err
+	}
+	return s.bootstrapAdministrator(ctx, email, password)
+}
+
+// ProvisionClients registers bundled clients without changing any identity.
+func (s *Service) ProvisionClients(ctx context.Context) error {
 	for _, client := range []map[string]any{
 		{"client_id": s.Config.WebClient, "client_secret": s.Config.WebSecret, "token_endpoint_auth_method": "client_secret_basic", "redirect_uris": []string{s.Config.Site + "/auth/callback"}},
 		{"client_id": s.Config.NativeClient, "token_endpoint_auth_method": "none", "redirect_uris": []string{s.Config.NativeRedirect}},
 	} {
 		client["grant_types"] = []string{"authorization_code", "refresh_token"}
 		client["response_types"] = []string{"code"}
-		client["scope"] = "openid offline_access email profile koujou"
-		client["audience"] = []string{s.Config.Audience}
+		client["scope"] = "openid offline_access email profile koujou koujou.mcp"
+		client["audience"] = []string{s.Config.Audience, s.Config.MCPResource()}
 		id := client["client_id"].(string)
 		var existing map[string]any
 		status, err := s.call(ctx, "GET", s.Config.HydraAdmin+"/admin/clients/"+id, nil, "", &existing)
@@ -312,6 +336,10 @@ func (s *Service) Bootstrap(ctx context.Context, email, password string) error {
 			return errors.New("OAuth client setup failed")
 		}
 	}
+	return nil
+}
+
+func (s *Service) bootstrapAdministrator(ctx context.Context, email, password string) error {
 	var identities []Identity
 	status, err := s.call(ctx, "GET", s.Config.KratosAdmin+"/admin/identities?credentials_identifier="+url.QueryEscape(email), nil, "", &identities)
 	if err != nil || status != 200 {

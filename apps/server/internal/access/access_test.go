@@ -318,4 +318,5 @@ func TestAccessPostgres(t *testing.T) {
 		t.Fatal(rows.Err())
 	}
 	t.Log("shared responses, journal and receipts contain no private invitation/device proofs")
+	t.Run("operation-boundaries", func(t *testing.T) { testOperationBoundaries(t, service) })
 }

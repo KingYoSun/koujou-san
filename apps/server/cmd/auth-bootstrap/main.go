@@ -14,12 +14,17 @@ import (
 func main() {
 	email := flag.String("admin-email", "", "explicit initial administrator email")
 	passwordFile := flag.String("password-file", "", "path to a private password file")
+	clientsOnly := flag.Bool("clients-only", false, "register bundled OAuth clients without changing identities")
 	flag.Parse()
-	if *email == "" || *passwordFile == "" {
+	if !*clientsOnly && (*email == "" || *passwordFile == "") {
 		fmt.Fprintln(os.Stderr, "--admin-email and --password-file are required")
 		os.Exit(2)
 	}
-	password, err := os.ReadFile(*passwordFile)
+	var password []byte
+	var err error
+	if !*clientsOnly {
+		password, err = os.ReadFile(*passwordFile)
+	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "password file unavailable")
 		os.Exit(1)
@@ -34,11 +39,19 @@ func main() {
 	defer store.Close()
 	service, err := auth.New(ctx, auth.Environment(), store.Database())
 	if err == nil {
-		err = service.Bootstrap(ctx, *email, strings.TrimSpace(string(password)))
+		if *clientsOnly {
+			err = service.ProvisionClients(ctx)
+		} else {
+			err = service.Bootstrap(ctx, *email, strings.TrimSpace(string(password)))
+		}
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "authentication bootstrap failed")
 		os.Exit(1)
 	}
-	fmt.Println("OAuth clients and explicit administrator are configured; email verification is required.")
+	if *clientsOnly {
+		fmt.Println("Bundled OAuth clients are configured.")
+	} else {
+		fmt.Println("OAuth clients and explicit administrator are configured; email verification is required.")
+	}
 }

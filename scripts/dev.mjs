@@ -252,8 +252,8 @@ async function infra(command) {
 }
 
 async function testDatabase(suite = "persistence", testName) {
-  const authentication = suite === "auth";
-  const graph = suite === "graphindex";
+  const authentication = suite === "auth" || suite === "mcpapi";
+  const graph = suite === "graphindex" || suite === "mcpapi";
   await resolveGo();
   if (!env.KOUJOU_DB_PASSWORD) throw new Error("Run pnpm run setup first.");
   const project = `koujou-san-db-test-${randomBytes(6).toString("hex")}`;
@@ -267,9 +267,12 @@ async function testDatabase(suite = "persistence", testName) {
     reservation.close((error) => (error ? reject(error) : resolve())),
   );
   if (authentication || graph) {
-    for (const name of authentication
-      ? ["HYDRA", "HYDRA_ADMIN", "KRATOS", "KRATOS_ADMIN", "MAILPIT", "API"]
-      : ["ARCADE"]) {
+    for (const name of [
+      ...(authentication
+        ? ["HYDRA", "HYDRA_ADMIN", "KRATOS", "KRATOS_ADMIN", "MAILPIT", "API"]
+        : []),
+      ...(graph ? ["ARCADE"] : []),
+    ]) {
       const server = createServer();
       await new Promise((resolve, reject) => {
         server.once("error", reject);
@@ -298,6 +301,8 @@ async function testDatabase(suite = "persistence", testName) {
           : "infra/compose.test.yaml",
     ),
   ];
+  if (authentication && graph)
+    compose.push("-f", path.join(root, "infra/compose.graph-test.yaml"));
   console.log(
     "Creating isolated PostgreSQL fixtures; only this test container is stopped and restored.",
   );
@@ -310,7 +315,7 @@ async function testDatabase(suite = "persistence", testName) {
       "--wait-timeout",
       "180",
       ...(authentication
-        ? ["kratos", "hydra", "mailpit"]
+        ? ["kratos", "hydra", "mailpit", ...(graph ? ["arcadedb"] : [])]
         : graph
           ? ["postgres", "arcadedb"]
           : ["postgres"]),
@@ -367,7 +372,7 @@ async function testDatabase(suite = "persistence", testName) {
       "test",
       `./internal/${suite}`,
       "-run",
-      `^${testName ?? { auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", sharedsync: "TestSyncPostgres", searchindex: "TestSearchPostgres", graphindex: "TestGraphPostgres", persistence: "TestPostgres" }[suite]}$`,
+      `^${testName ?? { auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", sharedsync: "TestSyncPostgres", searchindex: "TestSearchPostgres", graphindex: "TestGraphPostgres", mcpapi: "TestMCPIntegration", persistence: "TestPostgres" }[suite]}$`,
       "-count=1",
       "-v",
     ]);
@@ -418,6 +423,12 @@ const tasks = {
   doctor,
   "test:database": () => testDatabase(),
   "test:auth": () => testDatabase("auth"),
+  "test:mcp": () => testDatabase("mcpapi"),
+  "test:mcp:ui": async () => {
+    await client("build");
+    env.KOUJOU_TEST_MCP_UI = "1";
+    await testDatabase("mcpapi");
+  },
   "test:access": () => testDatabase("access"),
   "test:contexts": () => testDatabase("contexts"),
   "test:sync": () => testDatabase("sharedsync"),
