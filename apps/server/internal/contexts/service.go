@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"sort"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
@@ -74,6 +75,13 @@ func (s *Service) read(ctx context.Context, q query, p access.Principal, w strin
 	if err = s.check(ctx, q, p, w, id, "get"); err != nil {
 		return Record{}, invalidWithRef(err, r)
 	}
+	var versionTx pgx.Tx
+	if tx, ok := q.(pgx.Tx); ok {
+		versionTx = tx
+	}
+	if err = s.Access.CheckVersion(ctx, versionTx, p, w, id, revision); err != nil {
+		return Record{}, invalidWithRef(err, r)
+	}
 	if actualKind != r.Kind {
 		return Record{}, invalid("invalid_type", &r)
 	}
@@ -118,6 +126,12 @@ func (s *Service) Read(ctx context.Context, p access.Principal, w string, r Ref)
 			return Record{}, err
 		}
 	}
+	if p.OperationID != "" && unitLevel(r.Kind) > 1 {
+		resolved := s.Preview(ctx, p, w, ResolveRequest{Selection: Selection{Mode: "select", Include: []Ref{rec.Ref}}})
+		if !resolved.Ready {
+			return Record{}, invalid("forbidden", nil)
+		}
+	}
 	return rec, nil
 }
 func (s *Service) checkManifest(ctx context.Context, q query, p access.Principal, w string, m Manifest) error {
@@ -150,6 +164,9 @@ func decodeValue(raw []byte, v any) error {
 	return nil
 }
 func (s *Service) authorizeWrite(ctx context.Context, q query, p access.Principal, w string, i Identity) error {
+	if p.OperationID != "" && unitLevel(i.Kind) == 0 {
+		return invalid("forbidden", nil)
+	}
 	var exists bool
 	if err := q.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2)", w, resource(i)).Scan(&exists); err != nil {
 		return err
@@ -210,6 +227,12 @@ func (s *Service) prepare(ctx context.Context, tx pgx.Tx, p access.Principal, w 
 		}
 		if u.Kind != i.Kind {
 			return nil, invalid("invalid_type", nil)
+		}
+		if p.OperationID != "" {
+			var previous Unit
+			if oldErr != nil || json.Unmarshal(old.Value, &previous) != nil || !slices.Equal(previous.Tags, u.Tags) {
+				return nil, invalid("forbidden", nil)
+			}
 		}
 		g := graph{ctx, func(ctx context.Context, r Ref) (Unit, error) { return s.unit(ctx, tx, p, w, r) }, map[string]Unit{}, map[string]bool{}}
 		if err := validateUnit(u); err != nil {

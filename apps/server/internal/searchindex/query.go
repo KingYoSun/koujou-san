@@ -13,7 +13,6 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/blevesearch/bleve/v2"
 	"github.com/blevesearch/bleve/v2/search"
-	"github.com/blevesearch/bleve/v2/search/query"
 	indexapi "github.com/blevesearch/bleve_index_api"
 )
 
@@ -55,6 +54,10 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 	if err := s.Access.Check(ctx, p, w, "", "read"); err != nil {
 		return failed(w, "forbidden", "not_accessed"), err
 	}
+	subject, err := s.Access.CursorSubject(ctx, p, w)
+	if err != nil {
+		return failed(w, "forbidden", "not_accessed"), err
+	}
 	q, err := makeQuery(w, r)
 	if err != nil {
 		return failed(w, "invalid_request", "invalid_search"), err
@@ -80,67 +83,97 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 	var after []string
 	if r.Cursor != "" {
 		c, err := s.open(r.Cursor)
-		if err != nil || c.User != p.UserID || c.Workspace != w || c.Query != signature || c.Generation != s.generation || c.Position != cp.Position {
+		if err != nil || c.User != subject || c.Workspace != w || c.Query != signature || c.Generation != s.generation || c.Position != cp.Position {
 			return failed(w, "invalid_request", "invalid_cursor"), nil
 		}
 		after = c.After
 	}
 	stale := false
-	q = query.NewCustomFilterQueryWithFilter(q, func(ctx context.Context, hit *search.DocumentMatch) (bool, error) {
-		src, err := readSource(s.index, hit.ID)
-		if err != nil {
-			return false, err
-		}
-		for _, ref := range src.Dependencies {
-			if _, err = s.Contexts.Read(ctx, p, w, ref); err != nil {
-				if permissionError(err) {
-					return false, nil
-				}
-				if err.Error() == "missing_reference" {
-					stale = true
-					return false, nil
-				}
-				return false, err
-			}
-		}
-		var version string
-		var deleted bool
-		if err = s.Store.Database().QueryRow(ctx, "SELECT version,deleted FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2", w, "context:"+src.Ref.ID).Scan(&version, &deleted); err != nil {
-			return false, err
-		}
-		if deleted {
-			return false, nil
-		}
-		if len(r.Revisions) == 0 && version != src.Ref.Revision {
-			stale = true
-			return false, nil
-		}
-		return true, nil
-	}, nil, nil)
-	searchRequest := bleve.NewSearchRequestOptions(q, r.Limit+1, 0, false)
-	searchRequest.SortBy([]string{"-_score", "_id"})
-	if len(after) > 0 {
-		searchRequest.SetSearchAfter(after)
-	}
-	found, err := s.index.SearchInContext(ctx, searchRequest)
-	if err != nil {
-		return failed(w, "unavailable", "search_unavailable"), err
-	}
+	// Read ordered engine pages until one authorized page and its look-ahead
+	// are known. A broad query must not authorize every matching Context before
+	// returning its first page; raw engine counts/cursors never leave this loop.
 	items := []contexts.Record{}
-	hits := found.Hits
-	more := len(hits) > r.Limit
-	if more {
-		hits = hits[:r.Limit]
-	}
-	for _, hit := range hits {
-		src, err := readSource(s.index, hit.ID)
+	hits := []*search.DocumentMatch{}
+	scanAfter := after
+	for len(items) <= r.Limit {
+		request := bleve.NewSearchRequestOptions(q, pageSize+1, 0, false)
+		request.SortBy([]string{"-_score", "_id"})
+		if len(scanAfter) > 0 {
+			request.SetSearchAfter(scanAfter)
+		}
+		found, err := s.index.SearchInContext(ctx, request)
 		if err != nil {
 			return failed(w, "unavailable", "search_unavailable"), err
 		}
-		// Recheck after search as well: membership or a target grant may have changed
-		// while the engine was evaluating other matches.
+		for _, hit := range found.Hits {
+			scanAfter = hitPosition(hit)
+			src, err := readSource(s.index, hit.ID)
+			if err != nil {
+				return failed(w, "unavailable", "search_unavailable"), err
+			}
+			allowed := true
+			var record contexts.Record
+			for _, ref := range src.Dependencies {
+				rec, err := s.Contexts.Read(ctx, p, w, ref)
+				if err != nil {
+					if permissionError(err) {
+						allowed = false
+						break
+					}
+					if err.Error() == "missing_reference" {
+						stale = true
+						allowed = false
+						break
+					}
+					return failed(w, "unavailable", "storage_unavailable"), err
+				}
+				if ref == src.Ref {
+					record = rec
+				}
+			}
+			if !allowed {
+				continue
+			}
+			var version string
+			var deleted bool
+			if err = s.Store.Database().QueryRow(ctx, "SELECT version,deleted FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2", w, "context:"+src.Ref.ID).Scan(&version, &deleted); err != nil {
+				return failed(w, "unavailable", "storage_unavailable"), err
+			}
+			if deleted {
+				continue
+			}
+			if len(r.Revisions) == 0 && version != src.Ref.Revision {
+				stale = true
+				continue
+			}
+			items = append(items, record)
+			hits = append(hits, hit)
+			if len(items) > r.Limit {
+				break
+			}
+		}
+		if len(found.Hits) < pageSize+1 {
+			break
+		}
+	}
+	more := len(items) > r.Limit
+	if more {
+		items = items[:r.Limit]
+		hits = hits[:r.Limit]
+	}
+	// Recheck the returned page after evaluating later candidates. Classification
+	// and ACL changes during a query cannot leave previously allowed bodies in it.
+	fresh := []contexts.Record{}
+	for i, record := range items {
+		src, err := readSource(s.index, hits[i].ID)
+		if err != nil {
+			return failed(w, "unavailable", "search_unavailable"), err
+		}
 		allowed := true
 		for _, ref := range src.Dependencies {
+			if ref == record.Ref {
+				continue
+			}
 			if _, err = s.Contexts.Read(ctx, p, w, ref); err != nil {
 				if permissionError(err) {
 					allowed = false
@@ -149,14 +182,19 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 				return failed(w, "unavailable", "storage_unavailable"), err
 			}
 		}
-		if allowed {
-			rec, err := s.Contexts.Read(ctx, p, w, src.Ref)
-			if err != nil {
-				return failed(w, "unavailable", "storage_unavailable"), err
-			}
-			items = append(items, rec)
+		if !allowed {
+			continue
 		}
+		rec, err := s.Contexts.Read(ctx, p, w, record.Ref)
+		if err != nil {
+			if permissionError(err) {
+				continue
+			}
+			return failed(w, "unavailable", "storage_unavailable"), err
+		}
+		fresh = append(fresh, rec)
 	}
+	items = fresh
 	// A specifically requested SoT revision may not be present in a damaged or
 	// delayed index. Do not turn that known missing projection into complete zero.
 	if len(r.Revisions) > 0 {
@@ -211,11 +249,8 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 	result := apicontract.Response[Result]{Data: &Result{Items: items, Count: len(items), Evidence: contexts.CandidateEvidence{Engine: "bleve", Position: cp.Position, RequiredPosition: current.Position, State: state, Reason: reason}}, Meta: resultMeta(w, cp.Position, state, reason)}
 	if more && len(hits) > 0 {
 		last := hits[len(hits)-1]
-		after := append([]string{}, last.Sort...)
-		// Bleve's in-process score sort key is a sentinel; SearchAfter requires
-		// the actual numeric score, just as the JSON pagination API does.
-		after[0] = strconv.FormatFloat(last.Score, 'g', -1, 64)
-		next := s.seal(cursor{User: p.UserID, Workspace: w, Query: signature, Generation: s.generation, Position: cp.Position, After: after})
+		after := hitPosition(last)
+		next := s.seal(cursor{User: subject, Workspace: w, Query: signature, Generation: s.generation, Position: cp.Position, After: after})
 		result.Meta.NextCursor = &next
 	}
 	return result, nil
@@ -226,4 +261,11 @@ func prefixIDs(ids []string) []string {
 		result[i] = "context:" + id
 	}
 	return result
+}
+
+// Bleve's in-process score key is a sentinel; SearchAfter needs the score.
+func hitPosition(hit *search.DocumentMatch) []string {
+	after := append([]string{}, hit.Sort...)
+	after[0] = strconv.FormatFloat(hit.Score, 'g', -1, 64)
+	return after
 }

@@ -37,9 +37,10 @@ func New(store *persistence.Store, key []byte, user func(http.ResponseWriter, *h
 }
 
 type Principal struct {
-	UserID     string
-	DeviceID   string
-	generation string
+	UserID      string
+	OperationID string
+	DeviceID    string
+	generation  string
 }
 type Workspace struct {
 	ID      string `json:"id"`
@@ -154,6 +155,15 @@ func (s *Service) check(ctx context.Context, q query, p Principal, w, target, ac
 	if target == "" && (action == "get" || action == "search" || action == "update" || action == "execute" || action == "input" || action == "report") {
 		return ErrForbidden
 	}
+	if p.OperationID != "" {
+		op, err := s.operation(ctx, q, p, w, p.OperationID)
+		if err != nil {
+			return err
+		}
+		if p.DeviceID != "" || !operationAction(op, action) {
+			return ErrForbidden
+		}
+	}
 	if p.DeviceID != "" {
 		d, generation, err := s.device(ctx, q, w, p.DeviceID)
 		if err != nil {
@@ -220,7 +230,7 @@ func (s *Service) check(ctx context.Context, q query, p Principal, w, target, ac
 	if target == "" {
 		return nil
 	}
-	allowed, err := resourceGrants(ctx, q, w, p.UserID, []string{target}, action)
+	allowed, err := resourceGrants(ctx, q, w, p, []string{target}, action)
 	if err != nil {
 		return err
 	}
@@ -236,10 +246,10 @@ func (s *Service) Readable(ctx context.Context, p Principal, w string, ids []str
 	if err := s.Check(ctx, p, w, "", "read"); err != nil {
 		return nil, err
 	}
-	return resourceGrants(ctx, s.DB, w, p.UserID, ids, "get")
+	return resourceGrants(ctx, s.DB, w, p, ids, "get")
 }
-func resourceGrants(ctx context.Context, q query, w, user string, ids []string, action string) (map[string]bool, error) {
-	rows, err := q.Query(ctx, `SELECT r.id FROM access_resources r LEFT JOIN access_resource_grants g ON g.workspace_id=r.workspace_id AND g.resource_id=r.id AND g.user_id=$3 WHERE r.workspace_id=$1 AND r.id=ANY($2) AND (NOT r.restricted OR (g.can_read AND ($4!='update' OR g.can_update) AND ($4!='execute' OR g.can_execute)))`, w, ids, user, action)
+func resourceGrants(ctx context.Context, q query, w string, p Principal, ids []string, action string) (map[string]bool, error) {
+	rows, err := q.Query(ctx, `SELECT r.id FROM access_resources r LEFT JOIN access_resource_grants g ON g.workspace_id=r.workspace_id AND g.resource_id=r.id AND g.user_id=$3 WHERE r.workspace_id=$1 AND r.id=ANY($2) AND (NOT r.restricted OR (g.can_read AND ($4!='update' OR g.can_update) AND ($4!='execute' OR g.can_execute)))`, w, ids, p.UserID, action)
 	if err != nil {
 		return nil, err
 	}
@@ -252,7 +262,22 @@ func resourceGrants(ctx context.Context, q query, w, user string, ids []string, 
 		}
 		result[id] = true
 	}
-	return result, rows.Err()
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	rows.Close()
+	if p.OperationID != "" {
+		eligible, err := versionGrants(ctx, q, p, w, identityVersionRefs(ids))
+		if err != nil {
+			return nil, err
+		}
+		for id := range result {
+			if !eligible[VersionRef{ID: id}] {
+				delete(result, id)
+			}
+		}
+	}
+	return result, nil
 }
 
 // PutResource is called in the owning domain's transaction, not through a client

@@ -1,6 +1,6 @@
 # 現在状態
 
-更新日: 2026-10-15（JST）
+更新日: 2026-10-16（JST）
 
 開発環境の構築を終え、[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の実装を#3から番号順に進めている。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
 
@@ -49,6 +49,6 @@
 
 ## Issue #11の判定
 
-状態: In progress（設計見直し中）。Scope revision 1。2026-10-16のユーザー指示を受け、初期から膨大なContextを管理する前提をAGENTS.mdへ明記した。逐次選択・許可を求める案を撤回し、送信禁止の情報を分類・管理して規則を自動適用する設計へ[計画](2026-10-15-issue-11-plan.md)を修正している。初期接続は同梱クライアントの事前登録とする。製品実装はまだ行っていない。
+状態: Inspection pending（区分Cの独立検品中）。Scope revision 1。送信禁止分類・操作境界・実Ory/SDKによるMCP・共通認可・操作履歴・管理UIを実装した。1万Context×3版、共通UIの実操作、既存の認証・検索・関係探索の回帰は[検証記録](2026-10-16-issue-11-evidence.md)を参照。区分C検品・実PR CI・マージ後確認は未完了。
 
 #12〜#34は未着手。Context編集GUI、Runner、グラフ探索GUI、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。

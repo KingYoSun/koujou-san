@@ -20,6 +20,8 @@
     "test": "node scripts/dev.mjs test",
     "test:database": "node scripts/dev.mjs test:database",
     "test:auth": "node scripts/dev.mjs test:auth",
+    "test:mcp": "node scripts/dev.mjs test:mcp",
+    "test:mcp:ui": "node scripts/dev.mjs test:mcp:ui",
     "test:access": "node scripts/dev.mjs test:access",
     "test:contexts": "node scripts/dev.mjs test:contexts",
     "test:sync": "node scripts/dev.mjs test:sync",

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { apiRequest } from "./auth";
 import { SyncPanel } from "./sync-panel";
+import { DeliveryPolicy } from "./delivery-policy";
 import { discardSyncWorkspace } from "./sync-engine";
 import { syncStorage } from "./sync-store";
 
@@ -653,6 +654,13 @@ export function Team({ native }: { native: boolean }) {
             >
               さらに端末を表示
             </button>
+          )}
+          {admin && (
+            <DeliveryPolicy
+              key={selected}
+              native={native}
+              workspace={selected}
+            />
           )}
           {apiIdentity && me && (
             <SyncPanel

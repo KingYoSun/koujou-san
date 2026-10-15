@@ -76,6 +76,9 @@ jobs:
       - name: Test ArcadeDB projection and graph exploration
         run: pnpm run test:graph
 
+      - name: Test authenticated MCP with Ory and both projections
+        run: pnpm run test:mcp
+
       - name: Build
         run: pnpm run build
 

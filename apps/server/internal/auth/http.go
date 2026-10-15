@@ -292,9 +292,10 @@ func (s *Service) broker(w http.ResponseWriter, r *http.Request) {
 		Client struct {
 			ID string `json:"client_id"`
 		} `json:"client"`
-		Subject  string   `json:"subject"`
-		Scopes   []string `json:"requested_scope"`
-		Audience []string `json:"requested_access_token_audience"`
+		Subject    string   `json:"subject"`
+		RequestURL string   `json:"request_url"`
+		Scopes     []string `json:"requested_scope"`
+		Audience   []string `json:"requested_access_token_audience"`
 	}
 	endpoint := s.Config.HydraAdmin + "/admin/oauth2/auth/requests/" + kind + "?" + kind + "_challenge=" + url.QueryEscape(challenge)
 	status, err = s.call(r.Context(), "GET", endpoint, nil, "", &value)
@@ -315,16 +316,30 @@ func (s *Service) broker(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, scope := range value.Scopes {
-			if !strings.Contains(" openid offline_access email profile koujou ", " "+scope+" ") {
+			if !strings.Contains(" openid offline_access email profile koujou koujou.mcp ", " "+scope+" ") {
 				failure(w, ErrUnauthorized)
 				return
 			}
 		}
 		for _, audience := range value.Audience {
-			if audience != s.Config.Audience {
+			if audience != s.Config.Audience && audience != s.Config.MCPResource() {
 				failure(w, ErrUnauthorized)
 				return
 			}
+		}
+		// Hydra uses audience internally. Map the standard MCP resource indicator
+		// from the original authorization request to that audience at consent.
+		original, parseErr := url.Parse(value.RequestURL)
+		if parseErr != nil {
+			failure(w, ErrUnauthorized)
+			return
+		}
+		if resources, present := original.Query()["resource"]; present {
+			if len(resources) != 1 || resources[0] != s.Config.MCPResource() {
+				failure(w, ErrUnauthorized)
+				return
+			}
+			value.Audience = []string{resources[0]}
 		}
 		accept = map[string]any{"grant_scope": value.Scopes, "grant_access_token_audience": value.Audience, "remember": false, "session": map[string]any{"access_token": map[string]string{"aal": session.AAL}, "id_token": map[string]any{"email": session.Identity.Traits.Email, "email_verified": true}}}
 	}
