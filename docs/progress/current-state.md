@@ -29,6 +29,6 @@
 
 ## Issue #6の判定
 
-状態: In progress。Scope revision 1。[計画](2026-10-15-issue-6-plan.md)の4点をユーザーが決定した。確認済み利用者による作成、ログイン済みリンク所持者の招待受諾、3役割と独立した実行許可、登録者離脱時の該当Workspaceの端末許可失効を採用し、実装・検証を進める。
+状態: Inspection pending。Scope revision 1。[計画](2026-10-15-issue-6-plan.md)の4点を採用し、Workspace・所属・招待・独立した実行許可・端末失効を実装した。実PG・実Ory・Web/Tauri・Windows DPAPI試験と[独立検品](2026-10-15-issue-6-inspection.md)は成功。[検証記録](2026-10-15-issue-6-evidence.md)を参照する。PR CIとマージ後照合を残す。
 
-#7〜#34は未着手。Workspace・業務API、Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
+#7〜#34は未着手。Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
