@@ -22,6 +22,7 @@ import (
 var ErrForbidden = errors.New("forbidden")
 
 type query interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Service struct {
@@ -219,21 +220,39 @@ func (s *Service) check(ctx context.Context, q query, p Principal, w, target, ac
 	if target == "" {
 		return nil
 	}
-	var restricted bool
-	if err = q.QueryRow(ctx, "SELECT restricted FROM access_resources WHERE workspace_id=$1 AND id=$2", w, target).Scan(&restricted); err != nil {
-		return deny(err)
+	allowed, err := resourceGrants(ctx, q, w, p.UserID, []string{target}, action)
+	if err != nil {
+		return err
 	}
-	if !restricted {
-		return nil
-	}
-	var read, update, execute bool
-	if err = q.QueryRow(ctx, "SELECT can_read,can_update,can_execute FROM access_resource_grants WHERE workspace_id=$1 AND resource_id=$2 AND user_id=$3", w, target, p.UserID).Scan(&read, &update, &execute); err != nil {
-		return deny(err)
-	}
-	if !read || (action == "update" && !update) || (action == "execute" && !execute) {
+	if !allowed[target] {
 		return ErrForbidden
 	}
 	return nil
+}
+
+// Readable checks a bounded set of graph candidates using the same policy as
+// individual resource reads. References and containment never grant access.
+func (s *Service) Readable(ctx context.Context, p Principal, w string, ids []string) (map[string]bool, error) {
+	if err := s.Check(ctx, p, w, "", "read"); err != nil {
+		return nil, err
+	}
+	return resourceGrants(ctx, s.DB, w, p.UserID, ids, "get")
+}
+func resourceGrants(ctx context.Context, q query, w, user string, ids []string, action string) (map[string]bool, error) {
+	rows, err := q.Query(ctx, `SELECT r.id FROM access_resources r LEFT JOIN access_resource_grants g ON g.workspace_id=r.workspace_id AND g.resource_id=r.id AND g.user_id=$3 WHERE r.workspace_id=$1 AND r.id=ANY($2) AND (NOT r.restricted OR (g.can_read AND ($4!='update' OR g.can_update) AND ($4!='execute' OR g.can_execute)))`, w, ids, user, action)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	result := map[string]bool{}
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		result[id] = true
+	}
+	return result, rows.Err()
 }
 
 // PutResource is called in the owning domain's transaction, not through a client
