@@ -45,6 +45,6 @@
 
 ## Issue #10の判定
 
-状態: Inspection pending。Scope revision 1。ユーザーが[計画](2026-10-15-issue-10-plan.md)の負荷基準とAPI上限を採用し、実PG・ArcadeDBで投影・探索・入力確定・復旧と合意負荷を確認した。[検証記録](2026-10-15-issue-10-evidence.md)を固定成果物の独立検品へ渡し、その後にPR・CI・マージ後照合を行う。
+状態: In progress（CI・マージ後照合待ち）。Scope revision 1。[PR #42](https://github.com/KingYoSun/koujou-san/pull/42)で、ユーザー採用済みの[計画](2026-10-15-issue-10-plan.md)を実装した。[検証記録](2026-10-15-issue-10-evidence.md)と[独立検品](2026-10-15-issue-10-inspection.md)は全AC/INVARに適合。CIの確認後にマージとtree照合を行う。
 
 #11〜#34は未着手。Context編集GUI、Runner、グラフ探索GUI、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。

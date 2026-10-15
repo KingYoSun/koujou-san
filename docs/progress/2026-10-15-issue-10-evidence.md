@@ -41,7 +41,7 @@ Windows/amd64、AMD Ryzen 7 7800X3D、Docker 29.5.2のLinux VM（4 CPU・約15.6
 
 `pnpm run test:graph`と`pnpm run test:graph-load`は試験専用PG・ArcadeDBで成功した。機能試験の最終実行は`TestGraphPostgres` 14.98秒、負荷試験は`TestGraphLoad` 143.49秒。標準の開発用volumeは削除していない。
 
-Go全体テスト、`pnpm run check / pnpm run test / pnpm run build`は成功した。共通UIは5ファイル24テストが成功した。共通認可・既存cursorを変更したため、実PGの`test:access / test:contexts / test:search`も成功した。CI・固定commitの独立検品・マージ後の判定は、完了後に追記する。
+Go全体テスト、`pnpm run check / pnpm run test / pnpm run build`は成功した。共通UIは5ファイル24テストが成功した。共通認可・既存cursorを変更したため、実PGの`test:access / test:contexts / test:search`も成功した。[独立検品](2026-10-15-issue-10-inspection.md)で全AC/INVARの適合を確認した。最終対象は`e3c25ccfb1eb31e980a6501aa27d645616244662`。CIとマージ後の判定は完了後に追記する。
 
 CodeGraphで既存のContext解決・認可・API入口・検索利用側を確認した。新規graphindexは未索引だったため、その範囲は直接読んだ。新しい索引は作成していない。日本語文書はyomiyasuで推敲し、製品内で使う「正本」「固定版」などの用語は保持した。
 
