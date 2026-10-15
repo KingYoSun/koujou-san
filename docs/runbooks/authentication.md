@@ -54,3 +54,11 @@ cargo test -p koujou-san-desktop live_ory_browser_restart_refresh_logout -- --ig
 ```
 
 通常の`check / test / build`と`check:desktop / test:desktop`、CIの実Ory試験も変更範囲に応じて実行する。認証不能と未ログインを分け、Ory停止時にログアウト済み・revoke済みと断定しない。
+
+### 実ブラウザの通信と保存領域
+
+検証用アカウントでWebへログインした後、開発サーバーの`https://localhost:1420/tests/browser-auth.html`を開き、「認証と保存領域を検証」を押す。製品buildには含まれない検証ページで、資格情報の値を表示・保存しない。
+
+`profileStatus`と`sessionRetainedStatus`は200、`invalidCSRFStatus`は403、`profileHasOAuthFields`はfalseになる。Userの応答項目はid・email・display_name・administratorだけで、localStorage・sessionStorage・JavaScriptから読めるCookieの名前は空になる。Secure・HttpOnly・SameSite・Path属性は同じBFF handlerを使う実Ory統合試験でも照合する。結果とスクリーンショットを秘密値を含めずに保存する。
+
+画面操作の接続と再確認は[Computer Useの手順](computer-use.md)を参照する。
