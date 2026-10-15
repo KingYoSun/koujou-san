@@ -49,6 +49,6 @@
 
 ## Issue #11の判定
 
-状態: Inspection pending（区分Cの独立検品中）。Scope revision 1。送信禁止分類・操作境界・実Ory/SDKによるMCP・共通認可・操作履歴・管理UIを実装した。1万Context×3版、共通UIの実操作、既存の認証・検索・関係探索の回帰は[検証記録](2026-10-16-issue-11-evidence.md)を参照。区分C検品・実PR CI・マージ後確認は未完了。
+状態: In progress（独立検品PASS・PR CI待ち）。Scope revision 1。送信禁止分類・操作境界・実Ory/SDKによるMCP・共通認可・操作履歴・管理UIを実装した。1万Context×3版、共通UIの実操作、既存の認証・検索・関係探索の回帰は[検証記録](2026-10-16-issue-11-evidence.md)を参照。[独立検品](2026-10-16-issue-11-inspection.md)は全AC・INVARをPASS、blocker 0件。実PR CI・マージ後確認は未完了。
 
 #12〜#34は未着手。Context編集GUI、Runner、グラフ探索GUI、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。

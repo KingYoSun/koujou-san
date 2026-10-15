@@ -1,6 +1,6 @@
 # 0010: MCPの操作・送信分類・共通認可
 
-- 状態: Proposed（実接続と独立検品後に確定）
+- 状態: Accepted（実接続・独立検品で確認）
 - 日付: 2026-10-16
 - 対象: Issue #11、[計画](../progress/2026-10-15-issue-11-plan.md)
 
@@ -10,7 +10,7 @@ MCPはGo SDK v1.8.0、Streamable HTTPの2026-07-28を固定して検証する。
 
 操作はクライアントが現在のWorkspaceと作業から自動作成する。読取/編集の目的と、任意の固定Manifestを保存し、サーバー発行の操作handleをMCP接続へ結び付ける。モデルが渡すtool引数で操作や許可toolを変更しない。Runに紐付く操作ではManifestの固定版とplacementsから範囲を導き、none/excludeを再選択なしで適用する。
 
-既存のUser認可へ操作境界を追加し、Context読取、版照合、検索フィルタ、グラフの両端/所有者、編集transactionで共通に確認する。通常HTTPのPrincipalは操作境界を持たず、既存挙動を維持する。cursorはUser・Workspaceに加えて操作と送信方針の版にも結び付け、別操作へ再利用できないようにする。
+既存のUser認可へ操作境界を追加し、Context読取、版照合、検索フィルタ、グラフの両端/所有者、編集transactionで共通に確認する。通常HTTPのPrincipalは操作境界を持たず、既存挙動を維持する。cursorはUser・Workspaceに加えて操作と送信方針の版にも結び付ける。resource URIもWorkspace・操作で分け、private・TTL 0とHTTP no-storeを返す。別操作のcacheや継続へ再利用しない。
 
 ## 大量Contextと送信禁止の分類
 

@@ -60,3 +60,5 @@ SDKの初期schema推論がJSON本文をbyte配列と解釈し、実接続試験
 UI用fixtureのbuild参照path誤りと、失効で閉じられたSDK接続を再利用した試験も修正した。最終の専用環境は終了時に削除した。区分C検品・実PR CI・マージ後確認が揃うまでIssueをCloseしない。
 
 検索・探索の候補と選択の対応確認は`contexts.CandidateInput`へ集約し、HTTPとMCPの両方から使う。既存のHTTP応答・競合・cursor形式を維持した。最終差分でも`test:search`、`test:graph`、`test:mcp`を再実行してPASSした。
+
+[独立検品](2026-10-16-issue-11-inspection.md)は固定commit `941c611969a7c5a56575c181ed9d75984eebe88a`のAC-1〜6・INVAR-1〜5を全てPASS、blocker 0件と判定した。実装セッションを継承しない別コンテキストで、check・通常テスト・実認証/DB/検索/探索/MCPを再実行した。検品後の追加は記録とADR状態のみで、製品コードを変更していない。PRは[#43](https://github.com/KingYoSun/koujou-san/pull/43)。
