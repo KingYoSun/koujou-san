@@ -41,6 +41,10 @@
 
 ## Issue #9の判定
 
-状態: In progress。Scope revision 1。ユーザーが採用した[品質・負荷目標](2026-10-15-issue-9-plan.md)を満たし、検索・投影・再構築を実装した。[検証記録](2026-10-15-issue-9-evidence.md)と[独立検品](2026-10-15-issue-9-inspection.md)は全条件PASS、blockerなし。CIとマージ後照合は未完了。
+状態: Complete。Scope revision 1。[PR #41](https://github.com/KingYoSun/koujou-san/pull/41)を全CI成功後にマージした。main `730f20ff9ae3c0bf4dcf2dc1d12270796c4a93e3`と検証済みheadのtree差分は0。[検証記録](2026-10-15-issue-9-evidence.md)、[独立検品](2026-10-15-issue-9-inspection.md)、合意負荷・マージ後照合が揃い、#9をCloseした。
 
-#10〜#34は未着手。Context編集GUI、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #10の判定
+
+状態: Blocked（実装未着手）。Scope revision 1。[計画](2026-10-15-issue-10-plan.md)の負荷基準とAPI上限について、ユーザーの判断を待つ。標準ArcadeDBの起動とGoドライバの読取接続・stream完了は確認した。採用数値や製品機能の完成としては扱わない。
+
+#11〜#34は未着手。Context編集GUI、Runner、グラフ探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
