@@ -353,6 +353,11 @@ func TestSyncPostgres(t *testing.T) {
 	pathEvent.Sequence = "4"
 	pathEvent.ArtifactID = `C:\private\log`
 	request(credential, reportPath, pathEvent, 400)
+	pathRevision := event
+	pathRevision.ID = "path-revision-event"
+	pathRevision.Sequence = "4"
+	pathRevision.ArtifactRevision = `C:\private\log`
+	request(credential, reportPath, pathRevision, 400)
 	otherTarget := event
 	otherTarget.ID = "wrong-target"
 	otherTarget.Sequence = "4"

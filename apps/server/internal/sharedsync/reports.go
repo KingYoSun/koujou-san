@@ -65,7 +65,7 @@ func (s *Service) readReport(ctx context.Context, p access.Principal, w, id, rev
 func (s *Service) Report(ctx context.Context, p access.Principal, w string, event ReportInput) (apicontract.Response[apicontract.Reference], error) {
 	sequence, err := strconv.ParseInt(event.Sequence, 10, 64)
 	validKind := event.Kind == "input_observed" || event.Kind == "pause_observed" || event.Kind == "output_observed" || event.Kind == "completion_observed"
-	if err != nil || sequence <= 0 || !identifier.MatchString(event.ID) || event.TargetID == "" || !validKind || (event.ArtifactID == "") != (event.ArtifactRevision == "") || (event.ArtifactID != "" && !identifier.MatchString(event.ArtifactID)) {
+	if err != nil || sequence <= 0 || !identifier.MatchString(event.ID) || event.TargetID == "" || !validKind || (event.ArtifactID == "") != (event.ArtifactRevision == "") || (event.ArtifactID != "" && (!identifier.MatchString(event.ArtifactID) || !identifier.MatchString(event.ArtifactRevision))) {
 		return apicontract.Response[apicontract.Reference]{}, errInput
 	}
 	if p.DeviceID == "" {
