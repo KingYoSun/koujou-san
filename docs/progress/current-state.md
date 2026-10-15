@@ -53,6 +53,6 @@
 
 ## Issue #12の判定
 
-状態: Inspection pending。Scope revision 1。四粒度の編集・固定参照・版履歴、Scope整理、実検索/探索、入力プレビュー、Context単位の保存と旧下書きの移行を実装した。[計画](2026-10-16-issue-12-plan.md)と[検証記録](2026-10-16-issue-12-evidence.md)を参照する。Web/Windows、二Userの競合・切断・権限失効、実エンジン停止・遅延・打切りを確認した。固定成果物の独立検品、CI、マージ後照合を残す。
+状態: In progress。Scope revision 1。四粒度の編集・固定参照・版履歴、Scope整理、実検索/探索、入力プレビュー、Context単位の保存と旧下書きの移行を実装した。[計画](2026-10-16-issue-12-plan.md)、[検証記録](2026-10-16-issue-12-evidence.md)、[独立検品](2026-10-16-issue-12-inspection.md)を参照する。全AC・INVARはPASS、blockerは0件。CI、マージ後照合を残す。
 
 #13〜#34は未着手。Runner、実行・検品の詳細画面、LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
