@@ -58,6 +58,9 @@ jobs:
       - name: Test PostgreSQL persistence and recovery
         run: pnpm run test:database
 
+      - name: Test Ory authentication
+        run: pnpm run test:auth
+
       - name: Build
         run: pnpm run build
 

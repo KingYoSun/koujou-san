@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/KingYoSun/koujou-san/apps/server/internal/auth"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 )
@@ -18,6 +19,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	var ready func(context.Context) error
+	var routes []func(*http.ServeMux)
 	if databaseURL := os.Getenv("KOUJOU_DATABASE_URL"); databaseURL != "" {
 		store, err := persistence.Open(ctx, databaseURL)
 		if err != nil {
@@ -26,6 +28,14 @@ func main() {
 		}
 		defer store.Close()
 		ready = store.Ready
+		if os.Getenv("KOUJOU_AUTH_ENABLED") == "1" {
+			service, err := auth.New(ctx, auth.Environment(), store.Database())
+			if err != nil {
+				slog.Error("authentication initialization failed")
+				os.Exit(1)
+			}
+			routes = append(routes, service.Register)
+		}
 	}
 	address := os.Getenv("KOUJOU_API_ADDR")
 	if address == "" {
@@ -34,7 +44,7 @@ func main() {
 
 	server := &http.Server{
 		Addr:              address,
-		Handler:           httpapi.NewHandler(ready),
+		Handler:           httpapi.NewHandler(ready, routes...),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
@@ -44,7 +54,13 @@ func main() {
 	serverError := make(chan error, 1)
 	go func() {
 		slog.Info("starting development API", "address", address)
-		serverError <- server.ListenAndServe()
+		if cert := os.Getenv("KOUJOU_TLS_CERT"); cert != "" {
+			serverError <- server.ListenAndServeTLS(cert, os.Getenv("KOUJOU_TLS_KEY"))
+		} else if os.Getenv("KOUJOU_AUTH_ENABLED") == "1" {
+			serverError <- errors.New("authentication requires TLS")
+		} else {
+			serverError <- server.ListenAndServe()
+		}
 	}()
 
 	select {

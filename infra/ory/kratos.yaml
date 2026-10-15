@@ -2,37 +2,63 @@ version: v0.13.0
 
 serve:
   public:
-    base_url: http://127.0.0.1:4433/
+    base_url: https://localhost:1420/auth/identity/
     cors:
       enabled: true
       allowed_origins:
-        - http://127.0.0.1:1420
+        - https://localhost:1420
   admin:
     base_url: http://kratos:4434/
 
 selfservice:
-  default_browser_return_url: http://127.0.0.1:1420/
+  default_browser_return_url: https://localhost:1420/
   allowed_return_urls:
-    - http://127.0.0.1:1420/
+    - https://localhost:1420/
   methods:
     password:
       enabled: true
+    totp:
+      enabled: true
+      config:
+        issuer: koujou-san
+    code:
+      enabled: true
+      config:
+        passwordless_enabled: false
   flows:
     error:
-      ui_url: http://127.0.0.1:1420/auth/error
+      ui_url: https://localhost:1420/auth/error
     login:
-      ui_url: http://127.0.0.1:1420/auth/login
+      ui_url: https://localhost:1420/auth/login
+      after:
+        password:
+          hooks:
+            - hook: require_verified_address
     registration:
-      ui_url: http://127.0.0.1:1420/auth/registration
+      ui_url: https://localhost:1420/auth/registration
     settings:
-      ui_url: http://127.0.0.1:1420/auth/settings
+      ui_url: https://localhost:1420/auth/settings
+      required_aal: highest_available
     recovery:
-      enabled: false
+      enabled: true
+      use: code
+      ui_url: https://localhost:1420/auth/recovery
     verification:
-      enabled: false
+      enabled: true
+      use: code
+      ui_url: https://localhost:1420/auth/verification
     logout:
       after:
-        default_browser_return_url: http://127.0.0.1:1420/
+        default_browser_return_url: https://localhost:1420/
+
+session:
+  lifespan: 168h
+  whoami:
+    required_aal: highest_available
+
+courier:
+  smtp:
+    connection_uri: smtp://mailpit:1025/?disable_starttls=true
 
 identity:
   default_schema_id: default

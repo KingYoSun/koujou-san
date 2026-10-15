@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchHealth } from "./health";
+import { Account } from "./auth";
 
 type AppProps = {
   apiBaseUrl: string;
@@ -9,7 +10,7 @@ type AppProps = {
 export function App({ apiBaseUrl, native }: AppProps) {
   const health = useQuery({
     queryKey: ["api-health", apiBaseUrl],
-    queryFn: ({ signal }) => fetchHealth(apiBaseUrl, signal),
+    queryFn: ({ signal }) => fetchHealth(apiBaseUrl, signal, native),
     retry: false,
     refetchInterval: 10_000,
   });
@@ -48,6 +49,7 @@ export function App({ apiBaseUrl, native }: AppProps) {
           APIの表示はプロセスの起動確認です。
         </p>
       </section>
+      <Account native={native} />
       <footer>
         <p>Issueの受入条件と設計書を元に、ここから実装を始めます。</p>
         <p>

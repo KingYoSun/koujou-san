@@ -73,7 +73,14 @@ services:
 
   kratos:
     image: oryd/kratos:v26.2.0
-    command: ["serve", "--dev", "--config", "/etc/config/kratos.yaml"]
+    command:
+      [
+        "serve",
+        "--dev",
+        "--watch-courier",
+        "--config",
+        "/etc/config/kratos.yaml",
+      ]
     environment:
       DSN: postgres://kratos:${KRATOS_DB_PASSWORD:?Run pnpm run setup first}@postgres:5432/kratos?sslmode=disable
       SECRETS_COOKIE: ${KRATOS_COOKIE_SECRET:?Run pnpm run setup first}
@@ -136,6 +143,12 @@ services:
       timeout: 3s
       retries: 24
       start_period: 10s
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:v1.31.5
+    ports:
+      - "127.0.0.1:18025:8025"
     restart: unless-stopped
 
 volumes:

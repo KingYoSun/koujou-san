@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync } from "node:fs";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
@@ -152,9 +152,34 @@ async function setup() {
   ]);
   await cargo("fetch");
   await goRun(["mod", "download"]);
+  await prepareAuth();
   console.log(
     "Setup complete. Run pnpm run doctor, then pnpm run check / test / build.",
   );
+}
+
+async function prepareAuth() {
+  await resolveGo();
+  const additions = [];
+  for (const key of ["KOUJOU_AUTH_KEY", "KOUJOU_WEB_CLIENT_SECRET"]) {
+    if (!env[key]) {
+      env[key] = randomBytes(16).toString("hex");
+      additions.push(`${key}=${env[key]}`);
+    }
+  }
+  if (env.KOUJOU_AUTH_ENABLED === undefined) {
+    env.KOUJOU_AUTH_ENABLED = "1";
+    additions.push("KOUJOU_AUTH_ENABLED=1");
+  }
+  if (additions.length)
+    await appendFile(path.join(root, ".env"), `\n${additions.join("\n")}\n`, {
+      mode: 0o600,
+    });
+  await goRun(["run", "./cmd/devcert", path.join(root, ".cache/tls")]);
+  env.KOUJOU_TLS_CERT ??= path.join(root, ".cache/tls/cert.pem");
+  env.KOUJOU_TLS_KEY ??= path.join(root, ".cache/tls/key.pem");
+  env.KOUJOU_DEV_CA_FILE ??= env.KOUJOU_TLS_CERT;
+  env.KOUJOU_DATABASE_URL ??= `postgresql://koujou:${encodeURIComponent(env.KOUJOU_DB_PASSWORD)}@127.0.0.1:15432/koujou?sslmode=disable`;
 }
 
 function checkNode() {
@@ -218,7 +243,7 @@ async function infra(command) {
   await run(`docker${exe}`, [...args, ...actions[command]]);
 }
 
-async function testDatabase() {
+async function testDatabase(authentication = false) {
   await resolveGo();
   if (!env.KOUJOU_DB_PASSWORD) throw new Error("Run pnpm run setup first.");
   const project = `koujou-san-db-test-${randomBytes(6).toString("hex")}`;
@@ -231,6 +256,25 @@ async function testDatabase() {
   await new Promise((resolve, reject) =>
     reservation.close((error) => (error ? reject(error) : resolve())),
   );
+  if (authentication) {
+    for (const name of [
+      "HYDRA",
+      "HYDRA_ADMIN",
+      "KRATOS",
+      "KRATOS_ADMIN",
+      "MAILPIT",
+      "API",
+    ]) {
+      const server = createServer();
+      await new Promise((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(0, "127.0.0.1", resolve);
+      });
+      env[`KOUJOU_TEST_${name}_PORT`] = String(server.address().port);
+      await new Promise((resolve) => server.close(resolve));
+    }
+    env.KOUJOU_TEST_SITE = `https://127.0.0.1:${env.KOUJOU_TEST_API_PORT}`;
+  }
   const compose = [
     "compose",
     "--env-file",
@@ -240,7 +284,12 @@ async function testDatabase() {
     "-f",
     path.join(root, "infra/compose.yaml"),
     "-f",
-    path.join(root, "infra/compose.test.yaml"),
+    path.join(
+      root,
+      authentication
+        ? "infra/compose.auth-test.yaml"
+        : "infra/compose.test.yaml",
+    ),
   ];
   console.log(
     "Creating isolated PostgreSQL fixtures; only this test container is stopped and restored.",
@@ -253,7 +302,7 @@ async function testDatabase() {
       "--wait",
       "--wait-timeout",
       "60",
-      "postgres",
+      ...(authentication ? ["kratos", "hydra", "mailpit"] : ["postgres"]),
     ]);
     const container = (
       await run(`docker${exe}`, [...compose, "ps", "-q", "postgres"], {
@@ -272,9 +321,9 @@ async function testDatabase() {
     env.KOUJOU_TEST_PROJECT = project;
     await goRun([
       "test",
-      "./internal/persistence",
+      authentication ? "./internal/auth" : "./internal/persistence",
       "-run",
-      "^TestPostgres$",
+      authentication ? "^TestOryIntegration$" : "^TestPostgres$",
       "-count=1",
       "-v",
     ]);
@@ -307,7 +356,8 @@ async function testDatabase() {
 const tasks = {
   setup,
   doctor,
-  "test:database": testDatabase,
+  "test:database": () => testDatabase(false),
+  "test:auth": () => testDatabase(true),
   check: async () => {
     await resolveGo();
     const unformatted = await run(
@@ -349,14 +399,28 @@ const tasks = {
   "test:desktop": () => cargo("test", ["--workspace"]),
   "build:desktop": () => client("tauri:build"),
   "dev:api": async () => {
-    await resolveGo();
+    await prepareAuth();
     if (!env.KOUJOU_DATABASE_URL && env.KOUJOU_DB_PASSWORD) {
       env.KOUJOU_DATABASE_URL = `postgresql://koujou:${encodeURIComponent(env.KOUJOU_DB_PASSWORD)}@127.0.0.1:15432/koujou?sslmode=disable`;
     }
     await goRun(["run", "./cmd/api"]);
   },
-  "dev:web": () => client("dev"),
-  "dev:desktop": () => client("tauri:dev"),
+  "dev:web": async () => {
+    await prepareAuth();
+    await client("dev");
+  },
+  "dev:desktop": async () => {
+    await prepareAuth();
+    await client("tauri:dev");
+  },
+  "auth:bootstrap": async () => {
+    await prepareAuth();
+    const args = process.argv.slice(3);
+    const index = args.indexOf("--password-file");
+    if (index >= 0 && args[index + 1])
+      args[index + 1] = path.resolve(root, args[index + 1]);
+    await goRun(["run", "./cmd/auth-bootstrap", ...args]);
+  },
   "infra:up": () => infra("up"),
   "infra:down": () => infra("down"),
   "infra:status": () => infra("status"),

@@ -5,9 +5,18 @@ serve:
 urls:
   self:
     issuer: http://127.0.0.1:4444/
-  login: http://127.0.0.1:1420/auth/login
-  consent: http://127.0.0.1:1420/auth/consent
-  logout: http://127.0.0.1:1420/auth/logout
+  login: https://localhost:1420/auth/login
+  consent: https://localhost:1420/auth/consent
+  logout: https://localhost:1420/auth/logout
+
+ttl:
+  access_token: 15m
+  refresh_token: 168h
+  login_consent_request: 15m
+
+oauth2:
+  pkce:
+    enforced: true
 
 oidc:
   subject_identifiers:

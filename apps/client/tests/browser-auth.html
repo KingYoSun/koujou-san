@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ja">
+  <meta charset="utf-8" /><title>koujou-san ブラウザ認証検証</title>
+  <style>
+    body {
+      max-width: 800px;
+      margin: 48px auto;
+      font: 18px system-ui;
+      color: #1e293b;
+    }
+    pre {
+      padding: 24px;
+      background: #f1f5f9;
+      white-space: pre-wrap;
+    }
+    button {
+      padding: 12px;
+    }
+  </style>
+  <h1>ブラウザ認証検証</h1>
+  <p>検証用ページ。資格情報の値は表示・保存しません。</p>
+  <button id="check">認証と保存領域を検証</button>
+  <pre id="result">未実行</pre>
+  <script>
+    document.querySelector("#check").onclick = async () => {
+      const profileResponse = await fetch("/auth/me");
+      const profile = await profileResponse.json();
+      const rejected = await fetch("/auth/logout", { method: "POST" });
+      const retained = await fetch("/auth/me");
+      const result = {
+        profileStatus: profileResponse.status,
+        profileFields: Object.keys(profile.user ?? {}),
+        profileHasOAuthFields: /access_token|refresh_token|id_token/.test(
+          JSON.stringify(profile),
+        ),
+        invalidCSRFStatus: rejected.status,
+        sessionRetainedStatus: retained.status,
+        localStorageKeys: Object.keys(localStorage),
+        sessionStorageKeys: Object.keys(sessionStorage),
+        javascriptCookieNames: document.cookie
+          .split(";")
+          .map((v) => v.trim().split("=")[0])
+          .filter(Boolean),
+      };
+      document.querySelector("#result").textContent = JSON.stringify(
+        result,
+        null,
+        2,
+      );
+    };
+  </script>
+</html>

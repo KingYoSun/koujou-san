@@ -21,6 +21,9 @@ import (
 //go:embed 001_shared.sql
 var initialSchema string
 
+//go:embed 002_auth.sql
+var authSchema string
+
 type Store struct{ pool *pgxpool.Pool }
 
 func Open(ctx context.Context, url string) (*Store, error) {
@@ -29,7 +32,7 @@ func Open(ctx context.Context, url string) (*Store, error) {
 		return nil, errors.New("invalid PostgreSQL configuration")
 	}
 	if err = pool.Ping(ctx); err == nil {
-		err = migrate(ctx, pool, []string{initialSchema})
+		err = migrate(ctx, pool, []string{initialSchema, authSchema})
 	}
 	if err != nil {
 		pool.Close()
@@ -40,6 +43,10 @@ func Open(ctx context.Context, url string) (*Store, error) {
 
 func (s *Store) Close()                          { s.pool.Close() }
 func (s *Store) Ready(ctx context.Context) error { return s.pool.Ping(ctx) }
+
+// Database supplies the same pool to global identity/session services, whose
+// data is separate from Workspace mutations and the Ory-owned databases.
+func (s *Store) Database() *pgxpool.Pool { return s.pool }
 
 func migrate(ctx context.Context, pool *pgxpool.Pool, scripts []string) error {
 	return pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {

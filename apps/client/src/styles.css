@@ -140,6 +140,64 @@ footer p {
   margin: 4px 0;
 }
 
+.account {
+  margin-top: 24px;
+}
+.auth-form {
+  display: grid;
+  gap: 18px;
+  padding-top: 24px;
+  margin-top: 24px;
+  border-top: 1px solid var(--border);
+}
+.auth-field {
+  display: grid;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.auth-field input {
+  padding: 12px;
+  border: 1px solid var(--input);
+  border-radius: 6px;
+  font: inherit;
+  background: white;
+}
+.auth-field input:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 3px;
+}
+button {
+  padding: 11px 18px;
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  background: var(--primary);
+  color: white;
+  font: inherit;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.auth-links,
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 22px;
+}
+.auth-links a {
+  color: var(--primary);
+  font-size: 14px;
+}
+.totp-qr {
+  width: 200px;
+  max-width: 100%;
+}
+
 @media (max-width: 480px) {
   .shell {
     padding: 40px 16px;
