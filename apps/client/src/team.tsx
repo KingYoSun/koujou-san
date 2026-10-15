@@ -106,9 +106,15 @@ export function Team({ native }: { native: boolean }) {
   }
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const raw = new URLSearchParams(window.location.hash.slice(1)).get("join");
-    if (raw) sessionStorage.setItem("koujou.pending-invite", raw);
-    setInvitation(sessionStorage.getItem("koujou.pending-invite") ?? "");
+    const readInvitation = () => {
+      const raw = new URLSearchParams(window.location.hash.slice(1)).get(
+        "join",
+      );
+      if (raw) sessionStorage.setItem("koujou.pending-invite", raw);
+      setInvitation(sessionStorage.getItem("koujou.pending-invite") ?? "");
+    };
+    readInvitation();
+    window.addEventListener("hashchange", readInvitation);
     let active = true;
     const load = () => {
       apiRequest("/auth/me", native)
@@ -138,6 +144,7 @@ export function Team({ native }: { native: boolean }) {
     window.addEventListener("koujou-auth-changed", load);
     return () => {
       active = false;
+      window.removeEventListener("hashchange", readInvitation);
       window.removeEventListener("koujou-auth-changed", load);
     };
   }, [native]);

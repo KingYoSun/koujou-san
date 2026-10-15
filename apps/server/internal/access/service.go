@@ -145,6 +145,9 @@ func (s *Service) Check(ctx context.Context, p Principal, w, target, action stri
 	return s.check(ctx, s.DB, p, w, target, action)
 }
 func (s *Service) check(ctx context.Context, q query, p Principal, w, target, action string) error {
+	if target == "" && (action == "get" || action == "search" || action == "update" || action == "execute" || action == "input" || action == "report") {
+		return ErrForbidden
+	}
 	if p.DeviceID != "" {
 		d, generation, err := s.device(ctx, q, w, p.DeviceID)
 		if err != nil {

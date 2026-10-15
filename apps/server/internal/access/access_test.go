@@ -177,6 +177,9 @@ func TestAccessPostgres(t *testing.T) {
 	request("bob", "POST", path("one", "authorize"), map[string]string{"target": "private-child", "action": "get"}, 200)
 	request("bob", "POST", path("one", "authorize"), map[string]string{"target": "private-child", "action": "update"}, 403)
 	t.Log("Workspace/resource boundary, no containment/Scope grant, role matrix and independent execution permission passed")
+	for _, action := range []string{"get", "search", "update", "execute"} {
+		request("bob", "POST", path("one", "authorize"), map[string]string{"action": action}, 403)
+	}
 
 	register := func(actor, w, id, identifier string) map[string]any {
 		body := mutation(id, "0")
