@@ -45,6 +45,6 @@
 
 ## Issue #10の判定
 
-状態: Blocked（実装未着手）。Scope revision 1。[計画](2026-10-15-issue-10-plan.md)の負荷基準とAPI上限について、ユーザーの判断を待つ。標準ArcadeDBの起動とGoドライバの読取接続・stream完了は確認した。採用数値や製品機能の完成としては扱わない。
+状態: In progress。Scope revision 1。ユーザーが[計画](2026-10-15-issue-10-plan.md)の負荷基準とAPI上限の推奨案を採用した。標準ArcadeDBの読取接続に続いて、投影・探索・入力確定と復旧を実装・検証する。
 
 #11〜#34は未着手。Context編集GUI、Runner、グラフ探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
