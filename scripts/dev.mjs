@@ -243,7 +243,8 @@ async function infra(command) {
   await run(`docker${exe}`, [...args, ...actions[command]]);
 }
 
-async function testDatabase(authentication = false, access = false) {
+async function testDatabase(suite = "persistence") {
+  const authentication = suite === "auth";
   await resolveGo();
   if (!env.KOUJOU_DB_PASSWORD) throw new Error("Run pnpm run setup first.");
   const project = `koujou-san-db-test-${randomBytes(6).toString("hex")}`;
@@ -321,17 +322,9 @@ async function testDatabase(authentication = false, access = false) {
     env.KOUJOU_TEST_PROJECT = project;
     await goRun([
       "test",
-      authentication
-        ? "./internal/auth"
-        : access
-          ? "./internal/access"
-          : "./internal/persistence",
+      `./internal/${suite}`,
       "-run",
-      authentication
-        ? "^TestOryIntegration$"
-        : access
-          ? "^TestAccessPostgres$"
-          : "^TestPostgres$",
+      `^${{ auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", persistence: "TestPostgres" }[suite]}$`,
       "-count=1",
       "-v",
     ]);
@@ -364,9 +357,10 @@ async function testDatabase(authentication = false, access = false) {
 const tasks = {
   setup,
   doctor,
-  "test:database": () => testDatabase(false),
-  "test:auth": () => testDatabase(true),
-  "test:access": () => testDatabase(false, true),
+  "test:database": () => testDatabase(),
+  "test:auth": () => testDatabase("auth"),
+  "test:access": () => testDatabase("access"),
+  "test:contexts": () => testDatabase("contexts"),
   check: async () => {
     await resolveGo();
     const unformatted = await run(
@@ -391,6 +385,12 @@ const tasks = {
       await goRun(["run", "./cmd/contract-fixtures"], { capture: true }),
     );
     env.KOUJOU_CONTRACT_FIXTURES = fixturePath;
+    const contextPath = path.join(root, "test-results/contexts.json");
+    await writeFile(
+      contextPath,
+      await goRun(["run", "./cmd/context-fixtures"], { capture: true }),
+    );
+    env.KOUJOU_CONTEXT_FIXTURES = contextPath;
     await client("test");
   },
   build: async () => {

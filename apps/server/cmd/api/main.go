@@ -12,6 +12,7 @@ import (
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/auth"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 )
@@ -41,6 +42,12 @@ func main() {
 				return user.ID, ok
 			})
 			routes = append(routes, accessService.Register)
+			limits, err := contexts.EnvironmentLimits()
+			if err != nil {
+				slog.Error("Context configuration invalid")
+				os.Exit(1)
+			}
+			routes = append(routes, contexts.New(store, accessService, limits).Register)
 		}
 	}
 	address := os.Getenv("KOUJOU_API_ADDR")

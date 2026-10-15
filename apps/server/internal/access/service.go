@@ -144,6 +144,11 @@ func (s *Service) member(ctx context.Context, q query, w, u string) (Member, err
 func (s *Service) Check(ctx context.Context, p Principal, w, target, action string) error {
 	return s.check(ctx, s.DB, p, w, target, action)
 }
+
+// CheckTx keeps domain reference checks in the owning Workspace transaction.
+func (s *Service) CheckTx(ctx context.Context, tx pgx.Tx, p Principal, w, target, action string) error {
+	return s.check(ctx, tx, p, w, target, action)
+}
 func (s *Service) check(ctx context.Context, q query, p Principal, w, target, action string) error {
 	if target == "" && (action == "get" || action == "search" || action == "update" || action == "execute" || action == "input" || action == "report") {
 		return ErrForbidden

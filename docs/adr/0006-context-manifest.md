@@ -24,6 +24,6 @@ none・未指定では管理対象Contextを注入しない。noneと直接値�
 
 ユーザーが採用した初期上限は実入力16 MiB・10万配置。サーバー設定で変更できる。参照切れ・権限不足・容量超過・外部未取得・探索未完了は不足範囲とともに返し、完全なManifestを保存しない。noneでも無注入のManifestを残す。
 
-Workflowの基準更新は旧版、新版、変更された候補・所属と影響する未開始Runを記録する。Run開始時のManifestはその基準版と選択を固定する。前段outputの固定値は元Run・版・digestと対応付け、pauseの追加情報は別の記録から元Manifestを参照する。開始時inputを遡って書き換えない。実際の読了は観測しておらず、`unobserved`とする。
+Workflowの基準更新は旧版、新版、変更された候補・所属と影響する未開始Runを記録する。Run開始時のManifestはその基準版と選択を固定する。前段outputの固定値は元Run・版・digestと対応付け、pauseの追加情報は別の記録から元Manifestを参照する。由来のdigestは元情報を指し、抜粋値を含む最終入力のdigestとは分ける。今回のAPIは入力提供者が明示した由来を保存し、Runの正本との照合は後続Run APIが同じ型へ接続して行う。開始時inputを遡って書き換えない。実際の読了は観測しておらず、`unobserved`とする。
 
 Run状態機械・Runner配送は#16以降、Context編集GUIは#12、候補探索の実エンジンは#9/#10で接続する。本Issueは共通業務API、保存、解決と接続fixtureを提供する。
