@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { stopSyncActor } from "./sync-engine";
+import { purgeStoredActor } from "./sync-store";
+import { SyncHTTPError } from "./sync-error";
 
 type User = {
   id: string;
@@ -57,22 +60,7 @@ export async function apiRequest(
       method: options.method ?? "GET",
       body: options.body ?? null,
     });
-  const headers: Record<string, string> = {};
-  if (options.method && options.method !== "GET") {
-    csrfRequest ??= fetch("/auth/csrf")
-      .then((r) => r.json() as Promise<{ csrf: string }>)
-      .finally(() => {
-        csrfRequest = undefined;
-      });
-    const csrf = await csrfRequest;
-    headers["X-CSRF-Token"] = csrf.csrf;
-    headers["Content-Type"] = "application/json";
-  }
-  const response = await fetch(path, {
-    ...options,
-    headers,
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-  });
+  const response = await webRequest(path, options);
   if (!response.ok)
     throw new Error(
       response.status === 401
@@ -84,6 +72,51 @@ export async function apiRequest(
             : "認証サービスに接続できません。",
     );
   return response.json() as Promise<unknown>;
+}
+
+async function webRequest(
+  path: string,
+  options: { method?: string; body?: unknown },
+) {
+  const headers: Record<string, string> = {};
+  if (options.method && options.method !== "GET") {
+    csrfRequest ??= fetch("/auth/csrf")
+      .then((r) => r.json() as Promise<{ csrf: string }>)
+      .finally(() => {
+        csrfRequest = undefined;
+      });
+    const csrf = await csrfRequest;
+    headers["X-CSRF-Token"] = csrf.csrf;
+    headers["Content-Type"] = "application/json";
+  }
+  return fetch(path, {
+    ...options,
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+}
+
+export async function syncRequest(
+  path: string,
+  native: boolean,
+  options: { method: string; body?: unknown },
+) {
+  let status: number;
+  let body: unknown;
+  if (native) {
+    const response = await invoke<{ status: number; body: unknown }>(
+      "sync_request",
+      { path, method: options.method, body: options.body ?? null },
+    );
+    status = response.status;
+    body = response.body;
+  } else {
+    const response = await webRequest(path, options);
+    status = response.status;
+    body = await response.json();
+  }
+  if (status < 200 || status >= 300) throw new SyncHTTPError(status, body);
+  return body;
 }
 
 function Field({ node }: { node: Node }) {
@@ -329,6 +362,10 @@ export function Account({ native }: { native: boolean }) {
         : ((await apiRequest("/auth/logout", false, {
             method: "POST",
           })) as Record<string, string>);
+      if (user) {
+        await stopSyncActor(user.id);
+        await purgeStoredActor(native, user.id);
+      }
       setUser(undefined);
       setStatus("signed_out");
       window.dispatchEvent(new Event("koujou-auth-changed"));

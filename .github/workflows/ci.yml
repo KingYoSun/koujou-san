@@ -67,6 +67,9 @@ jobs:
       - name: Test Context versions and input manifests
         run: pnpm run test:contexts
 
+      - name: Test shared synchronization and report ordering
+        run: pnpm run test:sync
+
       - name: Build
         run: pnpm run build
 

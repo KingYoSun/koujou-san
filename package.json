@@ -18,6 +18,7 @@
     "test:auth": "node scripts/dev.mjs test:auth",
     "test:access": "node scripts/dev.mjs test:access",
     "test:contexts": "node scripts/dev.mjs test:contexts",
+    "test:sync": "node scripts/dev.mjs test:sync",
     "build": "node scripts/dev.mjs build",
     "dev": "node scripts/dev.mjs dev:web",
     "dev:api": "node scripts/dev.mjs dev:api",

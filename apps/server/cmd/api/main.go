@@ -15,6 +15,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/sharedsync"
 )
 
 func main() {
@@ -47,7 +48,8 @@ func main() {
 				slog.Error("Context configuration invalid")
 				os.Exit(1)
 			}
-			routes = append(routes, contexts.New(store, accessService, limits).Register)
+			contextService := contexts.New(store, accessService, limits)
+			routes = append(routes, contextService.Register, sharedsync.New(store, accessService, contextService, service.Config.Key).Register)
 		}
 	}
 	address := os.Getenv("KOUJOU_API_ADDR")

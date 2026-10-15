@@ -324,7 +324,7 @@ async function testDatabase(suite = "persistence") {
       "test",
       `./internal/${suite}`,
       "-run",
-      `^${{ auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", persistence: "TestPostgres" }[suite]}$`,
+      `^${{ auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", sharedsync: "TestSyncPostgres", persistence: "TestPostgres" }[suite]}$`,
       "-count=1",
       "-v",
     ]);
@@ -361,6 +361,7 @@ const tasks = {
   "test:auth": () => testDatabase("auth"),
   "test:access": () => testDatabase("access"),
   "test:contexts": () => testDatabase("contexts"),
+  "test:sync": () => testDatabase("sharedsync"),
   check: async () => {
     await resolveGo();
     const unformatted = await run(

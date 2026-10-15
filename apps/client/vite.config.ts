@@ -33,6 +33,7 @@ export default defineConfig({
       "/readyz": apiProxy,
       "/access/": apiProxy,
       "/contexts/": apiProxy,
+      "/sync/": apiProxy,
     },
     watch: { ignored: ["**/src-tauri/**"] },
   },
