@@ -29,6 +29,10 @@
 
 ## Issue #6の判定
 
-状態: Inspection pending。Scope revision 1。[計画](2026-10-15-issue-6-plan.md)の4点を採用し、Workspace・所属・招待・独立した実行許可・端末失効を実装した。実PG・実Ory・Web/Tauri・Windows DPAPI試験と[独立検品](2026-10-15-issue-6-inspection.md)は成功。[検証記録](2026-10-15-issue-6-evidence.md)を参照する。PR CIとマージ後照合を残す。
+状態: Complete。Scope revision 1。[PR #38](https://github.com/KingYoSun/koujou-san/pull/38)を全CI成功後にマージした。main `491ecd9c6a6640f0f0d857a21069c848019eaf23`と検証済みheadのtree差分は0。実PG・実Ory・Web/Tauri・Windows DPAPI試験、[独立検品](2026-10-15-issue-6-inspection.md)、マージ後照合が揃い、#6をCloseした。[検証記録](2026-10-15-issue-6-evidence.md)を参照する。
 
-#7〜#34は未着手。Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #7の判定
+
+状態: Blocked（ユーザー判断待ち）。Scope revision 1。[計画](2026-10-15-issue-7-plan.md)に対象・末端の受入条件・確認方法を整理した。新規Contextの初期公開範囲と解決1回の初期容量上限は、AGENTS.md §4に従って判断を確認中。判断に依存する製品実装は開始していない。
+
+#8〜#34は未着手。Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
