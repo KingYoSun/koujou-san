@@ -64,6 +64,9 @@ jobs:
       - name: Test Workspace and device authorization
         run: pnpm run test:access
 
+      - name: Test Context versions and input manifests
+        run: pnpm run test:contexts
+
       - name: Build
         run: pnpm run build
 

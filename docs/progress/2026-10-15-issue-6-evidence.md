@@ -37,6 +37,8 @@ Tauriでは検証用管理者の保存済みログインを使い、Workspaceを
 
 対象未指定のget/search/update/executeも共通Checkで拒否する。実PGの負例で確認した。Context本文・検索処理・Run割当/CLI起動の実装を、この認可fixtureの成功だけで完成扱いにしない。
 
-## 残作業
+## CIとマージ後の照合
 
-[独立検品](2026-10-15-issue-6-inspection.md)は適合。PR CIとマージ後照合を残す。
+[独立検品](2026-10-15-issue-6-inspection.md)は適合。[PR #38](https://github.com/KingYoSun/koujou-san/pull/38)のCI [38697335457](https://github.com/KingYoSun/koujou-san/actions/runs/38697335457)は共通UI・Goサーバー、Windows native、秘密値検査がすべて成功した。
+
+検証済みhead `e7235fc1d45f0840493ee81908829de867ed9ce0`とマージ後main `491ecd9c6a6640f0f0d857a21069c848019eaf23`のtreeは、どちらも`a66b837cfb4277e37fcf002ededa51dcdbc8f08a`で差分0だった。最新buildのWindowsアプリを開発用CA指定付きで再起動し、保存済みログインと端末資格情報で接続できた。専用のWeb合成アカウント2件はログアウト後に削除し、元の検証用管理者のログインを保持した。

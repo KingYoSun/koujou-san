@@ -1,0 +1,324 @@
+{
+  "conflict": {
+    "ready": false,
+    "missing": [
+      {
+        "code": "conflicting_revisions",
+        "ref": {
+          "kind": "sentence",
+          "id": "9007199254740993",
+          "revision": "next"
+        }
+      }
+    ]
+  },
+  "excerpt": {
+    "ready": true,
+    "missing": [],
+    "manifest": {
+      "schema": "context-manifest-v1",
+      "assembler": "structured-json-v1",
+      "workspace_id": "workspace-fixture",
+      "run_id": "implementation",
+      "selection": {
+        "mode": "select",
+        "include": [
+          {
+            "kind": "document",
+            "id": "doc",
+            "revision": "r1"
+          },
+          {
+            "kind": "sentence",
+            "id": "9007199254740993",
+            "revision": "9007199254740994"
+          },
+          {
+            "kind": "document",
+            "id": "doc",
+            "revision": "r1"
+          }
+        ],
+        "exclude": [
+          {
+            "kind": "sentence",
+            "id": "9007199254740993",
+            "revision": "9007199254740994"
+          }
+        ]
+      },
+      "operation_id": "",
+      "adopted_by": "",
+      "state": "ready",
+      "input_utf8": "{\"contexts\":[{\"kind\":\"document\",\"title\":\"製品方針\",\"children\":[{\"kind\":\"section\",\"title\":\"判断の基準\",\"children\":[{\"kind\":\"paragraph\",\"children\":[{\"kind\":\"sentence\",\"text\":\"二つ目の原文。\"}],\"excerpt\":true}],\"attachments\":[{\"digest\":\"1e593baef0f15f695aced807adff35b4726b4f2c494dede531473d4fe41a1b03\",\"range\":\"lines:1-2\",\"revision\":\"code-v1\",\"uri\":\"fixture://code\"}],\"excerpt\":true}],\"excerpt\":true}]}",
+      "digest": "54541578d2bddb1ced603f5af6841aaeea3e8723562758b0424f027143d38122",
+      "placements": [
+        {
+          "ref": {
+            "kind": "document",
+            "id": "doc",
+            "revision": "r1"
+          },
+          "path": [0],
+          "excerpt": true
+        },
+        {
+          "ref": {
+            "kind": "section",
+            "id": "sec",
+            "revision": "r1"
+          },
+          "path": [0, 0],
+          "excerpt": true
+        },
+        {
+          "ref": {
+            "kind": "paragraph",
+            "id": "p1",
+            "revision": "r1"
+          },
+          "path": [0, 0, 0],
+          "excerpt": true
+        },
+        {
+          "ref": {
+            "kind": "sentence",
+            "id": "s2",
+            "revision": "r1"
+          },
+          "path": [0, 0, 0, 0]
+        }
+      ],
+      "excluded": [
+        {
+          "kind": "sentence",
+          "id": "9007199254740993",
+          "revision": "9007199254740994"
+        }
+      ],
+      "duplicates": [
+        {
+          "kind": "document",
+          "id": "doc",
+          "revision": "r1"
+        },
+        {
+          "kind": "sentence",
+          "id": "9007199254740993",
+          "revision": "9007199254740994"
+        }
+      ],
+      "read_status": "unobserved"
+    }
+  },
+  "external-unfetched": {
+    "ready": false,
+    "missing": [
+      {
+        "code": "external_unfetched",
+        "source": "fixture://source"
+      }
+    ]
+  },
+  "none": {
+    "ready": true,
+    "missing": [],
+    "manifest": {
+      "schema": "context-manifest-v1",
+      "assembler": "structured-json-v1",
+      "workspace_id": "workspace-fixture",
+      "run_id": "",
+      "selection": {
+        "mode": "none"
+      },
+      "operation_id": "",
+      "adopted_by": "",
+      "state": "none",
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "placements": [],
+      "excluded": [],
+      "duplicates": [],
+      "read_status": "unobserved"
+    }
+  },
+  "none-conflict": {
+    "ready": false,
+    "missing": [
+      {
+        "code": "selection_conflict"
+      }
+    ]
+  },
+  "normal": {
+    "ready": true,
+    "missing": [],
+    "manifest": {
+      "schema": "context-manifest-v1",
+      "assembler": "structured-json-v1",
+      "workspace_id": "workspace-fixture",
+      "run_id": "implementation",
+      "selection": {
+        "mode": "select",
+        "include": [
+          {
+            "kind": "document",
+            "id": "doc",
+            "revision": "r1"
+          },
+          {
+            "kind": "sentence",
+            "id": "9007199254740993",
+            "revision": "9007199254740994"
+          },
+          {
+            "kind": "document",
+            "id": "doc",
+            "revision": "r1"
+          }
+        ]
+      },
+      "operation_id": "",
+      "adopted_by": "",
+      "state": "ready",
+      "input_utf8": "{\"contexts\":[{\"kind\":\"document\",\"title\":\"製品方針\",\"children\":[{\"kind\":\"section\",\"title\":\"判断の基準\",\"children\":[{\"kind\":\"paragraph\",\"children\":[{\"kind\":\"sentence\",\"text\":\"共有の原文。\"},{\"kind\":\"sentence\",\"text\":\"二つ目の原文。\"}]},{\"kind\":\"paragraph\",\"children\":[{\"kind\":\"sentence\",\"text\":\"共有の原文。\"}]}],\"attachments\":[{\"digest\":\"1e593baef0f15f695aced807adff35b4726b4f2c494dede531473d4fe41a1b03\",\"range\":\"lines:1-2\",\"revision\":\"code-v1\",\"uri\":\"fixture://code\"}]}]}]}",
+      "digest": "aead0f6d0b652e9921b6cdb87583cd119683ec893a1ba5d671312c0f2f88fdc0",
+      "placements": [
+        {
+          "ref": {
+            "kind": "document",
+            "id": "doc",
+            "revision": "r1"
+          },
+          "path": [0]
+        },
+        {
+          "ref": {
+            "kind": "section",
+            "id": "sec",
+            "revision": "r1"
+          },
+          "path": [0, 0]
+        },
+        {
+          "ref": {
+            "kind": "paragraph",
+            "id": "p1",
+            "revision": "r1"
+          },
+          "path": [0, 0, 0]
+        },
+        {
+          "ref": {
+            "kind": "sentence",
+            "id": "9007199254740993",
+            "revision": "9007199254740994"
+          },
+          "path": [0, 0, 0, 0]
+        },
+        {
+          "ref": {
+            "kind": "sentence",
+            "id": "s2",
+            "revision": "r1"
+          },
+          "path": [0, 0, 0, 1]
+        },
+        {
+          "ref": {
+            "kind": "paragraph",
+            "id": "p2",
+            "revision": "r1"
+          },
+          "path": [0, 0, 1]
+        },
+        {
+          "ref": {
+            "kind": "sentence",
+            "id": "9007199254740993",
+            "revision": "9007199254740994"
+          },
+          "path": [0, 0, 1, 0]
+        }
+      ],
+      "excluded": [],
+      "duplicates": [
+        {
+          "kind": "document",
+          "id": "doc",
+          "revision": "r1"
+        },
+        {
+          "kind": "sentence",
+          "id": "9007199254740993",
+          "revision": "9007199254740994"
+        }
+      ],
+      "read_status": "unobserved"
+    }
+  },
+  "output": {
+    "ready": true,
+    "missing": [],
+    "manifest": {
+      "schema": "context-manifest-v1",
+      "assembler": "structured-json-v1",
+      "workspace_id": "workspace-fixture",
+      "run_id": "",
+      "selection": {
+        "mode": "select",
+        "direct": [
+          {
+            "value": {
+              "result": "原出力"
+            },
+            "origin": {
+              "kind": "output",
+              "id": "source-run",
+              "revision": "o1",
+              "digest": "4f14cc02cf4542de77e874bce590238422b7c3b950b12e78f33aefb5cc33eb40",
+              "path": "/result"
+            },
+            "state": "ready"
+          }
+        ]
+      },
+      "operation_id": "",
+      "adopted_by": "",
+      "state": "ready",
+      "input_utf8": "{\"contexts\":[],\"direct\":[{\"result\":\"原出力\"}]}",
+      "digest": "dad5aa4ad48d60afdaa49699f325699aada6748046e84798acad96d3bc2dee2f",
+      "placements": [],
+      "excluded": [],
+      "duplicates": [],
+      "read_status": "unobserved"
+    }
+  },
+  "partial-candidates": {
+    "ready": false,
+    "missing": [
+      {
+        "code": "incomplete_candidates",
+        "source": "arcadedb:truncated"
+      }
+    ]
+  },
+  "unspecified": {
+    "ready": true,
+    "missing": [],
+    "manifest": {
+      "schema": "context-manifest-v1",
+      "assembler": "structured-json-v1",
+      "workspace_id": "workspace-fixture",
+      "run_id": "",
+      "selection": {},
+      "operation_id": "",
+      "adopted_by": "",
+      "state": "none",
+      "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "placements": [],
+      "excluded": [],
+      "duplicates": [],
+      "read_status": "unobserved"
+    }
+  }
+}

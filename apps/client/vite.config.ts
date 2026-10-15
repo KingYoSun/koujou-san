@@ -32,6 +32,7 @@ export default defineConfig({
       "/healthz": apiProxy,
       "/readyz": apiProxy,
       "/access/": apiProxy,
+      "/contexts/": apiProxy,
     },
     watch: { ignored: ["**/src-tauri/**"] },
   },
