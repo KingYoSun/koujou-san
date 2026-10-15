@@ -1,5 +1,20 @@
 @import "tailwindcss";
 
+.github-observation {
+  border-top: 1px solid #dbe4ef;
+  padding: 1rem 0;
+  overflow-wrap: anywhere;
+}
+.github-observation p {
+  margin: 0.5rem 0;
+}
+.github-observation h3 {
+  font-size: 1rem;
+}
+.github-observation h4 {
+  margin-top: 1rem;
+}
+
 :root {
   font-family: "Segoe UI", "Yu Gothic UI", sans-serif;
   color: #172033;

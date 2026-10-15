@@ -6,7 +6,7 @@ koujou-sanの製品仕様、開発手順、現在の状態をここから参照�
 
 1. [共通指示](../AGENTS.md)。
 2. [設計書](../koujou-san-design-doc.md)の概要、設計原則、採用技術、今回の作業に関係する節。
-3. [開発手順](runbooks/dev.md)と[Issueから実装する手順](runbooks/issue-lifecycle.md)。Context画面は[編集・Scope整理・プレビュー](runbooks/context-ui.md)も参照する。
+3. [開発手順](runbooks/dev.md)と[Issueから実装する手順](runbooks/issue-lifecycle.md)。Context画面は[編集・Scope整理・プレビュー](runbooks/context-ui.md)、GitHub接続は[観測手順](runbooks/github-observation.md)も参照する。
 4. 関連する[ADR](adr/README.md)、[進捗記録](progress/README.md)、実装とテスト。
 
 設計書第14章の段階A〜Dは開発の順序を示す。環境が起動するだけで、段階Aや初期リリースの受入条件を達成したとは扱わない。

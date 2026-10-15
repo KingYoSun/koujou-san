@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { apiRequest } from "./auth";
 import { ContextWorkspace } from "./context-workspace";
+import { GithubObservations } from "./github-observations";
 import { DeliveryPolicy } from "./delivery-policy";
 import { discardSyncWorkspace } from "./sync-engine";
 import { syncStorage } from "./sync-store";
@@ -402,6 +403,15 @@ export function Team({ native }: { native: boolean }) {
                 );
                 void root().catch(() => {});
               }}
+            />
+          )}
+          {apiIdentity && (
+            <GithubObservations
+              key={`${apiIdentity}/${me.id}/${selected}`}
+              api={apiIdentity}
+              user={me.id}
+              workspace={selected}
+              native={native}
             />
           )}
           <details className="workspace-management">

@@ -92,7 +92,8 @@ func TestMCPIntegration(t *testing.T) {
 	graph := graphindex.New(store, a, c, remote, graphindex.DefaultLimits(), cfg.Key)
 	defer graph.Close()
 	s := &Service{Auth: identity, Access: a, Contexts: c, Search: search, Graph: graph}
-	server := httptest.NewUnstartedServer(httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register))
+	githubMux := http.NewServeMux()
+	server := httptest.NewUnstartedServer(httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) }))
 	_ = server.Listener.Close()
 	server.Listener, err = net.Listen("tcp", "127.0.0.1:"+os.Getenv("KOUJOU_TEST_API_PORT"))
 	if err != nil {
@@ -618,7 +619,7 @@ func TestMCPIntegration(t *testing.T) {
 		if _, err = store.Database().Exec(ctx, "INSERT INTO access_members(workspace_id,user_id,role,active) VALUES('mcp-one',$1,'editor',true)", bob.ID); err != nil {
 			t.Fatal(err)
 		}
-		inspectUI(t, client, cfg.Site, ordinary, bobTokens, webTokens, server.Certificate().Raw, cfg, s)
+		inspectUI(t, client, cfg.Site, ordinary, bobTokens, webTokens, server.Certificate().Raw, cfg, s, githubMux)
 		_ = session.Close()
 		tokens = issue(cfg.MCPResource(), "koujou.mcp")
 		session, err = connect(tokens.Access, "mcp-one", handle)
