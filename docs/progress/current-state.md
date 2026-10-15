@@ -33,6 +33,6 @@
 
 ## Issue #7の判定
 
-状態: Blocked（ユーザー判断待ち）。Scope revision 1。[計画](2026-10-15-issue-7-plan.md)に対象・末端の受入条件・確認方法を整理した。新規Contextの初期公開範囲と解決1回の初期容量上限は、AGENTS.md §4に従って判断を確認中。判断に依存する製品実装は開始していない。
+状態: In progress。Scope revision 1。[計画](2026-10-15-issue-7-plan.md)の初期公開範囲はWorkspace共有、解決上限は16 MiB・10万配置とユーザーが決定した。四段階Context・所属履歴・基準版・Manifestと追加情報の保存、共通認可、Go/TS fixtureを実装・検証する。
 
 #8〜#34は未着手。Context、Runner、検索・探索、LLM操作は未実装であり、段階Aや初期リリースの完成とは扱わない。
