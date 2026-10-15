@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,8 +19,23 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
+	"github.com/blevesearch/bleve/v2"
 	"github.com/jackc/pgx/v5"
 )
+
+type indexDelegate = bleve.Index
+type interruptedIndex struct {
+	indexDelegate
+	writes, stopAfter int
+}
+
+func (i *interruptedIndex) Batch(batch *bleve.Batch) error {
+	i.writes++
+	if i.writes > i.stopAfter {
+		return errors.New("injected index stop")
+	}
+	return i.indexDelegate.Batch(batch)
+}
 
 func TestSearchPostgres(t *testing.T) {
 	url := os.Getenv("KOUJOU_TEST_DATABASE_URL")
@@ -243,6 +259,10 @@ func TestSearchPostgres(t *testing.T) {
 	if err = os.Remove(filepath.Join(dir, "active.json.tmp")); err != nil {
 		t.Fatal(err)
 	}
+	var membershipVersion string
+	if err = store.Database().QueryRow(ctx, "SELECT version FROM shared_versions WHERE workspace_id='one' AND resource_id='membership:doc-membership'").Scan(&membershipVersion); err != nil {
+		t.Fatal(err)
+	}
 	started := make(chan error, 1)
 	go func() { started <- s.Rebuild(ctx) }()
 	deadline := time.Now().Add(5 * time.Second)
@@ -269,13 +289,17 @@ func TestSearchPostgres(t *testing.T) {
 	}
 	newestText := "再構築と並行して更新した本文"
 	newest := put("one", "sentence", old.ID, next.Revision, contexts.Unit{Kind: "sentence", Text: &newestText})
+	put("one", "membership", "doc-membership", membershipVersion, contexts.Membership{Scope: scope, Context: contexts.Identity{Kind: "document", ID: "q00-document"}, Present: false})
 	if err = <-started; err != nil {
 		t.Fatal(err)
 	}
 	if result := search("alice", "one", Request{IDs: []string{old.ID}, Limit: 10}); result.Data.Count != 1 || result.Data.Items[0].Ref != newest {
 		t.Fatal("rebuild lost concurrent update")
 	}
-	t.Log("AC-4: real marker-write failure retained old generation; parallel update caught up before verified switch")
+	if result := search("alice", "one", Request{Scopes: []contexts.Identity{scope}, Limit: 10}); result.Data.Count != 0 || result.Meta.Completeness.State != "complete" {
+		t.Fatal("rebuild lost concurrent membership removal")
+	}
+	t.Log("AC-4: real marker-write failure retained old generation; parallel content and membership updates caught up before verified switch")
 	var oldEvent persistence.Change
 	var oldSequence int64
 	err = store.Database().QueryRow(ctx, `SELECT sequence,position,resource_id,version,kind,deleted,payload FROM shared_changes WHERE workspace_id='one' AND resource_id=$1 ORDER BY sequence LIMIT 1`, "context:"+old.ID).Scan(&oldSequence, &oldEvent.Position, &oldEvent.ID, &oldEvent.Version, &oldEvent.Kind, &oldEvent.Deleted, &oldEvent.Payload)
@@ -289,18 +313,47 @@ func TestSearchPostgres(t *testing.T) {
 	if got := search("alice", "one", Request{IDs: []string{old.ID}, Limit: 10}); got.Data.Items[0].Ref != newest {
 		t.Fatal("late old event overwrote new revision")
 	}
-	// Membership has its own event and does not inherit through containment.
-	var membershipVersion string
-	if err = store.Database().QueryRow(ctx, "SELECT version FROM shared_versions WHERE workspace_id='one' AND resource_id='membership:doc-membership'").Scan(&membershipVersion); err != nil {
+	// Stop after one of two queued updates is durable, then open the actual files
+	// again. The incomplete range must remain pending until the second is replayed.
+	beforeCP, err := readCheckpoint(s.index, "one")
+	if err != nil {
 		t.Fatal(err)
 	}
-	put("one", "membership", "doc-membership", membershipVersion, contexts.Membership{Scope: scope, Context: contexts.Identity{Kind: "document", ID: "q00-document"}, Present: false})
+	beforeCount, err := s.index.DocCount()
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstText, secondText := "途中停止の前に保存した版", "途中停止から再開して保存した版"
+	first := put("one", "sentence", "q04-sentence", saved["q04-sentence"][2].Revision, contexts.Unit{Kind: "sentence", Text: &firstText})
+	second := put("one", "sentence", "q05-sentence", saved["q05-sentence"][2].Revision, contexts.Unit{Kind: "sentence", Text: &secondText})
+	s.index = &interruptedIndex{indexDelegate: s.index, stopAfter: 1}
+	if err = s.Sync(ctx); err == nil {
+		t.Fatal("index interruption not injected")
+	}
+	middleCP, err := readCheckpoint(s.index, "one")
+	if err != nil || middleCP.Sequence != beforeCP.Sequence+1 {
+		t.Fatal("partial progress checkpoint not durable")
+	}
+	if err = s.Close(); err != nil {
+		t.Fatal(err)
+	}
+	s = New(store, a, c, dir, key)
+	if result := search("alice", "one", Request{IDs: []string{first.ID, second.ID}, Limit: 10}); result.Meta.Completeness.State != "pending" {
+		t.Fatal("interrupted range claimed complete after restart")
+	}
 	if err = s.Sync(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if got := search("alice", "one", Request{Scopes: []contexts.Identity{scope}, Limit: 10}); got.Data.Count != 0 {
-		t.Fatal("membership removal not projected")
+	resumed := search("alice", "one", Request{IDs: []string{first.ID, second.ID}, Limit: 10})
+	refs := map[contexts.Ref]bool{}
+	for _, item := range resumed.Data.Items {
+		refs[item.Ref] = true
 	}
+	afterCount, err := s.index.DocCount()
+	if err != nil || afterCount != beforeCount+2 || !refs[first] || !refs[second] || resumed.Meta.Completeness.State != "complete" {
+		t.Fatal("interrupted update did not reconcile without duplication")
+	}
+	t.Log("AC-3: stop after first durable batch/checkpoint, actual close/open pending state, remaining replay and exact revision/count convergence passed")
 	selection := contexts.ResolveRequest{RunID: "search-run", Selection: contexts.Selection{Mode: "select", Include: []contexts.Ref{newest}}}
 	searchSelection := ResolveRequest{Search: Request{IDs: []string{newest.ID}, Limit: 10}, Resolve: selection, ID: "search-manifest", Mutation: func() *apicontract.Mutation { m := mutation("0"); return &m }()}
 	raw := request("alice", "/search/workspaces/one/resolve", searchSelection, 200)

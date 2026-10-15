@@ -34,6 +34,7 @@ export default defineConfig({
       "/access/": apiProxy,
       "/contexts/": apiProxy,
       "/sync/": apiProxy,
+      "/search/": apiProxy,
     },
     watch: { ignored: ["**/src-tauri/**"] },
   },
