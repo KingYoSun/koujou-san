@@ -1,6 +1,6 @@
 # Issue #18: CLI Runnerの検証
 
-状態: In progress。受入範囲は[計画](2026-10-17-issue-18-plan.md)のScope revision 1。独立検品の修正差分確認、Windows画面終了後の継続、最終head CI・マージ後照合は未完了であり、IssueはCloseしない。
+状態: In progress。受入範囲は[計画](2026-10-17-issue-18-plan.md)のScope revision 1。Windows画面終了後の継続と新native設定の実操作は未確認であり、IssueはCloseしない。
 
 ## 実装と実接続
 
@@ -49,6 +49,8 @@ Windows Computer Useのwindow一覧は取得できている。一方、検証用
 
 一次の固定commit `d2d41f8395cc387bca73723c3118a3ec3cf1e5e5` を、会話履歴を継承しない担当が検品した。無注入Manifestの`input_utf8`省略を未対応扱いにするAC-2aの未達が一件あった。製品関数を使う失敗テストと、担当側の別crateでの再現が一致した。
 
-`state:none`ではcontextを省略するよう修正し、局所テストと[実Runner](assets/issue18-none.json)でpromptだけがCLIへ渡り、終了0となることを確認した。別クライアント条件も追加で確認した。専用fixtureの別利用者BobはCLI・端末登録なし、編集者・実行依頼不許可のまま二Pauseへ回答し、[配送/再開と終了](assets/issue18-bob.json)を確認した。[画面証跡](assets/issue18-bob.png)も保存した。修正差分と証跡を再検品へ渡す。
+`state:none`ではcontextを省略するよう修正し、局所テストと[実Runner](assets/issue18-none.json)でpromptだけがCLIへ渡り、終了0となることを確認した。別クライアント条件も追加で確認した。専用fixtureの別利用者BobはCLI・端末登録なし、編集者・実行依頼不許可のまま二Pauseへ回答し、[配送/再開と終了](assets/issue18-bob.json)を確認した。[画面証跡](assets/issue18-bob.png)も保存した。修正固定commit `636dcbb9b675a819d358d98c2e688c6e31aa26f2` の[再検品](2026-10-17-issue-18-inspection.md)でコードblockerが解消し、新たなblockerがないことを確認した。
 
 PRは[#51](https://github.com/KingYoSun/koujou-san/pull/51)。画面終了後の継続・新しいnative設定の実操作が未確認なのでdraftを維持する。
+
+専用Ory/MCP試験は `PASS 1783.17s` / package `1785.227s` で正常終了した。所有Runnerのactive 0・未送信なしを確認して受付を止め、実終了後に専用環境のサービス・volumeを終了した。今回作成したOAuth/deviceのDPAPIファイルだけを削除し、標準サービスと他の資格情報は変更していない。GUI起動の依頼は一時環境終了により取り下げ、再開時に環境を用意し直す。
