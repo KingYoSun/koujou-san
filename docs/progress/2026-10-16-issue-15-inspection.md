@@ -140,3 +140,22 @@ B-1 failed: current selection edited/unlocked P2,
 Webは専用fixture `798b703de745`、build `index-CO_uSBIH.js` で実装担当が再操作した。旧推奨P1・保存済み手動P2・新Issue版の待機状態からP3へ変更して固定し、続けて解除する両操作が成功した。[解除後の画像](assets/issue15-web-current-target-unlocked.jpg)を検品者が目視し、P3・自動反映・待機・最新推奨P1を確認した。画像は固定ソースでの操作後に追加された観測成果物として扱う。
 
 現在のB-1判定は **解消**。差分範囲に残る製品blockerは0件。前回の他条件のPASSを維持する。Windows詳細操作が未確認のため、全体の現在判定は **INCONCLUSIVE** とし、Issue完了やWindows適合を成功扱いしない。最終head CI・マージ後照合は別途必要である。
+
+## Windowsの未確認箇所の再判定（2026-10-16）
+
+証跡を含む対象commitを `c067c90409550ecd6dacafa3f876c2746fae49c2` に固定し、前回のWindows未確認箇所だけを再判定した。`a63f717` 以降の差分が文書・観測成果物のみで、製品ソースに変更がないことを確認した。検品者は新しい操作を追加せず、実装担当が提供した実操作の記録、4画像と同じfixtureのHTTP保存結果を照合した。
+
+利用者による一度の前面化後にキー操作が成功した。旧fixtureの期限切れにより専用fixtureを `05902001945e` へ作り直し、未使用API namespaceのDPAPI認証でWindows releaseアプリを起動した記録を確認した。新対象では前面化APIの成功表示だけに依存せず、画像で可視の対象タイトルバーをクリックして前面化し、その後の手動変更・解除・方針と処理状態の取得を実装担当が操作している。過去の前面化エラーが恒久的に直ったという判定にはしない。
+
+| AC-9aの確認対象 | 画像とHTTPの照合結果 | 判定 |
+| --- | --- | --- |
+| 評価待ち中の手動変更・固定 | 初期値はP2固定・旧推奨P1・待機。`issue15-native-fixed.jpg` とHTTPのfixedがP3・fixed=true・待機・推奨P1で一致 | PASS |
+| 固定解除と旧推奨の保持 | `issue15-native-unlocked.jpg` とHTTPのunlockedがP3・fixed=false・待機・推奨P1で一致。操作対象版は `VQIGJHSVRTI4UGQ6LMAIUTCMSA`、推奨対象版は旧い `MC5KWSSRFINPFDRANC67UN6A45` のままで、解除が旧推奨を採用していない | PASS |
+| 方針の採用版 | `issue15-native-policy.jpg` の `policy:ui-triage` と固定版 `64LHT7ONBSSOYTZ7L2FEML3GXK` がHTTPのpolicies・優先度の方針参照と一致 | PASS |
+| 処理状態と試行回数 | `issue15-native-jobs.jpg` の3要求が、HTTPの同じID・done/1回、waiting/0回、blocked/0回と一致。blockedは `policy_unset` で、GUIの「有効な方針が未設定です」と一致 | PASS |
+
+照合した成果物は [手動固定](assets/issue15-native-fixed.jpg)、[固定解除](assets/issue15-native-unlocked.jpg)、[方針版](assets/issue15-native-policy.jpg)、[処理状態](assets/issue15-native-jobs.jpg)、[HTTP保存結果](assets/issue15-native-http-snapshot.json)。HTTPのbefore/fixed/unlockedの値・状態と、新旧の対象版が別であることも機械的に照合して成功した。
+
+提供された `test:mcp:ui` の全体結果はPASS（552.79秒、package 554.787秒）。実操作後の検索エンジン停止とトークン失効試験まで完了し、アプリはAlt+F4、専用fixtureは自身の終了操作で閉じ、今回の検証用DPAPIだけを削除した記録を確認した。この検品で同試験やWindows操作を再実行したとは扱わない。
+
+これによりAC-9aのWindows詳細操作の **INCONCLUSIVEを解消し、PASS** とする。先行する独立検品とB-1差分検品のPASSを合わせ、Issue #15 Scope revision 1の全AC-1〜9・INVAR-1〜3について、現在の独立検品の総合判定は **PASS**。blockerは0件、検品範囲の未確認事項はない。初回FAILと途中のINCONCLUSIVEは履歴として残す。最終head CI・マージ後照合・Issue完了は別の終了手順であり、本判定だけで成功扱いしない。
