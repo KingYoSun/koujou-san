@@ -56,3 +56,21 @@ Windowsでの詳細なTriage操作、固定成果物の独立検品、最終head
 専用fixture `798b703de745` のWebで、旧推奨P1・手動採用P2のあるIssueを更新して評価待ちにした。GUIから手動P3の採用・固定と解除がともに成功し、解除後はP3・自動反映・待機のまま、古い推奨P1を採用しなかった。[修正後の画面](assets/issue15-web-current-target-unlocked.jpg)を保存した。HTTP/MCPの比較には現在対象版を返すselectionも含めた。最終buildの共通UI assetは `index-CO_uSBIH.js`。
 
 前のWeb fixtureは正常終了し、[通信の集計](assets/issue15-web-request-summary.json)にはmethod・path・件数だけを保存した。認証情報と本文は含めていない。Windowsアプリの検証用認証は前の専用namespace分を削除し、新しい専用APIの未使用namespaceへDPAPIで準備した。再起動したWindowsアプリも前面化が同じエラーで失敗し、詳細な実操作は未確認のままである。
+
+## Windows実操作の再開と完了（2026-10-16）
+
+利用者が起動済みアプリを前面へ出した後、Computer Useのキー入力でスクロールできた。旧fixtureは期限切れだったため、同じ固定ソース `0358e816` から専用fixture `05902001945e` を起動し直した。未使用API namespaceの検証用認証をDPAPIへ保存して新しいWindowsアプリを起動した。旧アプリとその検証用認証は対象を確認して終了・削除した。通常の開発APIと実GitHub Appは変更していない。
+
+新しい対象の前面化APIは成功を返したが、画像では他ウィンドウが重なっていた。最新画像で見えている対象のタイトルバーを、Computer Useの座標クリックで押し、実際の前面化を確認した。その後は入力欄、ボタン、スクロール、選択メニューをこちらで操作できた。選択メニューの項目クリックはWebView子ウィンドウとの不一致を返したため、対象を再取得し、キーボードで選択・確定した。別のUI自動化やWindows設定の変更はしていない。
+
+Windows版から同じIssueの採用P2・手動固定・推奨P1・待機を取得した。手動P3の保存と固定が成功し、HTTPでもP3・fixed=trueを確認。続けて固定解除し、P3・自動反映・待機のまま、古い推奨P1を採用しないことを画面とHTTPの両方で確認した。方針の現在版 `64LHT7ONBSSOYTZ7L2FEML3GXK` と、対象Issueの処理済み・待機・方針未設定による保留の三要求も同じID・状態・試行回数だった。
+
+- [Windowsの手動固定](assets/issue15-native-fixed.jpg)
+- [Windowsの固定解除](assets/issue15-native-unlocked.jpg)
+- [Windowsの方針版](assets/issue15-native-policy.jpg)
+- [Windowsの処理状態](assets/issue15-native-jobs.jpg)
+- [同じfixtureのHTTP保存結果](assets/issue15-native-http-snapshot.json)
+
+これにより、前節まで未確認だったWindowsの詳細なTriage操作を確認できた。製品ソースは変更しておらず、固定成果物の未確認箇所を新しい観測証跡で再判定する。過去の前面化エラーが恒久的に解消したとは扱わず、今回成功した操作と区別する。
+
+今回の `test:mcp:ui` は実操作後の検索エンジン停止・トークン失効試験も含めてPASS（552.79秒、package 554.787秒）。WindowsアプリはAlt+F4で通常終了し、専用fixtureも終了操作で閉じた。今回準備した検証用DPAPIファイルだけを削除した。
