@@ -61,6 +61,10 @@
 
 ## Issue #14の判定
 
-状態: In progress（最終CI待ち）。Scope revision 1。[PR #46](https://github.com/KingYoSun/koujou-san/pull/46)で個別契約単価・無期限の履歴・現在認可・重複を除いた集計を実装した。[検証記録](2026-10-16-issue-14-evidence.md)の専用PG・実Ory/MCP・Web/Tauri確認と、`38f903f`の[独立検品](2026-10-16-issue-14-inspection.md)で全条件PASS、blocker 0。最終headのCI・マージ後照合は未完了。
+状態: Complete。Scope revision 1。[PR #46](https://github.com/KingYoSun/koujou-san/pull/46)を最終head `d24675c5e5e430a4e30abe5261e7082608c6b8e2`の全CI成功後にマージした。main `cdf6c14ad6a97c50db1e385a3714c84fc3102f29`と最終headのtreeは`f2fc48613f25e5c55a3312d19eac5366185e00aa`で一致し、差分0。[検証記録](2026-10-16-issue-14-evidence.md)、[独立検品](2026-10-16-issue-14-inspection.md)、マージ後照合が揃い、#14をCloseした。個別契約単価もWorkspace共有を初期値とし、履歴を無期限に保持する。
 
-#15〜#34は未着手。Runner、実行・検品の詳細画面、LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #15の判定
+
+状態: Blocked（初期動作の判断待ち）。Scope revision 1。[計画](2026-10-16-issue-15-plan.md)で全条件と有限なfixtureを整理した。優先度の初期テンプレート、通常の手動変更の固定、有効化・自動化主体の権限・処理枠・予算を管理する役割をユーザーへ確認している。設計書ではいずれも未確定の案を含み、AGENTS.md §4に従って依存する実装を待つ。
+
+#16〜#34は未着手。Runner、実行・検品の詳細画面、LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。

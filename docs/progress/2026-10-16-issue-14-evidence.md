@@ -44,3 +44,9 @@ rootの`check / test / build`、`check:desktop / test:desktop / build:desktop`�
 初回の独立検品でAC-1bの欠測理由を保持する欄が不足していた。`reason=provider_did_not_report`を送る`TestMissingReasonWire`は修正前にFAILし、任意の理由欄を追加した後はPASSした。理由を含む欠測と既知数量の合成、HTTP保存・取得・PG比較も確認した。取得元が示した理由を保持し、原因をサーバーで推測しない。
 
 固定commit `38f903f46b3e873de2932ca45f04653f3979dfb6`の[差分再検品](2026-10-16-issue-14-inspection.md)で全AC・INVARがPASS、blockerとINCONCLUSIVEは0件となった。最終headの実CIとマージ後のtree照合が揃うまでは#14をCloseしない。実CLIの収集は#24、本格的な費用比較画面は#32の対象であり、本記録で実装済みとは扱わない。
+
+## マージ後の照合
+
+PR #46の最終headは`d24675c5e5e430a4e30abe5261e7082608c6b8e2`。[CI 38863532381](https://github.com/KingYoSun/koujou-san/actions/runs/38863532381)でLinuxが4分13秒、Windowsが5分24秒、GitGuardianが成功した。独立検品対象の`38f903f`からの差分は検品・証跡・現在状態の3文書のみである。
+
+マージしたmainは`cdf6c14ad6a97c50db1e385a3714c84fc3102f29`。最終headとmainのtreeは`f2fc48613f25e5c55a3312d19eac5366185e00aa`で一致し、`git diff --exit-code d24675c5e5e430a4e30abe5261e7082608c6b8e2 HEAD --`は差分0で成功した。全AC・INVAR・独立検品・実CI・マージ後照合を終え、Issue #14をCloseした。
