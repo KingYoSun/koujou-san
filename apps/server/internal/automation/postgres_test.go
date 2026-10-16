@@ -177,9 +177,40 @@ func TestAutomationPostgres(t *testing.T) {
 	if priority.Fixed || *priority.Adopted != "P0" {
 		t.Fatal(string(status.Value))
 	}
+	// Follow the GUI's selection -> displayed priority -> edit path after a
+	// source update. The saved basis remains old; editing uses the current input.
+	editDisplayedPriority := func() {
+		t.Helper()
+		selection, err := s.Query(ctx, admin, "one", Request{Mode: "selection", ID: issue.ID})
+		if err != nil || selection.Data == nil || len(selection.Data.Items) != 1 {
+			t.Fatal(selection, err)
+		}
+		var choice struct {
+			Target Ref    `json:"target"`
+			Policy Record `json:"policy"`
+		}
+		_ = decode(selection.Data.Items[0], &choice)
+		displayed, err := s.Priority(ctx, admin, "one", issue.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if choice.Target != issue {
+			t.Fatal("GUI selection lost current target", choice.Target, issue)
+		}
+		manualValue := "P0"
+		ref := put(displayed.ID, displayed.Version, PriorityEdit{Target: choice.Target, Policy: choice.Policy.Ref, Value: &manualValue, Reason: "manual while evaluation unavailable"})
+		ref = put(ref.ID, ref.Version, PriorityEdit{Target: choice.Target, Policy: choice.Policy.Ref, Unlock: true, Reason: "unlock without adopting stale recommendation"})
+		saved, err := s.Read(ctx, admin, "one", ref)
+		var v Priority
+		_ = decode(saved.Value, &v)
+		if err != nil || v.Fixed || v.Adopted == nil || *v.Adopted != "P0" || v.Target != issue {
+			t.Fatal("manual/unlock during evaluation wait or failure", string(saved.Value), err)
+		}
+	}
 	// Missing input, failure and stopping retain the adopted value and expose a
 	// distinct processing state instead of manufacturing the lowest level.
 	issue = scope("issue", issue.Version, "milestone")
+	editDisplayedPriority()
 	job, e = s.Claim(ctx, "triage", "missing-input-worker")
 	if e != nil || job == nil {
 		t.Fatal(job, e)
@@ -213,6 +244,7 @@ func TestAutomationPostgres(t *testing.T) {
 	if priority.State != "failed" || !priority.Stale || *priority.Adopted != "P0" {
 		t.Fatal(string(status.Value))
 	}
+	editDisplayedPriority()
 	controlValue.MaxAttempts = 3
 	ctl = put(ctl.ID, ctl.Version, controlValue)
 	issue = scope("issue", issue.Version, "milestone")

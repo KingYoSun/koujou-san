@@ -120,7 +120,14 @@ func checkAutomationMCP(t *testing.T, s *Service, p access.Principal, ordinary s
 		t.Fatal(string(body))
 	}
 	priorityRef := automation.Ref{ID: saved.Data.ID, Version: saved.Data.Version}
-	for _, q := range []automation.Request{{Mode: "heads", Kind: "policy", Limit: 1}, {Mode: "records", Kind: "priority", Limit: 50}, {Mode: "jobs", Limit: 50}, {Mode: "priority", ID: target.ID}} {
+	// Keep the saved priority/recommendation on the old input while the current
+	// Issue awaits evaluation, including the real Web/Tauri acceptance fixture.
+	scope, e = s.Contexts.Put(ctx, p, "mcp-one", contexts.Identity{Kind: "scope", ID: "automation-issue"}, contexts.Write{Mutation: mutation(target.Version), Value: json.RawMessage(`{"kind":"issue","name":"Triage受入: 再評価待ちでも手動変更できる"}`)})
+	if e != nil || scope.Data == nil {
+		t.Fatal(scope, e)
+	}
+	target.Version = scope.Data.Version
+	for _, q := range []automation.Request{{Mode: "heads", Kind: "policy", Limit: 1}, {Mode: "records", Kind: "priority", Limit: 50}, {Mode: "jobs", Limit: 50}, {Mode: "priority", ID: target.ID}, {Mode: "selection", ID: target.ID}} {
 		body := call(reader, "triage_query", q, false)
 		res, httpBody = request("POST", site+"/automation/workspaces/mcp-one/query", q, map[string]string{"Authorization": "Bearer " + ordinary})
 		var m, h apicontract.Response[automation.Page]

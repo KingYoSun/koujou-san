@@ -55,7 +55,7 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 		if err != nil {
 			return empty, err
 		}
-		page := Page{Items: []json.RawMessage{encode(map[string]any{"policy": policy, "reason": reason})}}
+		page := Page{Items: []json.RawMessage{encode(map[string]any{"target": Ref{ID: r.ID, Version: version}, "policy": policy, "reason": reason})}}
 		return apicontract.Response[Page]{Data: &page, Meta: apicontract.Meta{WorkspaceID: w, Completeness: apicontract.Completeness{State: "complete"}}}, nil
 	case "records":
 		sql = `SELECT jsonb_build_object('id',id,'version',version,'kind',kind,'position',position,'value',payload,'refs',refs),lpad(position::text,20,'0') FROM automation_records e WHERE workspace_id=$1 AND ($4='' OR kind=$4) AND ($5='' OR id=$5) AND lpad(position::text,20,'0')>$6 AND ` + access.ReadFilterSQL(refs) + ` ORDER BY position LIMIT $7`

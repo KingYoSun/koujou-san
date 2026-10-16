@@ -124,7 +124,9 @@ export function Automation({
   const [controlVersion, setControlVersion] = useState("0");
   const [issueID, setIssueID] = useState("");
   const [priority, setPriority] = useState<Version | null>(null);
-  const [selected, setSelected] = useState<Version | null>(null);
+  const [selected, setSelected] = useState<(Version & { target: Ref }) | null>(
+    null,
+  );
   const [priorityValue, setPriorityValue] = useState("");
   const [priorityReason, setPriorityReason] = useState("");
   const pending = useRef<{ key: string; id: string } | null>(null);
@@ -187,8 +189,14 @@ export function Automation({
       query({ mode: "selection", id: target }),
     ]);
     setPriority(p.data.items[0] as Version);
-    const choice = s.data.items[0] as { policy: Version; reason: string };
-    setSelected(choice.policy.id ? choice.policy : null);
+    const choice = s.data.items[0] as {
+      target: Ref;
+      policy: Version;
+      reason: string;
+    };
+    setSelected(
+      choice.policy.id ? { ...choice.policy, target: choice.target } : null,
+    );
     if (choice.reason) setMessage(reasons[choice.reason] ?? choice.reason);
   };
   const activation = async (enabled: boolean) => {
@@ -659,7 +667,7 @@ export function Automation({
               onClick={() =>
                 void run(async () => {
                   await write(priority.id, priority.version, {
-                    target: current!.target,
+                    target: selected.target,
                     policy: { id: selected.id, version: selected.version },
                     value: priorityValue,
                     reason: priorityReason,
@@ -677,7 +685,7 @@ export function Automation({
               onClick={() =>
                 void run(async () => {
                   await write(priority.id, priority.version, {
-                    target: current!.target,
+                    target: selected.target,
                     policy: { id: selected.id, version: selected.version },
                     value: null,
                     reason: priorityReason,
