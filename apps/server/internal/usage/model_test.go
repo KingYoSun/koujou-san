@@ -7,6 +7,23 @@ import (
 )
 
 func ptr(s string) *string { return &s }
+
+func TestMissingReasonWire(t *testing.T) {
+	var q Quantity
+	if err := decode([]byte(`{"value":null,"state":"missing","unit":"token","reason":"provider_did_not_report"}`), &q); err != nil {
+		t.Fatal("missing reason rejected:", err)
+	}
+	raw, _ := json.Marshal(q)
+	var got map[string]any
+	_ = json.Unmarshal(raw, &got)
+	if q.Value != nil || q.State != "missing" || got["reason"] != "provider_did_not_report" {
+		t.Fatal("missing reason lost:", string(raw))
+	}
+	partial, err := addQuantity(Quantity{Value: ptr("20"), State: "reported", Unit: "token"}, q)
+	if err != nil || partial.Value != nil || partial.Reason != q.Reason {
+		t.Fatal("missing component reason lost", partial, err)
+	}
+}
 func quantities() map[string]Quantity {
 	return map[string]Quantity{
 		"input":     {Value: ptr("100"), State: "reported", Unit: "token", Includes: []string{"cache"}},

@@ -287,7 +287,7 @@ func TestUsagePostgres(t *testing.T) {
 				o.Attribution.ID = fmt.Sprint("owner-", i)
 			}
 			o.ActualModel = nil
-			o.Quantities["missing"] = Quantity{State: "missing", Unit: "image"}
+			o.Quantities["missing"] = Quantity{State: "missing", Unit: "image", Reason: "provider_did_not_report"}
 			o.Quantities["na"] = Quantity{State: "not_applicable", Unit: "second"}
 			ref := put(ObservationID(o), "0", o)
 			var raw Record
@@ -304,7 +304,7 @@ func TestUsagePostgres(t *testing.T) {
 			if !reflect.DeepEqual(httpValue, dbValue) {
 				t.Fatal("HTTP/PG original record differs")
 			}
-			if got.ActualModel != nil || got.Quantities["input"].Value == nil || *got.Quantities["input"].Value != "0" || got.Quantities["missing"].Value != nil || got.Quantities["missing"].State != "missing" || got.Quantities["na"].State != "not_applicable" {
+			if got.ActualModel != nil || got.Quantities["input"].Value == nil || *got.Quantities["input"].Value != "0" || got.Quantities["missing"].Value != nil || got.Quantities["missing"].State != "missing" || got.Quantities["missing"].Reason != "provider_did_not_report" || got.Quantities["na"].State != "not_applicable" {
 				t.Fatal(string(raw.Value))
 			}
 			r := period

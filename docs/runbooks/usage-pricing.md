@@ -20,7 +20,7 @@ Workspaceの「利用量・料金」で、期間集計、export、記録と版�
 
 集計の`kind`は`usage / reported / estimated / api_equivalent / allocated`の一つ。版履歴は`usage / price / evaluation`を選ぶ。帰属種別・帰属先・Workflow・複数Scope・実モデル・通貨で絞り込める。`changes`は`since`の反映位置より後の対象範囲と原記録を返す。次ページには、同じ照会条件と返されたcursorを送る。反映位置と集計時点はページ間で固定され、現在の権限は毎回確認する。サーバーの再起動などでcursorが無効になったら最初から取得する。
 
-原記録は`reported / estimated / missing / not_applicable`とnull・0を区別する。実モデルは不明ならnullにする。累積値は同じ取得元・系列で連番を進める。親総量が子要求を含む場合は`covers_requests`にその要求を指定する。相関が不明な記録は`coverage=unknown`とし、金額を確定済みの合計へ含めない。
+原記録は`reported / estimated / missing / not_applicable`とnull・0を区別する。取得元が示す欠測理由は数量の任意の`reason`へ保存し、分からない原因を推測しない。実モデルは不明ならnullにする。累積値は同じ取得元・系列で連番を進める。親総量が子要求を含む場合は`covers_requests`にその要求を指定する。相関が不明な記録は`coverage=unknown`とし、金額を確定済みの合計へ含めない。
 
 費用評価は原記録の現在の計測範囲に対して明示的に作成する。推定額・API料金換算額は固定した料金版を参照する。料金なしでは未算定となる。再評価では新しいIDと前評価への固定参照を指定する。遅着や訂正の後は再評価するまで現在の集計額を再評価待ちとし、旧評価は版履歴から確認できる。換算のレート・時点・情報源は呼出し側が明示する。料金・為替を自動取得しない。
 

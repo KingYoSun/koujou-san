@@ -143,6 +143,9 @@ func addQuantity(a, b Quantity) (Quantity, error) {
 		return a, nil
 	}
 	if a.Value == nil || b.Value == nil {
+		if a.Value != nil || a.Reason == "" {
+			a.Reason = b.Reason
+		}
 		a.Value = nil
 		a.State = "missing"
 		return a, nil

@@ -16,6 +16,7 @@ var decimal = regexp.MustCompile(`^(0|[1-9][0-9]*)(\.[0-9]+)?$`)
 type Quantity struct {
 	Value    *string  `json:"value"`
 	State    string   `json:"state"` // reported, estimated, missing, not_applicable
+	Reason   string   `json:"reason,omitempty"`
 	Unit     string   `json:"unit"`
 	Includes []string `json:"includes,omitempty"`
 }

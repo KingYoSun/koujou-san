@@ -8,7 +8,7 @@
 
 | 条件 | 確認した経路と結果 | 証拠 |
 | --- | --- | --- |
-| AC-1 | 四帰属と未帰属、実モデルnull、欠測・0・非該当をHTTPで保存・取得し、PGのpayloadと比較 | `usage/postgres_test.go`の`attributions_and_missing` |
+| AC-1 | 四帰属と未帰属、実モデルnull、理由付き欠測・0・非該当をHTTPで保存・取得し、PGのpayloadと比較 | `usage/postgres_test.go`の`attributions_and_missing`、`TestMissingReasonWire` |
 | AC-2 | cache込み入力100と別記入力80+20は0.182000。出力に含まれるreasoningを再加算しない。画像2で0.242000。12000000000000001×0.000000001はHTTP/PGでも12000000.000000001 | `usage/model_test.go`、`large_decimal_through_http_and_pg` |
 | AC-3 | 同じ操作の再送は同じ版。累積100→150は150。子70・60を含む親200と同じ要求のgateway200は200。矛盾・不明範囲は確認対象 | `TestCoverageAdoption`、`cumulative_and_late_children`、PG試験のreceipt照合 |
 | AC-4 | P1→P2の料金変更、明示再評価、利用量訂正と再評価で旧評価・旧料金を保持。訂正後の現在集計は再評価待ち | PG履歴試験、[共通UIとAPIの保存結果](assets/issue14-web-api-snapshot.json) |
@@ -40,5 +40,7 @@
 rootの`check / test / build`、`check:desktop / test:desktop / build:desktop`を実行しPASS。共通UIは35試験、通常のdesktop試験は4件PASS・実環境を要する5件は既定でignored。専用の`live_context_ui_prepare`は明示実行してPASS。Cargoの既存のPDB出力名衝突・linker警告は残るがbuildは成功した。
 
 ## 残る判定
+
+初回の独立検品でAC-1bの欠測理由を保持する欄が不足していた。`reason=provider_did_not_report`を送る`TestMissingReasonWire`は修正前にFAILし、任意の理由欄を追加した後はPASSした。理由を含む欠測と既知数量の合成、HTTP保存・取得・PG比較も確認した。取得元が示した理由を保持し、原因をサーバーで推測しない。
 
 独立検品、最終headの実CI、マージ後のtree照合を行う。これらが揃うまでは#14をCloseしない。実CLIの収集は#24、本格的な費用比較画面は#32の対象であり、本記録で実装済みとは扱わない。
