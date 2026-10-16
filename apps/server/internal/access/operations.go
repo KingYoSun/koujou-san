@@ -96,15 +96,18 @@ func (s *Service) OperationPrincipal(ctx context.Context, user, w, handle string
 // CreateOperation receives already-authorized Manifest placements from the
 // owning Context service. A bounded empty set is meaningful: Run.input=none.
 func (s *Service) CreateOperation(ctx context.Context, p Principal, w, id, purpose string, bounded bool, refs []VersionRef, m apicontract.Mutation) (apicontract.Response[apicontract.Reference], error) {
-	if purpose != "read" && purpose != "edit" && purpose != "price-edit" {
+	if purpose != "read" && purpose != "edit" && purpose != "price-edit" && purpose != "triage-edit" && purpose != "triage-manage" {
 		return apicontract.Response[apicontract.Reference]{}, ErrForbidden
 	}
 	if refs == nil {
 		refs = []VersionRef{}
 	}
 	action := "read"
-	if purpose == "edit" || purpose == "price-edit" {
+	if purpose == "edit" || purpose == "price-edit" || purpose == "triage-edit" {
 		action = "register"
+	}
+	if purpose == "triage-manage" {
+		action = "manage"
 	}
 	return s.mutate(ctx, p, w, "operation:"+id, "llm-operation", action, m, struct {
 		Purpose string
@@ -191,7 +194,7 @@ func (s *Service) CheckVersion(ctx context.Context, tx pgx.Tx, p Principal, w, i
 	return nil
 }
 func operationAction(op Operation, action string) bool {
-	return action == "read" || action == "get" || action == "search" || (action == "update" && op.Purpose == "edit") || (action == "price_write" && op.Purpose == "price-edit")
+	return action == "read" || action == "get" || action == "search" || (action == "update" && op.Purpose == "edit") || (action == "price_write" && op.Purpose == "price-edit") || (action == "triage_write" && (op.Purpose == "triage-edit" || op.Purpose == "triage-manage")) || (action == "triage_manage" && op.Purpose == "triage-manage")
 }
 func identityVersionRefs(ids []string) []VersionRef {
 	refs := make([]VersionRef, 0, len(ids))

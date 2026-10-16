@@ -212,11 +212,11 @@ func (s *Service) check(ctx context.Context, q query, p Principal, w, target, ac
 	}
 	switch action {
 	case "read", "get", "search", "leave", "create":
-	case "manage":
+	case "manage", "triage_manage":
 		if m.Role != "admin" {
 			return ErrForbidden
 		}
-	case "update", "register", "price_write":
+	case "update", "register", "price_write", "triage_write":
 		if m.Role == "viewer" {
 			return ErrForbidden
 		}
@@ -230,7 +230,7 @@ func (s *Service) check(ctx context.Context, q query, p Principal, w, target, ac
 	if target == "" {
 		return nil
 	}
-	if action == "price_write" {
+	if action == "price_write" || action == "triage_write" {
 		action = "update"
 	}
 	allowed, err := resourceGrants(ctx, q, w, p, []string{target}, action)

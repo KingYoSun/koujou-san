@@ -51,7 +51,15 @@ var githubSchema string
 //go:embed 011_usage.sql
 var usageSchema string
 
-type Store struct{ pool *pgxpool.Pool }
+//go:embed 012_automation.sql
+var automationSchema string
+
+type Store struct {
+	pool *pgxpool.Pool
+	// Accepted is installed once at startup. It may write an outbox in this same
+	// transaction; it must not perform external I/O or recursively call Apply.
+	Accepted func(context.Context, pgx.Tx, Command, apicontract.Reference, json.RawMessage) error
+}
 
 func Open(ctx context.Context, url string) (*Store, error) {
 	pool, err := pgxpool.New(ctx, url)
@@ -59,13 +67,13 @@ func Open(ctx context.Context, url string) (*Store, error) {
 		return nil, errors.New("invalid PostgreSQL configuration")
 	}
 	if err = pool.Ping(ctx); err == nil {
-		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema, contextSchema, syncSchema, searchSchema, graphSchema, operationsSchema, catalogSchema, githubSchema, usageSchema})
+		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema, contextSchema, syncSchema, searchSchema, graphSchema, operationsSchema, catalogSchema, githubSchema, usageSchema, automationSchema})
 	}
 	if err != nil {
 		pool.Close()
 		return nil, errors.New("PostgreSQL connection or migration failed")
 	}
-	return &Store{pool}, nil
+	return &Store{pool: pool}, nil
 }
 
 func (s *Store) Close()                          { s.pool.Close() }
@@ -217,6 +225,11 @@ func (s *Store) Apply(ctx context.Context, scope Scope, command Command, apply f
 		}
 		if _, err = tx.Exec(ctx, "UPDATE shared_streams SET sequence=$2,position=$3 WHERE workspace_id=$1", reference.WorkspaceID, sequence, position); err != nil {
 			return err
+		}
+		if s.Accepted != nil {
+			if err = s.Accepted(ctx, tx, command, reference, state); err != nil {
+				return err
+			}
 		}
 		response = apicontract.Response[apicontract.Reference]{Data: &reference, Meta: metadata(reference.WorkspaceID, &position)}
 		response.Meta.OperationID = command.Mutation.OperationID
