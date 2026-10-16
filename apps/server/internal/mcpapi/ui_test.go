@@ -63,6 +63,7 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 		t.Fatal(err)
 	}
 	principal := access.Principal{UserID: user.ID}
+	refreshRunner := prepareRunnerUI(t, client, target, tokens, service, user.ID)
 	write := func(kind, id string, value any) contexts.Ref {
 		raw, _ := json.Marshal(value)
 		result, err := service.Contexts.Put(ctx, principal, "mcp-one", contexts.Identity{Kind: kind, ID: id}, contexts.Write{Mutation: apicontract.Mutation{OperationID: "ui-fixture-" + id, ExpectedVersion: "0"}, Value: raw})
@@ -191,6 +192,13 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 					})
 					if err != nil {
 						http.Error(w, "fixture policy failed", 500)
+						return
+					}
+				case "runner-web-contact":
+					refreshRunner()
+				case "allow-native-runner":
+					if _, err := service.Access.DB.Exec(ctx, `UPDATE access_devices SET can_input=true,can_report=true WHERE workspace_id='runner-ui' AND registered_by=$1`, user.ID); err != nil {
+						http.Error(w, "fixture permission failed", 500)
 						return
 					}
 				case "offline-on":

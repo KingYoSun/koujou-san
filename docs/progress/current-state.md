@@ -73,6 +73,6 @@
 
 ## Issue #17の判定
 
-状態: Planned（判断待ち）。Scope revision 1。[計画](2026-10-17-issue-17-plan.md)でAC-1〜7・INVAR-1〜3の検証を整理した。割当の認可・世代・能力・固定入力・準備/起動の区別を調べている。同じbranch/作業場所へ書くRunの直列化、またはRunごとのworktree/branch自動作成の初期方針をユーザーへ確認中で、依存する実装には着手していない。
+状態: In progress。Scope revision 1。[計画](2026-10-17-issue-17-plan.md)のAC-1〜7・INVAR-1〜3を維持する。ユーザー判断に従い、repositoryを使うRunごとにworktreeとbranchを自動作成する。割当の認可・端末能力・世代・固定入力・準備/起動の区別を、既存のRunと共通認可へ接続する。
 
 #18〜#34は未着手。実CLI起動・Runner割当・工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。

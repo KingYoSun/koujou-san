@@ -152,7 +152,7 @@ func (s *Service) save(ctx context.Context, tx pgx.Tx, w, root, id, kind, versio
 	_, err = tx.Exec(ctx, `INSERT INTO access_resources(workspace_id,id,restricted) VALUES($1,$2,false) ON CONFLICT DO NOTHING`, w, id)
 	return err
 }
-func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, action, kind string, m apicontract.Mutation, payload any, apply func(pgx.Tx, apicontract.Reference) (Run, []Ref, error)) (apicontract.Response[apicontract.Reference], error) {
+func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, action, kind string, m apicontract.Mutation, payload any, apply func(pgx.Tx, apicontract.Reference) (Run, []Ref, error), guards ...func(query) error) (apicontract.Response[apicontract.Reference], error) {
 	if p.OperationID != "" {
 		return apicontract.Response[apicontract.Reference]{}, access.ErrForbidden
 	}
@@ -170,8 +170,16 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, action,
 			q = tx
 			err = s.Access.CheckTx(ctx, tx, p, w, target, action)
 		}
-		if err != nil || action == "register" || p.DeviceID != "" {
+		if err != nil {
 			return err
+		}
+		for _, guard := range guards {
+			if err = guard(q); err != nil {
+				return err
+			}
+		}
+		if action == "register" || p.DeviceID != "" {
+			return nil
 		}
 		r, _, err := loadRun(ctx, q, w, root)
 		if err != nil {
@@ -485,8 +493,21 @@ func (s *Service) Report(ctx context.Context, p access.Principal, w, id string, 
 		refs := append([]Ref{{ID: ref.ID, Version: ref.Version}}, deps...)
 		now := time.Now().UTC()
 		switch e.Type {
+		case "prepared":
+			if r.Assignment == nil || r.State != "queued" || r.Assignment.PreparedAt != nil || r.CancelRequested {
+				return r, nil, ErrState
+			}
+			if (r.Assignment.Area == nil) != (e.PreparedArea == nil) || (r.Assignment.Area != nil && *r.Assignment.Area != *e.PreparedArea) {
+				return r, nil, ErrInvalid
+			}
+			r.Assignment.PreparedAt = &now
+		case "renew":
+			if r.Assignment == nil {
+				return r, nil, ErrState
+			}
+			r.Assignment.ExpiresAt = now.Add(assignmentLifetime)
 		case "started":
-			if r.State != "queued" || r.CancelRequested {
+			if r.State != "queued" || r.CancelRequested || (r.Assignment != nil && r.Assignment.PreparedAt == nil) {
 				return r, nil, ErrState
 			}
 			r.State = "running"
@@ -603,7 +624,7 @@ func (s *Service) Report(ctx context.Context, p access.Principal, w, id string, 
 		default:
 			return r, nil, ErrInvalid
 		}
-		if e.Type != "unknown" {
+		if e.Type != "unknown" && e.Type != "renew" {
 			r.Observation = "known"
 		}
 		r.ReportedThrough = e.Sequence
@@ -621,5 +642,11 @@ func (s *Service) Report(ctx context.Context, p access.Principal, w, id string, 
 			return r, nil, err
 		}
 		return r, old.Refs, nil
+	}, func(q query) error {
+		r, _, err := loadRun(ctx, q, w, id)
+		if err != nil {
+			return err
+		}
+		return s.checkAssignment(ctx, q, p, w, r, e.Generation, e.Type == "renew")
 	})
 }

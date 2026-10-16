@@ -57,6 +57,8 @@ type Link struct {
 	Next     Ref `json:"next"`
 }
 type Run struct {
+	Assignment           *Assignment `json:"assignment,omitempty"`
+	Preparation          string      `json:"preparation,omitempty"`
 	Name                 string      `json:"name,omitempty"`
 	Input                Ref         `json:"input"`
 	Previous             *Ref        `json:"previous,omitempty"`
@@ -127,6 +129,8 @@ type Answer struct {
 // Event is reported by the assigned authenticated execution adapter. Receiving a
 // response, delivering it and confirming continuation are separate events.
 type Event struct {
+	Generation   string `json:"generation,omitempty"`
+	PreparedArea *Area  `json:"prepared_area,omitempty"`
 	apicontract.Mutation
 	Sequence   string           `json:"sequence"`
 	Type       string           `json:"type"`

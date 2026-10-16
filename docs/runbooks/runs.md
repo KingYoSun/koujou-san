@@ -31,3 +31,13 @@ Webはブラウザからダウンロードする。WindowsはDownloadsへ保存�
 ## 検証
 
 `pnpm run test:runs`は専用PGで共通契約・競合・現在認可・ファイル出力を確認する。実Ory/MCPは`pnpm run test:mcp`、共通GUIの実操作は`pnpm run test:mcp:ui`を使う。ネイティブはdesktopのcheck/test/buildとWindows実操作で確認する。検証用の割当・固定commandのイベントはfixtureであり、製品Runnerの完成とは扱わない。
+
+## 担当端末と作業領域
+
+Windowsでは「この端末のRunner設定」で、接続の論理名・確認した版/環境/能力・CLI認証主体への参照・依頼を許可するメンバーIDを登録する。端末登録とWorkspaceでの入力取得/報告許可も必要である。repositoryを使う接続には論理IDと端末内pathを設定する。秘密値を入力しない。接続設定の保存はcommandを起動しない。
+
+実行依頼を許可された利用者は、起動前Runの「担当端末へ割り当てる」で端末ID、必要能力、任意のrepository論理IDと固定commitを指定する。不足があれば準備待ちとして表示する。競合時はRunを更新して現在の担当を確認する。端末登録やWorkspace参加だけで実行許可を得ることはない。
+
+Windowsの「この端末で割当を確認・準備」は、現在の許可と世代を照合して接続を更新し、Run専用worktree・branchを自動作成する。元checkoutは動かさず、再試行で編集中のファイルを初期化しない。pathは端末内の完了表示だけへ返す。準備完了はプロセス開始とは別で、実CLI起動は#18以降で接続する。
+
+Runnerの接続確認・割当の有効期間は2分。接続が古い場合は保存済みのRunner接続を更新する。期限切れや権限取消はCLIの停止確認ではなく、同じRunを別端末へ自動配布しない。終了したRunのworktree・branchも自動削除しない。
