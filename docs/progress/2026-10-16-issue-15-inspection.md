@@ -105,3 +105,38 @@ GUI blocker reproduced: unlock=true
 - 未確認: Windowsの詳細なTriage実操作。build・認証済みAX読取りだけではPASSにしない。
 - 修正後の再確認: B-1に関係する現在の対象版・古い推奨・手動変更・固定解除の差分とWeb実操作。正しい現在版では編集でき、旧入力の推奨は採用せず、CAS・手動固定・履歴を維持することを確認する。Windows操作を終えてAC-9aを再判定する。
 - 最終head CIとマージ後照合は本検品の対象commit後の作業であり、本記録から成功とは判定しない。
+
+## B-1の差分検品（2026-10-16）
+
+前節までのFAILは `e15d36416eeb415b8f0226840f0236ce0b23c614` の記録である。B-1の修正対象を `a63f7172cce5191d584833931606b7fc3d0170cf` に固定し、前回からの製品・試験4ファイルと本記録の差分を確認した。検品者は製品ソースを変更していない。B-1、旧推奨・保存版、CAS・再送、現在認可への影響に範囲を限定した。
+
+`Query(selection)` は、既に解決・認可確認した現在対象版を `target` として返す。GUIはその参照を手動変更・解除へ渡す。保存済みPriorityの対象版と最新推奨の評価対象版は書き換えていない。既存の現在版確認、CAS、権限確認も維持されている。
+
+| 影響する条件 | 差分の確認と結果 | 判定 |
+| --- | --- | --- |
+| B-1 / AC-9a 評価待ち中のGUI編集 | 現在版のselectionを取得し、手動P3へ変更して解除。採用値P3、固定解除、待機を保持し、旧推奨P1を採用しない。独立PGの同じpayload経路と提供されたWeb実操作・画像を照合 | PASS |
+| B-1 / AC-9a 失敗中のGUI編集 | 独立PGでexecutor失敗後にselectionから現在対象版を取得。手動P2へ変更して解除でき、旧推奨P1を採用しない | PASS |
+| AC-5 古い推奨と保存版の意味 | 旧推奨P1の対象版を最初の版のまま維持。Issue更新後の取得では保存済みTargetが旧版、selectionだけが現在版。手動P3/P2と解除後も推薦値と推薦対象版を保持 | PASS |
+| AC-2 / AC-9 更新再送とCAS | 同じ手動更新の再送は同一固定参照へ収束。古い優先度版を使う別操作は拒否し、Dataを返さない | PASS |
+| AC-7 / AC-9 現在認可・公開境界 | 同一receiptがある手動更新も、管理者をviewerへ変更した後の再送は拒否。noneと非公開対象のselectionはDataを返さず拒否 | PASS |
+| AC-9 HTTP/MCP共通応答 | selectionを含むHTTP/MCP比較fixtureを確認。旧い推奨を持つIssueを再更新した状態で同じ現在対象版を返す | PASS |
+| AC-9 Windows詳細操作 | 同buildの新しいウィンドウでも前面化失敗が継続している提供観測あり。本人の前面化待ちで詳細操作は未実施 | INCONCLUSIVE |
+
+独立追加試験 `independent_b1_current_target` は、旧推奨と異なる手動値を使って旧推奨の誤採用を識別した。評価待ちではP3、失敗中ではP2を採用し、いずれも解除後にP1へ戻らなかった。
+
+```text
+B-1 waiting: current selection edited/unlocked P3,
+  retained distinct old recommendation P1,
+  stale CAS/replay/role/none/private boundaries passed
+B-1 failed: current selection edited/unlocked P2,
+  retained distinct old recommendation P1,
+  stale CAS/replay/role/none/private boundaries passed
+```
+
+固定ソースの独立 `pnpm run test:automation` はPASS（3.74秒、package 4.605秒）。同じ固定ソースにOS一時ディレクトリのGo overlayで追加試験を重ねた実行もPASS（4.27秒、package 5.071秒）。追加試験ファイルは `C:/Users/kgm11/AppData/Local/Temp/koujou-issue15-b1-review-ac87221ea7fd41a68d0b167d32f206d2/postgres_test.go`、SHA256は `DBFEA25647FF9E80E9A809BCCA9F12BEC8ACD35E8AFCDCA79B5D24708E68E535`。
+
+独立 `pnpm run test:mcp` もPASS（`TestMCPIntegration` 58.59秒、package 60.387秒）。selectionを追加したHTTP/MCP比較、現在役割・非公開根拠・none/exclude・CAS/再送を含む共通fixtureを通過した。各試験の専用Composeは自身の資源だけを終了・削除した。yomiyasuの静的検査は入力一覧の列挙比率のnoticeのみで、役割が明確な一覧として維持した。`git diff --check` は成功した。
+
+Webは専用fixture `798b703de745`、build `index-CO_uSBIH.js` で実装担当が再操作した。旧推奨P1・保存済み手動P2・新Issue版の待機状態からP3へ変更して固定し、続けて解除する両操作が成功した。[解除後の画像](assets/issue15-web-current-target-unlocked.jpg)を検品者が目視し、P3・自動反映・待機・最新推奨P1を確認した。画像は固定ソースでの操作後に追加された観測成果物として扱う。
+
+現在のB-1判定は **解消**。差分範囲に残る製品blockerは0件。前回の他条件のPASSを維持する。Windows詳細操作が未確認のため、全体の現在判定は **INCONCLUSIVE** とし、Issue完了やWindows適合を成功扱いしない。最終head CI・マージ後照合は別途必要である。

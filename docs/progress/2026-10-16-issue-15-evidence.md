@@ -46,3 +46,13 @@ rootの`check / test / build`と共通Storeの`test:database`はPASS。共通Sto
 前面化は`failed to activate captured window`で失敗した。対象を再取得して再試行し、runbookに従いnode_replをresetして再初期化しても同じ結果だった。アプリは応答中で、LockAppや起動モーダルはウィンドウ一覧に無かった。ChromeへWindows操作を切り替えたり、別のUI自動化やOS設定で回避したりしていない。利用者へ一度だけ前面へ出す操作を依頼し、以後の操作はこちらで続ける予定である。
 
 Windowsでの詳細なTriage操作、固定成果物の独立検品、最終head CI、マージ後照合は未完了。未確認をPASSとして扱わず、残作業として保持する。実Hopper発行は#25、LLMのHopperは#27、TriageのLLM評価は#28の対象である。
+
+## 独立検品後のGUI修正
+
+初回の独立検品は `e15d364` を対象にFAILとなった。Issue更新後も、保存済み優先度にある旧対象版をGUIが編集要求へ送っていたため、評価待ち・失敗中の手動変更と固定解除が400で拒否された（B-1、AC-9a）。
+
+修正 `a63f717` では、方針選択時に解決済みの現在の対象版を返し、GUIの編集に使う。保存済み優先度と推奨の根拠は書き換えず、現在版の検証・CAS・現在認可も維持した。PGの同じ経路の回帰試験は修正前に `GUI selection lost current target` でFAIL、修正後はPASS（3.59秒、package 4.346秒）。型・静的検査とWindows release buildも成功した。
+
+専用fixture `798b703de745` のWebで、旧推奨P1・手動採用P2のあるIssueを更新して評価待ちにした。GUIから手動P3の採用・固定と解除がともに成功し、解除後はP3・自動反映・待機のまま、古い推奨P1を採用しなかった。[修正後の画面](assets/issue15-web-current-target-unlocked.jpg)を保存した。HTTP/MCPの比較には現在対象版を返すselectionも含めた。最終buildの共通UI assetは `index-CO_uSBIH.js`。
+
+前のWeb fixtureは正常終了し、[通信の集計](assets/issue15-web-request-summary.json)にはmethod・path・件数だけを保存した。認証情報と本文は含めていない。Windowsアプリの検証用認証は前の専用namespace分を削除し、新しい専用APIの未使用namespaceへDPAPIで準備した。再起動したWindowsアプリも前面化が同じエラーで失敗し、詳細な実操作は未確認のままである。

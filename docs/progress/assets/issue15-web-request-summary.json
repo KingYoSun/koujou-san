@@ -1,0 +1,43 @@
+{
+  "fixture": "931fafb68775",
+  "source": "owned Web acceptance request trace, methods and paths only",
+  "automation_requests": 27,
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/automation/workspaces/mcp-one/priority/scope:automation-issue",
+      "count": 1
+    },
+    {
+      "method": "POST",
+      "path": "/automation/workspaces/mcp-one/apply-past",
+      "count": 1
+    },
+    {
+      "method": "POST",
+      "path": "/automation/workspaces/mcp-one/jobs/HINT34WR6KSGOJ4GEKT4TTQWZB",
+      "count": 2
+    },
+    {
+      "method": "POST",
+      "path": "/automation/workspaces/mcp-one/query",
+      "count": 19
+    },
+    {
+      "method": "POST",
+      "path": "/automation/workspaces/mcp-one/records/activation:ui-triage",
+      "count": 1
+    },
+    {
+      "method": "POST",
+      "path": "/automation/workspaces/mcp-one/records/policy:ui-triage",
+      "count": 1
+    },
+    {
+      "method": "POST",
+      "path": "/automation/workspaces/mcp-one/records/priority:scope:automation-issue",
+      "count": 2
+    }
+  ],
+  "execution_route_requests": 0
+}
