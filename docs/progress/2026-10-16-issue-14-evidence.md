@@ -43,4 +43,4 @@ rootの`check / test / build`、`check:desktop / test:desktop / build:desktop`�
 
 初回の独立検品でAC-1bの欠測理由を保持する欄が不足していた。`reason=provider_did_not_report`を送る`TestMissingReasonWire`は修正前にFAILし、任意の理由欄を追加した後はPASSした。理由を含む欠測と既知数量の合成、HTTP保存・取得・PG比較も確認した。取得元が示した理由を保持し、原因をサーバーで推測しない。
 
-独立検品、最終headの実CI、マージ後のtree照合を行う。これらが揃うまでは#14をCloseしない。実CLIの収集は#24、本格的な費用比較画面は#32の対象であり、本記録で実装済みとは扱わない。
+固定commit `38f903f46b3e873de2932ca45f04653f3979dfb6`の[差分再検品](2026-10-16-issue-14-inspection.md)で全AC・INVARがPASS、blockerとINCONCLUSIVEは0件となった。最終headの実CIとマージ後のtree照合が揃うまでは#14をCloseしない。実CLIの収集は#24、本格的な費用比較画面は#32の対象であり、本記録で実装済みとは扱わない。

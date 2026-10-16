@@ -61,6 +61,6 @@
 
 ## Issue #14の判定
 
-状態: Inspection pending。Scope revision 1。個別契約単価を含む手動料金・無期限の履歴・現在認可・重複を除いた集計を実装し、専用PG・実Ory/MCP・Web/Tauriで確認した。[計画](2026-10-16-issue-14-plan.md)、[検証記録](2026-10-16-issue-14-evidence.md)を参照する。独立検品・最終headのCI・マージ後照合は未完了。
+状態: In progress（最終CI待ち）。Scope revision 1。[PR #46](https://github.com/KingYoSun/koujou-san/pull/46)で個別契約単価・無期限の履歴・現在認可・重複を除いた集計を実装した。[検証記録](2026-10-16-issue-14-evidence.md)の専用PG・実Ory/MCP・Web/Tauri確認と、`38f903f`の[独立検品](2026-10-16-issue-14-inspection.md)で全条件PASS、blocker 0。最終headのCI・マージ後照合は未完了。
 
 #15〜#34は未着手。Runner、実行・検品の詳細画面、LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。

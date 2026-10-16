@@ -1,5 +1,7 @@
 # Issue #14 独立検品
 
+現在の判定は修正commit `38f903f46b3e873de2932ca45f04653f3979dfb6`に対して**PASS**、blocker 0件。下記の初回記録を保持し、末尾の差分再検品でB-1の解消と全条件の判定維持を確認した。
+
 ## 対象と入力
 
 - 対象commit: `e0cfddbb8708a7778b4fc38129ffce4c37fcf762`。基準main: `1b46ec0cef76f50f7b92faa0a43d6c6d04a0b3e2`。
@@ -65,3 +67,23 @@ AC単位ではAC-1がFAIL、AC-2〜9とINVAR-1〜3は上記範囲でPASSであ�
 - 未実行: 検品者によるGUI実操作、check/build/desktop buildの再実行、実CI・merge後照合。GUIについては提供された固定観測資料と共通実装を評価した。他の未実行項目を独立成功とは扱わず、実CI・merge後照合は実装担当の終了手順に残す。
 - 標準8080の既存プロセス、本物のGitHub App、秘密鍵は操作していない。検品者による追跡対象の追加は本記録だけで、実装とGitの状態は変更していない。
 - 修正後の再確認: B-1の差分、reasonを含む欠測をstrict wire経路で保存・取得する試験、HTTPとPGの一致、null/0/非該当と既存数値計算への影響。修正commitを固定して、この記録に追記する。
+
+## 修正commitの差分再検品
+
+対象は`38f903f46b3e873de2932ca45f04653f3979dfb6`、比較元は初回対象`e0cfddbb8708a7778b4fc38129ffce4c37fcf762`。2026-10-16に同じ独立検品者が確認した。開始時と試験終了時のHEADは対象commit、追跡対象の変更は無かった。コードの探索・確認には再びCodeGraphを先に使った。
+
+製品コードの差分は`Quantity.reason`の任意欄追加と、既知数量と欠測数量の合成時に欠測側の理由を残す処理である。関連単体試験・HTTP/PG fixtureと文書も更新された。理由の推測、必須入力化、新しい制限、認可・計算規則・実行経路の変更は無い。
+
+| 条件・影響範囲 | 確認した経路と証拠 | 再判定 |
+| --- | --- | --- |
+| AC-1b、B-1 | `TestMissingReasonWire`をcache無効で独立実行し、strict decodeが理由付きmissing/nullを受け付け、再JSON化して`provider_did_not_report`を保持することを確認。PG `attributions_and_missing`も五帰属でHTTP保存・取得・PG payloadを比較し、同じ理由を検証 | PASS、B-1解消 |
+| Quantityの伝搬 | `model.go:16-22`の任意欄、`coverage.go:145-151`の合成、既存の構造体コピーによる`disjoint`、評価のQuantitiesへの代入と共通JSON保存を確認。単体試験で既知20＋理由付き欠測がnull・理由付き欠測を保つ | PASS |
+| AC-1の他の末端条件、INVAR-3 | 同じPG fixtureが実モデルnull、文字列0、missing/null、not_applicable/nullを引き続き区別。reason未指定の既存fixtureも通過し、欠測や料金なしを0へ補完していない | PASS維持 |
+| AC-2・3・4・5・6・7・8 | 全usage単体とPG統合試験を再実行。0.182000・0.242000・36.300000、大きな十進数、丸め、親子・二取得元・累積・再送、履歴・認可・複数Scope・大量件数の既存fixtureが通過 | PASS維持 |
+| AC-9、INVAR-1・2 | HTTP保存・取得は同じ共通serviceを使用。今回の差分は認可、MCP tool、GUI、Query/Read、Run・原出力への経路を変更していない。任意欄のJSON伝搬を確認し、初回の三入口・副作用の判定を維持 | PASS維持 |
+
+独立実行した`.tools/go/bin/go.exe test -count=1 -v ./internal/usage`は成功した。`TestMissingReasonWire`、`TestDecimalConsumption`、`TestCoverageAdoption`を実行し、packageは1.124秒。DB試験はこの単体コマンドでは明示的にskipされ、別の`pnpm run test:usage`で実行した。
+
+独立実行した`pnpm run test:usage`も成功した。`TestUsagePostgres`は3.70秒、packageは4.807秒。構造fixtureの初回2件ページは619.2642ms、`usage_group_records`のIndex Scanだった。専用Compose `5bf4942234af`は試験コマンドが片付けた。標準8080と本物のGitHub App・秘密鍵には触れていない。
+
+差分再検品の総合判定は**PASS**。AC-1〜9、INVAR-1〜3は全てPASSで、未解消blockerは0件、INCONCLUSIVEは無い。初回FAILは旧commitの履歴として保持する。今回の差分に認可・MCP・GUIの変更は無く、それらの実操作・実Ory試験は再実行していない。最終headの実CIとマージ後照合は、この独立検品とは別の終了手順として残る。
