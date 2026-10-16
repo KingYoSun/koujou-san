@@ -37,7 +37,7 @@ PRの現在状態には、GitHubの`merged:true`を受けても`closed`だけを
 
 ## 残る検証
 
-独立検品の最終判定、記録を含む最終headのCI、マージ後照合を残す。通常CIは固定応答と専用DBを使用し、実Appの秘密鍵を要求しない。未実行を成功に含めない。
+記録を含む最終headのCI、マージ後照合を残す。通常CIは固定応答と専用DBを使用し、実Appの秘密鍵を要求しない。未実行を成功に含めない。
 
 ## CIと先行の独立検品
 
@@ -56,3 +56,5 @@ PRの現在状態には、GitHubの`merged:true`を受けても`closed`だけを
 実Appを失効させる操作は行っていない。外部障害の発生は固定応答・PG試験で確認し、実画面には専用DBの`reason=connection_failed`という保存状態fixtureを入力した。[前後比較](assets/issue13-controlled-unknown.json)でsnapshot・成功取得時刻・内容版が変わらないことをassertし、[WebのUnknownと履歴](assets/issue13-web-unknown-history.jpg)、[WindowsのUnknown](assets/issue13-native-unknown.jpg)を確認した。最後にfixtureの理由を解除して実Appの正常照合へ戻した。
 
 [Web要求集計](assets/issue13-ui-request-summary.json)は674件、観測一覧GET 41件と履歴GET 2件を含み、実行の要求は0件。ネイティブ側も同じ認可付きAPIで取得し、外部ページを開く以外のCLI/CI操作を行っていない。対話専用のnative準備試験は明示選択して成功し、検証用OAuthだけをDPAPIで保存した。通常環境の資格情報・OSの信頼設定は変更していない。
+
+追加証跡commit `a799ecc8006fbbb3901f98460bf5d9573aa9d1a2`を独立検品へ渡し、全AC・INVARはPASS、blocker 0件で終了した。検品後の差分は判定記録と現在状態の更新だけであり、コードや条件は変更していない。

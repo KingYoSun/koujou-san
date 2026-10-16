@@ -57,6 +57,6 @@
 
 ## Issue #13の判定
 
-状態: Inspection pending。Scope revision 1。[PR #45](https://github.com/KingYoSun/koujou-san/pull/45)はdraft。[計画](2026-10-16-issue-13-plan.md)、[検証記録](2026-10-16-issue-13-evidence.md)、[独立検品](2026-10-16-issue-13-inspection.md)を参照する。本人の鍵保存後に実App接続、Web/Tauri、クライアント不在と再接続の照合まで成功した。先行検品の具体的blockerは0件。コード対象`18c26e7`と記録更新`e18432d`のCIは全成功。追加した証跡を使う独立検品の最終判定、最終headのCI、マージ後照合を残す。コード検証後の差分は文書と証跡だけである。
+状態: In progress。Scope revision 1。[PR #45](https://github.com/KingYoSun/koujou-san/pull/45)。[計画](2026-10-16-issue-13-plan.md)、[検証記録](2026-10-16-issue-13-evidence.md)、[独立検品](2026-10-16-issue-13-inspection.md)を参照する。実App接続、Web/Tauri、クライアント不在と再接続の照合まで成功し、独立検品は全条件PASS・blocker 0件で終了した。最終headのCIとマージ後照合を残す。コード検証後の差分は文書と証跡だけである。
 
 #14〜#34は未着手。Runner、実行・検品の詳細画面、LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
