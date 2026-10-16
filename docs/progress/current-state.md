@@ -65,6 +65,10 @@
 
 ## Issue #15の判定
 
-状態: In progress。Scope revision 1。[計画](2026-10-16-issue-15-plan.md)の三つの初期動作について推奨案の採用が確定した。版付き方針・手動固定・管理者による有効化と、自動化主体・Worker処理枠を実装し、専用PG・実Ory/MCP・Webの実操作を確認した。[検証記録](2026-10-16-issue-15-evidence.md)を参照。[PR #48](https://github.com/KingYoSun/koujou-san/pull/48)はDraft。初回独立検品で見つかった、Issue更新後のGUI手動変更・固定解除の不具合を`a63f717`で修正し、PGとWebで再確認した。本人が一度前面へ出した後、こちらで専用fixtureを更新し、新しいアプリも画像上のタイトルバーのクリックで前面化した。Windows版の優先度変更・固定解除・方針版・処理状態をHTTPと照合し、詳細な実操作を確認済み。Windows証跡も含む独立検品は全AC・INVARをPASS、blockerは0件。最終head CIを確認してマージする。検品は[記録](2026-10-16-issue-15-inspection.md)を参照。最終head CI・マージ後照合は未完了。
+状態: Complete。Scope revision 1。[PR #48](https://github.com/KingYoSun/koujou-san/pull/48)を最終head `e6704707c97ebe90faa59135fd1ffbf176f5253e` の全CI成功後にマージした。main `8d5499cfa72bf4bb44d1fd05646a9b19e1014f68` と最終headのtreeは `7069fe113df7098a092ed9fcffacb183e50ec650` で一致、差分0。Windows/Web・HTTP/MCPの実操作、専用PG、[独立検品](2026-10-16-issue-15-inspection.md)、マージ後照合が揃い、#15をCloseした。[検証記録](2026-10-16-issue-15-evidence.md)を参照する。
 
-#16〜#34は未着手。Runner、実行・検品の詳細画面、LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #16の判定
+
+状態: In progress。Scope revision 1。[計画](2026-10-16-issue-16-plan.md)へ既存AC-1〜10・INVAR-1〜3の有限なfixtureを整理した。Pauseへ回答できる人はRunの編集権限を持つメンバーに確定。実行依頼の許可とは分け、回答受領・配送・再開確認を別々に記録する。共通Run契約と、既存の確定入力・現在認可・共有保存の接続を調査し、実装へ進む。
+
+#17〜#34は未着手。実CLI起動・Runner割当・工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
