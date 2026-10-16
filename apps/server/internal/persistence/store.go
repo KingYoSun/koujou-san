@@ -54,6 +54,9 @@ var usageSchema string
 //go:embed 012_automation.sql
 var automationSchema string
 
+//go:embed 013_runs.sql
+var runsSchema string
+
 type Store struct {
 	pool *pgxpool.Pool
 	// Accepted is installed once at startup. It may write an outbox in this same
@@ -67,7 +70,7 @@ func Open(ctx context.Context, url string) (*Store, error) {
 		return nil, errors.New("invalid PostgreSQL configuration")
 	}
 	if err = pool.Ping(ctx); err == nil {
-		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema, contextSchema, syncSchema, searchSchema, graphSchema, operationsSchema, catalogSchema, githubSchema, usageSchema, automationSchema})
+		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema, contextSchema, syncSchema, searchSchema, graphSchema, operationsSchema, catalogSchema, githubSchema, usageSchema, automationSchema, runsSchema})
 	}
 	if err != nil {
 		pool.Close()

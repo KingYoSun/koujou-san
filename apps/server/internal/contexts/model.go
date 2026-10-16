@@ -234,6 +234,11 @@ func validateOrigin(o *Origin) error {
 	}
 	return nil
 }
+
+// ValidateFixed validates a stored artifact without fetching it or requiring it
+// to be available for input injection.
+func ValidateFixed(f Fixed) error { return validateFixed(f) }
+
 func validateFixed(f Fixed) error {
 	if f.URI == "" || f.Revision == "" || f.Range == "" || len(f.Digest) != 64 || (f.Delivery != "reference" && f.Delivery != "snapshot") || (f.State != "ready" && f.State != "unfetched" && f.State != "failed") {
 		return invalid("invalid_external", nil)

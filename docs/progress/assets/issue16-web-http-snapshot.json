@@ -1,0 +1,172 @@
+{
+  "head": {
+    "id": "run:ui-run",
+    "version": "TVR243NBYHXKW7IU2R6KOAPZOL",
+    "run_id": "run:ui-run",
+    "kind": "run",
+    "position": "30154",
+    "value": {
+      "name": "Run受入: ui-run",
+      "input": {
+        "id": "run-input:ui-run",
+        "version": "MP2IE3N7RZC6NCMLN7OIWF7MPY"
+      },
+      "state": "paused",
+      "created_at": "2026-10-16T15:57:45.4937655Z",
+      "started_at": "2026-10-16T15:57:45.5250661Z",
+      "observation": "known",
+      "active_pause": {
+        "id": "run-pause:ui-run:question-one",
+        "version": "TVR243NBYHXKW7IU2R6KOAPZOL"
+      },
+      "requested_by": "L6JANPDNWTLCCMDTIBXNIJ7P6R",
+      "cancel_requested": false,
+      "reported_through": "3",
+      "execution_requested_at": "2026-10-16T15:57:45.5097644Z"
+    },
+    "refs": [
+      {
+        "id": "run-input:ui-run",
+        "version": "MP2IE3N7RZC6NCMLN7OIWF7MPY"
+      }
+    ]
+  },
+  "input": {
+    "id": "run-input:ui-run",
+    "version": "MP2IE3N7RZC6NCMLN7OIWF7MPY",
+    "run_id": "run:ui-run",
+    "kind": "input",
+    "position": "25",
+    "value": {
+      "name": "Run受入: ui-run",
+      "input": {
+        "command": {
+          "kind": "human",
+          "target": "fixture-question",
+          "parameters": {
+            "request": "受入fixture。外部へ依頼を送信しない"
+          }
+        }
+      },
+      "artifacts": [
+        {
+          "uri": "https://example.test/fixture-artifact",
+          "range": "output",
+          "state": "unfetched",
+          "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "delivery": "reference",
+          "revision": "fixed-artifact-v1"
+        }
+      ],
+      "derivation": {
+        "name": "HumanReviewRun",
+        "version": "fixed-v1",
+        "result_schema": {
+          "type": "object",
+          "required": [
+            "decision"
+          ]
+        },
+        "verdict_field": "decision"
+      }
+    },
+    "refs": [
+      {
+        "id": "run:ui-run",
+        "version": "MP2IE3N7RZC6NCMLN7OIWF7MPY"
+      }
+    ]
+  },
+  "output": {
+    "data": {
+      "run": {
+        "id": "run:ui-run",
+        "version": "TVR243NBYHXKW7IU2R6KOAPZOL"
+      },
+      "items": [
+        {
+          "id": "run-output:ui-run:2",
+          "version": "HL3ZEOPFC7NFNZ53LDW7P24EJH",
+          "run_id": "run:ui-run",
+          "kind": "output",
+          "position": "28",
+          "value": {
+            "at": "2026-10-16T15:57:45.5390657Z",
+            "value": "Pause前の原出力",
+            "source": "fixed-human-request",
+            "channel": "stdout",
+            "sequence": "2"
+          },
+          "refs": [
+            {
+              "id": "run:ui-run",
+              "version": "HL3ZEOPFC7NFNZ53LDW7P24EJH"
+            }
+          ]
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "mcp-one",
+      "position": null,
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  },
+  "pause": {
+    "data": {
+      "run": {
+        "id": "run:ui-run",
+        "version": "TVR243NBYHXKW7IU2R6KOAPZOL"
+      },
+      "items": [
+        {
+          "id": "run-pause:ui-run:question-one",
+          "version": "TVR243NBYHXKW7IU2R6KOAPZOL",
+          "run_id": "run:ui-run",
+          "kind": "pause",
+          "position": "30154",
+          "value": {
+            "id": "question-one",
+            "state": "received",
+            "reason": "判断を待つ",
+            "request": {
+              "choices": [
+                "承認",
+                "差し戻し"
+              ],
+              "question": "受入fixtureの確認"
+            },
+            "response": "Web受入: 確認して承認",
+            "created_at": "2026-10-16T15:57:45.5535653Z",
+            "answered_at": "2026-10-16T16:03:15.9677618Z",
+            "answered_by": "L6JANPDNWTLCCMDTIBXNIJ7P6R",
+            "response_id": "W7ZL6VG3YB5NUFNO7ZHQ5SEZQ6",
+            "response_origin": {
+              "id": "L6JANPDNWTLCCMDTIBXNIJ7P6R",
+              "kind": "user"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:ui-run",
+              "version": "KOPYI26I2HVPPPCJOFABUI5CTP"
+            }
+          ]
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "mcp-one",
+      "position": null,
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  }
+}

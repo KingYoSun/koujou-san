@@ -67,6 +67,9 @@ jobs:
       - name: Test read-only GitHub observation and recovery
         run: pnpm run test:github
 
+      - name: Test Run records, pauses and export
+        run: pnpm run test:runs
+
       - name: Test durable automation and triage state
         run: pnpm run test:automation
 

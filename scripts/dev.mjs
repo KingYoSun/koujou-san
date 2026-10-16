@@ -404,6 +404,7 @@ async function testDatabase(suite = "persistence", testName) {
 }
 
 const tasks = {
+  "test:runs": () => testDatabase("runs", "TestRunsPostgres"),
   "test:automation": () => testDatabase("automation", "TestAutomationPostgres"),
   "test:usage": () => testDatabase("usage", "TestUsagePostgres"),
   "test:github": () => testDatabase("githubobserve"),
