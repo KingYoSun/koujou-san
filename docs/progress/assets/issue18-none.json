@@ -1,0 +1,155 @@
+{
+  "head": {
+    "id": "run:cli-none",
+    "version": "H43ZZW6ER5OFWO4U3ZMSYLVHCO",
+    "run_id": "run:cli-none",
+    "kind": "run",
+    "position": "242",
+    "value": {
+      "input": {
+        "id": "run-input:cli-none",
+        "version": "GUVBDJBMKMSUY5AORUZBFU3JQK"
+      },
+      "state": "succeeded",
+      "execution": {
+        "stop": false,
+        "pause": false,
+        "version": "fixture-v1",
+        "environment": "windows",
+        "version_observed": true
+      },
+      "exit_code": 0,
+      "assignment": {
+        "input": {
+          "id": "run-input:cli-none",
+          "version": "GUVBDJBMKMSUY5AORUZBFU3JQK"
+        },
+        "required": null,
+        "device_id": "0de624a8-cb1b-4813-9eb1-341b27a3beca",
+        "runner_id": "a5fc144d-74cd-4ca6-a1b4-fef29f145e1e",
+        "connection": {
+          "kind": "cli",
+          "users": [
+            "WJGKMPT7ZUNDKJK4CPL5QFXIK7"
+          ],
+          "target": "fixture-plain",
+          "subject": "owned-cli-reference",
+          "version": "fixture-v1",
+          "bindings": [
+            "stdin",
+            "file",
+            "argument"
+          ],
+          "confirmed": true,
+          "environment": "Windows",
+          "capabilities": [],
+          "repositories": [
+            "fixture-repo"
+          ]
+        },
+        "expires_at": "2026-10-16T19:29:18.0868494Z",
+        "generation": "F5JS6VSJ76GPNASIGFZFE5RLCT",
+        "prepared_at": "2026-10-16T19:27:17.4984975Z",
+        "requested_by": "WJGKMPT7ZUNDKJK4CPL5QFXIK7",
+        "runner_version": "QW6QKKWLS2HM536ASCLBA7VUOT"
+      },
+      "created_at": "2026-10-16T19:27:17.1736305Z",
+      "started_at": "2026-10-16T19:27:17.7631172Z",
+      "finished_at": "2026-10-16T19:27:18.3099935Z",
+      "observation": "known",
+      "requested_by": "WJGKMPT7ZUNDKJK4CPL5QFXIK7",
+      "cancel_requested": false,
+      "reported_through": "6",
+      "execution_requested_at": "2026-10-16T19:27:17.1989773Z"
+    },
+    "refs": [
+      {
+        "id": "run-input:cli-none",
+        "version": "GUVBDJBMKMSUY5AORUZBFU3JQK"
+      }
+    ]
+  },
+  "output": {
+    "data": {
+      "run": {
+        "id": "run:cli-none",
+        "version": "H43ZZW6ER5OFWO4U3ZMSYLVHCO"
+      },
+      "items": [
+        {
+          "id": "run-output:cli-none:3",
+          "version": "XWLO7DQSO6RK7E4GQ3NENGZB6Z",
+          "run_id": "run:cli-none",
+          "kind": "output",
+          "position": "239",
+          "value": {
+            "at": "2026-10-16T19:27:18.1355072Z",
+            "value": "Should this ordinary question become a Pause?\r\n",
+            "source": "fixture-plain",
+            "channel": "stdout",
+            "sequence": "3"
+          },
+          "refs": [
+            {
+              "id": "run:cli-none",
+              "version": "XWLO7DQSO6RK7E4GQ3NENGZB6Z"
+            }
+          ]
+        },
+        {
+          "id": "run-output:cli-none:4",
+          "version": "RLO7EXU7VYTNI7VF5WA74MI4W4",
+          "run_id": "run:cli-none",
+          "kind": "output",
+          "position": "240",
+          "value": {
+            "at": "2026-10-16T19:27:18.1928778Z",
+            "value": "PLAIN_STDERR_ORIGINAL\r\n",
+            "source": "fixture-plain",
+            "channel": "stderr",
+            "sequence": "4"
+          },
+          "refs": [
+            {
+              "id": "run:cli-none",
+              "version": "RLO7EXU7VYTNI7VF5WA74MI4W4"
+            }
+          ]
+        },
+        {
+          "id": "run-output:cli-none:5",
+          "version": "V5QG6R2JURQTJOSVEORWGAAMKC",
+          "run_id": "run:cli-none",
+          "kind": "output",
+          "position": "241",
+          "value": {
+            "at": "2026-10-16T19:27:18.2519957Z",
+            "value": "{\"input_b64\": \"eyJwcm9tcHQiOiJubyBjb250ZXh0IG11c3QgYmUgYWRkZWQifQ==\", \"server_secret_visible\": false}\r\n",
+            "source": "fixture-plain",
+            "channel": "stdout",
+            "sequence": "5"
+          },
+          "refs": [
+            {
+              "id": "run:cli-none",
+              "version": "V5QG6R2JURQTJOSVEORWGAAMKC"
+            }
+          ]
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "runner-ui",
+      "position": null,
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  },
+  "received": {
+    "prompt": "no context must be added"
+  },
+  "contextOmitted": true
+}

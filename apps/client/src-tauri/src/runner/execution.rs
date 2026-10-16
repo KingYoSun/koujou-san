@@ -258,7 +258,11 @@ pub(super) fn prepare(
     let mut inputs = BTreeMap::new();
     for name in ["context", "prompt"] {
         let value = if name == "context" && !assigned["manifest"].is_null() {
-            let text = assigned["manifest"]["value"]["input_utf8"]
+            let manifest = &assigned["manifest"]["value"];
+            if manifest["state"] == "none" {
+                continue;
+            }
+            let text = manifest["input_utf8"]
                 .as_str()
                 .ok_or("input_binding_unsupported")?;
             Some(Value::String(text.to_owned()))
@@ -518,6 +522,10 @@ mod tests {
         let manifest_input = prepare(&root, &manifest, &adapter, None).unwrap().input;
         let manifest_input: Value = serde_json::from_slice(&manifest_input).unwrap();
         assert_eq!(manifest_input["context"], original);
+        manifest["manifest"]["value"] = json!({"state":"none"});
+        let none_input = prepare(&root, &manifest, &adapter, None).unwrap().input;
+        let none_input: Value = serde_json::from_slice(&none_input).unwrap();
+        assert_eq!(none_input, json!({"prompt":"value {context} 日本語"}));
         adapter.stdin_json = false;
         assert!(prepare(&root, &base, &adapter, None).is_err());
         let mut args = base.clone();
