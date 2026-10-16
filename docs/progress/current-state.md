@@ -69,6 +69,10 @@
 
 ## Issue #16の判定
 
-状態: In progress（最終CI待ち）。Scope revision 1。[PR #49](https://github.com/KingYoSun/koujou-san/pull/49)でRunの固定入力・Pause回答/配送/再開・原出力・派生判定・前後関連・NDJSON書出しを実装した。実行依頼許可のない編集者も回答できる。専用PG・実Ory/MCP・Web/Tauri・実ファイル読戻しは成功し、実装headの全CIも成功。[検証記録](2026-10-16-issue-16-evidence.md)と[独立検品](2026-10-17-issue-16-inspection.md)の全末端PASS・blocker 0を照合した。残りは証跡込み最終headのCIとマージ後照合。
+状態: Complete。Scope revision 1。[PR #49](https://github.com/KingYoSun/koujou-san/pull/49)を最終head `283f0c430833d51c857e8ebd291f96e821754fe2` の全CI成功後にマージした。main `c4d1e27322ab4c66bd9679f5fc33ff1f07c8ad54` と最終headのtreeは `9575355ece53e891eea265cc4f22947aec22ab24` で一致、差分0。Web/Tauri・HTTP/MCP・実ファイル読戻し、[独立検品](2026-10-17-issue-16-inspection.md)、マージ後照合が揃い、#16をCloseした。[検証記録](2026-10-16-issue-16-evidence.md)を参照する。
 
-#17〜#34は未着手。実CLI起動・Runner割当・工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #17の判定
+
+状態: Planned（判断待ち）。Scope revision 1。[計画](2026-10-17-issue-17-plan.md)でAC-1〜7・INVAR-1〜3の検証を整理した。割当の認可・世代・能力・固定入力・準備/起動の区別を調べている。同じbranch/作業場所へ書くRunの直列化、またはRunごとのworktree/branch自動作成の初期方針をユーザーへ確認中で、依存する実装には着手していない。
+
+#18〜#34は未着手。実CLI起動・Runner割当・工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
