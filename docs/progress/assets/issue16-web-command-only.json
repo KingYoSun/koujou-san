@@ -1,0 +1,51 @@
+{
+  "head": {
+    "id": "run:2d86e80d-6a79-4b19-a1e4-2077da1f0c1b",
+    "version": "OLZLSCI2B3DDR2HMXDAMMSCZ34",
+    "run_id": "run:2d86e80d-6a79-4b19-a1e4-2077da1f0c1b",
+    "kind": "run",
+    "position": "30155",
+    "value": {
+      "name": "Web受入: commandのみ",
+      "input": {
+        "id": "run-input:2d86e80d-6a79-4b19-a1e4-2077da1f0c1b",
+        "version": "OLZLSCI2B3DDR2HMXDAMMSCZ34"
+      },
+      "state": "queued",
+      "created_at": "2026-10-16T16:04:18.943899Z",
+      "observation": "known",
+      "requested_by": "L6JANPDNWTLCCMDTIBXNIJ7P6R",
+      "cancel_requested": false,
+      "reported_through": "0"
+    },
+    "refs": [
+      {
+        "id": "run-input:2d86e80d-6a79-4b19-a1e4-2077da1f0c1b",
+        "version": "OLZLSCI2B3DDR2HMXDAMMSCZ34"
+      }
+    ]
+  },
+  "input": {
+    "id": "run-input:2d86e80d-6a79-4b19-a1e4-2077da1f0c1b",
+    "version": "OLZLSCI2B3DDR2HMXDAMMSCZ34",
+    "run_id": "run:2d86e80d-6a79-4b19-a1e4-2077da1f0c1b",
+    "kind": "input",
+    "position": "30155",
+    "value": {
+      "name": "Web受入: commandのみ",
+      "input": {
+        "command": {
+          "kind": "cli",
+          "target": "fixture-command-only",
+          "parameters": []
+        }
+      }
+    },
+    "refs": [
+      {
+        "id": "run:2d86e80d-6a79-4b19-a1e4-2077da1f0c1b",
+        "version": "OLZLSCI2B3DDR2HMXDAMMSCZ34"
+      }
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 # 現在状態
 
-更新日: 2026-10-16（JST）
+更新日: 2026-10-17（JST）
 
 開発環境の構築を終え、[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の実装を#3から番号順に進めている。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
 
@@ -69,6 +69,6 @@
 
 ## Issue #16の判定
 
-状態: In progress。Scope revision 1。[計画](2026-10-16-issue-16-plan.md)へ既存AC-1〜10・INVAR-1〜3の有限なfixtureを整理した。Pauseへ回答できる人はRunの編集権限を持つメンバーに確定。実行依頼の許可とは分け、回答受領・配送・再開確認を別々に記録する。共通Run契約、固定入力・二Pause・原出力・派生判定・前後関連・NDJSON書出しを実装し、専用PGと実Ory/MCPの先行検証を確認した。[検証記録](2026-10-16-issue-16-evidence.md)を参照。Web/Tauri実操作・独立検品・最終CI・マージ後照合を進める。
+状態: In progress（最終CI待ち）。Scope revision 1。[PR #49](https://github.com/KingYoSun/koujou-san/pull/49)でRunの固定入力・Pause回答/配送/再開・原出力・派生判定・前後関連・NDJSON書出しを実装した。実行依頼許可のない編集者も回答できる。専用PG・実Ory/MCP・Web/Tauri・実ファイル読戻しは成功し、実装headの全CIも成功。[検証記録](2026-10-16-issue-16-evidence.md)と[独立検品](2026-10-17-issue-16-inspection.md)の全末端PASS・blocker 0を照合した。残りは証跡込み最終headのCIとマージ後照合。
 
 #17〜#34は未着手。実CLI起動・Runner割当・工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。

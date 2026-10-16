@@ -1,0 +1,204 @@
+{
+  "pause": {
+    "data": {
+      "run": {
+        "id": "run:ui-native-run",
+        "version": "D4VG337QUYHQGS3JA2TW6I2NRW"
+      },
+      "items": [
+        {
+          "id": "run-pause:ui-native-run:question-one",
+          "version": "D4VG337QUYHQGS3JA2TW6I2NRW",
+          "run_id": "run:ui-native-run",
+          "kind": "pause",
+          "position": "30153",
+          "value": {
+            "id": "question-one",
+            "state": "received",
+            "reason": "判断を待つ",
+            "request": {
+              "choices": [
+                "承認",
+                "差し戻し"
+              ],
+              "question": "受入fixtureの確認"
+            },
+            "response": "Windows受入: 確認して承認",
+            "created_at": "2026-10-16T15:57:45.6200635Z",
+            "answered_at": "2026-10-16T16:00:45.2086084Z",
+            "answered_by": "L6JANPDNWTLCCMDTIBXNIJ7P6R",
+            "response_id": "A7HE22F222JBJHLGGZ4HXJJBGU",
+            "response_origin": {
+              "id": "L6JANPDNWTLCCMDTIBXNIJ7P6R",
+              "kind": "user"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:ui-native-run",
+              "version": "LQ2AZS76DCOVLLTUGBXNDRQRQ4"
+            }
+          ]
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "mcp-one",
+      "position": null,
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  },
+  "head_before": {
+    "id": "run:ui-native-run",
+    "version": "LQ2AZS76DCOVLLTUGBXNDRQRQ4",
+    "run_id": "run:ui-native-run",
+    "kind": "run",
+    "position": "34",
+    "value": {
+      "name": "Run受入: ui-native-run",
+      "input": {
+        "id": "run-input:ui-native-run",
+        "version": "SJ5GN2GYCCSEUHEOU7J4THGXQH"
+      },
+      "state": "paused",
+      "created_at": "2026-10-16T15:57:45.5655675Z",
+      "started_at": "2026-10-16T15:57:45.5930639Z",
+      "observation": "known",
+      "active_pause": {
+        "id": "run-pause:ui-native-run:question-one",
+        "version": "LQ2AZS76DCOVLLTUGBXNDRQRQ4"
+      },
+      "requested_by": "L6JANPDNWTLCCMDTIBXNIJ7P6R",
+      "cancel_requested": false,
+      "reported_through": "3",
+      "execution_requested_at": "2026-10-16T15:57:45.5800655Z"
+    },
+    "refs": [
+      {
+        "id": "run-input:ui-native-run",
+        "version": "SJ5GN2GYCCSEUHEOU7J4THGXQH"
+      }
+    ]
+  },
+  "head": {
+    "id": "run:ui-native-run",
+    "version": "D4VG337QUYHQGS3JA2TW6I2NRW",
+    "run_id": "run:ui-native-run",
+    "kind": "run",
+    "position": "30153",
+    "value": {
+      "name": "Run受入: ui-native-run",
+      "input": {
+        "id": "run-input:ui-native-run",
+        "version": "SJ5GN2GYCCSEUHEOU7J4THGXQH"
+      },
+      "state": "paused",
+      "created_at": "2026-10-16T15:57:45.5655675Z",
+      "started_at": "2026-10-16T15:57:45.5930639Z",
+      "observation": "known",
+      "active_pause": {
+        "id": "run-pause:ui-native-run:question-one",
+        "version": "D4VG337QUYHQGS3JA2TW6I2NRW"
+      },
+      "requested_by": "L6JANPDNWTLCCMDTIBXNIJ7P6R",
+      "cancel_requested": false,
+      "reported_through": "3",
+      "execution_requested_at": "2026-10-16T15:57:45.5800655Z"
+    },
+    "refs": [
+      {
+        "id": "run-input:ui-native-run",
+        "version": "SJ5GN2GYCCSEUHEOU7J4THGXQH"
+      }
+    ]
+  },
+  "input": {
+    "id": "run-input:ui-native-run",
+    "version": "SJ5GN2GYCCSEUHEOU7J4THGXQH",
+    "run_id": "run:ui-native-run",
+    "kind": "input",
+    "position": "30",
+    "value": {
+      "name": "Run受入: ui-native-run",
+      "input": {
+        "command": {
+          "kind": "human",
+          "target": "fixture-question",
+          "parameters": {
+            "request": "受入fixture。外部へ依頼を送信しない"
+          }
+        }
+      },
+      "artifacts": [
+        {
+          "uri": "https://example.test/fixture-artifact",
+          "range": "output",
+          "state": "unfetched",
+          "digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "delivery": "reference",
+          "revision": "fixed-artifact-v1"
+        }
+      ],
+      "derivation": {
+        "name": "HumanReviewRun",
+        "version": "fixed-v1",
+        "result_schema": {
+          "type": "object",
+          "required": [
+            "decision"
+          ]
+        },
+        "verdict_field": "decision"
+      }
+    },
+    "refs": [
+      {
+        "id": "run:ui-native-run",
+        "version": "SJ5GN2GYCCSEUHEOU7J4THGXQH"
+      }
+    ]
+  },
+  "output": {
+    "data": {
+      "run": {
+        "id": "run:ui-native-run",
+        "version": "D4VG337QUYHQGS3JA2TW6I2NRW"
+      },
+      "items": [
+        {
+          "id": "run-output:ui-native-run:2",
+          "version": "Z3IWXNEMWFMAXWQHSEJEHMHCSX",
+          "run_id": "run:ui-native-run",
+          "kind": "output",
+          "position": "33",
+          "value": {
+            "at": "2026-10-16T15:57:45.6065647Z",
+            "value": "Pause前の原出力",
+            "source": "fixed-human-request",
+            "channel": "stdout",
+            "sequence": "2"
+          },
+          "refs": [
+            {
+              "id": "run:ui-native-run",
+              "version": "Z3IWXNEMWFMAXWQHSEJEHMHCSX"
+            }
+          ]
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "mcp-one",
+      "position": null,
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  }
+}
