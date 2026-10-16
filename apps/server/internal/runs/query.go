@@ -315,6 +315,7 @@ func body(r *http.Request, v any) bool {
 	return d.Decode(v) == nil
 }
 func (s *Service) Register(mux *http.ServeMux) {
+	s.registerAssignment(mux)
 	base := "/runs/workspaces/{workspace}"
 	mux.HandleFunc("GET "+base+"/executions/{id}/export", s.exportHTTP)
 	mux.HandleFunc("GET "+base+"/records/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -364,6 +365,13 @@ func (s *Service) Register(mux *http.ServeMux) {
 		var value any
 		var err error
 		switch action {
+		case "assign":
+			var req Assign
+			if !body(r, &req) {
+				err = ErrInvalid
+			} else {
+				value, err = s.Assign(r.Context(), p, workspace, id, req)
+			}
 		case "create":
 			var req Create
 			if !body(r, &req) {

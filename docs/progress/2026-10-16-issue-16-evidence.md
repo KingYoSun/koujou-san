@@ -66,3 +66,7 @@ WebではcommandだけのRun `run:2d86e80d-6a79-4b19-a1e4-2077da1f0c1b` も作�
 ## 検品・CI・マージ
 
 固定commitの独立検品は [記録](2026-10-17-issue-16-inspection.md) を参照する。実装headのCI run `38921863763` は全成功（Linux 5分7秒、Windows 7分40秒、GitGuardian）。証跡と検品記録を含む最終headのCI、マージ後tree照合はこれから確認する。現在の判定は [current-state](current-state.md) へ集約する。
+
+## マージ後照合（2026-10-17）
+
+最終head `283f0c430833d51c857e8ebd291f96e821754fe2` のCI run `38929363822` は全成功（Linux 5分6秒、Windows 6分53秒、GitGuardian）。PR #49をマージし、main `c4d1e27322ab4c66bd9679f5fc33ff1f07c8ad54` と最終headのtreeが `9575355ece53e891eea265cc4f22947aec22ab24` で一致、diff 0を確認した。独立検品は全末端PASS・blocker 0で、全ACを確認して#16を手動Closeした。

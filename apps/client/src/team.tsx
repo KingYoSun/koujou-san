@@ -427,6 +427,7 @@ export function Team({ native }: { native: boolean }) {
             key={`runs/${apiIdentity}/${me.id}/${selected}`}
             native={native}
             workspace={selected}
+            user={me?.id ?? ""}
             role={current.role}
             canExecute={current.can_execute}
           />

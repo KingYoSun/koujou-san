@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { syncRequest } from "./auth";
 import { SyncHTTPError } from "./sync-error";
+import { RunnerSettings } from "./runner-settings";
 
 type Ref = { id: string; version: string };
 type RecordVersion = Ref & { run_id: string; kind: string; value: unknown };
@@ -11,7 +12,26 @@ type Page = {
   next: string;
   snapshot?: string;
 };
+type Assignment = {
+  generation: string;
+  device_id: string;
+  runner_id: string;
+  requested_by: string;
+  connection: {
+    target: string;
+    version: string;
+    environment: string;
+    subject: string;
+  };
+  input: Ref;
+  repository?: { id: string; commit: string };
+  area?: { id: string; branch: string; commit: string };
+  expires_at: string;
+  prepared_at?: string;
+};
 type Run = {
+  assignment?: Assignment;
+  preparation?: string;
   name?: string;
   input: Ref;
   previous?: Ref;
@@ -92,14 +112,20 @@ export function RunStatus({ value }: { value: Run }) {
 export function RunRecords({
   native,
   workspace,
+  user,
   role,
   canExecute,
 }: {
   native: boolean;
   workspace: string;
+  user: string;
   role: string;
   canExecute: boolean;
 }) {
+  const [deviceID, setDeviceID] = useState(""),
+    [repoID, setRepoID] = useState("");
+  const [commit, setCommit] = useState(""),
+    [required, setRequired] = useState("");
   const base = `/runs/workspaces/${encodeURIComponent(workspace)}`;
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
@@ -269,7 +295,7 @@ export function RunRecords({
     <details className="team-details">
       <summary>Run・入力・Pause・出力</summary>
       <p>
-        入力と質問への回答、実行状態と判定を分けて記録します。現在はRunnerの割当・実CLI起動を接続していないため、開始依頼は起動前の状態で保存します。
+        入力・回答・割当と、準備完了・プロセス開始を分けて記録します。実CLI起動はまだ接続していません。
       </p>
       <div className="team-controls">
         <button
@@ -338,6 +364,132 @@ export function RunRecords({
             {current.id} · {current.version}
           </p>
           <RunStatus value={runValue} />
+          {runValue.preparation && (
+            <p role="status">
+              準備待ち・設定不足:{" "}
+              {(
+                {
+                  device_absent: "端末の接続未確認",
+                  connection_missing: "接続設定なし",
+                  capability_unconfirmed: "能力未確認",
+                  capability_missing: "必要能力が不足",
+                  binding_missing: "入力方式が未対応",
+                } as Record<string, string>
+              )[runValue.preparation] ?? runValue.preparation}
+            </p>
+          )}
+          {runValue.assignment && (
+            <section aria-label="Runの割当">
+              <h4>実行担当</h4>
+              <p>
+                依頼者: {runValue.assignment.requested_by} / 端末:{" "}
+                {runValue.assignment.device_id} / Runner:{" "}
+                {runValue.assignment.runner_id}
+              </p>
+              <p>
+                接続: {runValue.assignment.connection.target} ·{" "}
+                {runValue.assignment.connection.version} / 環境:{" "}
+                {runValue.assignment.connection.environment} / CLI主体:{" "}
+                {runValue.assignment.connection.subject}
+              </p>
+              <p>
+                割当世代: {runValue.assignment.generation} / 有効期限:{" "}
+                {runValue.assignment.expires_at}
+                。期限切れはCLIの停止確認を意味しません。
+              </p>
+              <p>準備完了: {runValue.assignment.prepared_at ?? "未確認"}</p>
+              {runValue.assignment.area && (
+                <p>
+                  Run専用branch: {runValue.assignment.area.branch} / 領域:{" "}
+                  {runValue.assignment.area.id} / 固定commit:{" "}
+                  {runValue.assignment.area.commit}
+                </p>
+              )}
+              {native && (
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      const result = await invoke<{ path?: string }>(
+                        "prepare_run",
+                        {
+                          workspace,
+                          id: current.id,
+                          generation: runValue.assignment!.generation,
+                        },
+                      );
+                      await load(current.id);
+                      setNotice(
+                        `この端末の準備を確認しました。プロセスは起動していません。${result.path ? ` worktree: ${result.path}` : ""}`,
+                      );
+                    })
+                  }
+                >
+                  この端末で割当を確認・準備
+                </button>
+              )}
+            </section>
+          )}
+          {canExecute &&
+            runValue.state === "queued" &&
+            !runValue.assignment && (
+              <details>
+                <summary>担当端末へ割り当てる</summary>
+                <label>
+                  担当端末ID
+                  <input
+                    value={deviceID}
+                    onChange={(e) => setDeviceID(e.target.value)}
+                  />
+                </label>
+                <label>
+                  repositoryの論理ID（任意）
+                  <input
+                    value={repoID}
+                    onChange={(e) => setRepoID(e.target.value)}
+                  />
+                </label>
+                {repoID && (
+                  <label>
+                    作成元の固定commit
+                    <input
+                      value={commit}
+                      onChange={(e) => setCommit(e.target.value)}
+                    />
+                  </label>
+                )}
+                <label>
+                  必要な接続能力（空白区切り、任意）
+                  <input
+                    value={required}
+                    onChange={(e) => setRequired(e.target.value)}
+                  />
+                </label>
+                <p>
+                  端末の現在の許可と確認済み能力を照合します。repositoryを使うRunには別worktree・branchを自動作成します。割当だけではCLIは起動しません。
+                </p>
+                <button
+                  disabled={busy || !deviceID || (!!repoID && !commit)}
+                  onClick={() =>
+                    void run(async () => {
+                      await mutate(current.id, "assign", current.version, {
+                        device_id: deviceID,
+                        required: required.split(/\s+/).filter(Boolean),
+                        ...(repoID
+                          ? { repository: { id: repoID, commit } }
+                          : {}),
+                      });
+                      await load(current.id);
+                      setNotice(
+                        "割当要求を確認しました。準備状況と担当端末を確認してください。",
+                      );
+                    })
+                  }
+                >
+                  端末能力を確認して割当を依頼
+                </button>
+              </details>
+            )}
           {runValue.previous && (
             <p>
               関連元: {runValue.previous.id} · {runValue.previous.version}
@@ -615,6 +767,9 @@ export function RunRecords({
             </>
           )}
         </>
+      )}
+      {native && canEdit && (
+        <RunnerSettings key={workspace} workspace={workspace} user={user} />
       )}
       {canEdit && (
         <details>
