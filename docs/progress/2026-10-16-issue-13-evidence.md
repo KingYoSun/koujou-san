@@ -12,12 +12,12 @@ App「koujou-san-kukuri-observer」をkukuri-app所有で非公開登録し、ku
 
 | 条件 | 実行・照合した対象 | 現在の結果 |
 | --- | --- | --- |
-| AC-1 | 四種類の固定応答、実Appの最小権限・限定インストール、共通UIの実装 | 実Appによる取得と実画面照合は鍵取得後に行う |
+| AC-1 | 四種類の固定応答、実Appの最小権限・限定インストール、実GitHub取得、Web/Tauri | 取得元・識別子・対象版・時刻を実APIと画面で照合 |
 | AC-2 | 専用PGと固定応答。新しい回の成功後に重複・遅延・逆順の古いfailure通知を投入 | 現在状態を再取得し、同じ内容の照合では履歴を追加しない |
 | AC-3 | 同じrun IDの1回目failure、2回目success、指定と異なるcommit、必要ジョブのskip、固定した1回目 | ID・SHA・workflow・attempt・ジョブ結論を分離。UIの35件目の試験でsuccessをPASSへ置換しないことも照合 |
-| AC-4 | 接続先503、401、ジョブ取得2ページ目の失敗、API残量/Retry-After | 最後の結果・成功取得時刻を保持し、現在の観測はUnknown。部分ジョブを確定せず、API制限では減速 |
-| AC-5 | 専用PGのWorkerだけを動かし、クライアント不在で新しい回を観測して完了へ更新。再起動後に再取得 | 履歴と同じ完了結果を保持。実Appの固定Actions照合は後続 |
-| AC-6 | 署名JWT・repo IDを限定したread token要求、他Workspace・制限resource、範囲外repo ID・名前不一致・未署名Webhook | 拒否を確認。GitHubへの業務書込みなし。実接続の要求記録は後続 |
+| AC-4 | 接続先503、401、ジョブ取得2ページ目の失敗、API残量/Retry-After。専用DBの保存状態fixtureで両画面も照合 | 最後の結果・成功取得時刻を保持し、現在の観測はUnknown。部分ジョブを確定せず、API制限では減速 |
+| AC-5 | 専用PGでクライアント不在・完了更新・再起動。実AppでWeb/Tauri終了前後の再取得と再接続 | 5対象を画面終了後も再取得し、同じ内容版を再接続後に取得 |
+| AC-6 | 署名JWT・repo限定read要求、他Workspace・制限resource、範囲外repo ID・名前不一致・未署名Webhook、実App要求記録 | 拒否を確認。実Appの業務要求はGETだけで、POSTはtoken交換のみ |
 | INVAR-1/2 | 取得元・取得時刻・Unknown、CI conclusionと指定commit・必要ジョブを別表示 | 固定応答と保存・表示経路を照合。工程の自動前進・Run生成は追加していない |
 
 ## 実行結果
@@ -37,10 +37,22 @@ PRの現在状態には、GitHubの`merged:true`を受けても`closed`だけを
 
 ## 残る検証
 
-明示したAppによる実GitHub取得・要求記録、Web/Tauriの操作、独立検品の最終判定、マージ後照合を残す。通常CIは固定応答と専用DBを使用し、実Appの秘密鍵を要求しない。未実行を成功に含めない。
+独立検品の最終判定、記録を含む最終headのCI、マージ後照合を残す。通常CIは固定応答と専用DBを使用し、実Appの秘密鍵を要求しない。未実行を成功に含めない。
 
 ## CIと先行の独立検品
 
 コード対象は`18c26e7bb8157fce88cdd605e8de26514137f2ce`。[CI 38803132388](https://github.com/KingYoSun/koujou-san/actions/runs/38803132388)はLinux 4分43秒、Windows 7分32秒、GitGuardianが全て成功した。同じコードからWindowsアプリを再ビルドし、25.85秒で成功した。
 
 [先行の独立検品](2026-10-16-issue-13-inspection.md)では具体的blockerは0件。実Appの接続と実画面の証拠がない条件はINCONCLUSIVEのまま残し、マージ可能とは判定していない。Appの秘密鍵ファイルが所定のGit管理外パスへ保存された後、準備済みのlive/UI検証を実行して最終判定する。
+
+## 実App・実画面の結果（2026-10-16の再開後）
+
+本人が秘密鍵を保存した後、`pnpm run test:github:live`が10.80秒で成功した。[要求記録](assets/issue13-live-requests.json)にはAppによるtoken発行201と、kukuriのIssue #1220・PR #1843・commit・Actionsへの9件のGETだけを記録した。署名鍵やtokenの内容は含めない。run 38784153986 / workflow 248011545 / head ec3a86cf6a02bfd97079fd7a2e918afd06096c3cの1回目failure・2回目successを区別し、名前が一致しない範囲外repoはGET前に拒否した。
+
+`pnpm run test:github:ui`も成功した。実Ory・専用PG・実Bleve/ArcadeDBと実Appで`TestMCPIntegration`が776.90秒で完了し、専用Compose project `koujou-san-db-test-e2700fe86c1b`を片付けた。1万Context×3版・100Scopeを含む検証環境で、Web/Windowsの共通画面から同じ観測結果・固定版・時刻を確認した。[共有API](assets/issue13-shared-api-observations.json)、[Webの1回目](assets/issue13-web-observations.jpg)、[2回目とcommit](assets/issue13-web-current-attempt.jpg)、[Windows](assets/issue13-native-observations.jpg)を照合した。Windowsの「GitHubで開く」は、対象runの[実GitHub画面](assets/issue13-github-source.jpg)へ移動した。
+
+画面を開く前からサーバーに完了結果が保存されていたことを[初回の記録](assets/issue13-server-only-observation.json)で確認した。その後Web/Tauriを両方終了し、[終了後の記録](assets/issue13-after-clients-closed.json)で5対象全ての成功取得時刻が終了時刻より後へ進み、内容版は1のままであることを確認した。再接続したWeb画面と[API応答](assets/issue13-reconnected-observations.json)は、終了中にサーバーが保持した同じsnapshot・版を返した。
+
+実Appを失効させる操作は行っていない。外部障害の発生は固定応答・PG試験で確認し、実画面には専用DBの`reason=connection_failed`という保存状態fixtureを入力した。[前後比較](assets/issue13-controlled-unknown.json)でsnapshot・成功取得時刻・内容版が変わらないことをassertし、[WebのUnknownと履歴](assets/issue13-web-unknown-history.jpg)、[WindowsのUnknown](assets/issue13-native-unknown.jpg)を確認した。最後にfixtureの理由を解除して実Appの正常照合へ戻した。
+
+[Web要求集計](assets/issue13-ui-request-summary.json)は674件、観測一覧GET 41件と履歴GET 2件を含み、実行の要求は0件。ネイティブ側も同じ認可付きAPIで取得し、外部ページを開く以外のCLI/CI操作を行っていない。対話専用のnative準備試験は明示選択して成功し、検証用OAuthだけをDPAPIで保存した。通常環境の資格情報・OSの信頼設定は変更していない。

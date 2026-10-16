@@ -1,0 +1,554 @@
+{
+  "data": [
+    {
+      "target": {
+        "id": "kukuri-ci-attempt-1",
+        "installation_id": 171862620,
+        "repository_id": 1025894008,
+        "repository": "kukuri-app/kukuri",
+        "kind": "actions",
+        "external_id": "38784153986",
+        "attempt": 1
+      },
+      "expected_commit": "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c",
+      "required_jobs": [
+        "web-e2e / android-web-e2e"
+      ],
+      "observation_state": "observed",
+      "checked_at": "2026-10-16T10:33:19.543173+09:00",
+      "observed_at": "2026-10-16T10:33:19.543173+09:00",
+      "due_at": "2026-10-16T10:34:19.543173+09:00",
+      "delayed": false,
+      "version": 1,
+      "snapshot": {
+        "url": "https://github.com/kukuri-app/kukuri/actions/runs/38784153986",
+        "source_updated_at": "2026-10-15T18:46:23Z",
+        "source_version": "d23d12b8091d383c67aaa3eb63aa4e332bec921e8cd540fea1ca7406973a266c",
+        "state": "completed",
+        "commit": "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c",
+        "workflow_id": 248011545,
+        "run_id": 38784153986,
+        "run_attempt": 1,
+        "conclusion": "failure",
+        "jobs": [
+          {
+            "id": 116591697981,
+            "name": "windows-fast",
+            "status": "completed",
+            "conclusion": "failure",
+            "run_attempt": 1
+          },
+          {
+            "id": 116591698354,
+            "name": "linux-desktop-ui",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116591698434,
+            "name": "linux-community-node",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116591698591,
+            "name": "linux-cn",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116591698712,
+            "name": "linux-desktop-browser",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116591698793,
+            "name": "linux-rust-static",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116591699004,
+            "name": "linux-rust-tests",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116591699310,
+            "name": "linux-web-transport",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116591699381,
+            "name": "web-e2e / linux-web-e2e-build",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420548,
+            "name": "web-e2e / linux-web-e2e (pwa-accessibility)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420589,
+            "name": "web-e2e / linux-web-e2e (pwa-attachment)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420590,
+            "name": "web-e2e / linux-web-e2e (direct)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420608,
+            "name": "web-e2e / linux-web-e2e (lifecycle)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420664,
+            "name": "web-e2e / linux-web-e2e (pwa-input)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420682,
+            "name": "web-e2e / linux-web-e2e (pwa-entry)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420692,
+            "name": "web-e2e / linux-web-e2e (pwa-ime)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420693,
+            "name": "web-e2e / linux-web-e2e (same-account)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420741,
+            "name": "web-e2e / linux-web-e2e (settings)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420757,
+            "name": "web-e2e / linux-web-e2e (public-blob)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420773,
+            "name": "web-e2e / linux-web-e2e (webrtc-loss)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420796,
+            "name": "web-e2e / linux-web-e2e (pwa-shell)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420816,
+            "name": "web-e2e / linux-web-e2e (link-preview)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420865,
+            "name": "web-e2e / linux-web-e2e (site-data)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420894,
+            "name": "web-e2e / linux-web-e2e (transfer)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595420936,
+            "name": "web-e2e / linux-web-e2e (fallback)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595422490,
+            "name": "web-e2e / macos-web-e2e-build",
+            "status": "completed",
+            "conclusion": "skipped",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595422732,
+            "name": "web-e2e / android-web-e2e",
+            "status": "completed",
+            "conclusion": "skipped",
+            "run_attempt": 1
+          },
+          {
+            "id": 116595423885,
+            "name": "web-e2e / macos-web-e2e",
+            "status": "completed",
+            "conclusion": "skipped",
+            "run_attempt": 1
+          }
+        ]
+      }
+    },
+    {
+      "target": {
+        "id": "kukuri-ci-current",
+        "installation_id": 171862620,
+        "repository_id": 1025894008,
+        "repository": "kukuri-app/kukuri",
+        "kind": "actions",
+        "external_id": "38784153986"
+      },
+      "expected_commit": "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c",
+      "required_jobs": [
+        "web-e2e / android-web-e2e"
+      ],
+      "observation_state": "observed",
+      "checked_at": "2026-10-16T10:32:50.481748+09:00",
+      "observed_at": "2026-10-16T10:32:50.481748+09:00",
+      "due_at": "2026-10-16T10:33:50.481748+09:00",
+      "delayed": false,
+      "version": 1,
+      "snapshot": {
+        "url": "https://github.com/kukuri-app/kukuri/actions/runs/38784153986",
+        "source_updated_at": "2026-10-15T19:20:11Z",
+        "source_version": "339eaceecbc92ccc6b07b59d904c576966431d7d0bd6c0383bf83719f78dca1e",
+        "state": "completed",
+        "commit": "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c",
+        "workflow_id": 248011545,
+        "run_id": 38784153986,
+        "run_attempt": 2,
+        "conclusion": "success",
+        "jobs": [
+          {
+            "id": 116607059060,
+            "name": "windows-fast",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607060638,
+            "name": "linux-rust-static",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607061717,
+            "name": "linux-rust-tests",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607062098,
+            "name": "web-e2e / linux-web-e2e (pwa-input)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607062184,
+            "name": "web-e2e / android-web-e2e",
+            "status": "completed",
+            "conclusion": "skipped",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607062629,
+            "name": "web-e2e / macos-web-e2e-build",
+            "status": "completed",
+            "conclusion": "skipped",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607062702,
+            "name": "web-e2e / linux-web-e2e (pwa-attachment)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607063112,
+            "name": "web-e2e / linux-web-e2e (direct)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607063233,
+            "name": "web-e2e / macos-web-e2e",
+            "status": "completed",
+            "conclusion": "skipped",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607063432,
+            "name": "web-e2e / linux-web-e2e (pwa-shell)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607063547,
+            "name": "web-e2e / linux-web-e2e (pwa-accessibility)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607063566,
+            "name": "web-e2e / linux-web-e2e (pwa-entry)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607063587,
+            "name": "web-e2e / linux-web-e2e (pwa-ime)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607063907,
+            "name": "web-e2e / linux-web-e2e (fallback)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607063952,
+            "name": "web-e2e / linux-web-e2e (link-preview)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607064067,
+            "name": "web-e2e / linux-web-e2e (settings)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607064288,
+            "name": "web-e2e / linux-web-e2e (site-data)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607064345,
+            "name": "web-e2e / linux-web-e2e (lifecycle)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607065215,
+            "name": "web-e2e / linux-web-e2e (transfer)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607065349,
+            "name": "web-e2e / linux-web-e2e (same-account)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607065441,
+            "name": "web-e2e / linux-web-e2e (public-blob)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607065632,
+            "name": "web-e2e / linux-web-e2e (webrtc-loss)",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607112725,
+            "name": "linux-desktop-ui",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607115651,
+            "name": "linux-community-node",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607118995,
+            "name": "linux-web-transport",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607123075,
+            "name": "linux-desktop-browser",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607124811,
+            "name": "linux-cn",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          },
+          {
+            "id": 116607134834,
+            "name": "web-e2e / linux-web-e2e-build",
+            "status": "completed",
+            "conclusion": "success",
+            "run_attempt": 2
+          }
+        ]
+      }
+    },
+    {
+      "target": {
+        "id": "kukuri-commit",
+        "installation_id": 171862620,
+        "repository_id": 1025894008,
+        "repository": "kukuri-app/kukuri",
+        "kind": "commit",
+        "external_id": "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c"
+      },
+      "expected_commit": "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c",
+      "required_jobs": [
+        "web-e2e / android-web-e2e"
+      ],
+      "observation_state": "observed",
+      "checked_at": "2026-10-16T10:33:32.000467+09:00",
+      "observed_at": "2026-10-16T10:33:32.000467+09:00",
+      "due_at": "2026-10-16T10:34:32.000467+09:00",
+      "delayed": false,
+      "version": 1,
+      "snapshot": {
+        "url": "https://github.com/kukuri-app/kukuri/commit/ec3a86cf6a02bfd97079fd7a2e918afd06096c3c",
+        "title": "fix(test): 実アプリの試験の失敗時の診断と終了の評価に期限を付け、応答しない画面があっても止まらずに log を残す（#1842 AC-1）",
+        "source_updated_at": "2026-10-15T18:15:37Z",
+        "source_version": "56a3d71c169ffd17d01e24789fc7fb6d15a35bff6639e5c6c9c7b32db67cefdc",
+        "state": "available",
+        "commit": "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c"
+      }
+    },
+    {
+      "target": {
+        "id": "kukuri-issue-1220",
+        "installation_id": 171862620,
+        "repository_id": 1025894008,
+        "repository": "kukuri-app/kukuri",
+        "kind": "issue",
+        "external_id": "1220"
+      },
+      "expected_commit": "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c",
+      "required_jobs": [
+        "web-e2e / android-web-e2e"
+      ],
+      "observation_state": "observed",
+      "checked_at": "2026-10-16T10:33:32.347589+09:00",
+      "observed_at": "2026-10-16T10:33:32.347589+09:00",
+      "due_at": "2026-10-16T10:34:32.347589+09:00",
+      "delayed": false,
+      "version": 1,
+      "snapshot": {
+        "url": "https://github.com/kukuri-app/kukuri/issues/1220",
+        "title": "[Web W8] インストール不要のWebクライアントを統合し、実ブラウザで利用・復帰を検証する",
+        "source_updated_at": "2026-10-05T13:32:34Z",
+        "source_version": "5c2709ce89213c0cbd38d4e8eb299e9a94769dff30469dae6902ef4f52cc470c",
+        "state": "closed"
+      }
+    },
+    {
+      "target": {
+        "id": "kukuri-pr-1843",
+        "installation_id": 171862620,
+        "repository_id": 1025894008,
+        "repository": "kukuri-app/kukuri",
+        "kind": "pr",
+        "external_id": "1843"
+      },
+      "expected_commit": "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c",
+      "required_jobs": [
+        "web-e2e / android-web-e2e"
+      ],
+      "observation_state": "observed",
+      "checked_at": "2026-10-16T10:33:32.704563+09:00",
+      "observed_at": "2026-10-16T10:33:32.704563+09:00",
+      "due_at": "2026-10-16T10:34:32.704563+09:00",
+      "delayed": false,
+      "version": 1,
+      "snapshot": {
+        "url": "https://github.com/kukuri-app/kukuri/pull/1843",
+        "title": "fix(test): 実アプリの試験の失敗時の診断と終了の評価に期限を付け、応答しない画面があっても止まらずに log を残す（#1842 AC-1）",
+        "source_updated_at": "2026-10-15T19:21:05Z",
+        "source_version": "46485bdc3f9a144268b94bef562afb45f1a8fcae45cc87aba18431b87da31b72",
+        "state": "merged",
+        "commit": "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c"
+      }
+    }
+  ],
+  "meta": {
+    "workspace_id": "mcp-one",
+    "position": null,
+    "next_cursor": null,
+    "completeness": {
+      "state": "complete"
+    }
+  }
+}

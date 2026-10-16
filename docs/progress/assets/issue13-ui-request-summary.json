@@ -1,0 +1,17 @@
+{
+  "requests": 674,
+  "github_requests": [
+    {
+      "method": "GET",
+      "path": "/github/workspaces/mcp-one/observations",
+      "count": 41
+    },
+    {
+      "method": "GET",
+      "path": "/github/workspaces/mcp-one/observations/kukuri-ci-current/history",
+      "count": 2
+    }
+  ],
+  "execution_paths": [],
+  "note": "owned Web gateway trace; native requests independently verified through the same API and app UI"
+}
