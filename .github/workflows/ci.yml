@@ -64,6 +64,9 @@ jobs:
       - name: Test Workspace and device authorization
         run: pnpm run test:access
 
+      - name: Test read-only GitHub observation and recovery
+        run: pnpm run test:github
+
       - name: Test Context versions and input manifests
         run: pnpm run test:contexts
 

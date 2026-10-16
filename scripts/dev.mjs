@@ -372,7 +372,7 @@ async function testDatabase(suite = "persistence", testName) {
       "test",
       `./internal/${suite}`,
       "-run",
-      `^${testName ?? { auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", sharedsync: "TestSyncPostgres", searchindex: "TestSearchPostgres", graphindex: "TestGraphPostgres", mcpapi: "TestMCPIntegration", persistence: "TestPostgres" }[suite]}$`,
+      `^${testName ?? { auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", sharedsync: "TestSyncPostgres", searchindex: "TestSearchPostgres", graphindex: "TestGraphPostgres", mcpapi: "TestMCPIntegration", githubobserve: "TestGithubPostgres", persistence: "TestPostgres" }[suite]}$`,
       "-count=1",
       ...(env.KOUJOU_TEST_MCP_UI === "1" ? ["-timeout=35m"] : []),
       "-v",
@@ -404,6 +404,25 @@ async function testDatabase(suite = "persistence", testName) {
 }
 
 const tasks = {
+  "test:github": () => testDatabase("githubobserve"),
+  "test:github:live": async () => {
+    await resolveGo();
+    env.KOUJOU_TEST_GITHUB_LIVE = "1";
+    await goRun([
+      "test",
+      "./internal/githubobserve",
+      "-run",
+      "^TestGithubLive$",
+      "-count=1",
+      "-v",
+    ]);
+  },
+  "test:github:ui": async () => {
+    env.KOUJOU_TEST_GITHUB_LIVE = "1";
+    env.KOUJOU_TEST_MCP_UI = "1";
+    await client("build");
+    await testDatabase("mcpapi");
+  },
   "test:graph": () => testDatabase("graphindex"),
   "test:graph-load": () => {
     env.KOUJOU_GRAPH_LOAD_REPORT = path.join(

@@ -612,6 +612,24 @@ fn open_browser(url: &str) -> Result<(), String> {
 }
 
 #[tauri::command]
+pub fn open_github(url: String) -> Result<(), String> {
+    let parsed = github_url(&url)?;
+    open_browser(parsed.as_str())
+}
+fn github_url(url: &str) -> Result<Url, String> {
+    let parsed = Url::parse(url).map_err(|_| "invalid_github_url")?;
+    if parsed.scheme() != "https"
+        || parsed.host_str() != Some("github.com")
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || parsed.port().is_some()
+    {
+        return Err("invalid_github_url".into());
+    }
+    Ok(parsed)
+}
+
+#[tauri::command]
 pub async fn login(app: tauri::AppHandle) -> Result<(), String> {
     tauri::async_runtime::spawn_blocking(move || app.state::<Auth>().login(open_browser))
         .await
@@ -681,6 +699,18 @@ fn hex_name(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn github_navigation_stays_on_https_github() {
+        assert!(github_url("https://github.com/kukuri-app/kukuri/actions/runs/123").is_ok());
+        for url in [
+            "file:///C:/Windows/system32/cmd.exe",
+            "https://github.com.evil.test/",
+            "https://user@github.com/",
+            "https://github.com:8443/",
+        ] {
+            assert!(github_url(url).is_err());
+        }
+    }
     #[test]
     fn api_origin_and_storage_boundary() {
         let dir = std::env::temp_dir().join(format!("koujou-auth-{}", Uuid::new_v4()));

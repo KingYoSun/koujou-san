@@ -10,6 +10,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/auth"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/githubobserve"
 	"github.com/jackc/pgx/v5"
 	"io"
 	"net/http"
@@ -27,7 +28,7 @@ import (
 
 // Optional Computer Use fixture. Only this isolated test identity is forwarded;
 // no development-user credential or browser certificate exception is needed.
-func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob auth.Tokens, webTokens auth.Tokens, certificate []byte, cfg auth.Config, service *Service) {
+func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob auth.Tokens, webTokens auth.Tokens, certificate []byte, cfg auth.Config, service *Service, githubMux *http.ServeMux) {
 	t.Helper()
 	if os.Getenv("KOUJOU_TEST_MCP_UI") != "1" {
 		return
@@ -37,6 +38,26 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	var githubConfig *githubobserve.Config
+	if os.Getenv("KOUJOU_TEST_GITHUB_LIVE") == "1" {
+		var err error
+		githubConfig, err = githubobserve.Environment()
+		if err != nil || githubConfig == nil {
+			t.Fatal("GitHub UI test requires an explicit App configuration")
+		}
+		// Only fixture Workspace bindings are replaced. App/repository permissions
+		// remain exactly those of the explicit read-only live configuration.
+		githubConfig.Bindings = nil
+		for _, target := range githubConfig.Targets {
+			githubConfig.Bindings = append(githubConfig.Bindings, githubobserve.Binding{WorkspaceID: "mcp-one", TargetID: target.ID, ExpectedCommit: "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c", RequiredJobs: []string{"web-e2e / android-web-e2e"}})
+		}
+	}
+	observer, err := githubobserve.New(ctx, service.Access.Store, service.Access, githubConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observer.Register(githubMux)
+	observer.Start(ctx)
 	user, err := service.Auth.User(ctx, tokens.Access)
 	if err != nil {
 		t.Fatal(err)
@@ -222,7 +243,7 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 			traceLock.Lock()
 			trace = append(trace, entry)
 			traceLock.Unlock()
-			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/healthz", "/readyz"} {
+			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/healthz", "/readyz"} {
 				if strings.HasPrefix(r.URL.Path, prefix) {
 					token, err := bearer()
 					if err != nil {

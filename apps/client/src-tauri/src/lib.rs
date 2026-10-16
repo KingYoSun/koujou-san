@@ -7,6 +7,7 @@ pub fn run() {
             auth::logout,
             auth::api_request,
             auth::open_account,
+            auth::open_github,
             auth::device_identifier,
             auth::device_enroll,
             auth::device_contact,

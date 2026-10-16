@@ -13,6 +13,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/auth"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/githubobserve"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/mcpapi"
@@ -46,6 +47,18 @@ func main() {
 				return user.ID, ok
 			})
 			routes = append(routes, accessService.Register)
+			githubConfig, err := githubobserve.Environment()
+			if err != nil {
+				slog.Error("GitHub configuration invalid")
+				os.Exit(1)
+			}
+			observer, err := githubobserve.New(ctx, store, accessService, githubConfig)
+			if err != nil {
+				slog.Error("GitHub observation initialization failed")
+				os.Exit(1)
+			}
+			observer.Start(ctx)
+			routes = append(routes, observer.Register)
 			limits, err := contexts.EnvironmentLimits()
 			if err != nil {
 				slog.Error("Context configuration invalid")

@@ -1,0 +1,29 @@
+{
+  "command": "pnpm run test:github:live",
+  "date_jst": "2026-10-16",
+  "result": "PASS",
+  "duration_seconds": 10.8,
+  "repository_id": 1025894008,
+  "installation_id": 171862620,
+  "observations": [
+    {"kind":"issue","external_id":"1220","source_version":"5c2709ce89213c0cbd38d4e8eb299e9a94769dff30469dae6902ef4f52cc470c","observed_at":"2026-10-16T01:19:50Z"},
+    {"kind":"pr","external_id":"1843","commit":"ec3a86cf6a02bfd97079fd7a2e918afd06096c3c","source_version":"46485bdc3f9a144268b94bef562afb45f1a8fcae45cc87aba18431b87da31b72","observed_at":"2026-10-16T01:19:51Z"},
+    {"kind":"commit","external_id":"ec3a86cf6a02bfd97079fd7a2e918afd06096c3c","source_version":"56a3d71c169ffd17d01e24789fc7fb6d15a35bff6639e5c6c9c7b32db67cefdc","observed_at":"2026-10-16T01:19:51Z"},
+    {"kind":"actions","workflow_id":248011545,"run_id":38784153986,"run_attempt":2,"conclusion":"success","commit":"ec3a86cf6a02bfd97079fd7a2e918afd06096c3c","source_version":"339eaceecbc92ccc6b07b59d904c576966431d7d0bd6c0383bf83719f78dca1e","observed_at":"2026-10-16T01:19:57Z"},
+    {"kind":"actions","workflow_id":248011545,"run_id":38784153986,"run_attempt":1,"conclusion":"failure","commit":"ec3a86cf6a02bfd97079fd7a2e918afd06096c3c","source_version":"d23d12b8091d383c67aaa3eb63aa4e332bec921e8cd540fea1ca7406973a266c","observed_at":"2026-10-16T01:20:00Z"}
+  ],
+  "requests": [
+    {"method":"POST","path":"/app/installations/171862620/access_tokens","status":201},
+    {"method":"GET","path":"/repos/kukuri-app/kukuri/issues/1220","status":200},
+    {"method":"GET","path":"/repos/kukuri-app/kukuri/pulls/1843","status":200},
+    {"method":"GET","path":"/repos/kukuri-app/kukuri/commits/ec3a86cf6a02bfd97079fd7a2e918afd06096c3c","status":200},
+    {"method":"GET","path":"/repos/kukuri-app/kukuri/actions/runs/38784153986","status":200},
+    {"method":"GET","path":"/repos/kukuri-app/kukuri/actions/runs/38784153986/attempts/2/jobs?per_page=100&page=1","status":200},
+    {"method":"GET","path":"/repos/kukuri-app/kukuri/actions/runs/38784153986","status":304},
+    {"method":"GET","path":"/repos/kukuri-app/kukuri/actions/runs/38784153986/attempts/1","status":200},
+    {"method":"GET","path":"/repos/kukuri-app/kukuri/actions/runs/38784153986/attempts/1/jobs?per_page=100&page=1","status":200},
+    {"method":"GET","path":"/repos/kukuri-app/kukuri/actions/runs/38784153986/attempts/1","status":304}
+  ],
+  "outside_repository_name_rejected_before_get": true,
+  "credential_material_included": false
+}
