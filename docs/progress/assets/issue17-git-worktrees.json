@@ -1,0 +1,42 @@
+{
+  "base_commit": "800cb4d51d5cb196abe3f518d25b1605dba538e5",
+  "original_unchanged": true,
+  "git_listing": [
+    "worktree C:/Users/kgm11/koujou-san/.cache/issue17-git-e48f4f71efc447a3a2b8c330547773a7",
+    "HEAD 800cb4d51d5cb196abe3f518d25b1605dba538e5",
+    "branch refs/heads/master",
+    "",
+    "worktree C:/Users/kgm11/AppData/Local/Packages/OpenAI.Codex_2p2nqsd0c76g0/LocalCache/Local/dev.koujou-san.desktop/runner-f37d075cf112fe99daf1e846c059a56a167b36d3e30b9f89314d0079d389bfea/worktrees/25f5f836986a7cfb787d8517c8b9c6fc",
+    "HEAD 800cb4d51d5cb196abe3f518d25b1605dba538e5",
+    "branch refs/heads/koujou/run-25f5f836986a7cfb787d8517c8b9c6fc",
+    "",
+    "worktree C:/Users/kgm11/AppData/Local/Packages/OpenAI.Codex_2p2nqsd0c76g0/LocalCache/Local/dev.koujou-san.desktop/runner-f37d075cf112fe99daf1e846c059a56a167b36d3e30b9f89314d0079d389bfea/worktrees/4aab40ee6a50e34cc1cef15908d84c5e",
+    "HEAD 800cb4d51d5cb196abe3f518d25b1605dba538e5",
+    "branch refs/heads/koujou/run-4aab40ee6a50e34cc1cef15908d84c5e",
+    ""
+  ],
+  "implementation": "5054f09e68e4073517ab1d9d78d2c229e05f4296",
+  "original_branch": "master",
+  "worktrees": [
+    {
+      "commit": "800cb4d51d5cb196abe3f518d25b1605dba538e5",
+      "path": "C:\\Users\\kgm11\\AppData\\Local\\dev.koujou-san.desktop\\runner-f37d075cf112fe99daf1e846c059a56a167b36d3e30b9f89314d0079d389bfea\\worktrees\\25f5f836986a7cfb787d8517c8b9c6fc",
+      "version": "ANKRGT7S33AQEWNRIZYXFWMNLX",
+      "source_hash": "B8AA22129EFFE404C7AC0DFE6FCC67AB8F5968C4E465B656EEFE1D7B5FA4BC76",
+      "run_id": "run:ui-assign-native",
+      "prepared_at": "2026-10-16T17:45:17.6564013Z",
+      "process_started": false,
+      "branch": "koujou/run-25f5f836986a7cfb787d8517c8b9c6fc"
+    },
+    {
+      "commit": "800cb4d51d5cb196abe3f518d25b1605dba538e5",
+      "path": "C:\\Users\\kgm11\\AppData\\Local\\dev.koujou-san.desktop\\runner-f37d075cf112fe99daf1e846c059a56a167b36d3e30b9f89314d0079d389bfea\\worktrees\\4aab40ee6a50e34cc1cef15908d84c5e",
+      "version": "W5GXSJX73AJODPIMIDQFW5YEUV",
+      "source_hash": "DDDE2F969156626A3364E5DD69A5AC6EA9814631B3077746119F3FF5B40AFB10",
+      "run_id": "run:ui-assign-native-two",
+      "prepared_at": "2026-10-16T17:46:44.4192497Z",
+      "process_started": false,
+      "branch": "koujou/run-4aab40ee6a50e34cc1cef15908d84c5e"
+    }
+  ]
+}

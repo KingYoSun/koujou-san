@@ -1,0 +1,66 @@
+{
+  "id": "run:ui-assign-native-two",
+  "version": "W5GXSJX73AJODPIMIDQFW5YEUV",
+  "run_id": "run:ui-assign-native-two",
+  "kind": "run",
+  "position": "20",
+  "value": {
+    "name": "割当受入: ui-assign-native-two",
+    "input": {
+      "id": "run-input:ui-assign-native-two",
+      "version": "GMLTZOEOLP4NIULZBQVW47U3G2"
+    },
+    "state": "queued",
+    "assignment": {
+      "area": {
+        "id": "4aab40ee6a50e34cc1cef15908d84c5e",
+        "branch": "koujou/run-4aab40ee6a50e34cc1cef15908d84c5e",
+        "commit": "800cb4d51d5cb196abe3f518d25b1605dba538e5"
+      },
+      "input": {
+        "id": "run-input:ui-assign-native-two",
+        "version": "GMLTZOEOLP4NIULZBQVW47U3G2"
+      },
+      "required": [],
+      "device_id": "af7b3877-6b08-44a5-b39f-aca5d263539e",
+      "runner_id": "789f1f8c-8f63-4113-a647-20b5a497d87d",
+      "connection": {
+        "kind": "cli",
+        "users": [
+          "OCQ3LBB2PEKRGVCYRINOZXXF2C"
+        ],
+        "target": "git",
+        "subject": "local-git-fixture",
+        "version": "2.50.1.windows.1",
+        "bindings": [],
+        "confirmed": true,
+        "environment": "Windows",
+        "capabilities": [],
+        "repositories": [
+          "fixture-repository"
+        ]
+      },
+      "expires_at": "2026-10-16T17:48:43.7845069Z",
+      "generation": "EBWS3O73O4LVZ6Q5RFZZSZLC2Q",
+      "repository": {
+        "id": "fixture-repository",
+        "commit": "800cb4d51d5cb196abe3f518d25b1605dba538e5"
+      },
+      "prepared_at": "2026-10-16T17:46:44.4192497Z",
+      "requested_by": "OCQ3LBB2PEKRGVCYRINOZXXF2C",
+      "runner_version": "6MQIOY3AZYXYWMZ3SMTFDAJ6DM"
+    },
+    "created_at": "2026-10-16T17:29:21.1984282Z",
+    "observation": "known",
+    "requested_by": "OCQ3LBB2PEKRGVCYRINOZXXF2C",
+    "cancel_requested": false,
+    "reported_through": "2",
+    "execution_requested_at": "2026-10-16T17:46:16.2393418Z"
+  },
+  "refs": [
+    {
+      "id": "run-input:ui-assign-native-two",
+      "version": "GMLTZOEOLP4NIULZBQVW47U3G2"
+    }
+  ]
+}

@@ -73,6 +73,6 @@
 
 ## Issue #17の判定
 
-状態: In progress。Scope revision 1。[計画](2026-10-17-issue-17-plan.md)のAC-1〜7・INVAR-1〜3を維持する。ユーザー判断に従い、repositoryを使うRunごとにworktreeとbranchを自動作成する。割当の認可・端末能力・世代・固定入力・準備/起動の区別を、既存のRunと共通認可へ接続する。
+状態: In progress（最終CI待ち）。Scope revision 1。[PR #50](https://github.com/KingYoSun/koujou-san/pull/50)で現在権限・端末能力・世代・固定入力による一意割当と、Runごとのworktree/branch自動作成を実装した。Windowsの実pathの差を修正し、二つの領域の分離、再準備での編集保持、元checkout不変を実画面・Git・HTTPで照合した。[検証記録](2026-10-17-issue-17-evidence.md)と[独立検品](2026-10-17-issue-17-inspection.md)の全末端PASS・blocker 0を照合した。残りは証跡込み最終headのCIとマージ後照合。
 
 #18〜#34は未着手。実CLI起動・Runner割当・工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
