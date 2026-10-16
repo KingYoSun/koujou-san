@@ -1,0 +1,222 @@
+{
+  "price_history": {
+    "data": {
+      "items": [
+        {
+          "id": "price:personal",
+          "kind": "price",
+          "value": {
+            "model": "actual-fixture",
+            "rates": {
+              "input": {
+                "per": "1",
+                "unit": "token",
+                "amount": "0.001"
+              }
+            },
+            "scale": 6,
+            "source": "fictional contract",
+            "contract": "individual",
+            "currency": "USD",
+            "rounding": "half_up",
+            "connection": "client-personal",
+            "effective_from": "2026-01-01T00:00:00Z",
+            "effective_until": null
+          },
+          "version": "TGTVO562MPLN4XTDJT3R7OBKT5",
+          "position": 11
+        },
+        {
+          "id": "price:personal",
+          "kind": "price",
+          "value": {
+            "model": "actual-fixture",
+            "rates": {
+              "input": {
+                "per": "1",
+                "unit": "token",
+                "amount": "0.001"
+              }
+            },
+            "scale": 6,
+            "source": "fictional individual contract — Web inspection",
+            "contract": "individual",
+            "currency": "USD",
+            "rounding": "half_up",
+            "connection": "client-personal",
+            "effective_from": "2026-01-01T00:00:00Z",
+            "effective_until": null
+          },
+          "version": "P57GIB6HSTKBDL4VFQPF5MVTQV",
+          "position": 30132
+        }
+      ],
+      "as_of": "2026-10-16T06:30:34.4365852Z",
+      "timezone": "UTC",
+      "kind": "price",
+      "through": 30132
+    },
+    "meta": {
+      "workspace_id": "mcp-one",
+      "position": "2SG6L6KXO5NETH6H6XJ5CJZQKM",
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  },
+  "price_head": {
+    "id": "price:personal",
+    "version": "P57GIB6HSTKBDL4VFQPF5MVTQV",
+    "kind": "price",
+    "position": 30132,
+    "value": {
+      "model": "actual-fixture",
+      "rates": {
+        "input": {
+          "per": "1",
+          "unit": "token",
+          "amount": "0.001"
+        }
+      },
+      "scale": 6,
+      "source": "fictional individual contract — Web inspection",
+      "contract": "individual",
+      "currency": "USD",
+      "rounding": "half_up",
+      "connection": "client-personal",
+      "effective_from": "2026-01-01T00:00:00Z",
+      "effective_until": null
+    }
+  },
+  "evaluation": {
+    "id": "evaluation:usage-example",
+    "version": "WVKQL7BCDGOEBEM55BJCH2WZT7",
+    "kind": "evaluation",
+    "position": 13,
+    "value": {
+      "kind": "estimated",
+      "price": {
+        "id": "price:personal",
+        "version": "TGTVO562MPLN4XTDJT3R7OBKT5"
+      },
+      "scale": 6,
+      "state": "rated",
+      "usage": [
+        {
+          "id": "usage:e0104c305b97bbab71fb571c3107c1b255ec6e4322eb56ce700d231acc636e85",
+          "version": "4UVAPQVISGPYSRXNKZDJKTLLPO"
+        }
+      ],
+      "amount": "0.100000",
+      "source": "fictional contract",
+      "adopted": {
+        "usage-example:input": [
+          {
+            "id": "usage:e0104c305b97bbab71fb571c3107c1b255ec6e4322eb56ce700d231acc636e85",
+            "version": "4UVAPQVISGPYSRXNKZDJKTLLPO"
+          }
+        ]
+      },
+      "currency": "USD",
+      "rounding": "half_up",
+      "quantities": {
+        "input": {
+          "unit": "token",
+          "state": "reported",
+          "value": "100"
+        }
+      },
+      "coverage_group": "usage-example"
+    }
+  },
+  "export": {
+    "data": {
+      "items": [
+        {
+          "at": "2026-10-16T15:23:40.585376+09:00",
+          "key": "usage-example:estimated:USD",
+          "kind": "estimated",
+          "refs": [
+            {
+              "id": "usage:e0104c305b97bbab71fb571c3107c1b255ec6e4322eb56ce700d231acc636e85",
+              "version": "4UVAPQVISGPYSRXNKZDJKTLLPO"
+            },
+            {
+              "id": "usage:e0104c305b97bbab71fb571c3107c1b255ec6e4322eb56ce700d231acc636e85",
+              "version": "4UVAPQVISGPYSRXNKZDJKTLLPO"
+            },
+            {
+              "id": "price:personal",
+              "version": "TGTVO562MPLN4XTDJT3R7OBKT5"
+            },
+            {
+              "id": "evaluation:usage-example",
+              "version": "WVKQL7BCDGOEBEM55BJCH2WZT7"
+            }
+          ],
+          "group": "usage-example",
+          "state": "rated",
+          "value": {
+            "kind": "estimated",
+            "price": {
+              "id": "price:personal",
+              "version": "TGTVO562MPLN4XTDJT3R7OBKT5"
+            },
+            "scale": 6,
+            "state": "rated",
+            "usage": [
+              {
+                "id": "usage:e0104c305b97bbab71fb571c3107c1b255ec6e4322eb56ce700d231acc636e85",
+                "version": "4UVAPQVISGPYSRXNKZDJKTLLPO"
+              }
+            ],
+            "amount": "0.100000",
+            "source": "fictional contract",
+            "adopted": {
+              "usage-example:input": [
+                {
+                  "id": "usage:e0104c305b97bbab71fb571c3107c1b255ec6e4322eb56ce700d231acc636e85",
+                  "version": "4UVAPQVISGPYSRXNKZDJKTLLPO"
+                }
+              ]
+            },
+            "currency": "USD",
+            "rounding": "half_up",
+            "quantities": {
+              "input": {
+                "unit": "token",
+                "state": "reported",
+                "value": "100"
+              }
+            },
+            "coverage_group": "usage-example"
+          },
+          "amount": "0.100000",
+          "currency": "USD",
+          "position": 13,
+          "timezone": "Asia/Tokyo",
+          "quantities": {
+            "input": {
+              "unit": "token",
+              "state": "reported",
+              "value": "100"
+            }
+          }
+        }
+      ],
+      "as_of": "2026-10-16T06:30:34.4470854Z",
+      "timezone": "Asia/Tokyo",
+      "kind": "estimated",
+      "through": 30132
+    },
+    "meta": {
+      "workspace_id": "mcp-one",
+      "position": "2SG6L6KXO5NETH6H6XJ5CJZQKM",
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  }
+}

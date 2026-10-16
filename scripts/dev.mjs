@@ -404,6 +404,7 @@ async function testDatabase(suite = "persistence", testName) {
 }
 
 const tasks = {
+  "test:usage": () => testDatabase("usage", "TestUsagePostgres"),
   "test:github": () => testDatabase("githubobserve"),
   "test:github:live": async () => {
     await resolveGo();

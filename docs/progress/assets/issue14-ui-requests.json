@@ -1,0 +1,66 @@
+{
+  "requests": 623,
+  "usage_requests": [
+    {
+      "method": "POST",
+      "path": "/usage/workspaces/mcp-one/query",
+      "request_bytes": 297
+    },
+    {
+      "method": "POST",
+      "path": "/usage/workspaces/mcp-one/query",
+      "request_bytes": 243
+    },
+    {
+      "method": "POST",
+      "path": "/usage/workspaces/mcp-one/query",
+      "request_bytes": 237
+    },
+    {
+      "method": "GET",
+      "path": "/usage/workspaces/mcp-one/records/price:personal",
+      "request_bytes": 0
+    },
+    {
+      "method": "POST",
+      "path": "/usage/workspaces/mcp-one/records/price:personal",
+      "request_bytes": 426
+    },
+    {
+      "method": "GET",
+      "path": "/usage/workspaces/mcp-one/records/price:personal",
+      "request_bytes": 0
+    },
+    {
+      "method": "GET",
+      "path": "/usage/workspaces/mcp-one/records/evaluation:usage-example",
+      "request_bytes": 0
+    },
+    {
+      "method": "POST",
+      "path": "/usage/workspaces/mcp-one/query",
+      "request_bytes": 44
+    },
+    {
+      "method": "POST",
+      "path": "/usage/workspaces/mcp-one/query",
+      "request_bytes": 132
+    },
+    {
+      "method": "POST",
+      "path": "/usage/workspaces/mcp-one/query",
+      "request_bytes": 237
+    },
+    {
+      "method": "POST",
+      "path": "/usage/workspaces/mcp-one/query",
+      "request_bytes": 242
+    },
+    {
+      "method": "POST",
+      "path": "/usage/workspaces/mcp-one/query",
+      "request_bytes": 240
+    }
+  ],
+  "execution_paths": []
+}

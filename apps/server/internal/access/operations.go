@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"encoding/json"
+	"strings"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/jackc/pgx/v5"
@@ -95,14 +96,14 @@ func (s *Service) OperationPrincipal(ctx context.Context, user, w, handle string
 // CreateOperation receives already-authorized Manifest placements from the
 // owning Context service. A bounded empty set is meaningful: Run.input=none.
 func (s *Service) CreateOperation(ctx context.Context, p Principal, w, id, purpose string, bounded bool, refs []VersionRef, m apicontract.Mutation) (apicontract.Response[apicontract.Reference], error) {
-	if purpose != "read" && purpose != "edit" {
+	if purpose != "read" && purpose != "edit" && purpose != "price-edit" {
 		return apicontract.Response[apicontract.Reference]{}, ErrForbidden
 	}
 	if refs == nil {
 		refs = []VersionRef{}
 	}
 	action := "read"
-	if purpose == "edit" {
+	if purpose == "edit" || purpose == "price-edit" {
 		action = "register"
 	}
 	return s.mutate(ctx, p, w, "operation:"+id, "llm-operation", action, m, struct {
@@ -154,18 +155,7 @@ func versionGrants(ctx context.Context, q query, p Principal, w string, refs []V
 		return out, nil
 	}
 	raw, _ := json.Marshal(refs)
-	rows, err := q.Query(ctx, `WITH wanted AS (SELECT * FROM jsonb_to_recordset($4::jsonb) AS r(id text,version text))
- SELECT r.id,r.version FROM wanted r JOIN access_operations o ON o.workspace_id=$1 AND o.id=$2 AND o.user_id=$3 AND NOT o.closed
- LEFT JOIN access_delivery_policies p ON p.workspace_id=$1
- LEFT JOIN shared_versions v ON v.workspace_id=$1 AND v.resource_id=r.id
- LEFT JOIN LATERAL (SELECT payload FROM context_records WHERE workspace_id=$1 AND resource_id=r.id AND revision=v.version LIMIT 1) c ON true
- LEFT JOIN LATERAL (SELECT payload FROM context_records WHERE workspace_id=$1 AND resource_id=r.id AND revision=r.version LIMIT 1) f ON true
- WHERE (NOT o.bounded OR EXISTS(SELECT 1 FROM access_operation_refs a WHERE a.workspace_id=$1 AND a.operation_id=o.id AND a.resource_id=r.id AND (r.version='' OR a.version=r.version)))
- AND NOT (COALESCE(c.payload->'tags','[]'::jsonb) ?| ARRAY(SELECT jsonb_array_elements_text(COALESCE(p.payload->'denied_tags','[]'::jsonb))))
- AND NOT (COALESCE(f.payload->'tags','[]'::jsonb) ?| ARRAY(SELECT jsonb_array_elements_text(COALESCE(p.payload->'denied_tags','[]'::jsonb))))
- AND NOT EXISTS(SELECT 1 FROM context_records m JOIN shared_versions mv ON mv.workspace_id=m.workspace_id AND mv.resource_id=m.resource_id AND mv.version=m.revision AND NOT mv.deleted
- WHERE r.id LIKE 'context:%' AND m.workspace_id=$1 AND m.kind='membership' AND m.payload->'context'->>'id'=substring(r.id from 9) AND m.payload->>'present'='true' AND p.payload->'denied_scopes' ? (m.payload->'scope'->>'id'))
- AND NOT (r.id LIKE 'scope:%' AND COALESCE(p.payload->'denied_scopes','[]'::jsonb) ? substring(r.id from 7))`, w, p.OperationID, p.UserID, raw)
+	rows, err := q.Query(ctx, versionQuery("$1", "$2", "$3", "$4"), w, p.OperationID, p.UserID, raw)
 	if err != nil {
 		return nil, err
 	}
@@ -201,7 +191,7 @@ func (s *Service) CheckVersion(ctx context.Context, tx pgx.Tx, p Principal, w, i
 	return nil
 }
 func operationAction(op Operation, action string) bool {
-	return action == "read" || action == "get" || action == "search" || (action == "update" && op.Purpose == "edit")
+	return action == "read" || action == "get" || action == "search" || (action == "update" && op.Purpose == "edit") || (action == "price_write" && op.Purpose == "price-edit")
 }
 func identityVersionRefs(ids []string) []VersionRef {
 	refs := make([]VersionRef, 0, len(ids))
@@ -231,4 +221,33 @@ func (s *Service) RecordOperation(ctx context.Context, p Principal, w, method, b
 	}
 	_, err = s.DB.Exec(ctx, `INSERT INTO access_operation_events(workspace_id,operation_id,id,user_id,method,boundary,result) VALUES($1,$2,$3,$4,$5,$6,$7)`, w, p.OperationID, rand.Text(), p.UserID, method, boundary, raw)
 	return err
+}
+
+// versionQuery is shared by fixed reads and server-side cost aggregation.
+func versionQuery(w, op, user, refs string) string {
+	const query = `WITH wanted AS (SELECT * FROM jsonb_to_recordset(@refs::jsonb) AS r(id text,version text))
+ SELECT r.id,r.version FROM wanted r JOIN access_operations o ON o.workspace_id=@workspace AND o.id=@operation AND o.user_id=@user AND NOT o.closed
+ LEFT JOIN access_delivery_policies p ON p.workspace_id=@workspace
+ LEFT JOIN shared_versions v ON v.workspace_id=@workspace AND v.resource_id=r.id
+ LEFT JOIN LATERAL (SELECT payload FROM context_records WHERE workspace_id=@workspace AND resource_id=r.id AND revision=v.version LIMIT 1) c ON true
+ LEFT JOIN LATERAL (SELECT payload FROM context_records WHERE workspace_id=@workspace AND resource_id=r.id AND revision=r.version LIMIT 1) f ON true
+ WHERE (NOT o.bounded OR EXISTS(SELECT 1 FROM access_operation_refs a WHERE a.workspace_id=@workspace AND a.operation_id=o.id AND a.resource_id=r.id AND (r.version='' OR a.version=r.version)))
+ AND NOT (COALESCE(c.payload->'tags','[]'::jsonb) ?| ARRAY(SELECT jsonb_array_elements_text(COALESCE(p.payload->'denied_tags','[]'::jsonb))))
+ AND NOT (COALESCE(f.payload->'tags','[]'::jsonb) ?| ARRAY(SELECT jsonb_array_elements_text(COALESCE(p.payload->'denied_tags','[]'::jsonb))))
+ AND NOT EXISTS(SELECT 1 FROM context_records m JOIN shared_versions mv ON mv.workspace_id=m.workspace_id AND mv.resource_id=m.resource_id AND mv.version=m.revision AND NOT mv.deleted
+ WHERE r.id LIKE 'context:%' AND m.workspace_id=@workspace AND m.kind='membership' AND m.payload->'context'->>'id'=substring(r.id from 9) AND m.payload->>'present'='true' AND p.payload->'denied_scopes' ? (m.payload->'scope'->>'id'))
+ AND NOT (r.id LIKE 'scope:%' AND COALESCE(p.payload->'denied_scopes','[]'::jsonb) ? substring(r.id from 7))`
+	return strings.NewReplacer("@workspace", w, "@operation", op, "@user", user, "@refs", refs).Replace(query)
+}
+
+// ReadFilterSQL checks all provenance refs before grouping, counting or export.
+// Only trusted SQL expressions are passed by domain services. Parameters are
+// $1 Workspace, $2 authenticated user, $3 operation (empty for ordinary HTTP).
+func ReadFilterSQL(refs string) string {
+	return `NOT EXISTS(SELECT 1 FROM jsonb_to_recordset(` + refs + `) AS need(id text,version text)
+ LEFT JOIN access_resources ar ON ar.workspace_id=$1 AND ar.id=need.id
+ LEFT JOIN access_resource_grants ag ON ag.workspace_id=ar.workspace_id AND ag.resource_id=ar.id AND ag.user_id=$2
+ WHERE ar.id IS NULL OR (ar.restricted AND NOT COALESCE(ag.can_read,false)))
+ AND ($3='' OR NOT EXISTS(SELECT 1 FROM jsonb_to_recordset(` + refs + `) AS need(id text,version text)
+ WHERE NOT EXISTS(SELECT 1 FROM (` + versionQuery("$1", "$3", "$2", refs) + `) permitted WHERE permitted.id=need.id AND permitted.version=need.version)))`
 }

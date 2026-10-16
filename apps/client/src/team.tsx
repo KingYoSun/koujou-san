@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { apiRequest } from "./auth";
 import { ContextWorkspace } from "./context-workspace";
+import { UsagePricing } from "./usage-pricing";
 import { GithubObservations } from "./github-observations";
 import { DeliveryPolicy } from "./delivery-policy";
 import { discardSyncWorkspace } from "./sync-engine";
@@ -414,6 +415,12 @@ export function Team({ native }: { native: boolean }) {
               native={native}
             />
           )}
+          <UsagePricing
+            key={`usage/${apiIdentity}/${me.id}/${selected}`}
+            native={native}
+            workspace={selected}
+            role={current.role}
+          />
           <details className="workspace-management">
             <summary>参加者・招待・端末・共有ポリシー</summary>
             <button

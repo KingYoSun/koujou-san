@@ -216,7 +216,7 @@ func (s *Service) check(ctx context.Context, q query, p Principal, w, target, ac
 		if m.Role != "admin" {
 			return ErrForbidden
 		}
-	case "update", "register":
+	case "update", "register", "price_write":
 		if m.Role == "viewer" {
 			return ErrForbidden
 		}
@@ -229,6 +229,9 @@ func (s *Service) check(ctx context.Context, q query, p Principal, w, target, ac
 	}
 	if target == "" {
 		return nil
+	}
+	if action == "price_write" {
+		action = "update"
 	}
 	allowed, err := resourceGrants(ctx, q, w, p, []string{target}, action)
 	if err != nil {

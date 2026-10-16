@@ -58,3 +58,9 @@ PRの現在状態には、GitHubの`merged:true`を受けても`closed`だけを
 [Web要求集計](assets/issue13-ui-request-summary.json)は674件、観測一覧GET 41件と履歴GET 2件を含み、実行の要求は0件。ネイティブ側も同じ認可付きAPIで取得し、外部ページを開く以外のCLI/CI操作を行っていない。対話専用のnative準備試験は明示選択して成功し、検証用OAuthだけをDPAPIで保存した。通常環境の資格情報・OSの信頼設定は変更していない。
 
 追加証跡commit `a799ecc8006fbbb3901f98460bf5d9573aa9d1a2`を独立検品へ渡し、全AC・INVARはPASS、blocker 0件で終了した。検品後の差分は判定記録と現在状態の更新だけであり、コードや条件は変更していない。
+
+## 最終CI・マージ後照合
+
+最終headは`384ea26b1aaa3b0ff45bca3d233bba5067910087`。[CI 38836281086](https://github.com/KingYoSun/koujou-san/actions/runs/38836281086)はLinux 4分29秒、Windows 6分33秒、GitGuardianが全て成功した。[PR #45](https://github.com/KingYoSun/koujou-san/pull/45)を2026-10-16（JST）にマージした。
+
+main `1b46ec0cef76f50f7b92faa0a43d6c6d04a0b3e2`と最終headのtreeはともに`87a540244da6bd53d4babf2edf1e4d8e6bcd6d86`。`git diff <head> main --exit-code`は0で、検品後の3文書差分も含めて内容が一致した。全条件・独立検品・実CI・マージ後照合が揃った後にIssueを手動Closeした。
