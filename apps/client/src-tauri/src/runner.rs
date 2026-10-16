@@ -78,10 +78,9 @@ fn prepare_area(repo: &Path, root: &Path, area: &Area) -> Result<PathBuf, String
         &["rev-parse", "--path-format=absolute", "--git-common-dir"],
     )?;
     fs::create_dir_all(root).map_err(|_| "worktree_directory_failed")?;
-    let root = root
-        .canonicalize()
-        .map_err(|_| "worktree_directory_failed")?;
-    let target = PathBuf::from(git_path(&root)?).join(&area.id);
+    // Keep the application's configured path. Resolving Windows' packaged-app
+    // junction expands it past Git's explicit GIT_DIR limit.
+    let target = PathBuf::from(git_path(root)?).join(&area.id);
     if target.exists() {
         if git(
             &target,
@@ -93,17 +92,34 @@ fn prepare_area(repo: &Path, root: &Path, area: &Area) -> Result<PathBuf, String
         }
     } else {
         let target_text = target.to_str().ok_or("invalid_repository_path")?;
-        git(
+        let tip = git(
             &repo,
             &[
-                "worktree",
-                "add",
-                "-b",
-                &area.branch,
-                target_text,
-                &area.commit,
+                "for-each-ref",
+                "--format=%(objectname)",
+                &format!("refs/heads/{}", area.branch),
             ],
         )?;
+        if tip.is_empty() {
+            git(
+                &repo,
+                &[
+                    "worktree",
+                    "add",
+                    "-b",
+                    &area.branch,
+                    target_text,
+                    &area.commit,
+                ],
+            )?;
+        } else {
+            // A failed Git preparation may have created the branch already.
+            // Reuse only the expected base; never reset an existing branch.
+            if tip != area.commit {
+                return Err("run_area_conflict".into());
+            }
+            git(&repo, &["worktree", "add", target_text, &area.branch])?;
+        }
     }
     Ok(target)
 }
@@ -239,11 +255,32 @@ mod tests {
             branch: format!("koujou/run-{}", "b".repeat(32)),
             commit: commit.clone(),
         };
-        let first = prepare_area(&repo, &root.join("areas"), &a).unwrap();
-        let second = prepare_area(&repo, &root.join("areas"), &b).unwrap();
+        // The app-data junction has a longer canonical path on packaged Windows.
+        // A previous failure can leave the expected branch without a worktree.
+        git(&repo, &["branch", &a.branch, &a.commit]).unwrap();
+        let first = prepare_area(
+            &repo,
+            &root.join("native-application-runner").join("areas"),
+            &a,
+        )
+        .unwrap();
+        let second = prepare_area(
+            &repo,
+            &root.join("native-application-runner").join("areas"),
+            &b,
+        )
+        .unwrap();
         assert_ne!(first, second);
         fs::write(first.join("source.txt"), "run one edited").unwrap();
-        assert_eq!(prepare_area(&repo, &root.join("areas"), &a).unwrap(), first);
+        assert_eq!(
+            prepare_area(
+                &repo,
+                &root.join("native-application-runner").join("areas"),
+                &a
+            )
+            .unwrap(),
+            first
+        );
         assert_eq!(
             fs::read_to_string(first.join("source.txt")).unwrap(),
             "run one edited"
@@ -263,7 +300,14 @@ mod tests {
         );
         let mut invalid = a.clone();
         invalid.id = "../outside".into();
-        assert!(prepare_area(&repo, &root.join("areas"), &invalid).is_err());
+        assert!(
+            prepare_area(
+                &repo,
+                &root.join("native-application-runner").join("areas"),
+                &invalid
+            )
+            .is_err()
+        );
         // Only this test's freshly generated UUID directory is disposable.
         assert!(root.starts_with(std::env::temp_dir()));
         fs::remove_dir_all(root).unwrap();

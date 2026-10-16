@@ -18,3 +18,9 @@ Windowsの`test:desktop`は通常6試験PASS。新しいGit試験は、所有す
 ## 残る確認
 
 最終実装のdesktop build、実OryとWeb/Windowsの画面操作、実際の二worktreeの固定commit/branchと保存記録の照合、固定成果物の独立検品、最終head CI・マージ後照合はこれから確認する。実CLI起動・対話・OSプロセス復旧をこのIssueの完了へ含めない。
+
+## Windows実アプリで検出した差
+
+固定60180c0の実アプリでは、割当とrenew後のGit準備が失敗し、preparedを受理しないことを確認した。所有する実pathでの再現試験はGitの `$GIT_DIR too big` を返した。Windowsのapp-data junctionをcanonicalizeすると、Codex packageの長い実pathへ展開されることを実引数で確認した。Gitの[setup.c](https://github.com/git/git/blob/v2.50.1/setup.c)には明示GIT_DIRの長さの検査があり、core.longpathsの変更だけでは解消しなかった。
+
+作成先は設定された短いapp-data pathを保つよう修正した。失敗でbranchだけが残る再試行も、固定commitが一致する場合はそのbranchを使ってworktreeを作る。長いapp-data配置を模した試験へ拡張し、元checkout・別Run・編集中のファイルを保持する条件を維持する。診断用の出力と一時試験は製品へ残していない。修正後の実画面と実Git照合を続ける。
