@@ -47,3 +47,7 @@ Nativeの接続設定は、合成した専用configを所有namespaceへCLIで�
 修正版のdesktop testは6成功・6環境依存ignored、desktop buildは成功。実装headのCI run `38941724605` はLinux 4分11秒・Windows 5分3秒・GitGuardian成功。最終の証跡・検品記録を含むheadのCIとマージ後照合は別に確認する。
 
 独立検品は実GitのHEAD/branch/hash・元checkoutのclean状態も直接読取りで確認し、全末端をPASSとした。割当前後のTriage採用値P2→P1でも全RunのID/版/payload/開始/取消が変わらないことを、独立Go overlayで直接比較した。fixture終了後、専用サービスと所有するOAuth/端末のDPAPI資格情報を片付けた。合成Git領域は証跡確認用として残している。
+
+## マージ後照合（2026-10-17）
+
+最終head `25af101053c55f440ac188fe63e2a05f92404afd` のCI run `38943075319` は全成功（Linux 4分28秒、Windows 5分36秒、GitGuardian）。PR #50をマージし、main `bef3bf7402ce8f78f421616a27189e1f02acb512` と最終headのtreeが `f18a80be1d54845adcf6bcd1fff0263b88db4663` で一致、diff 0を確認した。全末端AC/INVAR・独立検品・マージ後照合が揃い、#17を手動Closeした。

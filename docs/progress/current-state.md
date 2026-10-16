@@ -73,6 +73,10 @@
 
 ## Issue #17の判定
 
-状態: In progress（最終CI待ち）。Scope revision 1。[PR #50](https://github.com/KingYoSun/koujou-san/pull/50)で現在権限・端末能力・世代・固定入力による一意割当と、Runごとのworktree/branch自動作成を実装した。Windowsの実pathの差を修正し、二つの領域の分離、再準備での編集保持、元checkout不変を実画面・Git・HTTPで照合した。[検証記録](2026-10-17-issue-17-evidence.md)と[独立検品](2026-10-17-issue-17-inspection.md)の全末端PASS・blocker 0を照合した。残りは証跡込み最終headのCIとマージ後照合。
+状態: Complete。Scope revision 1。[PR #50](https://github.com/KingYoSun/koujou-san/pull/50)を最終head `25af101053c55f440ac188fe63e2a05f92404afd` の全CI成功後にマージした。main `bef3bf7402ce8f78f421616a27189e1f02acb512` と最終headのtreeは `f18a80be1d54845adcf6bcd1fff0263b88db4663` で一致、差分0。現在認可・端末能力・世代、実Git二worktree・Web/Windows、[独立検品](2026-10-17-issue-17-inspection.md)、マージ後照合が揃い、#17をCloseした。[検証記録](2026-10-17-issue-17-evidence.md)を参照する。
 
-#18〜#34は未着手。実CLI起動・Runner割当・工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #18の判定
+
+状態: In progress。Scope revision 1。[計画](2026-10-17-issue-18-plan.md)に既存AC-1〜8・INVAR-1〜3の検証を整理した。ユーザー判断に従い、画面とは独立したRunnerで許可済みの割当・実行を継続する。現CLI版とstdioの入口を調べ、親終了・時間的中断/復帰・Runner再起動・CLI消失を試作して、実プロセスとの対応を確定する。
+
+#19〜#34は未着手。実CLI起動と独立Runner、工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
