@@ -33,6 +33,7 @@ Codexのworktree向けに `.codex/environments/environment.toml` のsetupにも 
 | `pnpm run test:mcp` | 実Ory・SDK・検索エンジンによるMCP認証・操作境界・編集 |
 | `pnpm run test:mcp:ui` | 二UserでContext編集を実操作する検証環境 |
 | `pnpm run test:access` | 試験専用DBによるWorkspace・端末の認可と失効 |
+| `pnpm run test:automation` | 試験専用DBによる受理・永続Worker・Triage方針と優先度 |
 | `pnpm run test:usage` | 試験専用DBによる利用量・料金版・費用評価・認可・集計 |
 | `pnpm run test:github` | 試験専用DBと固定応答によるGitHub観測・権限・復旧 |
 | `pnpm run test:github:live` | 明示したGitHub Appによる実接続の読取り |

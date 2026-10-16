@@ -38,6 +38,7 @@ export default defineConfig({
       "/graph/": apiProxy,
       "/github/": apiProxy,
       "/usage/": apiProxy,
+      "/automation/": apiProxy,
       "/mcp": apiProxy,
       "/.well-known/oauth-protected-resource/": apiProxy,
     },

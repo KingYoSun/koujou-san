@@ -1,0 +1,48 @@
+# Issue #15: 永続要求・WorkerとTriage共有状態の検証
+
+- 対象: [計画](2026-10-16-issue-15-plan.md)のAC-1〜9・INVAR-1〜3、Scope revision 1。
+- 基準main: `cdf6c14ad6a97c50db1e385a3714c84fc3102f29`。
+- ユーザー判断: 編集可能なP0〜P3テンプレート、通常の手動変更の固定、有効化・自動化主体・枠・予算のWorkspace管理者による管理。
+- 確定した構成は[ADR 0015](../adr/0015-automation-foundation.md)、操作は[runbook](../runbooks/automation.md)を参照する。
+
+## 条件と証拠
+
+| 条件 | 観測結果と経路 | 証拠 |
+| --- | --- | --- |
+| AC-1 | Issue Scopeの保存とoutboxの間、結果保存の前・後・queue保存後の停止で両方がrollback。受理時は両方を保存 | `TestAutomationPostgres`、`result_acceptance_and_separate_workers` |
+| AC-2 | 同じ受理は一意キーで一要求となる。二Workerの同時取得は一所有者。期限切れを同じID・新leaseで回収し、旧所有者の書込みを拒否 | PG並行取得・期限回収・明示適用のreceipt比較 |
+| AC-3 | 接続数1のpoolで外部処理を待つ間も別queryが完了。Triage100要求の待機中にHopperを処理。期間件数・固定費用評価・欠測費用で保留 | PGの長い処理fixtureと枠・予算試験 |
+| AC-4 | 異なる尺度と優先順を持つ方針から一つを選択。同順位はpolicy_conflict、未設定はpolicy_unsetで待機 | PGの二尺度・三方針fixture、実Ory/MCP |
+| AC-5 | 手動P2固定中も最新推奨P0を保存し、採用値を維持。解除で有効な推奨を反映。情報不足・失敗・停止でも採用P0を保持し、状態とstaleを区別 | PGの固定・解除・情報不足・失敗・停止、Webの固定/解除画像 |
+| AC-6 | 方針の保存と有効化で過去要求が増えず、明示したページのみ要求を作る。再送は同じ固定結果、継続位置を返す | PGの要求件数、[Web/API結果](assets/issue15-web-api-snapshot.json) |
+| AC-7 | 取得前・確定前の主体や現在権限を再確認し、失効時は保留。保存済み結果と優先度を維持 | PGの主体無効化、実Ory/MCPの役割失効・非公開根拠 |
+| AC-8 | DBへ要求・担当・状態・再開位置・結果を保存。別Store/Workerから回収し、保存結果は外部処理を再実行せず確定。共通HTTP状態と固定版を取得 | PGの再取得・単一接続Store、HTTP/MCP比較、Web履歴 |
+| AC-9 | HTTP/MCPで固定版・優先度・処理状態が一致。read/Context editは更新拒否、triage-editは管理操作拒否、管理操作は明示した目的と現在の管理者権限を確認 | `checkAutomationMCP`、Web実操作。編集者画面では方針編集を提供し、管理設定・有効化ボタンを提供しないことも確認。Windowsの詳細確認は下記 |
+| INVAR-1〜3 | Run/pauseを作らず、Hopper/Triageの枠・対話・権限を暗黙に共用しない。完了観測・未受理ログからHopper要求を作らない | PGのsync-report観測fixture、`AcceptResultTx`、実装経路 |
+
+## 実行結果
+
+`pnpm run test:automation`は専用PGでPASS。最新の実行は`TestAutomationPostgres`が3.53秒、packageが4.346秒。transaction停止、CASとreceipt、並行取得、担当期限、再開位置と保存結果、枠・試行・費用予算、固定・解除、欠測・失敗・停止の保持を確認した。別のDB製品・外部LLMは使っていない。
+
+`pnpm run test:mcp`は実Oryと公式SDKでPASS（54.37秒、package 56.253秒）。Triageの固定版・HTTP/MCP再送・明示した編集/管理目的・役割失効・非公開根拠・checkpoint/leaseの非公開に加え、既存のMCP・分類・検索・探索も通過した。最初の実行にはTriageの新fixtureの呼出しが入っていなかったため、その実行だけを本条件の証拠にせず、呼出しを接続した後の実行を採用した。
+
+rootの`check / test / build`と共通Storeの`test:database`はPASS。共通Storeの既存の停止・復元・CAS・API再起動の条件も維持した。UIは10ファイル35試験。Windows releaseアプリのbuildと、専用fixtureの`live_context_ui_prepare`もPASS。既存のCargoのPDB出力名衝突・linker警告は残るがbuildは成功した。
+
+## Webの実操作
+
+実Ory・PG・Bleve・ArcadeDBと1万Context×3版・100Scopeを持つ専用fixture `931fafb68775`を使用した。Webから方針・採用値・推奨・手動固定を取得し、固定解除でP2から有効な推奨P1へ戻した。次に手動P3へ変更し、通常操作で固定されることを確認した。
+
+方針を新版として保存・有効化した前後で対象要求は2件のまま。明示適用したときだけ3件となり、継続位置も表示した。未確定要求の停止と明示再開を行い、履歴へ待機・停止・待機の時刻を取得した。履歴見出しが空になる不具合は同じ画面で再現し、状態・時刻・試行を表示する修正後に再確認した。
+
+- [固定解除](assets/issue15-web-unlocked.jpg)
+- [手動固定](assets/issue15-web-fixed.jpg)
+- [停止・再開の履歴](assets/issue15-web-history.jpg)
+- [方針の新旧版・要求・履歴・採用値のAPI結果](assets/issue15-web-api-snapshot.json)
+
+## Windowsの確認状況と残作業
+
+専用APIの未使用namespaceへDPAPIで検証用認証を保存し、Windowsアプリを起動した。Windows操作ツールの読み取りで、認証済み利用者・mcp-oneの管理者・Triage画面の入口を確認できた。
+
+前面化は`failed to activate captured window`で失敗した。対象を再取得して再試行し、runbookに従いnode_replをresetして再初期化しても同じ結果だった。アプリは応答中で、LockAppや起動モーダルはウィンドウ一覧に無かった。ChromeへWindows操作を切り替えたり、別のUI自動化やOS設定で回避したりしていない。利用者へ一度だけ前面へ出す操作を依頼し、以後の操作はこちらで続ける予定である。
+
+Windowsでの詳細なTriage操作、固定成果物の独立検品、最終head CI、マージ後照合は未完了。未確認をPASSとして扱わず、残作業として保持する。実Hopper発行は#25、LLMのHopperは#27、TriageのLLM評価は#28の対象である。

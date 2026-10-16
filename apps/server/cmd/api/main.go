@@ -12,6 +12,7 @@ import (
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/auth"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/automation"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/githubobserve"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
@@ -90,7 +91,9 @@ func main() {
 			routes = append(routes, contextService.Register, sharedsync.New(store, accessService, contextService, service.Config.Key).Register)
 			usageService := usage.New(store, accessService)
 			routes = append(routes, usageService.Register)
-			routes = append(routes, (&mcpapi.Service{Auth: service, Access: accessService, Contexts: contextService, Search: searchService, Graph: graphService, Usage: usageService}).Register)
+			automationService := automation.New(store, accessService)
+			routes = append(routes, automationService.Register)
+			routes = append(routes, (&mcpapi.Service{Auth: service, Access: accessService, Contexts: contextService, Search: searchService, Graph: graphService, Usage: usageService, Automation: automationService}).Register)
 		}
 	}
 	address := os.Getenv("KOUJOU_API_ADDR")

@@ -1,0 +1,537 @@
+{
+  "policy_history": {
+    "data": {
+      "items": [
+        {
+          "id": "policy:ui-triage",
+          "kind": "policy",
+          "refs": [
+            {
+              "id": "scope:automation-issue",
+              "version": ""
+            }
+          ],
+          "value": {
+            "name": "Triage受入方針",
+            "levels": [
+              {
+                "id": "P0",
+                "name": "緊急",
+                "meaning": "直ちに対応する"
+              },
+              {
+                "id": "P1",
+                "name": "高",
+                "meaning": "通常の作業より先に対応する"
+              },
+              {
+                "id": "P2",
+                "name": "通常",
+                "meaning": "通常の順序で対応する"
+              },
+              {
+                "id": "P3",
+                "name": "低",
+                "meaning": "他の作業を優先できる"
+              }
+            ],
+            "scopes": [
+              "automation-issue"
+            ],
+            "context": [],
+            "criteria": "fixture criteria",
+            "precedence": 0
+          },
+          "version": "FWQI4BLCVDZ3VVLI3CLZ6NLFFA",
+          "position": 17
+        },
+        {
+          "id": "policy:ui-triage",
+          "kind": "policy",
+          "refs": [
+            {
+              "id": "scope:automation-issue",
+              "version": ""
+            }
+          ],
+          "value": {
+            "name": "Triage受入方針",
+            "levels": [
+              {
+                "id": "P0",
+                "name": "緊急",
+                "meaning": "直ちに対応する"
+              },
+              {
+                "id": "P1",
+                "name": "高",
+                "meaning": "通常の作業より先に対応する"
+              },
+              {
+                "id": "P2",
+                "name": "通常",
+                "meaning": "通常の順序で対応する"
+              },
+              {
+                "id": "P3",
+                "name": "低",
+                "meaning": "他の作業を優先できる"
+              }
+            ],
+            "scopes": [
+              "automation-issue"
+            ],
+            "context": [],
+            "criteria": "fixture criteria: Webで編集した方針の版",
+            "precedence": 0
+          },
+          "version": "232HZVWJ22I4JDCTWSX2FHCEXM",
+          "position": 30143
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "mcp-one",
+      "position": "S3MQU5KNEDEM6CGZWPKAS54WVJ",
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  },
+  "priority": {
+    "id": "priority:scope:automation-issue",
+    "version": "UKM4EK5T37GXBK5HEYOH4OGZPT",
+    "kind": "priority",
+    "position": 30142,
+    "value": {
+      "target": {
+        "id": "scope:automation-issue",
+        "version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ"
+      },
+      "policy": {
+        "id": "policy:ui-triage",
+        "version": "FWQI4BLCVDZ3VVLI3CLZ6NLFFA"
+      },
+      "adopted": "P3",
+      "origin": "manual",
+      "fixed": true,
+      "recommendation": "P1",
+      "recommendation_target": {
+        "id": "scope:automation-issue",
+        "version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ"
+      },
+      "recommendation_policy": {
+        "id": "policy:ui-triage",
+        "version": "FWQI4BLCVDZ3VVLI3CLZ6NLFFA"
+      },
+      "reason": "管理画面から明示再開",
+      "adopted_reason": "Web受入: 手動判断を固定して維持する",
+      "recommendation_reason": "受入fixtureの推奨",
+      "state": "waiting",
+      "stale": true,
+      "job": "AXOJ6CCGYLYU32DGYWHYCCE2OG",
+      "refs": []
+    },
+    "refs": [
+      {
+        "id": "scope:automation-issue",
+        "version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ"
+      },
+      {
+        "id": "activation:ui-triage",
+        "version": "7DVX2RJPAA425YVLESTUTPWOBN"
+      },
+      {
+        "id": "policy:ui-triage",
+        "version": "232HZVWJ22I4JDCTWSX2FHCEXM"
+      },
+      {
+        "id": "scope:automation-issue",
+        "version": ""
+      },
+      {
+        "id": "priority:scope:automation-issue",
+        "version": "UKM4EK5T37GXBK5HEYOH4OGZPT"
+      },
+      {
+        "id": "scope:automation-issue",
+        "version": ""
+      },
+      {
+        "id": "scope:automation-issue",
+        "version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ"
+      },
+      {
+        "id": "policy:ui-triage",
+        "version": "FWQI4BLCVDZ3VVLI3CLZ6NLFFA"
+      },
+      {
+        "id": "scope:automation-issue",
+        "version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ"
+      },
+      {
+        "id": "activation:ui-triage",
+        "version": "7DVX2RJPAA425YVLESTUTPWOBN"
+      },
+      {
+        "id": "policy:ui-triage",
+        "version": "232HZVWJ22I4JDCTWSX2FHCEXM"
+      },
+      {
+        "id": "scope:automation-issue",
+        "version": ""
+      }
+    ]
+  },
+  "before_policy": {
+    "data": {
+      "items": [
+        {
+          "id": "AXOJ6CCGYLYU32DGYWHYCCE2OG",
+          "kind": "triage",
+          "refs": [
+            {
+              "id": "scope:automation-issue",
+              "version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ"
+            },
+            {
+              "id": "activation:ui-triage",
+              "version": "7FEASOZ5JJUWMHTUVYKM2DFF7A"
+            },
+            {
+              "id": "policy:ui-triage",
+              "version": "FWQI4BLCVDZ3VVLI3CLZ6NLFFA"
+            },
+            {
+              "id": "scope:automation-issue",
+              "version": ""
+            }
+          ],
+          "state": "done",
+          "due_at": "2026-10-16T18:39:33.288614+09:00",
+          "reason": "",
+          "result": {
+            "refs": [],
+            "usage": [],
+            "reason": "受入fixtureの推奨",
+            "priority": "P1",
+            "usage_state": "not_applicable"
+          },
+          "worker": "mcp-fixture-worker",
+          "attempts": 1,
+          "deadline": "2026-10-16T18:41:05.301609+09:00",
+          "event_id": "scope:automation-issue@VU5KMSRYZUMABJ2BSBGGWPWUFQ",
+          "target_id": "scope:automation-issue",
+          "created_at": "2026-10-16T18:39:33.288614+09:00",
+          "updated_at": "2026-10-16T18:39:33.327104+09:00",
+          "lease_until": null,
+          "workspace_id": "mcp-one",
+          "definition_id": "policy:ui-triage",
+          "has_checkpoint": false,
+          "target_version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ",
+          "control_version": "0",
+          "definition_version": "FWQI4BLCVDZ3VVLI3CLZ6NLFFA"
+        },
+        {
+          "id": "SJMAN2WND4GKFA43P5I34PR7KL",
+          "kind": "triage",
+          "refs": [
+            {
+              "id": "scope:automation-issue",
+              "version": "VJEV6NTA7OQCYEYXA5XHDH6OCN"
+            }
+          ],
+          "state": "blocked",
+          "due_at": "2026-10-16T18:39:33.065624+09:00",
+          "reason": "policy_unset",
+          "result": null,
+          "worker": "",
+          "attempts": 0,
+          "deadline": null,
+          "event_id": "scope:automation-issue@VJEV6NTA7OQCYEYXA5XHDH6OCN",
+          "target_id": "scope:automation-issue",
+          "created_at": "2026-10-16T18:39:33.065624+09:00",
+          "updated_at": "2026-10-16T18:39:33.065624+09:00",
+          "lease_until": null,
+          "workspace_id": "mcp-one",
+          "definition_id": "",
+          "has_checkpoint": false,
+          "target_version": "VJEV6NTA7OQCYEYXA5XHDH6OCN",
+          "control_version": "0",
+          "definition_version": ""
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "mcp-one",
+      "position": "5PLKZMVCDXDRK5G2FD23FNWEGH",
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  },
+  "history": {
+    "data": {
+      "items": [
+        {
+          "at": "2026-10-16T18:44:12.280858+09:00",
+          "state": "waiting",
+          "reason": "",
+          "worker": "",
+          "attempt": 0,
+          "position": 104,
+          "has_checkpoint": false
+        },
+        {
+          "at": "2026-10-16T18:49:55.535252+09:00",
+          "state": "stopped",
+          "reason": "管理画面から停止",
+          "worker": "",
+          "attempt": 0,
+          "position": 105,
+          "has_checkpoint": false
+        },
+        {
+          "at": "2026-10-16T18:50:10.129134+09:00",
+          "state": "waiting",
+          "reason": "管理画面から明示再開",
+          "worker": "",
+          "attempt": 0,
+          "position": 106,
+          "has_checkpoint": false
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "mcp-one",
+      "position": "S3MQU5KNEDEM6CGZWPKAS54WVJ",
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  },
+  "after_activation": {
+    "data": {
+      "items": [
+        {
+          "id": "AXOJ6CCGYLYU32DGYWHYCCE2OG",
+          "kind": "triage",
+          "refs": [
+            {
+              "id": "scope:automation-issue",
+              "version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ"
+            },
+            {
+              "id": "activation:ui-triage",
+              "version": "7FEASOZ5JJUWMHTUVYKM2DFF7A"
+            },
+            {
+              "id": "policy:ui-triage",
+              "version": "FWQI4BLCVDZ3VVLI3CLZ6NLFFA"
+            },
+            {
+              "id": "scope:automation-issue",
+              "version": ""
+            }
+          ],
+          "state": "done",
+          "due_at": "2026-10-16T18:39:33.288614+09:00",
+          "reason": "",
+          "result": {
+            "refs": [],
+            "usage": [],
+            "reason": "受入fixtureの推奨",
+            "priority": "P1",
+            "usage_state": "not_applicable"
+          },
+          "worker": "mcp-fixture-worker",
+          "attempts": 1,
+          "deadline": "2026-10-16T18:41:05.301609+09:00",
+          "event_id": "scope:automation-issue@VU5KMSRYZUMABJ2BSBGGWPWUFQ",
+          "target_id": "scope:automation-issue",
+          "created_at": "2026-10-16T18:39:33.288614+09:00",
+          "updated_at": "2026-10-16T18:39:33.327104+09:00",
+          "lease_until": null,
+          "workspace_id": "mcp-one",
+          "definition_id": "policy:ui-triage",
+          "has_checkpoint": false,
+          "target_version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ",
+          "control_version": "0",
+          "definition_version": "FWQI4BLCVDZ3VVLI3CLZ6NLFFA"
+        },
+        {
+          "id": "SJMAN2WND4GKFA43P5I34PR7KL",
+          "kind": "triage",
+          "refs": [
+            {
+              "id": "scope:automation-issue",
+              "version": "VJEV6NTA7OQCYEYXA5XHDH6OCN"
+            }
+          ],
+          "state": "blocked",
+          "due_at": "2026-10-16T18:39:33.065624+09:00",
+          "reason": "policy_unset",
+          "result": null,
+          "worker": "",
+          "attempts": 0,
+          "deadline": null,
+          "event_id": "scope:automation-issue@VJEV6NTA7OQCYEYXA5XHDH6OCN",
+          "target_id": "scope:automation-issue",
+          "created_at": "2026-10-16T18:39:33.065624+09:00",
+          "updated_at": "2026-10-16T18:39:33.065624+09:00",
+          "lease_until": null,
+          "workspace_id": "mcp-one",
+          "definition_id": "",
+          "has_checkpoint": false,
+          "target_version": "VJEV6NTA7OQCYEYXA5XHDH6OCN",
+          "control_version": "0",
+          "definition_version": ""
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "mcp-one",
+      "position": "KQZ23FQYA4TMDYSEPT3JAPJ7MD",
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  },
+  "jobs": {
+    "data": {
+      "items": [
+        {
+          "id": "AXOJ6CCGYLYU32DGYWHYCCE2OG",
+          "kind": "triage",
+          "refs": [
+            {
+              "id": "scope:automation-issue",
+              "version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ"
+            },
+            {
+              "id": "activation:ui-triage",
+              "version": "7FEASOZ5JJUWMHTUVYKM2DFF7A"
+            },
+            {
+              "id": "policy:ui-triage",
+              "version": "FWQI4BLCVDZ3VVLI3CLZ6NLFFA"
+            },
+            {
+              "id": "scope:automation-issue",
+              "version": ""
+            }
+          ],
+          "state": "done",
+          "due_at": "2026-10-16T18:39:33.288614+09:00",
+          "reason": "",
+          "result": {
+            "refs": [],
+            "usage": [],
+            "reason": "受入fixtureの推奨",
+            "priority": "P1",
+            "usage_state": "not_applicable"
+          },
+          "worker": "mcp-fixture-worker",
+          "attempts": 1,
+          "deadline": "2026-10-16T18:41:05.301609+09:00",
+          "event_id": "scope:automation-issue@VU5KMSRYZUMABJ2BSBGGWPWUFQ",
+          "target_id": "scope:automation-issue",
+          "created_at": "2026-10-16T18:39:33.288614+09:00",
+          "updated_at": "2026-10-16T18:39:33.327104+09:00",
+          "lease_until": null,
+          "workspace_id": "mcp-one",
+          "definition_id": "policy:ui-triage",
+          "has_checkpoint": false,
+          "target_version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ",
+          "control_version": "0",
+          "definition_version": "FWQI4BLCVDZ3VVLI3CLZ6NLFFA"
+        },
+        {
+          "id": "HINT34WR6KSGOJ4GEKT4TTQWZB",
+          "kind": "triage",
+          "refs": [
+            {
+              "id": "scope:automation-issue",
+              "version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ"
+            },
+            {
+              "id": "activation:ui-triage",
+              "version": "7DVX2RJPAA425YVLESTUTPWOBN"
+            },
+            {
+              "id": "policy:ui-triage",
+              "version": "232HZVWJ22I4JDCTWSX2FHCEXM"
+            },
+            {
+              "id": "scope:automation-issue",
+              "version": ""
+            }
+          ],
+          "state": "waiting",
+          "due_at": "2026-10-16T18:50:10.129134+09:00",
+          "reason": "管理画面から明示再開",
+          "result": null,
+          "worker": "",
+          "attempts": 0,
+          "deadline": null,
+          "event_id": "explicit:scope:automation-issue@VU5KMSRYZUMABJ2BSBGGWPWUFQ",
+          "target_id": "scope:automation-issue",
+          "created_at": "2026-10-16T18:44:12.280858+09:00",
+          "updated_at": "2026-10-16T18:50:10.129134+09:00",
+          "lease_until": null,
+          "workspace_id": "mcp-one",
+          "definition_id": "policy:ui-triage",
+          "has_checkpoint": false,
+          "target_version": "VU5KMSRYZUMABJ2BSBGGWPWUFQ",
+          "control_version": "FQHLZWBFSBGBGSH364T4W75OVA",
+          "definition_version": "232HZVWJ22I4JDCTWSX2FHCEXM"
+        },
+        {
+          "id": "SJMAN2WND4GKFA43P5I34PR7KL",
+          "kind": "triage",
+          "refs": [
+            {
+              "id": "scope:automation-issue",
+              "version": "VJEV6NTA7OQCYEYXA5XHDH6OCN"
+            }
+          ],
+          "state": "blocked",
+          "due_at": "2026-10-16T18:39:33.065624+09:00",
+          "reason": "policy_unset",
+          "result": null,
+          "worker": "",
+          "attempts": 0,
+          "deadline": null,
+          "event_id": "scope:automation-issue@VJEV6NTA7OQCYEYXA5XHDH6OCN",
+          "target_id": "scope:automation-issue",
+          "created_at": "2026-10-16T18:39:33.065624+09:00",
+          "updated_at": "2026-10-16T18:39:33.065624+09:00",
+          "lease_until": null,
+          "workspace_id": "mcp-one",
+          "definition_id": "",
+          "has_checkpoint": false,
+          "target_version": "VJEV6NTA7OQCYEYXA5XHDH6OCN",
+          "control_version": "0",
+          "definition_version": ""
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "mcp-one",
+      "position": "S3MQU5KNEDEM6CGZWPKAS54WVJ",
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  }
+}
