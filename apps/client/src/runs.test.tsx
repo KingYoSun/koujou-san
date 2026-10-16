@@ -42,4 +42,22 @@ it("keeps process success, inspection failure, unknown observation and cancellat
   );
   expect(invalid).toContain("形式不正");
   expect(invalid).not.toContain("PASS");
+  const completedWithoutStop = renderToStaticMarkup(
+    <RunStatus
+      value={{
+        ...base,
+        cancel_requested: true,
+        execution: {
+          environment: "windows",
+          version: "fixed",
+          version_observed: true,
+          pause: false,
+          stop: false,
+        },
+      }}
+    />,
+  );
+  expect(completedWithoutStop).toContain("正常終了");
+  expect(completedWithoutStop).toContain("停止: 未対応");
+  expect(completedWithoutStop).not.toContain("実終了を待ちます");
 });

@@ -21,7 +21,11 @@ pub fn run() {
             run_export::export_run,
             runner::runner_configure,
             runner::runner_contact,
-            runner::prepare_run
+            runner::prepare_run,
+            runner::runner_execution_save,
+            runner::runner_start,
+            runner::runner_status,
+            runner::runner_stop_accepting
         ])
         .run(tauri::generate_context!())
         .expect("failed to run koujou-san desktop");
@@ -31,3 +35,7 @@ mod run_export;
 mod sync_store;
 
 mod runner;
+
+pub fn run_background_runner() {
+    runner::background_entry();
+}

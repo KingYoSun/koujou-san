@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { syncRequest } from "./auth";
 import { SyncHTTPError } from "./sync-error";
 import { RunnerSettings } from "./runner-settings";
+import { ExecutionSettings } from "./execution-settings";
 
 type Ref = { id: string; version: string };
 type RecordVersion = Ref & { run_id: string; kind: string; value: unknown };
@@ -30,6 +31,14 @@ type Assignment = {
   prepared_at?: string;
 };
 type Run = {
+  active_pause?: Ref;
+  execution?: {
+    environment: string;
+    version: string;
+    version_observed: boolean;
+    pause: boolean;
+    stop: boolean;
+  };
   assignment?: Assignment;
   preparation?: string;
   name?: string;
@@ -92,6 +101,21 @@ export function RunStatus({ value }: { value: Run }) {
       {value.cancel_requested && value.state !== "cancelled" && (
         <p>取消要求あり。取消の完了は確認していません。</p>
       )}
+      {value.execution && (
+        <p>
+          実行環境: {value.execution.environment} / 接続版:{" "}
+          {value.execution.version}（
+          {value.execution.version_observed ? "起動前に確認" : "接続の申告値"}
+          ）/ 対話: {value.execution.pause ? "対応" : "未対応"} / 停止:{" "}
+          {value.execution.stop ? "対応" : "未対応"}
+        </p>
+      )}
+      {value.cancel_requested &&
+        value.execution &&
+        !value.execution.stop &&
+        ["queued", "running", "paused"].includes(value.state) && (
+          <p>この接続は停止に対応していません。CLIの実終了を待ちます。</p>
+        )}
       {value.assessment && (
         <p>
           派生契約の確認:{" "}
@@ -295,7 +319,7 @@ export function RunRecords({
     <details className="team-details">
       <summary>Run・入力・Pause・出力</summary>
       <p>
-        入力・回答・割当と、準備完了・プロセス開始を分けて記録します。実CLI起動はまだ接続していません。
+        入力・回答・割当と、準備完了・プロセス開始を分けて記録します。実CLIは有効な割当と端末内の接続設定を照合して起動します。
       </p>
       <div className="team-controls">
         <button
@@ -374,6 +398,10 @@ export function RunRecords({
                   capability_unconfirmed: "能力未確認",
                   capability_missing: "必要能力が不足",
                   binding_missing: "入力方式が未対応",
+                  local_configuration_missing:
+                    "端末内のprogram・接続版・作業場所を確認してください",
+                  input_binding_unsupported: "端末の接続が入力方式を扱えません",
+                  process_start_failed: "端末でプロセスを起動できませんでした",
                 } as Record<string, string>
               )[runValue.preparation] ?? runValue.preparation}
             </p>
@@ -721,10 +749,20 @@ export function RunRecords({
                                   disabled={!answer}
                                   onClick={() =>
                                     void run(async () => {
+                                      const latest = await read({
+                                        id: current.id,
+                                        version: "head",
+                                      });
+                                      const latestRun = latest.value as Run;
+                                      if (
+                                        latestRun.state !== "paused" ||
+                                        latestRun.active_pause?.id !== record.id
+                                      )
+                                        throw Error("pause_changed");
                                       await mutate(
                                         current.id,
                                         "answer",
-                                        current.version,
+                                        latest.version,
                                         {
                                           pause_id: pause.id,
                                           value: jsonAnswer
@@ -767,6 +805,12 @@ export function RunRecords({
             </>
           )}
         </>
+      )}
+      {native && canEdit && (
+        <ExecutionSettings
+          key={`execution/${workspace}`}
+          workspace={workspace}
+        />
       )}
       {native && canEdit && (
         <RunnerSettings key={workspace} workspace={workspace} user={user} />

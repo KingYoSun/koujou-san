@@ -1,0 +1,528 @@
+use super::*;
+use crate::auth::{DeviceClient, RuntimeBinding};
+use journal::Journal;
+use std::{
+    collections::HashMap,
+    io::{BufRead, BufReader, Read, Write},
+    sync::Arc,
+    thread,
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
+};
+
+struct Api {
+    client: Arc<DeviceClient>,
+    id: String,
+    generation: String,
+}
+impl Api {
+    fn request(&self, action: &str, method: &str, body: Value) -> Result<Value, String> {
+        let ws = &self.client.binding.workspace;
+        self.client.request(
+            &["runs", "workspaces", ws, "executions", &self.id, action],
+            method,
+            body,
+            &[("generation", &self.generation)],
+        )
+    }
+    fn state(&self) -> Result<Value, String> {
+        self.request("runner-state", "GET", Value::Null)
+    }
+    fn connection(&self, unknown: bool) -> Result<(), String> {
+        let state = self.state()?;
+        if matches!(
+            state["value"]["state"].as_str(),
+            Some("succeeded" | "failed" | "cancelled")
+        ) {
+            return Ok(());
+        }
+        self.request("connection","POST",json!({"operation_id":Uuid::new_v4().to_string(),"expected_version":state["run"]["version"],"generation":self.generation,"unknown":unknown}))?;
+        Ok(())
+    }
+    fn drain(&self, journal: &Journal) -> Result<(), String> {
+        for _ in 0..32 {
+            let Some((position, operation, mut body)) = journal.pending(&self.id)? else {
+                return Ok(());
+            };
+            for retry in 0..2 {
+                if body.get("operation_id").is_none() || retry > 0 {
+                    let state = self.state()?;
+                    let sequence = state["value"]["reported_through"]
+                        .as_str()
+                        .ok_or("invalid_runner_state")?
+                        .parse::<u64>()
+                        .map_err(|_| "invalid_runner_state")?
+                        + 1;
+                    body["operation_id"] = json!(operation);
+                    body["expected_version"] = state["run"]["version"].clone();
+                    body["sequence"] = json!(sequence.to_string());
+                    body["generation"] = json!(self.generation);
+                }
+                journal.attempted(position, &body)?;
+                match self.request("report", "POST", body.clone()) {
+                    Ok(_) => {
+                        journal.sent(position)?;
+                        break;
+                    }
+                    Err(e) if e == "version_conflict" && retry == 0 => continue,
+                    Err(e) => return Err(e),
+                }
+            }
+        }
+        Ok(())
+    }
+    fn event(&self, journal: &Journal, value: Value) -> Result<(), String> {
+        journal.enqueue(&self.id, &value)?;
+        self.drain(journal)
+    }
+}
+fn publish(
+    client: &DeviceClient,
+    config: &Configuration,
+    profiles: &execution::ExecutionSettings,
+) -> Result<(), String> {
+    let ws = &client.binding.workspace;
+    let current = client.request(
+        &["runs", "workspaces", ws, "runner", "self"],
+        "GET",
+        Value::Null,
+        &[],
+    )?;
+    let mut connections = config.connections.clone();
+    for connection in &mut connections {
+        if let Some(adapter) = execution::selected(profiles, connection) {
+            if let Some(caps) = connection["capabilities"].as_array_mut() {
+                caps.retain(|c| {
+                    if c == "pause" {
+                        adapter.protocol == "jsonl-v1"
+                    } else if c == "stop" {
+                        adapter.stop_supported && adapter.wsl.is_empty()
+                    } else {
+                        true
+                    }
+                });
+            }
+        }
+    }
+    client.request(&["runs","workspaces",ws,"runner"],"POST",json!({"operation_id":Uuid::new_v4().to_string(),"expected_version":current["version"],"runner_id":config.runner_id,"connections":connections}),&[])?;
+    Ok(())
+}
+fn reader(
+    stream: impl Read + Send + 'static,
+    journal: Journal,
+    id: String,
+    device: String,
+    protocol: String,
+    source: String,
+    channel: &'static str,
+    structured: bool,
+) -> thread::JoinHandle<Result<(), String>> {
+    thread::spawn(move || {
+        let mut input = BufReader::new(stream);
+        let mut bytes = Vec::new();
+        loop {
+            bytes.clear();
+            let n = input
+                .read_until(b'\n', &mut bytes)
+                .map_err(|_| "cli_output_unavailable")?;
+            if n == 0 {
+                break;
+            }
+            let position = journal.log(&id, channel, &bytes)?;
+            if channel == "stdout" {
+                if let Some(report) = protocol::result(&protocol, &bytes, structured) {
+                    journal.result(&id, &report)?;
+                }
+            }
+            for value in
+                protocol::frames(&protocol, &device, &id, position, channel, &source, &bytes)
+            {
+                journal.enqueue(&id, &value)?;
+            }
+        }
+        Ok(())
+    })
+}
+fn run_one(
+    api: Api,
+    journal: Journal,
+    config: Configuration,
+    profiles: execution::ExecutionSettings,
+) -> Result<(), String> {
+    let root = &api.client.binding.root;
+    api.connection(false)?;
+    let assigned = api.request("assigned-input", "GET", Value::Null)?;
+    journal.input(&api.id, &assigned)?;
+    let Some(adapter) = execution::selected(&profiles, &assigned["spec"]["input"]["command"])
+    else {
+        api.event(
+            &journal,
+            json!({"type":"preparation-blocked","source":"local_configuration_missing"}),
+        )?;
+        journal.phase(&api.id, "blocked", None)?;
+        return Ok(());
+    };
+    let area = match execution::repository(&assigned, &config, Some(adapter), root) {
+        Ok(v) => v,
+        Err(_) => {
+            api.event(
+                &journal,
+                json!({"type":"preparation-blocked","source":"local_configuration_missing"}),
+            )?;
+            journal.phase(&api.id, "blocked", None)?;
+            return Ok(());
+        }
+    };
+    let mut prepared = match execution::prepare(root, &assigned, adapter, area.as_deref()) {
+        Ok(v) => v,
+        Err(e) => {
+            let reason = if e == "input_binding_unsupported" {
+                e
+            } else {
+                "local_configuration_missing".into()
+            };
+            api.event(
+                &journal,
+                json!({"type":"preparation-blocked","source":reason}),
+            )?;
+            journal.phase(&api.id, "blocked", None)?;
+            return Ok(());
+        }
+    };
+    if assigned["assignment"]["prepared_at"].is_null() {
+        api.event(
+            &journal,
+            json!({"type":"prepared","prepared_area":assigned["assignment"]["area"]}),
+        )?;
+    }
+    let observed_version = match prepared.verify_version(
+        assigned["assignment"]["connection"]["version"]
+            .as_str()
+            .unwrap_or(""),
+    ) {
+        Ok(v) => v,
+        Err(_) => {
+            api.event(
+                &journal,
+                json!({"type":"preparation-blocked","source":"local_configuration_missing"}),
+            )?;
+            journal.phase(&api.id, "blocked", None)?;
+            return Ok(());
+        }
+    };
+    // Resolve current authorization after all Git/file preparation, immediately
+    // before the actual task process. No program is inferred from a shared target.
+    let current = api.request("assigned-input", "GET", Value::Null)?;
+    if current["assignment"]["input"] != assigned["assignment"]["input"]
+        || current["assignment"]["area"] != assigned["assignment"]["area"]
+    {
+        return Err("assignment_changed".into());
+    }
+    if api.state()?["value"]["cancel_requested"] == true {
+        api.event(&journal, json!({"type":"cancelled"}))?;
+        journal.phase(&api.id, "completed", None)?;
+        return Ok(());
+    }
+    journal.phase(&api.id, "starting", None)?;
+    let mut child = match prepared.command.spawn() {
+        Ok(child) => child,
+        Err(_) => {
+            api.event(
+                &journal,
+                json!({"type":"preparation-blocked","source":"process_start_failed"}),
+            )?;
+            journal.phase(&api.id, "blocked", None)?;
+            return Ok(());
+        }
+    };
+    journal.phase(&api.id, "running", Some(child.id()))?;
+    journal.enqueue(&api.id,&json!({"type":"started","execution":{"environment":if adapter.wsl.is_empty(){"windows".to_owned()}else{format!("wsl:{}",adapter.wsl)},"version":assigned["assignment"]["connection"]["version"],"version_observed":observed_version,"pause":prepared.protocol=="jsonl-v1","stop":prepared.stop_supported&&adapter.wsl.is_empty()}}))?;
+    let device = assigned["assignment"]["device_id"]
+        .as_str()
+        .unwrap_or("")
+        .to_owned();
+    let source = assigned["spec"]["input"]["command"]["target"]
+        .as_str()
+        .unwrap_or("")
+        .to_owned();
+    let stdout = reader(
+        child.stdout.take().ok_or("cli_output_unavailable")?,
+        journal.clone(),
+        api.id.clone(),
+        device.clone(),
+        prepared.protocol.clone(),
+        source.clone(),
+        "stdout",
+        !assigned["spec"]["derivation"]["result_schema"].is_null(),
+    );
+    let stderr = reader(
+        child.stderr.take().ok_or("cli_output_unavailable")?,
+        journal.clone(),
+        api.id.clone(),
+        device,
+        prepared.protocol.clone(),
+        source,
+        "stderr",
+        false,
+    );
+    let mut online = api.drain(&journal).is_ok();
+    let mut stdin = child.stdin.take();
+    if let Some(input) = stdin.as_mut() {
+        if input
+            .write_all(&prepared.input)
+            .and_then(|_| input.flush())
+            .is_err()
+        {
+            online = false;
+        }
+    }
+    if prepared.protocol != "jsonl-v1" {
+        drop(stdin.take());
+    }
+    let mut renewal = Instant::now();
+    let mut stopped = false;
+    loop {
+        if let Some(status) = child.try_wait().map_err(|_| "cli_status_unavailable")? {
+            stdout.join().map_err(|_| "cli_output_unavailable")??;
+            stderr.join().map_err(|_| "cli_output_unavailable")??;
+            journal.enqueue(&api.id,&json!({"type":if stopped{"cancelled"}else{"finished"},"exit_code":status.code().unwrap_or(-1),"report":journal.final_result(&api.id)?}))?;
+            // The source process has ended; unsent facts remain durable until accepted.
+            loop {
+                let _ = api.connection(!online);
+                if api.drain(&journal).is_ok() && journal.pending(&api.id)?.is_none() {
+                    journal.phase(&api.id, "completed", None)?;
+                    return Ok(());
+                }
+                journal.phase(&api.id, "unconfirmed", None)?;
+                thread::sleep(Duration::from_secs(1));
+            }
+        }
+        if renewal.elapsed() >= Duration::from_secs(30) || !online {
+            online = api.connection(!online).is_ok();
+            renewal = Instant::now();
+        }
+        if online {
+            online = api.drain(&journal).is_ok();
+        }
+        if let Ok(state) = api.state() {
+            if state["value"]["cancel_requested"] == true
+                && prepared.stop_supported
+                && adapter.wsl.is_empty()
+                && !stopped
+            {
+                stopped = child.kill().is_ok();
+            }
+            let pause = &state["pause"];
+            if online && pause["state"] == "received" && prepared.protocol == "jsonl-v1" {
+                let response = pause["response_id"]
+                    .as_str()
+                    .ok_or("invalid_runner_state")?;
+                if journal.claim_response(&api.id, response)? {
+                    // Queue the delivery fact before writing, so the child's immediate resume
+                    // event cannot overtake it. It is sent only after the write succeeds.
+                    journal.enqueue(
+                        &api.id,
+                        &json!({"type":"delivered","pause_id":pause["id"],"response_id":response}),
+                    )?;
+                    let mut answer=serde_json::to_vec(&json!({"type":"answer","pause_id":pause["id"],"response_id":response,"value":pause["response"]})).map_err(|_|"invalid_runner_state")?;
+                    answer.push(b'\n');
+                    if stdin
+                        .as_mut()
+                        .ok_or("cli_input_unavailable")?
+                        .write_all(&answer)
+                        .and_then(|_| stdin.as_mut().unwrap().flush())
+                        .is_err()
+                    {
+                        journal.phase(&api.id, "unconfirmed", None)?;
+                        return Err("cli_delivery_unconfirmed".into());
+                    }
+                    online = api.drain(&journal).is_ok();
+                }
+            }
+        }
+        if !online {
+            journal.phase(&api.id, "unconfirmed", None)?;
+        }
+        thread::sleep(Duration::from_millis(250));
+    }
+}
+fn lock(root: &Path) -> Result<rusqlite::Connection, String> {
+    let db = rusqlite::Connection::open(root.join("runner-lock.sqlite"))
+        .map_err(|_| "runner_lock_unavailable")?;
+    db.execute_batch("BEGIN EXCLUSIVE")
+        .map_err(|_| "runner_already_running")?;
+    Ok(db)
+}
+fn serve(binding: RuntimeBinding) -> Result<(), String> {
+    let root = binding.root.clone();
+    fs::create_dir_all(&root).map_err(|_| "runner_directory_failed")?;
+    let _guard = lock(&root)?;
+    let client = Arc::new(DeviceClient::open(binding)?);
+    let journal = Journal::open(&root)?;
+    let mut jobs: HashMap<String, thread::JoinHandle<()>> = HashMap::new();
+    let mut contact = Instant::now() - Duration::from_secs(60);
+    let recovered = journal.recover_unknown()?;
+    let mut recovered = recovered.into_iter().collect::<HashMap<_, _>>();
+    let mut connected = false;
+    loop {
+        jobs.retain(|_, job| !job.is_finished());
+        let config = config(&root)?;
+        let profiles = execution::settings(&root)?;
+        if contact.elapsed() >= Duration::from_secs(30) {
+            connected = publish(&client, &config, &profiles).is_ok();
+            if connected {
+                contact = Instant::now();
+            }
+        }
+        if connected {
+            recovered.retain(|id, generation| {
+                let api = Api {
+                    client: client.clone(),
+                    id: id.clone(),
+                    generation: generation.clone(),
+                };
+                api.connection(true).is_err()
+            });
+        }
+        let stopping = root.join("stop-accepting").exists();
+        if !stopping && connected {
+            let mut after = String::new();
+            loop {
+                let ws = &client.binding.workspace;
+                let page = client.request(
+                    &["runs", "workspaces", ws, "runner", "assignments"],
+                    "GET",
+                    Value::Null,
+                    &[("after", &after)],
+                );
+                let Ok(page) = page else {
+                    connected = false;
+                    break;
+                };
+                for state in page["items"].as_array().ok_or("invalid_runner_state")? {
+                    let Some(id) = state["run"]["id"].as_str() else {
+                        continue;
+                    };
+                    if jobs.contains_key(id)
+                        || state["value"]["assignment"]["runner_id"] != config.runner_id
+                    {
+                        continue;
+                    }
+                    let generation = state["value"]["assignment"]["generation"]
+                        .as_str()
+                        .ok_or("invalid_runner_state")?;
+                    use sha2::{Digest, Sha256};
+                    let hash = format!(
+                        "{:x}",
+                        Sha256::digest(
+                            serde_json::to_vec(&profiles)
+                                .map_err(|_| "invalid_execution_configuration")?
+                        )
+                    );
+                    if !journal.begin(id, generation, &hash)? {
+                        continue;
+                    }
+                    let api = Api {
+                        client: client.clone(),
+                        id: id.to_owned(),
+                        generation: generation.to_owned(),
+                    };
+                    let own = journal.clone();
+                    let cfg = config.clone();
+                    let settings = profiles.clone();
+                    let run = id.to_owned();
+                    jobs.insert(
+                        id.to_owned(),
+                        thread::spawn(move || {
+                            if run_one(api, own.clone(), cfg, settings).is_err() {
+                                let _ = own.phase(&run, "unknown", None);
+                            }
+                        }),
+                    );
+                }
+                after = page["next"].as_str().unwrap_or("").to_owned();
+                if after.is_empty() {
+                    break;
+                }
+            }
+        }
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        let summary = journal.summary()?;
+        fs::write(root.join("runner-status.json"),serde_json::to_vec(&json!({"pid":std::process::id(),"last_seen":now,"connected":connected,"accepting":!stopping,"active":jobs.len(),"journal":summary})).map_err(|_|"runner_status_failed")?).map_err(|_|"runner_status_failed")?;
+        if stopping && jobs.is_empty() {
+            break;
+        }
+        thread::sleep(Duration::from_secs(1));
+    }
+    Ok(())
+}
+pub(crate) fn main_entry() {
+    let mut args = std::env::args().skip(1);
+    if args.next().as_deref() != Some("--binding") {
+        return;
+    }
+    let Some(file) = args.next() else { return };
+    let result = fs::read(file)
+        .map_err(|_| "runner_binding_unavailable".to_owned())
+        .and_then(|raw| {
+            serde_json::from_slice::<RuntimeBinding>(&raw)
+                .map_err(|_| "invalid_runner_binding".to_owned())
+        })
+        .and_then(serve);
+    if result.is_err() {
+        std::process::exit(1)
+    }
+}
+pub(super) fn start(auth: &Auth, workspace: &str) -> Result<Value, String> {
+    let binding = auth.runner_binding(workspace)?;
+    fs::create_dir_all(&binding.root).map_err(|_| "runner_directory_failed")?;
+    if execution::settings(&binding.root)?.adapters.is_empty() {
+        return Err("local_configuration_missing".into());
+    }
+    let file = binding.root.join("binding.json");
+    fs::write(
+        &file,
+        serde_json::to_vec(&binding).map_err(|_| "runner_binding_unavailable")?,
+    )
+    .map_err(|_| "runner_binding_unavailable")?;
+    let _ = fs::remove_file(binding.root.join("stop-accepting"));
+    let executable = std::env::current_exe()
+        .map_err(|_| "runner_binary_unavailable")?
+        .with_file_name(if cfg!(windows) {
+            "koujou-san-runner.exe"
+        } else {
+            "koujou-san-runner"
+        });
+    let mut command = Command::new(executable);
+    command
+        .arg("--binding")
+        .arg(file)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000 | 0x00000200);
+    }
+    let child = command.spawn().map_err(|_| "runner_binary_unavailable")?;
+    Ok(json!({"requested":true,"pid":child.id(),"command_started":false}))
+}
+pub(super) fn status(auth: &Auth, workspace: &str) -> Result<Value, String> {
+    let root = auth.runner_storage(workspace)?;
+    if !root.exists() {
+        return Ok(json!({"running":false}));
+    }
+    let running = match lock(&root) {
+        Ok(_) => false,
+        Err(e) if e == "runner_already_running" => true,
+        Err(e) => return Err(e),
+    };
+    let value = fs::read(root.join("runner-status.json"))
+        .ok()
+        .and_then(|s| serde_json::from_slice::<Value>(&s).ok())
+        .unwrap_or(Value::Null);
+    Ok(json!({"running":running,"last_observation":value}))
+}

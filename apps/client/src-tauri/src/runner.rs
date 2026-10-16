@@ -10,7 +10,7 @@ use std::{
 use tauri::Manager;
 use uuid::Uuid;
 
-#[derive(Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Deserialize, Serialize)]
 struct Configuration {
     runner_id: String,
     connections: Vec<Value>,
@@ -201,13 +201,9 @@ pub async fn prepare_run(
         let assigned=auth.runner_request(&workspace,&["runs","workspaces",&workspace,"executions",&id,"assigned-input"],"GET",Value::Null,&[("generation",&generation)])?;
         if assigned["assignment"]["runner_id"]!=configuration.runner_id{return Err("runner_identity_mismatch".into())}
         let a=&assigned["assignment"];
-        let mut path=None;
-        if !a["repository"].is_null(){
-            let repo_id=a["repository"]["id"].as_str().ok_or("invalid_assignment")?;
-            let repo=configuration.repositories.get(repo_id).ok_or("repository_not_configured")?;
-            let area:Area=serde_json::from_value(a["area"].clone()).map_err(|_|"invalid_assignment")?;
-            path=Some(prepare_area(repo,&root.join("worktrees"),&area)?);
-        }
+        let profiles=execution::settings(&root)?;
+        let adapter=execution::selected(&profiles,&assigned["spec"]["input"]["command"]);
+        let path=execution::repository(&assigned,&configuration,adapter,&root)?;
         // Recheck current permission and generation after Git I/O, before reporting readiness.
         let current=auth.runner_request(&workspace,&["runs","workspaces",&workspace,"executions",&id,"assigned-input"],"GET",Value::Null,&[("generation",&generation)])?;
         if current["assignment"]["input"]!=a["input"]||current["assignment"]["area"]!=a["area"]{return Err("assignment_changed".into())}
@@ -312,4 +308,75 @@ mod tests {
         assert!(root.starts_with(std::env::temp_dir()));
         fs::remove_dir_all(root).unwrap();
     }
+}
+
+mod execution;
+
+#[tauri::command]
+pub async fn runner_execution_save(
+    app: tauri::AppHandle,
+    workspace: String,
+    adapter: Value,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let auth = app.state::<Auth>();
+        let root = auth.runner_storage(&workspace)?;
+        let adapter: execution::Adapter =
+            serde_json::from_value(adapter).map_err(|_| "invalid_execution_configuration")?;
+        if adapter.kind.is_empty() || adapter.target.is_empty() || adapter.program.is_empty() {
+            return Err("invalid_execution_configuration".into());
+        }
+        let mut settings = execution::settings(&root)?;
+        settings
+            .adapters
+            .retain(|a| a.kind != adapter.kind || a.target != adapter.target);
+        settings.adapters.push(adapter);
+        settings.revision = Uuid::new_v4().to_string();
+        fs::create_dir_all(&root).map_err(|_| "execution_configuration_unavailable")?;
+        let temp = root.join(format!("execution-{}.tmp", Uuid::new_v4()));
+        fs::write(
+            &temp,
+            serde_json::to_vec(&settings).map_err(|_| "invalid_execution_configuration")?,
+        )
+        .map_err(|_| "execution_configuration_unavailable")?;
+        fs::rename(temp, root.join("execution.json"))
+            .map_err(|_| "execution_configuration_unavailable")?;
+        Ok(json!({"configured":true,"process_started":false}))
+    })
+    .await
+    .map_err(|_| "runner_task_failed")?
+}
+
+mod journal;
+mod protocol;
+mod runtime;
+pub(crate) fn background_entry() {
+    runtime::main_entry();
+}
+#[tauri::command]
+pub async fn runner_start(app: tauri::AppHandle, workspace: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || runtime::start(&app.state::<Auth>(), &workspace))
+        .await
+        .map_err(|_| "runner_task_failed")?
+}
+#[tauri::command]
+pub async fn runner_status(app: tauri::AppHandle, workspace: String) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || runtime::status(&app.state::<Auth>(), &workspace))
+        .await
+        .map_err(|_| "runner_task_failed")?
+}
+#[tauri::command]
+pub async fn runner_stop_accepting(
+    app: tauri::AppHandle,
+    workspace: String,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = app.state::<Auth>().runner_storage(&workspace)?;
+        fs::create_dir_all(&root).map_err(|_| "runner_directory_failed")?;
+        fs::write(root.join("stop-accepting"), b"stop accepting new Runs")
+            .map_err(|_| "runner_status_failed")?;
+        Ok(json!({"accepting":false,"running_commands_stopped":false}))
+    })
+    .await
+    .map_err(|_| "runner_task_failed")?
 }

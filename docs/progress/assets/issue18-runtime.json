@@ -1,0 +1,260 @@
+{
+  "api_origin": "https://127.0.0.1:56326/",
+  "workspace": "runner-ui",
+  "runs": [
+    {
+      "run": "run:cli-plain",
+      "version": "VXUMKHRG6KDFL452ZOBA5QS4X3",
+      "state": "succeeded",
+      "cancel_requested": false,
+      "execution": {
+        "stop": false,
+        "pause": false,
+        "version": "fixture-v1",
+        "environment": "windows",
+        "version_observed": true
+      },
+      "pause_count": 0,
+      "output_records": 3,
+      "unfetched_diagnostic_refs": 0,
+      "export_bytes": 23166,
+      "export_sha256": "3b25428b2e0c3e04e8e0e42349379b9e68e14d9ba7585ef4c2f73542a43364ae",
+      "local_metadata_absent": true
+    },
+    {
+      "run": "run:cli-dialogue",
+      "version": "7GI5YHK4S7XSNRNM5COOWZKUF2",
+      "state": "succeeded",
+      "cancel_requested": false,
+      "execution": {
+        "stop": false,
+        "pause": true,
+        "version": "fixture-v1",
+        "environment": "windows",
+        "version_observed": true
+      },
+      "assessment": {
+        "state": "valid",
+        "report": {
+          "answers": [
+            {
+              "accepted": true,
+              "question": "first"
+            },
+            {
+              "accepted": true,
+              "question": "second"
+            }
+          ],
+          "decision": "PASS"
+        },
+        "verdict": "PASS"
+      },
+      "pause_count": 2,
+      "output_records": 8,
+      "unfetched_diagnostic_refs": 0,
+      "export_bytes": 55128,
+      "export_sha256": "ea5c2b804224c55e0d3b7517ade7af65260917d0ecf89802ff3404db2002bf57",
+      "local_metadata_absent": true
+    },
+    {
+      "run": "run:cli-echo",
+      "version": "Y5RJUEFPCI2EHKTF4CNKSTSW7I",
+      "state": "succeeded",
+      "cancel_requested": false,
+      "execution": {
+        "stop": false,
+        "pause": false,
+        "version": "fixture-v1",
+        "environment": "windows",
+        "version_observed": true
+      },
+      "pause_count": 0,
+      "output_records": 1,
+      "unfetched_diagnostic_refs": 0,
+      "export_bytes": 15132,
+      "export_sha256": "99a0ea09cf04fb0e952cdbd9463f2c8fe2166c7a4351ea65feba90d8bcad7bfe",
+      "local_metadata_absent": true
+    },
+    {
+      "run": "run:cli-stop",
+      "version": "WIWNCNH6F6NBCAXGF2F6D3JQDZ",
+      "state": "cancelled",
+      "cancel_requested": true,
+      "execution": {
+        "stop": true,
+        "pause": false,
+        "version": "fixture-v1",
+        "environment": "windows",
+        "version_observed": true
+      },
+      "pause_count": 0,
+      "output_records": 1,
+      "unfetched_diagnostic_refs": 0,
+      "export_bytes": 19339,
+      "export_sha256": "789e7f7b9a1831cbc19995634c333b18174dd2527922a91031f77e8d29e17a0a",
+      "local_metadata_absent": true
+    },
+    {
+      "run": "run:cli-no-stop",
+      "version": "YDXTZXPHRE7F7R2POGVNIGGYJB",
+      "state": "succeeded",
+      "cancel_requested": true,
+      "execution": {
+        "stop": false,
+        "pause": false,
+        "version": "fixture-v1",
+        "environment": "windows",
+        "version_observed": true
+      },
+      "pause_count": 0,
+      "output_records": 2,
+      "unfetched_diagnostic_refs": 0,
+      "export_bytes": 22050,
+      "export_sha256": "a5374f6d423023fc7c2e026ed6e3a572e6c52c6690342d6081cc1cf5f329c474",
+      "local_metadata_absent": true
+    },
+    {
+      "run": "run:cli-codex-fixed",
+      "version": "3BF464XKCJR4S33F74VTYGQ3OU",
+      "state": "succeeded",
+      "cancel_requested": false,
+      "execution": {
+        "stop": false,
+        "pause": false,
+        "version": "0.162.1",
+        "environment": "windows",
+        "version_observed": true
+      },
+      "assessment": {
+        "state": "valid",
+        "report": {
+          "marker": "KOUJOU_RUNTIME_CLI_OK",
+          "decision": "PASS"
+        },
+        "verdict": "PASS"
+      },
+      "pause_count": 0,
+      "output_records": 9,
+      "unfetched_diagnostic_refs": 8,
+      "export_bytes": 41100,
+      "export_sha256": "1d5cfbd2b189d3045325bd0a318c439294a1d88f391971b925280147e234b2fe",
+      "local_metadata_absent": true
+    },
+    {
+      "run": "run:cli-claude",
+      "version": "FNNL3W4HB3VT3YL2JUCCU46VCY",
+      "state": "succeeded",
+      "cancel_requested": false,
+      "execution": {
+        "stop": false,
+        "pause": false,
+        "version": "2.1.300",
+        "environment": "windows",
+        "version_observed": true
+      },
+      "assessment": {
+        "state": "valid",
+        "report": {
+          "marker": "KOUJOU_RUNTIME_CLI_OK",
+          "decision": "PASS"
+        },
+        "verdict": "PASS"
+      },
+      "pause_count": 0,
+      "output_records": 5,
+      "unfetched_diagnostic_refs": 2,
+      "export_bytes": 34119,
+      "export_sha256": "03dbdffddd4647f87e6d1956cbe8c5b4639e318888310f3418a6820fab743161",
+      "local_metadata_absent": true
+    },
+    {
+      "run": "run:cli-wsl-fixed",
+      "version": "XGJMWJPYBCESLN6FBVAZHX4MHJ",
+      "state": "succeeded",
+      "cancel_requested": false,
+      "execution": {
+        "stop": false,
+        "pause": false,
+        "version": "fixture-v1",
+        "environment": "wsl:Ubuntu-22.04",
+        "version_observed": true
+      },
+      "pause_count": 0,
+      "output_records": 1,
+      "unfetched_diagnostic_refs": 0,
+      "export_bytes": 15635,
+      "export_sha256": "9593cc449dc7fbcb77041f6fd07eab5f1d0b759127a4a785a0e0e4ca30ccc453",
+      "local_metadata_absent": true
+    }
+  ],
+  "checks": {
+    "stdinExact": true,
+    "fileContextExact": true,
+    "promptArgumentLiteral": true,
+    "naturalQuestionDidNotPause": true,
+    "twoDistinctPausesResolved": true,
+    "cli-stop": {
+      "priorEffectRetained": true
+    },
+    "cli-no-stop": {
+      "priorEffectRetained": true
+    }
+  },
+  "repository": {
+    "commit": "cf5ad81b3040920b471c73e38515aa1888b7e629",
+    "runs": [
+      {
+        "run": "run:cli-repo-windows",
+        "area": {
+          "id": "6792c5627ad1f0cb1ee0254dfb29eaaf",
+          "branch": "koujou/run-6792c5627ad1f0cb1ee0254dfb29eaaf",
+          "commit": "cf5ad81b3040920b471c73e38515aa1888b7e629"
+        },
+        "prepared": "2026-10-16T19:11:46.8886886Z",
+        "execution": {
+          "stop": false,
+          "pause": false,
+          "version": "fixture-v1",
+          "environment": "windows",
+          "version_observed": true
+        },
+        "effect": true
+      },
+      {
+        "run": "run:cli-repo-wsl",
+        "area": {
+          "id": "e78c2cb36be501678697b78aa859586c",
+          "branch": "koujou/run-e78c2cb36be501678697b78aa859586c",
+          "commit": "cf5ad81b3040920b471c73e38515aa1888b7e629"
+        },
+        "prepared": "2026-10-16T19:11:48.1937254Z",
+        "execution": {
+          "stop": false,
+          "pause": false,
+          "version": "fixture-v1",
+          "environment": "wsl:Ubuntu-22.04",
+          "version_observed": true
+        },
+        "effect": true
+      }
+    ],
+    "originalUnchanged": true
+  },
+  "refused": [
+    {
+      "run": "run:cli-unsupported",
+      "state": "queued",
+      "preparation": "input_binding_unsupported",
+      "started": false,
+      "assigned": true
+    },
+    {
+      "run": "run:cli-disallowed",
+      "state": "queued",
+      "preparation": "connection_missing",
+      "started": false,
+      "assigned": false
+    }
+  ]
+}

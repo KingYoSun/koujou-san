@@ -56,24 +56,32 @@ type Link struct {
 	Previous Ref `json:"previous"`
 	Next     Ref `json:"next"`
 }
+type ExecutionInfo struct {
+	Environment     string `json:"environment"`
+	Version         string `json:"version"`
+	VersionObserved bool   `json:"version_observed"`
+	Pause           bool   `json:"pause"`
+	Stop            bool   `json:"stop"`
+}
 type Run struct {
-	Assignment           *Assignment `json:"assignment,omitempty"`
-	Preparation          string      `json:"preparation,omitempty"`
-	Name                 string      `json:"name,omitempty"`
-	Input                Ref         `json:"input"`
-	Previous             *Ref        `json:"previous,omitempty"`
-	RequestedBy          string      `json:"requested_by"`
-	CreatedAt            time.Time   `json:"created_at"`
-	ExecutionRequestedAt *time.Time  `json:"execution_requested_at,omitempty"`
-	StartedAt            *time.Time  `json:"started_at,omitempty"`
-	FinishedAt           *time.Time  `json:"finished_at,omitempty"`
-	State                string      `json:"state"`
-	Observation          string      `json:"observation"`
-	ReportedThrough      string      `json:"reported_through"`
-	CancelRequested      bool        `json:"cancel_requested"`
-	ActivePause          *Ref        `json:"active_pause,omitempty"`
-	ExitCode             *int        `json:"exit_code,omitempty"`
-	Assessment           *Assessment `json:"assessment,omitempty"`
+	Execution            *ExecutionInfo `json:"execution,omitempty"`
+	Assignment           *Assignment    `json:"assignment,omitempty"`
+	Preparation          string         `json:"preparation,omitempty"`
+	Name                 string         `json:"name,omitempty"`
+	Input                Ref            `json:"input"`
+	Previous             *Ref           `json:"previous,omitempty"`
+	RequestedBy          string         `json:"requested_by"`
+	CreatedAt            time.Time      `json:"created_at"`
+	ExecutionRequestedAt *time.Time     `json:"execution_requested_at,omitempty"`
+	StartedAt            *time.Time     `json:"started_at,omitempty"`
+	FinishedAt           *time.Time     `json:"finished_at,omitempty"`
+	State                string         `json:"state"`
+	Observation          string         `json:"observation"`
+	ReportedThrough      string         `json:"reported_through"`
+	CancelRequested      bool           `json:"cancel_requested"`
+	ActivePause          *Ref           `json:"active_pause,omitempty"`
+	ExitCode             *int           `json:"exit_code,omitempty"`
+	Assessment           *Assessment    `json:"assessment,omitempty"`
 }
 type PauseRequest struct {
 	ID           string          `json:"id"`
@@ -129,8 +137,9 @@ type Answer struct {
 // Event is reported by the assigned authenticated execution adapter. Receiving a
 // response, delivering it and confirming continuation are separate events.
 type Event struct {
-	Generation   string `json:"generation,omitempty"`
-	PreparedArea *Area  `json:"prepared_area,omitempty"`
+	Execution    *ExecutionInfo `json:"execution,omitempty"`
+	Generation   string         `json:"generation,omitempty"`
+	PreparedArea *Area          `json:"prepared_area,omitempty"`
 	apicontract.Mutation
 	Sequence   string           `json:"sequence"`
 	Type       string           `json:"type"`

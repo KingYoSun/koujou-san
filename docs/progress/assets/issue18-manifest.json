@@ -1,0 +1,195 @@
+{
+  "head": {
+    "id": "run:cli-manifest",
+    "version": "TSPTPPZXGCCR7WJF7IIOWQCIEK",
+    "run_id": "run:cli-manifest",
+    "kind": "run",
+    "position": "201",
+    "value": {
+      "input": {
+        "id": "run-input:cli-manifest",
+        "version": "T2563JJS65TC4X7AVEI4XYP6TP"
+      },
+      "state": "succeeded",
+      "execution": {
+        "stop": false,
+        "pause": false,
+        "version": "fixture-v1",
+        "environment": "windows",
+        "version_observed": true
+      },
+      "exit_code": 0,
+      "assignment": {
+        "input": {
+          "id": "run-input:cli-manifest",
+          "version": "T2563JJS65TC4X7AVEI4XYP6TP"
+        },
+        "required": null,
+        "device_id": "0de624a8-cb1b-4813-9eb1-341b27a3beca",
+        "runner_id": "a5fc144d-74cd-4ca6-a1b4-fef29f145e1e",
+        "connection": {
+          "kind": "cli",
+          "users": [
+            "WJGKMPT7ZUNDKJK4CPL5QFXIK7"
+          ],
+          "target": "fixture-plain",
+          "subject": "owned-cli-reference",
+          "version": "fixture-v1",
+          "bindings": [
+            "stdin",
+            "file",
+            "argument"
+          ],
+          "confirmed": true,
+          "environment": "Windows",
+          "capabilities": [],
+          "repositories": [
+            "fixture-repo"
+          ]
+        },
+        "expires_at": "2026-10-16T19:20:56.2063654Z",
+        "generation": "UXMUMKE7FZIZDXS7GAEFECPKD7",
+        "prepared_at": "2026-10-16T19:18:50.227028Z",
+        "requested_by": "WJGKMPT7ZUNDKJK4CPL5QFXIK7",
+        "runner_version": "WI6P2V2JX64NREPIENT7W7K67G"
+      },
+      "created_at": "2026-10-16T19:17:13.1722545Z",
+      "started_at": "2026-10-16T19:18:53.8446624Z",
+      "finished_at": "2026-10-16T19:18:57.5266301Z",
+      "observation": "known",
+      "requested_by": "WJGKMPT7ZUNDKJK4CPL5QFXIK7",
+      "cancel_requested": false,
+      "reported_through": "6",
+      "execution_requested_at": "2026-10-16T19:17:13.2052543Z"
+    },
+    "refs": [
+      {
+        "id": "run-input:cli-manifest",
+        "version": "T2563JJS65TC4X7AVEI4XYP6TP"
+      }
+    ]
+  },
+  "manifest": {
+    "ref": {
+      "kind": "manifest",
+      "id": "cli-fixed",
+      "revision": "XN6447PIPYRCSVUSVJRN24GB6D"
+    },
+    "value": {
+      "state": "ready",
+      "digest": "bb8db9a30337179ca3f6fba5cc118c70e395644bf8ab6b2b1ae2b5c4b710fbae",
+      "run_id": "cli-manifest",
+      "schema": "context-manifest-v1",
+      "excluded": [],
+      "assembler": "structured-json-v1",
+      "selection": {
+        "mode": "select",
+        "include": [
+          {
+            "id": "cli-source",
+            "kind": "sentence",
+            "revision": "SO3USA34KDRM5ZSKKCFJZQNAFN"
+          }
+        ]
+      },
+      "adopted_by": "WJGKMPT7ZUNDKJK4CPL5QFXIK7",
+      "duplicates": [],
+      "input_utf8": "{\"contexts\":[{\"kind\":\"sentence\",\"text\":\"固定Manifest本文 日本語\\n改行も保持する\"}]}",
+      "placements": [
+        {
+          "ref": {
+            "id": "cli-source",
+            "kind": "sentence",
+            "revision": "SO3USA34KDRM5ZSKKCFJZQNAFN"
+          },
+          "path": [
+            0
+          ]
+        }
+      ],
+      "read_status": "unobserved",
+      "operation_id": "d285044f-45fa-4a15-89f0-d89f734cfae7",
+      "workspace_id": "runner-ui"
+    }
+  },
+  "output": {
+    "data": {
+      "run": {
+        "id": "run:cli-manifest",
+        "version": "TSPTPPZXGCCR7WJF7IIOWQCIEK"
+      },
+      "items": [
+        {
+          "id": "run-output:cli-manifest:3",
+          "version": "X4MRDKTGGDQFE7IZQDK5ZGSPKR",
+          "run_id": "run:cli-manifest",
+          "kind": "output",
+          "position": "196",
+          "value": {
+            "at": "2026-10-16T19:18:56.9297271Z",
+            "value": "Should this ordinary question become a Pause?\r\n",
+            "source": "fixture-plain",
+            "channel": "stdout",
+            "sequence": "3"
+          },
+          "refs": [
+            {
+              "id": "run:cli-manifest",
+              "version": "X4MRDKTGGDQFE7IZQDK5ZGSPKR"
+            }
+          ]
+        },
+        {
+          "id": "run-output:cli-manifest:4",
+          "version": "KVP3IF5LSAA4S5HIJ4A6TIMOSC",
+          "run_id": "run:cli-manifest",
+          "kind": "output",
+          "position": "198",
+          "value": {
+            "at": "2026-10-16T19:18:57.299262Z",
+            "value": "PLAIN_STDERR_ORIGINAL\r\n",
+            "source": "fixture-plain",
+            "channel": "stderr",
+            "sequence": "4"
+          },
+          "refs": [
+            {
+              "id": "run:cli-manifest",
+              "version": "KVP3IF5LSAA4S5HIJ4A6TIMOSC"
+            }
+          ]
+        },
+        {
+          "id": "run-output:cli-manifest:5",
+          "version": "SB7FAGG4X2S5DLMW23VWZW5B6A",
+          "run_id": "run:cli-manifest",
+          "kind": "output",
+          "position": "200",
+          "value": {
+            "at": "2026-10-16T19:18:57.4451226Z",
+            "value": "{\"input_b64\": \"eyJjb250ZXh0Ijoie1wiY29udGV4dHNcIjpbe1wia2luZFwiOlwic2VudGVuY2VcIixcInRleHRcIjpcIuWbuuWumk1hbmlmZXN05pys5paHIOaXpeacrOiqnlxcbuaUueihjOOCguS/neaMgeOBmeOCi1wifV19In0=\", \"server_secret_visible\": false}\r\n",
+            "source": "fixture-plain",
+            "channel": "stdout",
+            "sequence": "5"
+          },
+          "refs": [
+            {
+              "id": "run:cli-manifest",
+              "version": "SB7FAGG4X2S5DLMW23VWZW5B6A"
+            }
+          ]
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "runner-ui",
+      "position": null,
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  },
+  "exact": true
+}

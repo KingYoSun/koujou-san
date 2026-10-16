@@ -77,6 +77,6 @@
 
 ## Issue #18の判定
 
-状態: In progress。Scope revision 1。[計画](2026-10-17-issue-18-plan.md)に既存AC-1〜8・INVAR-1〜3の検証を整理した。ユーザー判断に従い、画面とは独立したRunnerで許可済みの割当・実行を継続する。現CLI版とstdioの入口を調べ、親終了・時間的中断/復帰・Runner再起動・CLI消失を試作して、実プロセスとの対応を確定する。
+状態: In progress。Scope revision 1。ユーザー判断に従い、画面とは独立したRunnerを実装した。[計画](2026-10-17-issue-18-plan.md)と[検証記録](2026-10-17-issue-18-evidence.md)を参照する。Windows/WSLの実CLI、二Pause、停止、専用worktree、Codex/Claudeの同じ入力・判定契約、固定Manifest、Web回答を確認した。Windows画面の起動が自動承認レビューに拒否されたため、ユーザーへ起動だけを依頼している。画面終了後の継続・独立検品・最終head CI・マージ後照合は未完了で、#18はCloseしない。
 
-#19〜#34は未着手。実CLI起動と独立Runner、工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+#19〜#34は未着手。工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
