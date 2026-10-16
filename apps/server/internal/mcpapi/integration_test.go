@@ -29,6 +29,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/sharedsync"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
 	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
@@ -91,9 +92,9 @@ func TestMCPIntegration(t *testing.T) {
 	}
 	graph := graphindex.New(store, a, c, remote, graphindex.DefaultLimits(), cfg.Key)
 	defer graph.Close()
-	s := &Service{Auth: identity, Access: a, Contexts: c, Search: search, Graph: graph}
+	s := &Service{Auth: identity, Access: a, Contexts: c, Search: search, Graph: graph, Usage: usage.New(store, a)}
 	githubMux := http.NewServeMux()
-	server := httptest.NewUnstartedServer(httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) }))
+	server := httptest.NewUnstartedServer(httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) }))
 	_ = server.Listener.Close()
 	server.Listener, err = net.Listen("tcp", "127.0.0.1:"+os.Getenv("KOUJOU_TEST_API_PORT"))
 	if err != nil {
@@ -332,7 +333,7 @@ func TestMCPIntegration(t *testing.T) {
 		return []byte(text.Text)
 	}
 	listed, err := session.ListTools(ctx, nil)
-	if err != nil || len(listed.Tools) != 5 {
+	if err != nil || len(listed.Tools) != 8 {
 		t.Fatal("tool catalogue", err)
 	}
 	call(session, "context_get", public, false)
@@ -392,6 +393,7 @@ func TestMCPIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer editor.Close()
+	checkUsageMCP(t, s, p, ordinary.Access, session, editor, none, func(handle string) (*mcp.ClientSession, error) { return connect(tokens.Access, "mcp-one", handle) }, call, request, cfg.Site)
 	write := contexts.Write{Mutation: mutation(public.Revision), Value: json.RawMessage(`{"kind":"sentence","text":"edited from ordinary HTTP"}`)}
 	resp, raw = request("POST", cfg.Site+"/contexts/workspaces/mcp-one/sentence/public", write, map[string]string{"Authorization": "Bearer " + ordinary.Access})
 	var saved apicontract.Response[apicontract.Reference]

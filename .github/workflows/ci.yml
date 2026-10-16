@@ -67,6 +67,9 @@ jobs:
       - name: Test read-only GitHub observation and recovery
         run: pnpm run test:github
 
+      - name: Test usage pricing and cost history
+        run: pnpm run test:usage
+
       - name: Test Context versions and input manifests
         run: pnpm run test:contexts
 
