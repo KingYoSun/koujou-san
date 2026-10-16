@@ -57,6 +57,10 @@
 
 ## Issue #13の判定
 
-状態: In progress。Scope revision 1。[PR #45](https://github.com/KingYoSun/koujou-san/pull/45)。[計画](2026-10-16-issue-13-plan.md)、[検証記録](2026-10-16-issue-13-evidence.md)、[独立検品](2026-10-16-issue-13-inspection.md)を参照する。実App接続、Web/Tauri、クライアント不在と再接続の照合まで成功し、独立検品は全条件PASS・blocker 0件で終了した。最終headのCIとマージ後照合を残す。コード検証後の差分は文書と証跡だけである。
+状態: Complete。Scope revision 1。[PR #45](https://github.com/KingYoSun/koujou-san/pull/45)を全CI成功後にマージした。main `1b46ec0cef76f50f7b92faa0a43d6c6d04a0b3e2`と最終head `384ea26b1aaa3b0ff45bca3d233bba5067910087`のtreeは`87a540244da6bd53d4babf2edf1e4d8e6bcd6d86`で一致し、差分0。[検証記録](2026-10-16-issue-13-evidence.md)、[独立検品](2026-10-16-issue-13-inspection.md)、マージ後照合が揃い、#13をCloseした。
 
-#14〜#34は未着手。Runner、実行・検品の詳細画面、LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #14の判定
+
+状態: Blocked（初期公開範囲・保持方針の判断待ち）。Scope revision 1。[計画](2026-10-16-issue-14-plan.md)で全条件と有限なfixtureを整理し、標準ライブラリによる算術probeを確認した。判断に依存する実装は始めていない。
+
+#15〜#34は未着手。Runner、実行・検品の詳細画面、LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
