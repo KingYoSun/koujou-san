@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { apiRequest } from "./auth";
 import { ContextWorkspace } from "./context-workspace";
 import { Automation } from "./automation";
+import { RunRecords } from "./runs";
 import { UsagePricing } from "./usage-pricing";
 import { GithubObservations } from "./github-observations";
 import { DeliveryPolicy } from "./delivery-policy";
@@ -421,6 +422,13 @@ export function Team({ native }: { native: boolean }) {
             native={native}
             workspace={selected}
             role={current.role}
+          />
+          <RunRecords
+            key={`runs/${apiIdentity}/${me.id}/${selected}`}
+            native={native}
+            workspace={selected}
+            role={current.role}
+            canExecute={current.can_execute}
           />
           <Automation
             key={`automation/${apiIdentity}/${me.id}/${selected}`}

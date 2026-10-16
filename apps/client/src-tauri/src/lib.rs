@@ -17,10 +17,12 @@ pub fn run() {
             sync_store::sync_read,
             sync_store::sync_remove,
             sync_store::sync_purge_actor,
-            sync_store::sync_request
+            sync_store::sync_request,
+            run_export::export_run
         ])
         .run(tauri::generate_context!())
         .expect("failed to run koujou-san desktop");
 }
 pub mod auth;
+mod run_export;
 mod sync_store;

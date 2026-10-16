@@ -104,7 +104,16 @@ func (s *Service) unit(ctx context.Context, q query, p access.Principal, w strin
 	return u, err
 }
 func (s *Service) Read(ctx context.Context, p access.Principal, w string, r Ref) (Record, error) {
-	rec, err := s.read(ctx, s.Store.Database(), p, w, r)
+	return s.readChecked(ctx, s.Store.Database(), p, w, r)
+}
+
+// ReadTx reuses current Manifest/dependency authorization in the owning Run's
+// acceptance transaction; it does not create another shared mutation.
+func (s *Service) ReadTx(ctx context.Context, tx pgx.Tx, p access.Principal, w string, r Ref) (Record, error) {
+	return s.readChecked(ctx, tx, p, w, r)
+}
+func (s *Service) readChecked(ctx context.Context, q query, p access.Principal, w string, r Ref) (Record, error) {
+	rec, err := s.read(ctx, q, p, w, r)
 	if err != nil {
 		return rec, err
 	}
@@ -113,7 +122,7 @@ func (s *Service) Read(ctx context.Context, p access.Principal, w string, r Ref)
 		if err = json.Unmarshal(rec.Value, &m); err != nil {
 			return Record{}, err
 		}
-		if err = s.checkManifest(ctx, s.Store.Database(), p, w, m); err != nil {
+		if err = s.checkManifest(ctx, q, p, w, m); err != nil {
 			return Record{}, err
 		}
 	}
@@ -122,12 +131,12 @@ func (s *Service) Read(ctx context.Context, p access.Principal, w string, r Ref)
 		if err = json.Unmarshal(rec.Value, &a); err != nil {
 			return Record{}, err
 		}
-		if _, err = s.Read(ctx, p, w, a.Manifest); err != nil {
+		if _, err = s.readChecked(ctx, q, p, w, a.Manifest); err != nil {
 			return Record{}, err
 		}
 	}
 	if p.OperationID != "" && unitLevel(r.Kind) > 1 {
-		resolved := s.Preview(ctx, p, w, ResolveRequest{Selection: Selection{Mode: "select", Include: []Ref{rec.Ref}}})
+		resolved := s.resolve(ctx, q, p, w, ResolveRequest{Selection: Selection{Mode: "select", Include: []Ref{rec.Ref}}})
 		if !resolved.Ready {
 			return Record{}, invalid("forbidden", nil)
 		}

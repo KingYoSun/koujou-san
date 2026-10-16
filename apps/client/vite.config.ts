@@ -39,6 +39,7 @@ export default defineConfig({
       "/github/": apiProxy,
       "/usage/": apiProxy,
       "/automation/": apiProxy,
+      "/runs/": apiProxy,
       "/mcp": apiProxy,
       "/.well-known/oauth-protected-resource/": apiProxy,
     },

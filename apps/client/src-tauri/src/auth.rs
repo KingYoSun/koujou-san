@@ -48,6 +48,22 @@ pub struct Auth {
     device_lock: Mutex<()>,
 }
 
+fn build_client(api: &Url, timeout: Option<Duration>) -> Result<Client, String> {
+    let mut client = Client::builder()
+        .timeout(timeout)
+        .connect_timeout(Duration::from_secs(10))
+        .redirect(reqwest::redirect::Policy::none());
+    if matches!(api.host_str(), Some("localhost" | "127.0.0.1")) {
+        if let Ok(path) = std::env::var("KOUJOU_DEV_CA_FILE") {
+            let pem = fs::read(path).map_err(|_| "development_CA_unavailable")?;
+            client = client.add_root_certificate(
+                reqwest::Certificate::from_pem(&pem).map_err(|_| "invalid_development_CA")?,
+            );
+        }
+    }
+    client.build().map_err(|_| "http_client_failed".into())
+}
+
 impl Auth {
     pub(crate) fn sync_binding(&self, user: &str, workspace: &str) -> (PathBuf, String) {
         let prefix = hex_name(&format!("{}\0{}", self.api, user));
@@ -67,20 +83,10 @@ impl Auth {
         {
             return Err("HTTPS API root required".into());
         }
-        let mut client = Client::builder()
-            .timeout(Duration::from_secs(10))
-            .redirect(reqwest::redirect::Policy::none());
-        if matches!(api.host_str(), Some("localhost" | "127.0.0.1")) {
-            if let Ok(path) = std::env::var("KOUJOU_DEV_CA_FILE") {
-                let pem = fs::read(path).map_err(|_| "development_CA_unavailable")?;
-                client = client.add_root_certificate(
-                    reqwest::Certificate::from_pem(&pem).map_err(|_| "invalid_development_CA")?,
-                );
-            }
-        }
+        let client = build_client(&api, Some(Duration::from_secs(10)))?;
         Ok(Self {
             api,
-            client: client.build().map_err(|_| "http_client_failed")?,
+            client,
             file,
             tokens: Mutex::new(Tokens::default()),
             login_lock: Mutex::new(()),
@@ -176,6 +182,39 @@ impl Auth {
         self.persist(&config, &refreshed)?;
         *tokens = refreshed;
         Ok(tokens.access_token.clone())
+    }
+    pub(crate) fn export_response(
+        &self,
+        workspace: &str,
+        id: &str,
+        version: &str,
+    ) -> Result<reqwest::blocking::Response, String> {
+        if workspace.is_empty() || id.is_empty() || version.is_empty() || version == "head" {
+            return Err("fixed_run_required".into());
+        }
+        let mut target = self.api.clone();
+        target
+            .path_segments_mut()
+            .map_err(|_| "invalid_API_path")?
+            .clear()
+            .extend(["runs", "workspaces", workspace, "executions", id, "export"]);
+        target.query_pairs_mut().append_pair("version", version);
+        let response = build_client(&self.api, None)?
+            .get(target)
+            .bearer_auth(self.access()?)
+            .send()
+            .map_err(|_| "export_connection_failed")?;
+        if !response.status().is_success() {
+            return Err(if response.status().as_u16() == 401 {
+                "authentication_required"
+            } else if response.status().as_u16() == 403 {
+                "forbidden"
+            } else {
+                "export_unavailable"
+            }
+            .into());
+        }
+        Ok(response)
     }
     pub(crate) fn request_response(
         &self,
