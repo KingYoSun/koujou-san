@@ -26,6 +26,9 @@ func (s *Service) accepted(ctx context.Context, tx pgx.Tx, c persistence.Command
 	if strings.HasPrefix(c.Kind, "hopper-") || c.Deleted {
 		return nil
 	}
+	if err := s.evidenceChanged(ctx, tx, c.WorkspaceID, Ref{ID: ref.ID, Version: ref.Version}); err != nil {
+		return err
+	}
 	var envelope struct {
 		Value json.RawMessage `json:"value"`
 		Refs  []Ref           `json:"refs"`
@@ -91,7 +94,7 @@ func (s *Service) accepted(ctx context.Context, tx pgx.Tx, c persistence.Command
 
 // AcceptSourceTx is called only by trusted result owners in their acceptance tx.
 // No HTTP/MCP route can submit fabricated result observations.
-func (s *Service) AcceptSourceTx(ctx context.Context, tx pgx.Tx, w string, source Source) error {
+func (s *Service) AcceptSourceTx(ctx context.Context, tx pgx.Tx, w string, source Source, only ...Ref) error {
 	if source.Event == "" || !fixed(source.Target) || (source.Kind != "run" && source.Kind != "github") {
 		return ErrInvalid
 	}
@@ -117,29 +120,35 @@ func (s *Service) AcceptSourceTx(ctx context.Context, tx pgx.Tx, w string, sourc
 			return err
 		}
 	}
-	rows, err := tx.Query(ctx, `SELECT DISTINCT a.payload FROM hopper_targets t JOIN shared_versions h ON h.workspace_id=t.workspace_id AND h.resource_id='hopper-active:'||substring(t.definition_id from 8) JOIN hopper_records a ON a.workspace_id=h.workspace_id AND a.id=h.resource_id AND a.version=h.version WHERE t.workspace_id=$1 AND t.kind=$2 AND t.target=ANY($3)`, w, source.Kind, source.Keys)
-	if err != nil {
-		return err
-	}
 	activations := []Activation{}
-	for rows.Next() {
-		var b []byte
-		var a Activation
-		if err = rows.Scan(&b); err != nil {
-			break
+	if len(only) > 0 {
+		for _, definition := range only {
+			activations = append(activations, Activation{Definition: definition, Enabled: true})
 		}
-		err = json.Unmarshal(b, &a)
+	} else {
+		rows, err := tx.Query(ctx, `SELECT DISTINCT a.payload FROM hopper_targets t JOIN shared_versions h ON h.workspace_id=t.workspace_id AND h.resource_id='hopper-active:'||substring(t.definition_id from 8) JOIN hopper_records a ON a.workspace_id=h.workspace_id AND a.id=h.resource_id AND a.version=h.version WHERE t.workspace_id=$1 AND t.kind=$2 AND t.target=ANY($3)`, w, source.Kind, source.Keys)
 		if err != nil {
-			break
+			return err
 		}
-		activations = append(activations, a)
-	}
-	if err == nil {
-		err = rows.Err()
-	}
-	rows.Close()
-	if err != nil {
-		return err
+		for rows.Next() {
+			var b []byte
+			var a Activation
+			if err = rows.Scan(&b); err != nil {
+				break
+			}
+			err = json.Unmarshal(b, &a)
+			if err != nil {
+				break
+			}
+			activations = append(activations, a)
+		}
+		if err == nil {
+			err = rows.Err()
+		}
+		rows.Close()
+		if err != nil {
+			return err
+		}
 	}
 	for _, a := range activations {
 		r, err := record(ctx, tx, w, a.Definition)
@@ -148,7 +157,7 @@ func (s *Service) AcceptSourceTx(ctx context.Context, tx pgx.Tx, w string, sourc
 		}
 		var d Definition
 		_ = json.Unmarshal(r.Value, &d)
-		if !a.Enabled || source.Depth > 0 && !d.IncludeDerived {
+		if !a.Enabled || len(only) == 0 && source.Depth > 0 && !d.IncludeDerived {
 			continue
 		}
 		if err = s.Automation.AcceptResultTx(ctx, tx, w, automation.Source{Event: source.Event, Target: source.Target}, a.Definition); err != nil {

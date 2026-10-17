@@ -26,7 +26,40 @@ func (s *Service) active(ctx context.Context, tx pgx.Tx, w string, definition Re
 	return a, nil
 }
 func (s *Service) Execute(ctx context.Context, j automation.Job) (automation.Result, error) {
-	id := "hopper-evaluation:" + hash([]string{j.Workspace, j.Event, j.Target.ID, j.Target.Version, j.Definition.ID, j.Definition.Version})
+	id := semanticEvaluationID(j)
+	if previous, err := record(ctx, s.Store.Database(), j.Workspace, Ref{ID: id, Version: "head"}); err == nil {
+		var e Evaluation
+		if err = json.Unmarshal(previous.Value, &e); err != nil {
+			return automation.Result{}, err
+		}
+		err = pgx.BeginFunc(ctx, s.Store.Database(), func(tx pgx.Tx) error { _, _, err := s.checkSemanticJob(ctx, tx, j, e.Source); return err })
+		if err != nil {
+			return automation.Result{}, automation.ErrLease
+		}
+		return evaluationResult(previous), nil
+	} else if !missing(err) {
+		return automation.Result{}, err
+	}
+	var source Source
+	var data []byte
+	if err := s.Store.Database().QueryRow(ctx, `SELECT payload FROM hopper_sources WHERE workspace_id=$1 AND event_id=$2 AND target_id=$3 AND target_version=$4`, j.Workspace, j.Event, j.Target.ID, j.Target.Version).Scan(&data); err != nil {
+		return automation.Result{}, err
+	}
+	if err := json.Unmarshal(data, &source); err != nil {
+		return automation.Result{}, err
+	}
+	definition, err := record(ctx, s.Store.Database(), j.Workspace, j.Definition)
+	if err != nil {
+		return automation.Result{}, err
+	}
+	var d Definition
+	if err = json.Unmarshal(definition.Value, &d); err != nil {
+		return automation.Result{}, err
+	}
+	semantic, err := s.semantic(ctx, j, id, d, source)
+	if err != nil {
+		return automation.Result{}, err
+	}
 	var controller automation.Control
 	var control Ref
 	guard := func(tx pgx.Tx) *apicontract.Problem {
@@ -35,9 +68,14 @@ func (s *Service) Execute(ctx context.Context, j automation.Job) (automation.Res
 		if err != nil {
 			return problem(err)
 		}
-		a, err := s.active(ctx, tx, j.Workspace, j.Definition)
-		if err == nil && a.Controller != controller.Controller {
-			err = access.ErrForbidden
+		if source.DryRun {
+			err = s.Access.CheckTx(ctx, tx, access.Principal{UserID: source.RequestedBy}, j.Workspace, "", "manage")
+		} else {
+			a, e := s.active(ctx, tx, j.Workspace, j.Definition)
+			err = e
+			if err == nil && a.Controller != controller.Controller {
+				err = access.ErrForbidden
+			}
 		}
 		return problem(err)
 	}
@@ -45,25 +83,15 @@ func (s *Service) Execute(ctx context.Context, j automation.Job) (automation.Res
 		Event              string
 		Target, Definition Ref
 	}{j.Event, j.Target, j.Definition})}, func(tx pgx.Tx, ref apicontract.Reference) (json.RawMessage, error) {
-		var source Source
-		var b []byte
-		if err := tx.QueryRow(ctx, `SELECT payload FROM hopper_sources WHERE workspace_id=$1 AND event_id=$2 AND target_id=$3 AND target_version=$4`, j.Workspace, j.Event, j.Target.ID, j.Target.Version).Scan(&b); err != nil {
+		e := Evaluation{Definition: j.Definition, Source: source, Root: source.Root, Depth: source.Depth, State: "evaluated", At: time.Now().UTC(), DryRun: source.DryRun, Semantic: semantic}
+		if err = s.recheckSemantic(ctx, tx, access.Principal{UserID: controller.Controller}, j.Workspace, &e, d); err != nil {
 			return nil, err
 		}
-		if err := json.Unmarshal(b, &source); err != nil {
-			return nil, err
-		}
-		r, err := record(ctx, tx, j.Workspace, j.Definition)
-		if err != nil {
-			return nil, err
-		}
-		var d Definition
-		_ = json.Unmarshal(r.Value, &d)
-		e := Evaluation{Definition: j.Definition, Source: source, Root: source.Root, Depth: source.Depth, State: "evaluated", At: time.Now().UTC()}
 		if err = s.evaluate(ctx, tx, j.Workspace, access.Principal{UserID: controller.Controller}, &e, d, Ref{ID: ref.ID, Version: ref.Version}, control, false); err != nil {
 			return nil, err
 		}
-		refs := append(append(append([]Ref{}, e.Source.Refs...), source.Target), append(r.Refs, r.Ref)...)
+		refs := append(append(append([]Ref{}, e.Source.Refs...), source.Target), append(definition.Refs, definition.Ref)...)
+		refs = append(refs, e.audit...)
 		if e.Cost != nil {
 			refs = append(refs, e.Cost.Sources...)
 		}
@@ -81,7 +109,22 @@ func (s *Service) Execute(ctx context.Context, j automation.Job) (automation.Res
 		}
 		return automation.Result{}, err
 	}
-	return automation.Result{Reason: "hopper_evaluated", Refs: []Ref{ref}, Usage: []Ref{}, UsageState: "not_applicable"}, nil
+	r, err := record(ctx, s.Store.Database(), j.Workspace, ref)
+	if err != nil {
+		return automation.Result{}, err
+	}
+	return evaluationResult(r), nil
+}
+
+func evaluationResult(r Record) automation.Result {
+	result := automation.Result{Reason: "hopper_evaluated", Refs: []Ref{r.Ref}, Usage: []Ref{}, UsageState: "not_applicable"}
+	var e Evaluation
+	if json.Unmarshal(r.Value, &e) == nil && e.Semantic != nil {
+		result.Refs = append(result.Refs, r.Refs...)
+		result.Usage = e.Semantic.Costs
+		result.UsageState = e.Semantic.UsageState
+	}
+	return result
 }
 func (s *Service) evaluate(ctx context.Context, tx pgx.Tx, w string, p access.Principal, e *Evaluation, d Definition, ref, control Ref, approved bool) error {
 	if err := s.refs(ctx, tx, p, w, append(append([]Ref{}, e.Source.Refs...), e.Source.Target)); err != nil {
@@ -121,7 +164,18 @@ func (s *Service) evaluate(ctx context.Context, tx pgx.Tx, w string, p access.Pr
 			return err
 		}
 	}
-	e.Verdict = Evaluate(d.Condition, e.Source.Facts)
+	semanticVerdict := "unknown"
+	if e.Semantic != nil {
+		if e.Semantic.State != "complete" {
+			e.State = e.Semantic.State
+			e.Reason = e.Semantic.Reason
+			return nil
+		}
+		if e.Semantic.Decision != nil {
+			semanticVerdict = e.Semantic.Decision.Verdict
+		}
+	}
+	e.Verdict = evaluateCondition(d.Condition, e.Source.Facts, semanticVerdict)
 	for _, required := range d.Required {
 		if required.State == "unfetched" || required.State == "missing" {
 			e.State = "input_waiting"
@@ -161,7 +215,7 @@ func (s *Service) evaluate(ctx context.Context, tx pgx.Tx, w string, p access.Pr
 	}
 	key := ""
 	if problem := d.Problem; problem != nil {
-		identity, ok := selected(decodeValue(e.Source.Facts.Report), problem.IdentityPath)
+		identity, ok := selected(evaluationData(e), problem.IdentityPath)
 		if !ok {
 			e.State = "unknown"
 			e.Reason = "problem_identity_missing"

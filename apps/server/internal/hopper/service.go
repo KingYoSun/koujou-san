@@ -7,15 +7,18 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"os"
 	"strings"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/automation"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/publications"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/serverllm"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/workflows"
 	"github.com/jackc/pgx/v5"
@@ -26,6 +29,8 @@ type query interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Service struct {
+	Gateway      *serverllm.Gateway
+	Usage        *usage.Service
 	Store        *persistence.Store
 	Access       *access.Service
 	Automation   *automation.Service
@@ -36,7 +41,7 @@ type Service struct {
 }
 
 func New(store *persistence.Store, a *access.Service, auto *automation.Service, r *runs.Service, w *workflows.Service, p *publications.Service, g *graphindex.Service) *Service {
-	s := &Service{store, a, auto, r, w, p, g}
+	s := &Service{Store: store, Access: a, Automation: auto, Runs: r, Workflows: w, Publications: p, Graph: g, Gateway: &serverllm.Gateway{ConfigFile: os.Getenv("KOUJOU_SERVER_LLM_CONFIG")}, Usage: usage.New(store, a)}
 	previous := store.Accepted
 	store.Accepted = func(ctx context.Context, tx pgx.Tx, c persistence.Command, ref apicontract.Reference, state json.RawMessage) error {
 		if previous != nil {
@@ -147,6 +152,9 @@ func (s *Service) mutation(ctx context.Context, p access.Principal, w, id, actio
 	})
 }
 func validDefinition(d Definition) bool {
+	if hasSemantic(d.Condition) && !validSemantic(d.Semantic) {
+		return false
+	}
 	b := d.Bounds
 	if b.Cost != nil && !usage.ValidCostBudget(*b.Cost) {
 		return false
@@ -184,6 +192,15 @@ func validDefinition(d Definition) bool {
 }
 func (s *Service) template(ctx context.Context, p access.Principal, w string, d Definition) ([]Ref, error) {
 	refs := []Ref{d.Action.Template}
+	if d.Semantic != nil {
+		refs = append(refs, d.Semantic.Evidence...)
+		for _, price := range d.Semantic.Prices {
+			refs = append(refs, Ref{ID: price.ID, Version: price.Version})
+		}
+		for _, r := range append(append([]contexts.Ref{}, d.Semantic.Context.Include...), d.Semantic.Context.Exclude...) {
+			refs = append(refs, Ref{ID: "context:" + r.ID, Version: r.Revision})
+		}
+	}
 	if d.Action.Kind == "run" {
 		r, err := s.Workflows.Read(ctx, p, w, d.Action.Template)
 		if err != nil {
@@ -272,10 +289,10 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, req R
 	if req.Limit == 0 {
 		req.Limit = 50
 	}
-	if req.Limit < 1 || req.Limit > 100 || req.After < 0 || (req.Mode != "heads" && req.Mode != "history") {
+	if req.Limit < 1 || req.Limit > 100 || req.After < 0 || (req.Mode != "heads" && req.Mode != "history" && req.Mode != "attempts") || (req.Mode == "attempts" && req.ID == "") {
 		return out, ErrInvalid
 	}
-	rows, err := s.Store.Database().Query(ctx, `SELECT r.id,r.version,r.kind,r.position,r.payload,r.refs FROM hopper_records r WHERE r.workspace_id=$1 AND (r.position>$4 OR ($10<>'' AND r.position=$4 AND r.id>$10)) AND ($5='' OR r.kind=$5) AND ($6='' OR r.id=$6) AND ($7='' OR r.payload->>'root'=$7) AND ($8='history' OR EXISTS(SELECT 1 FROM shared_versions h WHERE h.workspace_id=r.workspace_id AND h.resource_id=r.id AND h.version=r.version AND NOT h.deleted)) AND `+access.ReadFilterSQL(`r.refs||jsonb_build_array(jsonb_build_object('id',r.id,'version',r.version))`)+` ORDER BY r.position,r.id LIMIT $9`, w, p.UserID, p.OperationID, req.After, req.Kind, req.ID, req.Root, req.Mode, req.Limit, req.AfterID)
+	rows, err := s.Store.Database().Query(ctx, `SELECT r.id,r.version,r.kind,r.position,r.payload,r.refs FROM hopper_records r WHERE r.workspace_id=$1 AND (r.position>$4 OR ($10<>'' AND r.position=$4 AND r.id>$10)) AND ($5='' OR r.kind=$5) AND (($8='attempts' AND EXISTS(SELECT 1 FROM hopper_model_attempts a WHERE a.workspace_id=r.workspace_id AND a.evaluation_id=$6 AND a.resource_id=r.id)) OR ($8<>'attempts' AND ($6='' OR r.id=$6))) AND ($7='' OR r.payload->>'root'=$7) AND ($8='history' OR EXISTS(SELECT 1 FROM shared_versions h WHERE h.workspace_id=r.workspace_id AND h.resource_id=r.id AND h.version=r.version AND NOT h.deleted)) AND `+access.ReadFilterSQL(`r.refs||jsonb_build_array(jsonb_build_object('id',r.id,'version',r.version))`)+` ORDER BY r.position,r.id LIMIT $9`, w, p.UserID, p.OperationID, req.After, req.Kind, req.ID, req.Root, req.Mode, req.Limit, req.AfterID)
 	if err != nil {
 		return out, err
 	}
@@ -289,7 +306,7 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, req R
 		if err = json.Unmarshal(refs, &r.Refs); err != nil {
 			return out, err
 		}
-		out.Items = append(out.Items, r)
+		out.Items = append(out.Items, compactSemanticRecord(r))
 		out.After = r.Position
 		out.AfterID = r.ID
 	}

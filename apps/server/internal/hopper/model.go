@@ -18,12 +18,13 @@ var ErrInvalid = errors.New("invalid_hopper")
 var ErrState = errors.New("hopper_state_conflict")
 
 type Condition struct {
-	All   []Condition     `json:"all,omitempty"`
-	Any   []Condition     `json:"any,omitempty"`
-	Not   *Condition      `json:"not,omitempty"`
-	Field string          `json:"field,omitempty"`
-	Op    string          `json:"op,omitempty"`
-	Value json.RawMessage `json:"value,omitempty"`
+	Semantic bool            `json:"semantic,omitempty"`
+	All      []Condition     `json:"all,omitempty"`
+	Any      []Condition     `json:"any,omitempty"`
+	Not      *Condition      `json:"not,omitempty"`
+	Field    string          `json:"field,omitempty"`
+	Op       string          `json:"op,omitempty"`
+	Value    json.RawMessage `json:"value,omitempty"`
 }
 type Facts struct {
 	State      string          `json:"state,omitempty"`
@@ -66,6 +67,7 @@ type Problem struct {
 	Mode          string   `json:"mode"`
 }
 type Definition struct {
+	Semantic       *SemanticSpec    `json:"semantic,omitempty"`
 	Name           string           `json:"name"`
 	Targets        []Target         `json:"targets"`
 	Condition      Condition        `json:"condition"`
@@ -87,16 +89,24 @@ type Activation struct {
 	Controller string `json:"controller"`
 }
 type Source struct {
-	Event  string   `json:"event"`
-	Target Ref      `json:"target"`
-	Kind   string   `json:"kind"`
-	Keys   []string `json:"keys"`
-	Facts  Facts    `json:"facts"`
-	Refs   []Ref    `json:"refs"`
-	Root   string   `json:"root,omitempty"`
-	Depth  int      `json:"depth"`
+	DryRun      bool     `json:"dry_run,omitempty"`
+	RequestedBy string   `json:"requested_by,omitempty"`
+	Previous    *Ref     `json:"previous_evaluation,omitempty"`
+	Event       string   `json:"event"`
+	Target      Ref      `json:"target"`
+	Kind        string   `json:"kind"`
+	Keys        []string `json:"keys"`
+	Facts       Facts    `json:"facts"`
+	Refs        []Ref    `json:"refs"`
+	Root        string   `json:"root,omitempty"`
+	Depth       int      `json:"depth"`
 }
 type Evaluation struct {
+	// protected refs constrain derived work; audit refs additionally retain the
+	// complete evaluator input/response without injecting their bodies into Runs.
+	protected   []Ref
+	audit       []Ref
+	Semantic    *SemanticOutcome `json:"semantic,omitempty"`
 	Cost        *usage.CostState `json:"cost,omitempty"`
 	Definition  Ref              `json:"definition"`
 	Source      Source           `json:"source"`
@@ -110,6 +120,7 @@ type Evaluation struct {
 	At          time.Time        `json:"at"`
 }
 type Record struct {
+	MetadataOnly bool `json:"metadata_only,omitempty"`
 	Ref
 	Kind     string          `json:"kind"`
 	Position int64           `json:"position"`
@@ -135,6 +146,7 @@ type Page struct {
 	AfterID string   `json:"after_id"`
 }
 type Past struct {
+	Publish bool `json:"publish,omitempty"`
 	apicontract.Mutation
 	Definition Ref    `json:"definition"`
 	Kind       string `json:"kind"`

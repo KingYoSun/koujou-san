@@ -99,13 +99,16 @@ func (s *Service) Decide(ctx context.Context, p access.Principal, w, id string, 
 		}
 		e.Reason = ""
 		e.State = "evaluated"
+		if err = s.recheckSemantic(ctx, tx, actor, w, &e, d); err != nil {
+			return Record{}, err
+		}
 		if err = s.evaluate(ctx, tx, w, actor, &e, d, ref, control, true); err != nil {
 			return Record{}, err
 		}
 		if e.Cost != nil {
 			r.Refs = append(r.Refs, e.Cost.Sources...)
 		}
-		r.Refs = append(r.Refs, e.Source.Refs...)
+		r.Refs = append(append(r.Refs, e.Source.Refs...), e.audit...)
 		return s.save(ctx, tx, w, ref, "evaluation", e, r.Refs)
 	})
 }
@@ -150,6 +153,18 @@ func (s *Service) Past(ctx context.Context, p access.Principal, w string, req Pa
 		items := []Ref{}
 		dependencies := append(append([]Ref{}, r.Refs...), r.Ref)
 		for _, source := range sources {
+			if hasSemantic(d.Condition) || req.Publish {
+				source.Event = "past:" + hash([]any{req.OperationID, source.Event, r.Ref})
+				source.DryRun = !req.Publish
+				source.RequestedBy = p.UserID
+				if err = s.AcceptSourceTx(ctx, tx, w, source, r.Ref); err != nil {
+					return Record{}, err
+				}
+				items = append(items, Ref{ID: "hopper-evaluation:" + hash([]string{w, source.Event, source.Target.ID, source.Target.Version, r.ID, r.Version})})
+				dependencies = append(dependencies, source.Refs...)
+				dependencies = append(dependencies, source.Target)
+				continue
+			}
 			e := Evaluation{Definition: r.Ref, Source: source, Root: source.Root, Depth: source.Depth, DryRun: true, State: "evaluated", At: time.Now().UTC()}
 			trial := Ref{ID: "hopper-trial:" + hash([]string{ref.ID, source.Event, source.Target.Version}), Version: ref.Version}
 			if err = s.evaluate(ctx, tx, w, p, &e, d, trial, Ref{}, false); err != nil {

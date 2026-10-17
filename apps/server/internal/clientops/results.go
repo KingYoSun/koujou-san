@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strconv"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/modelreply"
 	"time"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
@@ -13,61 +13,22 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type Reply struct {
-	ID      string `json:"id"`
-	Model   string `json:"model"`
-	Choices []struct {
-		Message struct {
-			Content *string `json:"content"`
-			Calls   []struct {
-				ID       string `json:"id"`
-				Type     string `json:"type"`
-				Function struct {
-					Name      string `json:"name"`
-					Arguments string `json:"arguments"`
-				} `json:"function"`
-			} `json:"tool_calls"`
-		} `json:"message"`
-		Finish string `json:"finish_reason"`
-	} `json:"choices"`
-	Usage struct {
-		Input        *uint64 `json:"prompt_tokens"`
-		Output       *uint64 `json:"completion_tokens"`
-		InputDetails struct {
-			Cached *uint64 `json:"cached_tokens"`
-		} `json:"prompt_tokens_details"`
-		OutputDetails struct {
-			Reasoning *uint64 `json:"reasoning_tokens"`
-		} `json:"completion_tokens_details"`
-	} `json:"usage"`
-}
+type Reply = modelreply.Reply
 
 func ReadTool(name string) bool {
 	return name == "context_search" || name == "context_graph" || name == "context_get" || name == "context_resolve"
 }
 func parseReply(b json.RawMessage, m Model) (Reply, string) {
-	var r Reply
-	if json.Unmarshal(b, &r) != nil || len(r.Choices) != 1 {
-		return r, "invalid_model_response"
-	}
-	allowed := false
-	for _, name := range m.Allowed {
-		if name == r.Model {
-			allowed = true
-		}
-	}
-	if !allowed {
-		return r, "model_not_allowed"
+	r, reason := modelreply.Parse(b, m.Allowed)
+	if reason != "" && reason != "incomplete_model_response" {
+		return r, reason
 	}
 	for _, call := range r.Choices[0].Message.Calls {
 		if call.ID == "" || call.Type != "function" || !ReadTool(call.Function.Name) || !json.Valid([]byte(call.Function.Arguments)) {
 			return r, "tool_not_allowed"
 		}
 	}
-	if r.Choices[0].Finish == "length" || r.Choices[0].Finish == "content_filter" {
-		return r, "incomplete_model_response"
-	}
-	return r, ""
+	return r, reason
 }
 
 type Finish struct {
@@ -200,18 +161,8 @@ func unique(refs []Ref) []Ref {
 	}
 	return out
 }
-func quantity(n *uint64, includes []string) usage.Quantity {
-	q := usage.Quantity{State: "missing", Reason: "provider_did_not_report", Unit: "token", Includes: includes}
-	if n != nil {
-		v := strconv.FormatUint(*n, 10)
-		q.Value = &v
-		q.State = "reported"
-		q.Reason = ""
-	}
-	return q
-}
 func (s *Service) observe(ctx context.Context, tx pgx.Tx, p access.Principal, w string, operation Ref, op Operation, turn Turn, intent Record, reply Reply, unavailable, provisional bool) error {
-	quantities := map[string]usage.Quantity{"input": quantity(reply.Usage.Input, []string{"cache_read"}), "cache_read": quantity(reply.Usage.InputDetails.Cached, nil), "output": quantity(reply.Usage.Output, []string{"reasoning"}), "reasoning": quantity(reply.Usage.OutputDetails.Reasoning, nil)}
+	quantities := reply.Quantities()
 	var actual *string
 	if !unavailable && reply.Model != "" {
 		actual = &reply.Model
@@ -223,7 +174,7 @@ func (s *Service) observe(ctx context.Context, tx pgx.Tx, p access.Principal, w 
 	}
 	if unavailable {
 		for k := range quantities {
-			quantities[k] = quantity(nil, nil)
+			quantities[k] = modelreply.Quantity(nil, nil)
 		}
 	}
 	if provisional {

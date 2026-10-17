@@ -415,7 +415,8 @@ const tasks = {
   },
   "test:clientops": () =>
     testDatabase("clientops", "TestClientOperationsPostgres"),
-  "test:hopper": () => testDatabase("hopper", "TestHopperPostgres"),
+  "test:hopper": () =>
+    testDatabase("hopper", "TestHopper(Postgres|SemanticPostgres)"),
   "test:hopper:ui": async () => {
     env.KOUJOU_TEST_HOPPER_UI = "1";
     env.KOUJOU_TEST_MCP_UI = "1";
