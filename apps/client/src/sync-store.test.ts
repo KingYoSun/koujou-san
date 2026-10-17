@@ -9,10 +9,44 @@ import {
   saveAnswerDraft,
   purgeStoredActor,
   syncStorage,
+  readLocalDraft,
+  saveLocalDraft,
 } from "./sync-store";
 import type { SavedSync, SyncItem } from "./sync-engine";
 
 const n = { api: "https://api.test/", user: "alice", workspace: "one" };
+
+it("keeps workflow drafts separate from Pause drafts and purges both with the Workspace", async () => {
+  await saveLocalDraft(
+    false,
+    n,
+    "same-id",
+    { text: '{"schema":"workflow-definition-v1"}', version: "fixed" },
+    "workflow-definition",
+  );
+  await saveAnswerDraft(false, n, "same-id", {
+    pauseVersion: "pause-v",
+    value: "answer",
+    json: false,
+  });
+  expect(
+    (
+      await readLocalDraft<{ text: string }>(
+        false,
+        n,
+        "same-id",
+        "workflow-definition",
+      )
+    )?.text,
+  ).toContain("workflow-definition-v1");
+  expect((await readAnswerDraft(false, n, "same-id"))?.value).toBe("answer");
+  await syncStorage(false).remove(n);
+  allowAnswerScope(n);
+  expect(
+    await readLocalDraft(false, n, "same-id", "workflow-definition"),
+  ).toBeUndefined();
+  expect(await readAnswerDraft(false, n, "same-id")).toBeUndefined();
+});
 beforeEach(() => {
   globalThis.indexedDB = new IDBFactory();
   allowAnswerActor(n.user);

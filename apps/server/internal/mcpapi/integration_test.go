@@ -32,6 +32,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/sharedsync"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/workflows"
 	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
@@ -95,9 +96,11 @@ func TestMCPIntegration(t *testing.T) {
 	graph := graphindex.New(store, a, c, remote, graphindex.DefaultLimits(), cfg.Key)
 	defer graph.Close()
 	s := &Service{Auth: identity, Access: a, Contexts: c, Search: search, Graph: graph, Usage: usage.New(store, a), Automation: automation.New(store, a), Runs: runs.New(store, a, c)}
+	s.Workflows = workflows.New(store, a, c, s.Runs)
+	s.Workflows.StartWorker(ctx)
 	githubMux := http.NewServeMux()
 	handler := func(runService *runs.Service) http.Handler {
-		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
+		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
 	}
 	faults := &reconnectFixture{}
 	server := httptest.NewUnstartedServer(faults.handler(handler(s.Runs)))
@@ -340,7 +343,7 @@ func TestMCPIntegration(t *testing.T) {
 		return []byte(text.Text)
 	}
 	listed, err := session.ListTools(ctx, nil)
-	if err != nil || len(listed.Tools) != 15 {
+	if err != nil || len(listed.Tools) != 19 {
 		t.Fatal("tool catalogue", err)
 	}
 	call(session, "context_get", public, false)
@@ -403,6 +406,7 @@ func TestMCPIntegration(t *testing.T) {
 	checkUsageMCP(t, s, p, ordinary.Access, session, editor, none, func(handle string) (*mcp.ClientSession, error) { return connect(tokens.Access, "mcp-one", handle) }, call, request, cfg.Site)
 	checkAutomationMCP(t, s, p, ordinary.Access, session, editor, none, func(handle string) (*mcp.ClientSession, error) { return connect(tokens.Access, "mcp-one", handle) }, call, request, cfg.Site)
 	checkRunsMCP(t, s, p, session, none, call, request, cfg.Site, ordinary.Access)
+	checkWorkflowsMCP(t, s, p, session, none, fixed, call, request, cfg.Site, ordinary.Access)
 	write := contexts.Write{Mutation: mutation(public.Revision), Value: json.RawMessage(`{"kind":"sentence","text":"edited from ordinary HTTP"}`)}
 	resp, raw = request("POST", cfg.Site+"/contexts/workspaces/mcp-one/sentence/public", write, map[string]string{"Authorization": "Bearer " + ordinary.Access})
 	var saved apicontract.Response[apicontract.Reference]

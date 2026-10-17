@@ -189,6 +189,15 @@ impl Auth {
         id: &str,
         version: &str,
     ) -> Result<reqwest::blocking::Response, String> {
+        self.export_response_for(workspace, id, version, false)
+    }
+    pub(crate) fn export_response_for(
+        &self,
+        workspace: &str,
+        id: &str,
+        version: &str,
+        workflow: bool,
+    ) -> Result<reqwest::blocking::Response, String> {
         if workspace.is_empty() || id.is_empty() || version.is_empty() || version == "head" {
             return Err("fixed_run_required".into());
         }
@@ -197,7 +206,14 @@ impl Auth {
             .path_segments_mut()
             .map_err(|_| "invalid_API_path")?
             .clear()
-            .extend(["runs", "workspaces", workspace, "executions", id, "export"]);
+            .extend([
+                if workflow { "workflows" } else { "runs" },
+                "workspaces",
+                workspace,
+                "executions",
+                id,
+                "export",
+            ]);
         target.query_pairs_mut().append_pair("version", version);
         let response = build_client(&self.api, None)?
             .get(target)

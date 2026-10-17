@@ -23,6 +23,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/sharedsync"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/workflows"
 )
 
 func main() {
@@ -96,7 +97,11 @@ func main() {
 			routes = append(routes, automationService.Register)
 			runService := runs.New(store, accessService, contextService)
 			routes = append(routes, runService.Register)
-			routes = append(routes, (&mcpapi.Service{Auth: service, Access: accessService, Contexts: contextService, Search: searchService, Graph: graphService, Usage: usageService, Automation: automationService, Runs: runService}).Register)
+			workflowService := workflows.New(store, accessService, contextService, runService)
+			workflowService.Observer = observer
+			workflowService.StartWorker(ctx)
+			routes = append(routes, workflowService.Register)
+			routes = append(routes, (&mcpapi.Service{Auth: service, Access: accessService, Contexts: contextService, Search: searchService, Graph: graphService, Usage: usageService, Automation: automationService, Runs: runService, Workflows: workflowService}).Register)
 		}
 	}
 	address := os.Getenv("KOUJOU_API_ADDR")

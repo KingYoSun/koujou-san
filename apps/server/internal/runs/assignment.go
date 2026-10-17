@@ -130,6 +130,9 @@ func (s *Service) ContactRunner(ctx context.Context, p access.Principal, w strin
 		return nil
 	}}
 	return s.Store.Apply(ctx, scope, persistence.Command{WorkspaceID: w, ResourceID: "runner:" + p.DeviceID, Kind: "runner-contact", Mutation: req.Mutation, Payload: raw(req)}, func(tx pgx.Tx, ref apicontract.Reference) (json.RawMessage, error) {
+		if _, err := tx.Exec(ctx, `INSERT INTO access_resources(workspace_id,id,restricted) VALUES($1,$2,false) ON CONFLICT DO NOTHING`, w, ref.ID); err != nil {
+			return nil, err
+		}
 		now := time.Now().UTC()
 		r := Runner{Ref: Ref{ID: ref.ID, Version: ref.Version}, DeviceID: p.DeviceID, RunnerID: req.RunnerID, Connections: req.Connections, SeenAt: now, ExpiresAt: now.Add(assignmentLifetime)}
 		_, err := tx.Exec(ctx, `INSERT INTO run_runners VALUES($1,$2,$3,$4) ON CONFLICT(workspace_id,device_id) DO UPDATE SET version=EXCLUDED.version,payload=EXCLUDED.payload`, w, p.DeviceID, ref.Version, raw(r))
@@ -174,23 +177,36 @@ func (s *Service) eligible(ctx context.Context, q query, w, user, device string,
 	if reason != "" {
 		return r, c, reason, nil
 	}
-	for _, b := range spec.Input.Command.Binding {
+	if reason = CapabilityGap(c, spec.Input.Command, required); reason != "" {
+		return r, c, reason, nil
+	}
+	return r, c, "", nil
+}
+
+// CapabilityGap is shared by definition validation and the final assignment.
+func CapabilityGap(c Connection, command Command, required []string) string {
+	for _, b := range command.Binding {
 		if !slices.Contains(c.Bindings, b) {
-			return r, c, "binding_missing", nil
+			return "binding_missing"
 		}
 	}
 	for _, need := range required {
 		if !slices.Contains(c.Capabilities, need) {
-			return r, c, "capability_missing", nil
+			return "capability_missing"
 		}
 	}
-	return r, c, "", nil
+	return ""
 }
 func (s *Service) Assign(ctx context.Context, p access.Principal, w, id string, req Assign) (apicontract.Response[apicontract.Reference], error) {
 	if req.DeviceID == "" || req.Repository != nil && (req.Repository.ID == "" || !commitID.MatchString(req.Repository.Commit)) {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
 	return s.mutate(ctx, p, w, id, "execute", "run-assign", req.Mutation, req, func(tx pgx.Tx, ref apicontract.Reference) (Run, []Ref, error) {
+		if s.BeforeStart != nil {
+			if err := s.BeforeStart(ctx, tx, w, ref.ID); err != nil {
+				return Run{}, nil, err
+			}
+		}
 		r, old, err := loadRun(ctx, tx, w, id)
 		if err != nil {
 			return r, nil, err
@@ -324,6 +340,11 @@ func (s *Service) Assigned(ctx context.Context, p access.Principal, w, id, gener
 	if err = s.checkAssignment(ctx, s.Store.Database(), p, w, r, generation, false); err != nil {
 		return AssignedInput{}, err
 	}
+	if s.BeforeStart != nil {
+		if err = s.BeforeStart(ctx, nil, w, rec.ID); err != nil {
+			return AssignedInput{}, err
+		}
+	}
 	spec, err := s.input(ctx, s.Store.Database(), w, r)
 	if err != nil {
 		return AssignedInput{}, err
@@ -364,6 +385,9 @@ func (s *Service) registerAssignment(mux *http.ServeMux) {
 		var value any
 		if err == nil {
 			value, err = runner(r.Context(), s.Store.Database(), ws, r.PathValue("device"))
+			if err == nil {
+				err = s.Access.Check(r.Context(), p, ws, "runner:"+r.PathValue("device"), "get")
+			}
 			if errors.Is(err, pgx.ErrNoRows) {
 				value = Runner{Ref: Ref{ID: "runner:" + r.PathValue("device"), Version: "0"}, DeviceID: r.PathValue("device"), Connections: []Connection{}}
 				err = nil

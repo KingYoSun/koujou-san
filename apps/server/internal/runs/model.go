@@ -219,6 +219,10 @@ func validate(s Spec) error {
 	}
 	return nil
 }
+
+// ValidateSpec shares the Run input contract with versioned definitions. It has
+// no storage, process or network effects.
+func ValidateSpec(s Spec) error { return validate(s) }
 func schema(b json.RawMessage) (*jsonschema.Resolved, error) {
 	var s jsonschema.Schema
 	if json.Unmarshal(b, &s) != nil {

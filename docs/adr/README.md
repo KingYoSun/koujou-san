@@ -29,3 +29,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0018: 画面から独立したCLI Runner](0018-independent-cli-runner.md)
 
 - [0019: 切断後の実行照合と新Runへの引継ぎ](0019-execution-reconciliation.md)
+
+- [0020: 固定版の工程定義とRun間の進行](0020-versioned-workflows.md)

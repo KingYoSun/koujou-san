@@ -151,6 +151,28 @@ type View struct {
 	Snapshot       *Snapshot  `json:"snapshot"`
 }
 
+// Current performs a read-only observation now, for an explicitly bound target.
+// A cached or delayed success is never sufficient to authorize an external write.
+func (s *Service) Current(ctx context.Context, p access.Principal, w, id string) (Snapshot, error) {
+	if err := s.access.Check(ctx, p, w, "github:"+id, "get"); err != nil {
+		return Snapshot{}, err
+	}
+	if s.config == nil {
+		return Snapshot{}, errors.New("not_configured")
+	}
+	var source []byte
+	if err := s.store.Database().QueryRow(ctx, `SELECT t.spec FROM github_targets t JOIN github_bindings b ON b.target_id=t.id WHERE b.workspace_id=$1 AND t.id=$2 AND t.active`, w, id).Scan(&source); err != nil {
+		return Snapshot{}, err
+	}
+	var target Target
+	if json.Unmarshal(source, &target) != nil {
+		return Snapshot{}, errors.New("invalid_target")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.remote.observe(ctx, target)
+}
+
 func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /github/workspaces/{workspace}/observations", s.listHTTP)
 	mux.HandleFunc("GET /github/workspaces/{workspace}/observations/{target}/history", s.historyHTTP)

@@ -119,6 +119,27 @@ export async function syncRequest(
   return body;
 }
 
+export async function workspaceAccessLost(
+  native: boolean,
+  workspace: string,
+  error: unknown,
+) {
+  if (error instanceof SyncHTTPError && error.status === 401) return true;
+  try {
+    await syncRequest(
+      `/access/workspaces/${encodeURIComponent(workspace)}/members`,
+      native,
+      { method: "GET" },
+    );
+    return false;
+  } catch (probe) {
+    return (
+      probe instanceof SyncHTTPError &&
+      (probe.status === 401 || probe.status === 403)
+    );
+  }
+}
+
 function Field({ node }: { node: Node }) {
   const attributes = node.attributes;
   if (node.type === "img")
