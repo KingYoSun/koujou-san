@@ -5,7 +5,8 @@
 - 一次固定commit: `d2d41f8395cc387bca73723c3118a3ec3cf1e5e5`。
 - 修正固定commit: `636dcbb9b675a819d358d98c2e688c6e31aa26f2`。
 - 担当: 実装履歴を継承しない独立コンテキスト `/root/issue18_independent_review`。
-- 結果: コードblockerは解消。Windows実操作の未確認が残るためReadyにはしない。
+- 追加のWindows受入固定commit: `fa4822f88c21ca29a8cca7da3271bbdb89c4115a`。
+- 結果: 全AC・INVARと追加のWindows受入を確認。blockerなし。最終head CIとマージ後照合は別に行う。
 
 ## 判定
 
@@ -24,6 +25,8 @@
 
 二次のコード差分は無注入Manifestの省略と入力テストに限定され、別crateでの再実行・既存入力テスト1件・`git diff --check`が成功した。新たなコードblockerはなかった。
 
-## 未確認
+## Windows受入の追加検品（09:06時点）
 
-新しいnative設定の実操作と、Windows画面終了後の製品Runner継続は確認していない。所有processの試作や実CLIの成功で代替せず、[実接続記録](2026-10-17-issue-18-evidence.md)に残作業を記録する。検品時点の修正head CIは実行中であり、最終headの結果は[PR #51](https://github.com/KingYoSun/koujou-san/pull/51)で別に確認する。Issueは未Close、PRはdraftである。
+固定commit `fa4822f88c21ca29a8cca7da3271bbdb89c4115a` の画像3点とJSONを担当が直接照合した。native設定の保存完了、GUI→Runner→CLIのPID対応、GUI終了後の二回答・配送・再開・終了0/Succeededが一致した。最初の回答後もCLI PIDは同じで、CLI終了後の09:02:39 JSTにも同じRunnerが受付中・active 0・未送信なしであった。
+
+Runner/APIの実装差分はなく、footerとコメントの訂正も合意済み挙動と整合した。追加blockerはなく、従来の未確認二項目を確認済みと判定した。`git diff --check`も成功した。進行中の最終head CIとマージ後照合を別に確認する。
