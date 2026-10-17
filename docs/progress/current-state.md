@@ -97,8 +97,12 @@
 
 [PR #55](https://github.com/KingYoSun/koujou-san/pull/55)を最終head `3550469`の全CI・全条件の独立検品PASS後にマージした。main `a12eade`と最終headのtree一致・diff 0を確認してIssueを手動Closeした。詳細は[証跡](2026-10-17-issue-22-evidence.md)を参照する。
 
-## Issue #23の準備
+## Issue #23の判定
 
-状態: In progress。ユーザー判断に従い「作業と判断」へ一覧・詳細・回答を集約し、[PR #57](https://github.com/KingYoSun/koujou-san/pull/57)を作成した。共有PGと状態別UI試験、二アカウントから実CLIへの回答、受付/配送/継続の別表示、理由付き差し戻しと新Run関連を確認した。[独立検品](2026-10-17-issue-23-inspection.md)ではAC-5以外がPASS、実装上のblockerは0件。AC-5の本人観測は、ユーザー承認により未確認のまま#33 AC-4へ移管した（Scope revision 2）。UI suiteは本人観測待ちで有効期限に達してFAIL終了し、全体成功とは扱わない。移管後の独立検品照合、最終head CI・マージ後照合が残る。[証跡](2026-10-17-issue-23-evidence.md)を参照する。
+状態: Complete。Scope revision 2。[PR #57](https://github.com/KingYoSun/koujou-san/pull/57)を最終head `381b2650ffdcd085cbc4a86458362e5731c14321`の全CIと独立検品PASS後にマージした。main `e651f9d8a24574f1a24f23a0da11df7c4a96db40`とのtree一致・差分0を確認してCloseした。[証跡](2026-10-17-issue-23-evidence.md)を参照する。人による初見操作（元AC-5）はユーザー承認により未確認のまま#33 AC-4へ移管した。
 
-#24〜#34は未着手（#33は実スリープ確認の移管を反映済み）。LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #24の準備
+
+状態: In progress。採用CLIの新規・再利用セッションからモデルと数量の機械記録を確認し、累積値の境界・取得制約を調査した。実装と検証の範囲は[計画](2026-10-17-issue-24-plan.md)を参照する。
+
+#25〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。LLM操作などは未実装であり、初期リリースの完成とは扱わない。

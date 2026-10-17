@@ -2,7 +2,7 @@
 
 - 基準main: `a12eade021e8131ec88f0023203b52aad3b38858`。Scope revision 2、区分C。
 - [計画](2026-10-17-issue-23-plan.md)のAC-1〜7・INVAR-1〜3。現在の判定は[current-state](current-state.md)を参照する。
-- [独立検品](2026-10-17-issue-23-inspection.md)ではAC-5以外をPASSとし、実装上のblockerは0件。AC-5はユーザー承認により未確認のまま#33 AC-4へ移管した。最終head CIとマージ後照合は未完了。
+- [独立検品](2026-10-17-issue-23-inspection.md)ではAC-5以外をPASSとし、実装上のblockerは0件。AC-5はユーザー承認により未確認のまま#33 AC-4へ移管した。最終head CIとマージ後照合は末尾の完了照合を参照する。
 
 ## 実装と局所確認
 
@@ -46,3 +46,7 @@ AC-5の依頼は「受入: 固定ビルドの画面を確認」。対象は所�
 再実行したUI suiteは本人観測待ちのまま30分の有効期限に達し、`UI inspection timed out`でFAIL終了した（1902.67秒、ログ`.cache/issue23-ui-run.log`、保存先`test-results/issue23-ui-timeout.log`）。製品の回答処理の失敗ではないが、suite全体を成功へ読み替えない。既に取得した段階別GUI観測、専用PG、状態別UI試験は上記の証拠として保持する。専用サービス・volumeは試験が終了処理で削除し、秘密値入りfixture設定も削除した。初回fixtureのFAILも失敗記録として残す。
 
 記録更新前のhead `a8fdd60e67bda147a588e9073d7f079cc2532b86`はCI [39020954917](https://github.com/KingYoSun/koujou-san/actions/runs/39020954917)のShared UI and server・Windows native client、およびGitGuardianが全成功。記録更新後の最終head CIとマージ後照合を確認して完了を判定する。
+
+## 完了照合
+
+Scope revision 2の残る条件は独立検品PASS、blocker 0件。最終head `381b2650ffdcd085cbc4a86458362e5731c14321`はCI [39021816496](https://github.com/KingYoSun/koujou-san/actions/runs/39021816496)のShared UI and server・Windows native clientとGitGuardianが全成功した。PR #57をマージし、main `e651f9d8a24574f1a24f23a0da11df7c4a96db40`と最終headのtree `6d91786de187411b4cbabcc0cde5b29eeced7666`が一致、差分0を確認して#23を手動Closeした。AC-5は未確認のまま#33 AC-4へ引き継ぐ。
