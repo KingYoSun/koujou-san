@@ -1,6 +1,26 @@
 name: koujou-san-dev
 
 services:
+  bifrost:
+    profiles: ["llm"]
+    image: maximhq/bifrost:v2.3.0@sha256:8f37e33a8caa85faf59a875605c61d1d934738e517d8fe96e2d9fcf6f0ef9098
+    env_file:
+      - path: ../.cache/bifrost/provider.env
+        required: false
+    environment:
+      BIFROST_ADMIN_PASSWORD: ${BIFROST_ADMIN_PASSWORD:-}
+      BIFROST_WORKER_KEY: ${BIFROST_WORKER_KEY:-}
+      BIFROST_ENCRYPTION_KEY: ${BIFROST_ENCRYPTION_KEY:-}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - 'test -n "$$BIFROST_ADMIN_PASSWORD" && test -n "$$BIFROST_WORKER_KEY" && test -n "$$BIFROST_ENCRYPTION_KEY"; exec /app/docker-entrypoint.sh /app/main'
+    ports:
+      - "127.0.0.1:18080:8080"
+    volumes:
+      - bifrost-data:/app/data
+      - ../.cache/bifrost/config.json:/app/data/config.json:ro
+    restart: unless-stopped
+
   postgres:
     image: postgres:17.11-bookworm
     environment:
@@ -155,6 +175,7 @@ services:
     restart: unless-stopped
 
 volumes:
+  bifrost-data:
   postgres-data:
   arcadedb-config:
   arcadedb-data:

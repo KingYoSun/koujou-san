@@ -52,6 +52,8 @@
     "infra:up": "node scripts/dev.mjs infra:up",
     "infra:down": "node scripts/dev.mjs infra:down",
     "infra:status": "node scripts/dev.mjs infra:status",
+    "infra:llm:up": "node scripts/dev.mjs infra:llm:up",
+    "infra:llm:stop": "node scripts/dev.mjs infra:llm:stop",
     "format": "prettier --write package.json pnpm-workspace.yaml contracts scripts .github infra apps/client",
     "format:check": "prettier --check package.json pnpm-workspace.yaml contracts scripts .github infra apps/client"
   },

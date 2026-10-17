@@ -504,6 +504,16 @@ button:disabled {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.hopper-editor {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.hopper-editor pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 420px;
+  overflow: auto;
+}
 
 .work-list {
   display: grid;

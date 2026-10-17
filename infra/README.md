@@ -9,6 +9,9 @@
 | Kratos public / admin | `http://127.0.0.1:4433` / `http://127.0.0.1:4434` | `oryd/kratos:v26.2.0`         |
 | Hydra public / admin  | `http://127.0.0.1:4444` / `http://127.0.0.1:4445` | `oryd/hydra:v26.2.0`          |
 | Mailpit               | `http://127.0.0.1:18025`                          | `axllent/mailpit:v1.31.5`     |
+| Bifrost（任意の`llm` profile） | `http://127.0.0.1:18080` | HTTP 2.3.0・digest固定 |
+
+Bifrostは`pnpm run infra:llm:up`で起動する。標準の`infra:up`では起動しない。専用認証・接続設定・本文ログ・外部通信・backupは[サーバーモデル接続](../docs/runbooks/server-models.md)を参照する。
 
 `pnpm run infra:status` で状態を確認し、`pnpm run infra:down` で停止する。通常の停止は named volume を保持する。PostgreSQL は `koujou`、`kratos`、`hydra` を別の role・database に分け、Ory の migration が成功してから各サービスを起動する。
 

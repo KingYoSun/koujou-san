@@ -34,8 +34,11 @@ func (s *Service) semanticUsage(ctx context.Context, w, evaluation string, outco
 		return err
 	}
 	defer rows.Close()
-	outcome.Usage, outcome.Costs, outcome.UsageState = []Ref{}, []Ref{}, "complete"
+	outcome.Usage, outcome.Costs, outcome.UsageState = []Ref{}, []Ref{}, "not_applicable"
 	for rows.Next() {
+		if outcome.UsageState == "not_applicable" {
+			outcome.UsageState = "complete"
+		}
 		var payload []byte
 		var id, version *string
 		if err = rows.Scan(&payload, &id, &version); err != nil {

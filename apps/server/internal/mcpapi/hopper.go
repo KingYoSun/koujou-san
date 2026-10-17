@@ -19,7 +19,7 @@ func (s *Service) registerHopper(server *mcp.Server) {
 	addTool(server, s, "hopper_semantic_template", "Read editable initial semantic evaluation settings. Does not configure, evaluate or publish.", s.hopperSemanticTemplate)
 	addTool(server, s, "hopper_set", "Save a fixed Hopper definition or activation with CAS/replay. Requires hopper-edit; activation requires hopper-manage and current administrator.", s.hopperSet)
 	addTool(server, s, "hopper_evaluate_past", "Request evaluation of a bounded page of past accepted results. Default publish=false never publishes or starts Runs; semantic evaluation can consume model usage. Explicit publish=true enqueues normal evaluation and requires current active definition and automation authority. Requires hopper-manage.", s.hopperPast)
-	addTool(server, s, "hopper_decide", "Explicitly publish a proposal or stop/resume a chain under current administrator, automation, template, execution and budget permissions. Dry-run results cannot be published.", s.hopperDecide)
+	addTool(server, s, "hopper_decide", "Explicitly publish a proposal, stop/resume a chain, or request reevaluate as a separate history with additional model consumption, under current administrator and automation permissions. Dry-run results cannot be published.", s.hopperDecide)
 }
 
 func (s *Service) hopperConnections(ctx context.Context, _ struct{}) (outcome, error) {

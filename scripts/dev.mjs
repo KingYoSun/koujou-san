@@ -153,6 +153,7 @@ async function setup() {
   await cargo("fetch");
   await goRun(["mod", "download"]);
   await prepareAuth();
+  await prepareBifrost();
   console.log(
     "Setup complete. Run pnpm run doctor, then pnpm run check / test / build.",
   );
@@ -188,6 +189,69 @@ async function prepareAuth() {
     root,
     env.KOUJOU_SEARCH_DIR || ".cache/search",
   );
+  if (env.KOUJOU_SERVER_LLM_CONFIG)
+    env.KOUJOU_SERVER_LLM_CONFIG = path.resolve(
+      root,
+      env.KOUJOU_SERVER_LLM_CONFIG,
+    );
+}
+
+async function prepareBifrost() {
+  const dir = path.join(root, ".cache/bifrost");
+  await mkdir(dir, { recursive: true });
+  let local = existsSync(path.join(root, ".env"))
+    ? await readFile(path.join(root, ".env"), "utf8")
+    : "";
+  let changed = false;
+  for (const key of [
+    "BIFROST_ADMIN_PASSWORD",
+    "BIFROST_ENCRYPTION_KEY",
+    "BIFROST_WORKER_KEY",
+  ]) {
+    if (!env[key]) {
+      const stored = local
+        .split(/\r?\n/)
+        .filter(
+          (line) => line.startsWith(`${key}=`) && line.length > key.length + 1,
+        )
+        .at(-1)
+        ?.slice(key.length + 1);
+      env[key] =
+        stored ??
+        (key === "BIFROST_WORKER_KEY" ? "sk-bf-" : "") +
+          randomBytes(16).toString("hex");
+      // Fill an existing empty setting rather than appending a duplicate key.
+      const empty = new RegExp(`^${key}=\\r?$`, "gm");
+      local = empty.test(local)
+        ? local.replace(empty, `${key}=${env[key]}`)
+        : `${local}\n${key}=${env[key]}\n`;
+      changed = true;
+    }
+  }
+  if (!env.KOUJOU_SERVER_LLM_CONFIG) {
+    env.KOUJOU_SERVER_LLM_CONFIG = ".cache/bifrost/connections.json";
+    local += `\nKOUJOU_SERVER_LLM_CONFIG=${env.KOUJOU_SERVER_LLM_CONFIG}\n`;
+    changed = true;
+  }
+  if (changed) await writeFile(path.join(root, ".env"), local, { mode: 0o600 });
+  for (const [file, value] of [
+    ["worker-key", env.BIFROST_WORKER_KEY],
+    ["connections.json", "[]\n"],
+    [
+      "provider.env",
+      "# Upstream provider credentials for the optional Bifrost service.\n",
+    ],
+    [
+      "config.json",
+      await readFile(
+        path.join(root, "infra/bifrost/config.template.json"),
+        "utf8",
+      ),
+    ],
+  ]) {
+    if (!existsSync(path.join(dir, file)))
+      await writeFile(path.join(dir, file), value, { flag: "wx", mode: 0o600 });
+  }
 }
 
 function checkNode() {
@@ -369,6 +433,7 @@ async function testDatabase(suite = "persistence", testName) {
       env.KOUJOU_TEST_GRAPH_URL = `http://127.0.0.1:${env.KOUJOU_TEST_ARCADE_PORT}`;
       env.KOUJOU_TEST_GRAPH_PASSWORD = env.ARCADEDB_ROOT_PASSWORD;
     }
+    env.KOUJOU_SERVER_LLM_CONFIG = ""; // Tests use only explicitly owned model fixtures.
     await goRun([
       "test",
       `./internal/${suite}`,
@@ -577,6 +642,34 @@ const tasks = {
   "infra:up": () => infra("up"),
   "infra:down": () => infra("down"),
   "infra:status": () => infra("status"),
+  "infra:llm:up": async () => {
+    await prepareBifrost();
+    await run(`docker${exe}`, [
+      "compose",
+      "--env-file",
+      path.join(root, ".env"),
+      "-f",
+      path.join(root, "infra/compose.yaml"),
+      "--profile",
+      "llm",
+      "up",
+      "-d",
+      "--wait",
+      "bifrost",
+    ]);
+  },
+  "infra:llm:stop": () =>
+    run(`docker${exe}`, [
+      "compose",
+      "--env-file",
+      path.join(root, ".env"),
+      "-f",
+      path.join(root, "infra/compose.yaml"),
+      "--profile",
+      "llm",
+      "stop",
+      "bifrost",
+    ]),
 };
 
 const startedAt = new Date().toISOString();

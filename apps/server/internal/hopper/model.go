@@ -104,20 +104,21 @@ type Source struct {
 type Evaluation struct {
 	// protected refs constrain derived work; audit refs additionally retain the
 	// complete evaluator input/response without injecting their bodies into Runs.
-	protected   []Ref
-	audit       []Ref
-	Semantic    *SemanticOutcome `json:"semantic,omitempty"`
-	Cost        *usage.CostState `json:"cost,omitempty"`
-	Definition  Ref              `json:"definition"`
-	Source      Source           `json:"source"`
-	Root        string           `json:"root"`
-	Depth       int              `json:"depth"`
-	State       string           `json:"state"`
-	Reason      string           `json:"reason"`
-	Verdict     string           `json:"verdict"`
-	DryRun      bool             `json:"dry_run"`
-	Destination *Ref             `json:"destination,omitempty"`
-	At          time.Time        `json:"at"`
+	protected    []Ref
+	audit        []Ref
+	Semantic     *SemanticOutcome `json:"semantic,omitempty"`
+	Reevaluation string           `json:"reevaluation,omitempty"`
+	Cost         *usage.CostState `json:"cost,omitempty"`
+	Definition   Ref              `json:"definition"`
+	Source       Source           `json:"source"`
+	Root         string           `json:"root"`
+	Depth        int              `json:"depth"`
+	State        string           `json:"state"`
+	Reason       string           `json:"reason"`
+	Verdict      string           `json:"verdict"`
+	DryRun       bool             `json:"dry_run"`
+	Destination  *Ref             `json:"destination,omitempty"`
+	At           time.Time        `json:"at"`
 }
 type Record struct {
 	MetadataOnly bool `json:"metadata_only,omitempty"`

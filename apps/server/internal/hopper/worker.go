@@ -56,6 +56,15 @@ func (s *Service) Execute(ctx context.Context, j automation.Job) (automation.Res
 	if err = json.Unmarshal(definition.Value, &d); err != nil {
 		return automation.Result{}, err
 	}
+	if hasSemantic(d.Condition) && source.Previous == nil {
+		var previous Ref
+		err = s.Store.Database().QueryRow(ctx, `SELECT id,version FROM hopper_records WHERE workspace_id=$1 AND kind='evaluation' AND payload#>>'{source,target,id}'=$2 AND payload#>>'{definition,id}'=$3 ORDER BY position DESC LIMIT 1`, j.Workspace, source.Target.ID, j.Definition.ID).Scan(&previous.ID, &previous.Version)
+		if err == nil {
+			source.Previous = &previous
+		} else if !missing(err) {
+			return automation.Result{}, err
+		}
+	}
 	semantic, err := s.semantic(ctx, j, id, d, source)
 	if err != nil {
 		return automation.Result{}, err

@@ -24,7 +24,12 @@ type modelAttempt struct {
 	Outcome    *SemanticOutcome    `json:"outcome,omitempty"`
 }
 
-func (s *Service) semantic(ctx context.Context, j automation.Job, evaluation string, d Definition, source Source) (*SemanticOutcome, error) {
+func (s *Service) semantic(ctx context.Context, j automation.Job, evaluation string, d Definition, source Source) (result *SemanticOutcome, resultErr error) {
+	defer func() {
+		if result != nil && resultErr == nil {
+			resultErr = s.semanticUsage(ctx, j.Workspace, evaluation, result)
+		}
+	}()
 	if !hasSemantic(d.Condition) || Evaluate(d.Condition, source.Facts) != "unknown" {
 		return nil, nil
 	}
@@ -70,7 +75,7 @@ func (s *Service) semantic(ctx context.Context, j automation.Job, evaluation str
 			return nil, ErrInvalid
 		}
 		if previous.Outcome != nil && previous.Outcome.State != "failed" {
-			return previous.Outcome, s.semanticUsage(ctx, j.Workspace, evaluation, previous.Outcome)
+			return previous.Outcome, nil
 		}
 	}
 	connection, err := s.Gateway.Connection(j.Workspace, d.Semantic.Connection, d.Semantic.Revision)
@@ -171,7 +176,7 @@ func (s *Service) semantic(ctx context.Context, j automation.Job, evaluation str
 		outcome.Reason = reason
 	} else {
 		var decision SemanticDecision
-		if len(reply.Choices[0].Message.Calls) > 0 || reply.Choices[0].Message.Content == nil || decode([]byte(*reply.Choices[0].Message.Content), &decision) != nil || !decision.validate(input) {
+		if len(reply.Choices[0].Message.Calls) > 0 || reply.Choices[0].Message.Content == nil || json.Unmarshal([]byte(*reply.Choices[0].Message.Content), &decision) != nil || !decision.validate(input) {
 			outcome.State = "failed"
 			outcome.Reason = "invalid_semantic_response"
 		} else {
@@ -225,7 +230,7 @@ func (s *Service) semantic(ctx context.Context, j automation.Job, evaluation str
 	if outcome.State == "failed" && j.Attempts < maxAttempts {
 		return nil, errors.New("retry_semantic_request")
 	}
-	return outcome, s.semanticUsage(ctx, j.Workspace, evaluation, outcome)
+	return outcome, nil
 }
 
 func (s *Service) recheckSemantic(ctx context.Context, tx pgx.Tx, p access.Principal, w string, e *Evaluation, d Definition) error {

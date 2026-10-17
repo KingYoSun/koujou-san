@@ -43,3 +43,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0025: 型付き結果からの発行と、起点を保つ連鎖制御](0025-deterministic-hopper.md)
 
 - [0026: クライアントによるContext選択と共通の版付き保存](0026-client-context-selection.md)
+
+- [0027: サーバーLLMによるHopperの意味判断](0027-server-hopper-semantics.md)

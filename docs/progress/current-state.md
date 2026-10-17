@@ -113,8 +113,8 @@
 
 状態: Complete。Scope revision 1。[PR #60](https://github.com/KingYoSun/koujou-san/pull/60)を最終head `ee3d485778e362fb2c9f94f188efd18dfebb677a`の全CIと独立検品blocker 0件の確認後にマージした。merge `4638bbd61510a365a03bb134d2a2415ec521fc45`とのtreeは`c7ba875a22d813a8f8522619d738dff4bacbb7f5`で一致、差分0。#26をCloseし、親#2を更新した。共有操作・MCP・共通画面、Rigの直接組込み、ChatGPT契約の新しいOAuthと二要求・一tool往復・JSON取得を確認した。失敗試行、実契約の確認範囲、認証情報の削除・失効は[証跡](2026-10-18-issue-26-evidence.md)、判定は[独立検品](2026-10-18-issue-26-inspection.md)を参照する。
 
-## Issue #27の準備
+## Issue #27の判定
 
-状態: In progress。Scope revision 1。基準mainは#26マージ後の`4638bbd61510a365a03bb134d2a2415ec521fc45`。Bifrost HTTP 2.3.0を固定した[隔離probe](2026-10-18-issue-27-gateway-probe.md)を終えた。本人の回答により、標準構成の任意サービスとして同梱する。入力1 MiB・出力4096 token・一要求120秒・Worker最大2試行・Workspace同時2評価を変更可能な初期値とする。元結果・必要な証拠の変更だけ関係する評価を自動再評価し、定義・Context更新による過去全件の自動再評価はしない。[計画](2026-10-18-issue-27-plan.md)に条件と終了範囲を固定し、実装へ進む。
+状態: In progress。Scope revision 1。基準mainは#26マージ後の`4638bbd61510a365a03bb134d2a2415ec521fc45`。本人が選んだ任意Bifrost、変更可能な初期上限、関係する証拠だけの再評価を実装した。所有CLI/HTTP・PG・Ory/MCP・共通画面とGateway復元の検証を終え、最終固定commitの独立検品・CIへ進む。実providerの意味判断は未実行で、接続・認証・消費枠の本人判断が必要である。[計画](2026-10-18-issue-27-plan.md)、[証跡と残る確認](2026-10-18-issue-27-evidence.md)、[ADR](../adr/0027-server-hopper-semantics.md)を参照する。未実行条件を達成とは扱わない。
 
 #28〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。
