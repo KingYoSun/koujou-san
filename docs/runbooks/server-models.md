@@ -28,7 +28,7 @@ pnpm run infra:llm:stop
     "endpoint": "http://127.0.0.1:18080/v1",
     "key_file": "C:/Users/USER/koujou-san/.cache/bifrost/worker-key",
     "workspaces": ["WORKSPACE_ID"],
-    "models": [{ "requested": "openai/PROVIDER_MODEL", "actual": ["ACTUAL_MODEL"] }]
+    "models": [{ "requested": "openai/PROVIDER_MODEL", "allowed_actual": ["ACTUAL_MODEL"] }]
   }
 ]
 ```

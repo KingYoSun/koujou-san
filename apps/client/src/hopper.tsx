@@ -14,7 +14,7 @@ type ModelConnection = {
   id: string;
   name: string;
   revision: string;
-  models: { requested: string; actual: string[] }[];
+  models: { requested: string; allowed_actual: string[] }[];
 };
 type SemanticSettings = {
   connection: string;
@@ -638,7 +638,7 @@ export function Hopper({
                   connection: connection.id,
                   revision: connection.revision,
                   model: model.requested,
-                  allowed_models: model.actual,
+                  allowed_models: model.allowed_actual,
                 };
                 value.condition = {
                   all: [value.condition, { semantic: true }],
@@ -663,7 +663,7 @@ export function Hopper({
                         connection: c.id,
                         revision: c.revision,
                         model: c.models[0].requested,
-                        allowed_models: c.models[0].actual,
+                        allowed_models: c.models[0].allowed_actual,
                         fallbacks: [],
                       });
                   }}
@@ -691,7 +691,7 @@ export function Hopper({
                     if (m)
                       editSemantic({
                         model: m.requested,
-                        allowed_models: m.actual,
+                        allowed_models: m.allowed_actual,
                         fallbacks: [],
                       });
                   }}
