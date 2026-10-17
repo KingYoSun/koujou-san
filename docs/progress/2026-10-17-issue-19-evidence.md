@@ -31,6 +31,8 @@ API試験はTLSのHTTPサーバーを実際に停止し、同じアドレスと�
 
 独立検品は初回head `e0dd23f286e2289c06fa7461ac43a174e60cc2ff`で、Runner消失後の保存済み出力が観測をknownへ戻す経路を指摘した。以前の観測更新へ戻した実PG試験は`stored report invented current session continuity output known`で失敗した。割当へセッション未確認を永続記録する修正後は、同じ出力・古いknown・receipt再送を受理してもUnknownを保ち、終端だけを確認済みの事実として扱う試験が成功した。
 
+修正後のhead `a5a618ac487402b5c6dad44df3d35966157002dd`で、実CLIと専用APIでもこの組合せを再現した。Runner消失後の保存済み出力（報告5）をcommitしてHTTP応答を失わせ、直後にAPIを停止した。DBの最後の変更が`run-event`、端末側の同じoperation IDは未確認のままであることを照合し、この時点で共有観測はUnknown・`session_unconfirmed=true`だった。再接続後も最後のrunningとUnknownを維持し、追加CLIは0。後から行うUnknown書込みに依存せず保持できることを確認した。
+
 Web保存の試験は、既存Context下書き1万件を保持したまま対象Pauseだけを読み戻す。API/利用者/Workspace/Pauseの分離、質問版の保持、失効時の保存待ちと遅着応答を確認した。WindowsではDPAPIの暗号化と旧同期DBの読戻し、journalの旧列構成と50件ずつの102件復旧、再発行拒否を確認した。
 
 root check/test/buildとdesktop check/test/buildを実行した。rootの共通UIは11ファイル37試験、desktopは11試験成功。実Oryへの認証・端末登録は明示したignored試験を実行して成功。最終差分の検証・独立検品・CIは追記する。
