@@ -24,6 +24,10 @@ type CriterionResult = {
   evidence_refs: Ref[];
   unverified: string[];
 };
+type ReportData = {
+  criteria_results?: CriterionResult[];
+  unverified?: string[];
+};
 type View = {
   launch: Entry & {
     value: {
@@ -44,10 +48,7 @@ type View = {
       assessment?: {
         state: string;
         verdict?: string;
-        report?: {
-          criteria_results?: CriterionResult[];
-          unverified?: string[];
-        };
+        report?: unknown;
       };
     };
   };
@@ -63,6 +64,10 @@ type View = {
   >;
 };
 const format = (v: unknown) => JSON.stringify(v, null, 2);
+const acceptedReport = (v: View) =>
+  v.run.value.assessment?.state === "valid"
+    ? (v.run.value.assessment.report as ReportData | undefined)
+    : undefined;
 const sourceKinds: Record<string, string> = {
   "machine-observation": "実行・機器の観測",
   "human-confirmation": "人の確認",
@@ -83,6 +88,104 @@ const dimensions: Record<string, string> = {
   criteria: "固定基準",
   context: "Context注入",
 };
+
+export function InspectionResult({
+  value: v,
+  title,
+}: {
+  value: View;
+  title: string;
+}) {
+  const report = acceptedReport(v);
+  return (
+    <section aria-label={title}>
+      <h4>
+        {title}: {v.launch.value.run_id}
+      </h4>
+      <p>
+        過去の判定:{" "}
+        <strong>{v.run.value.assessment?.verdict ?? "未判定"}</strong> / 形式:{" "}
+        {v.run.value.assessment?.state ?? "未確認"} / 現在の適用:{" "}
+        <strong>
+          {v.validity === "STALE"
+            ? "Stale（基準変更・再検品が必要）"
+            : "採用中の基準に一致"}
+        </strong>
+      </p>
+      <p>
+        実行: {v.run.value.state} / 終了コード:{" "}
+        {v.run.value.exit_code ?? "未観測"} / Context:{" "}
+        {v.launch.value.manifest.state === "none"
+          ? "明示的に無注入"
+          : v.launch.value.manifest.state}
+      </p>
+      <p className="note">
+        固定基準・Context注入の強制は、版と注入内容の固定です。CLIから読める全ファイル・記憶の分離を保証するものではありません。
+      </p>
+      <dl className="status-list">
+        {Object.entries(v.launch.value.separation).map(([name, s]) => (
+          <div key={name}>
+            <dt>{dimensions[name] ?? name}</dt>
+            <dd>
+              {levels[s.level] ?? s.level} · {s.method || "方法未確認"}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <div className="table-scroll">
+        <table className="inspection-results">
+          <thead>
+            <tr>
+              <th>条件</th>
+              <th>判定</th>
+              <th>実行</th>
+              <th>証拠</th>
+              <th>未確認</th>
+            </tr>
+          </thead>
+          <tbody>
+            {report?.criteria_results?.map((c) => (
+              <tr key={c.criterion_id}>
+                <td>{c.criterion_id}</td>
+                <td>{c.verdict}</td>
+                <td>{c.executed ? "実行済み" : "未実行"}</td>
+                <td>
+                  {c.evidence_refs
+                    ?.map((e) => `${e.id}@${e.version}`)
+                    .join(", ") || "なし"}
+                </td>
+                <td>{c.unverified?.join(" / ") || "記載なし"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p>
+        全体の未確認:{" "}
+        {report
+          ? report.unverified?.join(" / ") || "記載なし"
+          : "形式未確認・不正のため未判定"}
+      </p>
+      <h4>証拠の現在の状態</h4>
+      <ul>
+        {Object.entries(v.evidence_current).map(([key, e]) => (
+          <li key={key}>
+            {key} · {sourceKinds[e.kind] ?? e.kind} · {e.state} ·{" "}
+            {e.description}
+            <br />
+            <code>
+              {e.artifact.uri} / {e.artifact.revision} / {e.artifact.digest}
+            </code>
+          </li>
+        ))}
+      </ul>
+      <details>
+        <summary>固定入力・Manifest・原レポート</summary>
+        <pre>{format(v)}</pre>
+      </details>
+    </section>
+  );
+}
 
 export function Inspections({
   native,
@@ -254,7 +357,7 @@ export function Inspections({
         launch: { id: result.launch.id, version: result.launch.version },
         source: { id: result.run.id, version: result.run.version },
         criteria:
-          result.run.value.assessment?.report?.criteria_results?.map(
+          acceptedReport(result)?.criteria_results?.map(
             (c) => c.criterion_id,
           ) ?? [],
         decision: "accept-with-exceptions",
@@ -305,92 +408,6 @@ export function Inspections({
     );
     setNotice("端末内の下書きです。共有への保存・採用・実行は別の操作です。");
   };
-  const renderView = (v: View, title: string) => (
-    <section aria-label={title}>
-      <h4>
-        {title}: {v.launch.value.run_id}
-      </h4>
-      <p>
-        過去の判定:{" "}
-        <strong>{v.run.value.assessment?.verdict ?? "未判定"}</strong> / 形式:{" "}
-        {v.run.value.assessment?.state ?? "未確認"} / 現在の適用:{" "}
-        <strong>
-          {v.validity === "STALE"
-            ? "Stale（基準変更・再検品が必要）"
-            : "採用中の基準に一致"}
-        </strong>
-      </p>
-      <p>
-        実行: {v.run.value.state} / 終了コード:{" "}
-        {v.run.value.exit_code ?? "未観測"} / Context:{" "}
-        {v.launch.value.manifest.state === "none"
-          ? "明示的に無注入"
-          : v.launch.value.manifest.state}
-      </p>
-      <p className="note">
-        固定基準・Context注入の強制は、版と注入内容の固定です。CLIから読める全ファイル・記憶の分離を保証するものではありません。
-      </p>
-      <dl className="status-list">
-        {Object.entries(v.launch.value.separation).map(([name, s]) => (
-          <div key={name}>
-            <dt>{dimensions[name] ?? name}</dt>
-            <dd>
-              {levels[s.level] ?? s.level} · {s.method || "方法未確認"}
-            </dd>
-          </div>
-        ))}
-      </dl>
-      <div className="table-scroll">
-        <table className="inspection-results">
-          <thead>
-            <tr>
-              <th>条件</th>
-              <th>判定</th>
-              <th>実行</th>
-              <th>証拠</th>
-              <th>未確認</th>
-            </tr>
-          </thead>
-          <tbody>
-            {v.run.value.assessment?.report?.criteria_results?.map((c) => (
-              <tr key={c.criterion_id}>
-                <td>{c.criterion_id}</td>
-                <td>{c.verdict}</td>
-                <td>{c.executed ? "実行済み" : "未実行"}</td>
-                <td>
-                  {c.evidence_refs
-                    ?.map((e) => `${e.id}@${e.version}`)
-                    .join(", ") || "なし"}
-                </td>
-                <td>{c.unverified?.join(" / ") || "記載なし"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p>
-        全体の未確認:{" "}
-        {v.run.value.assessment?.report?.unverified?.join(" / ") || "記載なし"}
-      </p>
-      <h4>証拠の現在の状態</h4>
-      <ul>
-        {Object.entries(v.evidence_current).map(([key, e]) => (
-          <li key={key}>
-            {key} · {sourceKinds[e.kind] ?? e.kind} · {e.state} ·{" "}
-            {e.description}
-            <br />
-            <code>
-              {e.artifact.uri} / {e.artifact.revision} / {e.artifact.digest}
-            </code>
-          </li>
-        ))}
-      </ul>
-      <details>
-        <summary>固定入力・Manifest・原レポート</summary>
-        <pre>{format(v)}</pre>
-      </details>
-    </section>
-  );
   return (
     <details className="panel workflow-editor" aria-label="独立検品・証拠">
       <summary>独立検品・証拠</summary>
@@ -598,7 +615,7 @@ export function Inspections({
       </button>
       {view && (
         <>
-          {renderView(view, "選択した判定")}
+          <InspectionResult value={view} title="選択した判定" />
           <label>
             比較する検品Run ID
             <input
@@ -620,7 +637,7 @@ export function Inspections({
           >
             別の判定を並べて表示
           </button>
-          {other && renderView(other, "比較する判定")}
+          {other && <InspectionResult value={other} title="比較する判定" />}
           {canEdit && (
             <>
               <p>
