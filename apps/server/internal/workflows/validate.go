@@ -32,6 +32,9 @@ func validate(d Definition, resolve func(Ref) (Definition, error)) []Problem {
 			}
 		}
 		candidate := *d.Spec
+		if d.Spec.Manifest != nil {
+			add("/spec/manifest", "selection_required_for_new_run")
+		}
 		for _, input := range d.Inputs {
 			if input == "context" && len(candidate.Input.Context) == 0 {
 				candidate.Input.Context = raw(nil)
@@ -148,6 +151,13 @@ func validate(d Definition, resolve func(Ref) (Definition, error)) []Problem {
 					if err != nil || run.Schema != "run-definition-v1" {
 						add(path+"/definition", "definition_unavailable")
 					} else {
+						if run.Write != nil {
+							for _, required := range run.Write.Required {
+								if !deps[required.Node] || len(required.On) == 0 {
+									add(path+"/definition/write/required", "judgment_unconnected")
+								}
+							}
+						}
 						for _, problem := range validate(run, resolve) {
 							add(path+"/definition"+problem.Path, problem.Code)
 						}

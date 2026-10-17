@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { syncRequest, workspaceAccessLost } from "./auth";
 import { syncStorage, answerScopeEpoch, allowAnswerScope } from "./sync-store";
 import { SyncHTTPError } from "./sync-error";
@@ -24,6 +25,7 @@ type Task = {
   outcome?: string;
   run?: Ref;
   definition?: Ref;
+  stale?: boolean;
 };
 type Graph = { nodes: { id: string; choices?: string[] }[] };
 type Page = { items: Record<Task>[]; next: string };
@@ -222,7 +224,7 @@ export function WorkflowExecution({
                       "0",
                       {
                         adoption: ref(adoption),
-                        inputs: JSON.parse(inputs),
+                        inputs_utf8: inputs,
                         repositories: JSON.parse(repositories),
                       },
                     );
@@ -257,6 +259,9 @@ export function WorkflowExecution({
                 <p>
                   {r.value.node}（{r.value.attempt}回目）: {r.value.state}{" "}
                   {r.value.outcome ?? ""}
+                  {r.value.stale
+                    ? "（採用変更により、この試行の判定は失効）"
+                    : ""}
                 </p>
                 {r.value.run && (
                   <p>
@@ -268,11 +273,19 @@ export function WorkflowExecution({
                   <button
                     onClick={() =>
                       void act(async () => {
-                        const p = await request(
+                        const p = (await request(
                           `/executions/${encodeURIComponent(record.id)}/preview`,
-                          { execution: ref(record), node: r.value.node },
+                          {
+                            execution: ref(record),
+                            node: r.value.node,
+                            format: "source",
+                          },
+                        )) as { input_utf8: string; sources: Ref[] };
+                        setPreview(
+                          p.input_utf8 +
+                            "\n\n固定参照:\n" +
+                            JSON.stringify(p.sources, null, 2),
                         );
-                        setPreview(JSON.stringify(p, null, 2));
                       })
                     }
                   >
@@ -380,7 +393,6 @@ export function WorkflowExecution({
               <button
                 onClick={() =>
                   void act(async () => {
-                    const { invoke } = await import("@tauri-apps/api/core");
                     const value = await invoke<{
                       complete: boolean;
                       path: string;

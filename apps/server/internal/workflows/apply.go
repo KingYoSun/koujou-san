@@ -49,6 +49,13 @@ func impact(old, next Definition, ts map[string]Task) (affected, invalidated []s
 		}
 	}
 	baseline := !bytes.Equal(raw(old.Baseline), raw(next.Baseline))
+	if baseline {
+		for id, t := range ts {
+			if t.Prepared != nil && t.Prepared.Manifest != nil && t.Prepared.Manifest.State == "ready" {
+				changed[id] = true
+			}
+		}
+	}
 	for id := range changed {
 		for descendant := range descendants(next, id) {
 			changed[descendant] = true
@@ -60,6 +67,9 @@ func impact(old, next Definition, ts map[string]Task) (affected, invalidated []s
 			if t.DecisionAt != nil {
 				invalidated = append(invalidated, id)
 			}
+		}
+		if changed[id] && t.Run != nil && !t.Unstarted && t.Prepared != nil && t.Prepared.Judgment {
+			invalidated = append(invalidated, id)
 		}
 	}
 	for id := range after {
@@ -153,6 +163,20 @@ func (s *Service) Apply(ctx context.Context, p access.Principal, w, id string, r
 			t = Task{Node: id, Attempt: attempt, Definition: node.Definition, State: "pending", Repository: t.Repository, Previous: t.Run}
 			if !exists {
 				t.State = "skipped"
+			}
+			if err = s.saveTask(ctx, tx, w, ref, t, refs); err != nil {
+				return Record{}, err
+			}
+		}
+		for _, id := range invalidated {
+			t := ts[id]
+			if t.Run == nil {
+				continue
+			}
+			t.Stale = true
+			if t.State == "done" {
+				t.Outcome = "STALE"
+				t.Retried = false
 			}
 			if err = s.saveTask(ctx, tx, w, ref, t, refs); err != nil {
 				return Record{}, err

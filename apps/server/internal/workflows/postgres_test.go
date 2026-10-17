@@ -167,6 +167,13 @@ func TestWorkflowsPostgres(t *testing.T) {
 		t.Fatal(contact, err)
 	}
 	capability := plainDefinition()
+	missingSource := plainDefinition()
+	missingSource.Spec.Sources = []Ref{{ID: first.ID, Version: "missing-version"}}
+	missingSourceRef := accept("editor", "/records/run-definition:missing-source", Write{Mutation: mutation("0"), Value: raw(missingSource)})
+	unavailable, sourceErr := s.Validate(ctx, access.Principal{UserID: "editor"}, "one", missingSourceRef)
+	if sourceErr != nil || unavailable.Valid || len(unavailable.Problems) != 1 || unavailable.Problems[0].Code != "reference_unavailable" {
+		t.Fatal("missing fixed source not detected before execution", unavailable, sourceErr)
+	}
 	capability.DeviceID = "worker"
 	capability.Required = []string{"unavailable"}
 	capabilityRef := accept("editor", "/records/run-definition:capability", Write{Mutation: mutation("0"), Value: raw(capability)})

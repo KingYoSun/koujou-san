@@ -63,7 +63,9 @@ func executionScenario(t *testing.T, s *Service, device access.Principal, mutati
 	g := put("workflow-definition:execution", graph)
 	ad := adopt(g)
 	input := map[string]map[string]json.RawMessage{"judge": {"prompt": raw("inspect selected change")}}
-	root := must(s.Start(ctx, admin, w, "workflow-execution:fixed", Start{Mutation: mutation("0"), Adoption: ad, Inputs: input}))
+	input["judge"]["prompt"] = json.RawMessage(`{"message":"inspect selected change","exact":123456789012345678901234567890}`)
+	inputUTF8 := string(raw(input))
+	root := must(s.Start(ctx, admin, w, "workflow-execution:fixed", Start{Mutation: mutation("0"), Adoption: ad, InputsUTF8: &inputUTF8}))
 	step := func(count int) {
 		t.Helper()
 		for i := 0; i < count; i++ {
@@ -94,8 +96,17 @@ func executionScenario(t *testing.T, s *Service, device access.Principal, mutati
 		if run.Assignment == nil {
 			t.Fatal("unassigned", node, run)
 		}
+		if node == "judge" {
+			record, err := s.Runs.Read(ctx, admin, w, run.Input)
+			if err != nil || !strings.Contains(string(record.Value), "123456789012345678901234567890") {
+				t.Fatal("UTF-8 start input lost numeric precision", err)
+			}
+		}
 		version := rr.Version
 		for i, event := range []runs.Event{{Type: "prepared"}, {Type: "started"}, {Type: "output", Channel: "stdout", Source: "fixture", Value: raw(map[string]string{"unselected": "NEVER_INJECT"})}, {Type: "finished", ExitCode: ptr(0), Report: raw(map[string]any{"decision": outcome, "selected": map[string]any{"context": "only context", "prompt": "only prompt", "command": "only command"}, "unselected": "NEVER_INJECT", "suggestion": "start undefined command"})}} {
+			if run.StartedAt != nil && i < 2 {
+				continue
+			}
 			event.Mutation = mutation(version)
 			event.Sequence = string(rune('1' + i))
 			event.Generation = run.Assignment.Generation
@@ -105,7 +116,15 @@ func executionScenario(t *testing.T, s *Service, device access.Principal, mutati
 			version = must(s.Runs.Report(ctx, device, w, rr.ID, event)).Version
 		}
 	}
-	step(4)
+	step(1)
+	// A new service instance resumes the saved intent; no in-memory scheduler
+	// state or new identity is needed to create and assign that exact Run.
+	restarted := New(s.Store, s.Access, s.Contexts, s.Runs)
+	if err := restarted.Step(ctx, w, root.ID); err != nil {
+		t.Fatal(err)
+	}
+	s.Runs.BeforeStart = s.beforeStart
+	step(2)
 	if state()["a"].State != "running" || state()["b"].State != "running" || state()["judge"].Run != nil {
 		t.Fatal("parallel or required fan-in failed", state())
 	}
@@ -257,5 +276,72 @@ func executionScenario(t *testing.T, s *Service, device access.Principal, mutati
 		t.Fatal("new Context not adopted for unstarted Run", state())
 	}
 	t.Log("fixed workflow+Run export, unchanged live adoption on edit, explicit affected unstarted inputs and stale decision invalidation passed")
+	// A late PASS for an input/criterion adopted before an explicit change is a
+	// historical fact, not a PASS for the new basis. Only the declared STALE return
+	// creates another Run; unrelated completed Runs are retained.
+	inspectionV1 := selectedDef
+	inspectionSpec := *selectedDef.Spec
+	inspectionV1.Spec = &inspectionSpec
+	inspectionV1.Spec.Derivation = &runs.Contract{Name: "basis-check", Version: "v1", VerdictField: "decision"}
+	inspectionOne := put("run-definition:basis-v1", inspectionV1)
+	basisGraph := Definition{Schema: "workflow-definition-v1", Name: "stale basis", Baseline: &baseline, Budget: &Budget{Parallel: 1, MaxRuns: 2}, Nodes: []Node{{ID: "inspection", Definition: &inspectionOne, Retry: map[string]string{"STALE": "inspection"}}, {ID: "gate", Choices: []string{"approve"}, Join: "all", Depends: []Dependency{{Node: "inspection", On: []string{"PASS"}, Required: true}}}}}
+	basisOne := put("workflow-definition:basis-v1", basisGraph)
+	root = must(s.Start(ctx, admin, w, "workflow-execution:basis", Start{Mutation: mutation("0"), Adoption: adopt(basisOne)}))
+	step(2)
+	oldInspection := state()["inspection"]
+	runningRecord, err := s.Runs.Read(ctx, admin, w, Ref{ID: oldInspection.Run.ID, Version: "head"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var running runs.Run
+	_ = json.Unmarshal(runningRecord.Value, &running)
+	for i, event := range []runs.Event{{Type: "prepared"}, {Type: "started"}} {
+		event.Mutation = mutation(runningRecord.Version)
+		event.Generation = running.Assignment.Generation
+		event.Sequence = string(rune('1' + i))
+		runningRecord.Ref = must(s.Runs.Report(ctx, device, w, runningRecord.ID, event))
+	}
+	inspectionV2 := inspectionV1
+	nextSpec := *inspectionV1.Spec
+	inspectionV2.Spec = &nextSpec
+	inspectionV2.Spec.Derivation = &runs.Contract{Name: "basis-check", Version: "v2", VerdictField: "decision"}
+	inspectionTwo := put("run-definition:basis-v2", inspectionV2)
+	basisGraph.Nodes[0].Definition = &inspectionTwo
+	basisTwo := put("workflow-definition:basis-v2", basisGraph)
+	_, basisRoot, _ := execution(ctx, s.Store.Database(), w, root.ID)
+	change, err := s.Impact(ctx, admin, w, ImpactRequest{Execution: basisRoot.Ref, Adoption: adopt(basisTwo)})
+	if err != nil || len(change.Invalidated) != 1 || change.Invalidated[0] != "inspection" {
+		t.Fatal("running judgment was not invalidated", change, err)
+	}
+	must(s.Apply(ctx, admin, w, root.ID, Apply{Mutation: mutation(basisRoot.Version), Impact: change}))
+	report("inspection", "PASS")
+	step(1)
+	if state()["inspection"].Outcome != "STALE" || state()["gate"].State != "pending" {
+		t.Fatal("late old PASS advanced new basis", state())
+	}
+	oldResult, err := s.Runs.Read(ctx, admin, w, Ref{ID: oldInspection.Run.ID, Version: "head"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var original runs.Run
+	_ = json.Unmarshal(oldResult.Value, &original)
+	if original.Assessment == nil || original.Assessment.Verdict != "PASS" {
+		t.Fatal("historical PASS was overwritten")
+	}
+	step(3)
+	if state()["inspection"].Run.ID == oldInspection.Run.ID {
+		t.Fatal("STALE return reused old Run")
+	}
+	report("inspection", "PASS")
+	step(2)
+	_, gateRoot, _ := execution(ctx, s.Store.Database(), w, root.ID)
+	currentGate := state()["gate"]
+	must(s.Decide(ctx, editor, w, root.ID, Decision{Mutation: mutation(gateRoot.Version), Node: "gate", Attempt: currentGate.Attempt, Choice: "approve"}))
+	step(1)
+	settled, _, err := execution(ctx, s.Store.Database(), w, root.ID)
+	if err != nil || settled.State != "completed" || settled.Count != 2 {
+		t.Fatal("declared stale reinspection did not complete", settled, err)
+	}
+	t.Log("criterion changes mark old/late judgments STALE, retain original Run PASS, and only the declared return creates a new inspection Run")
 }
 func ptr(v int) *int { return &v }

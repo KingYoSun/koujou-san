@@ -104,7 +104,7 @@ func externalScenario(t *testing.T, s *Service, device access.Principal, mutatio
 	write := plainDefinition()
 	write.DeviceID = "worker"
 	write.Spec.Input.Command.Parameters = raw(map[string]string{"sha": commit})
-	write.Write = &WriteGuard{Target: "fixed-pr", Commit: commit, Required: []string{"gate"}, Conditional: true, Parameter: []string{"sha"}}
+	write.Write = &WriteGuard{Target: "fixed-pr", Commit: commit, Required: []Dependency{{Node: "gate", On: []string{"approve"}}}, Conditional: true, Parameter: []string{"sha"}}
 	wr := put("run-definition:merge", write)
 	graph.Name = "explicit conditional operation"
 	graph.Nodes = []Node{{ID: "gate", Choices: []string{"approve", "rework"}}, {ID: "merge", Definition: &wr, Join: "all", Depends: []Dependency{{Node: "gate", On: []string{"approve"}, Required: true}}}}
@@ -231,4 +231,43 @@ func externalScenario(t *testing.T, s *Service, device access.Principal, mutatio
 		t.Fatal("expired prepared task created a Run")
 	}
 	t.Log("finite retry/time budgets, exact chosen cost valuation, missing coverage and currency boundaries passed")
+	graph.Name = "Runner preparation wait"
+	graph.Budget = &Budget{Parallel: 1, MaxRuns: 1}
+	ad = adopt(put("workflow-definition:runner-wait", graph))
+	waiting := must(s.Start(ctx, p, w, "workflow-execution:runner-wait", Start{Mutation: mutation("0"), Adoption: ad}))
+	profile, err := s.Capabilities(ctx, p, w, "worker", "head")
+	if err != nil {
+		t.Fatal(err)
+	}
+	profile.Connections[0].Confirmed = false
+	contact := must(s.Runs.ContactRunner(ctx, device, w, runs.RunnerContact{Mutation: mutation(profile.Version), RunnerID: profile.RunnerID, Connections: profile.Connections}))
+	for i := 0; i < 2; i++ {
+		if err = s.Step(ctx, w, waiting.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	blocked, blockedRoot, err := execution(ctx, s.Store.Database(), w, waiting.ID)
+	if err != nil || blocked.State != "waiting" || !strings.HasPrefix(blocked.Reason, "runner_preparation:") {
+		t.Fatal("resource wait conflated with Run Pause", blocked, err)
+	}
+	ts, _ = tasks(ctx, s.Store.Database(), w, waiting.ID)
+	queuedID := ts["command"].Run.ID
+	if err = s.Step(ctx, w, waiting.ID); err != nil {
+		t.Fatal(err)
+	}
+	_, unchanged, _ := execution(ctx, s.Store.Database(), w, waiting.ID)
+	if unchanged.Ref != blockedRoot.Ref {
+		t.Fatal("unchanged unavailable profile repeatedly mutated history")
+	}
+	profile.Connections[0].Confirmed = true
+	must(s.Runs.ContactRunner(ctx, device, w, runs.RunnerContact{Mutation: mutation(contact.Version), RunnerID: profile.RunnerID, Connections: profile.Connections}))
+	if err = s.Step(ctx, w, waiting.ID); err != nil {
+		t.Fatal(err)
+	}
+	ready, _, err := execution(ctx, s.Store.Database(), w, waiting.ID)
+	ts, _ = tasks(ctx, s.Store.Database(), w, waiting.ID)
+	if err != nil || ready.State != "running" || ready.Count != 1 || ts["command"].Run.ID != queuedID || ts["command"].State != "running" {
+		t.Fatal("Runner readiness did not resume the fixed intent", ready, ts, err)
+	}
+	t.Log("resource wait is separate from Pause; unchanged profiles do not grow history and a new confirmed contact reuses the queued Run")
 }

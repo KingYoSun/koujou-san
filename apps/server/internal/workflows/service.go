@@ -38,6 +38,9 @@ func New(store *persistence.Store, a *access.Service, c *contexts.Service, r *ru
 }
 func kind(id string) string { k, _, _ := strings.Cut(id, ":"); return k }
 func decode(raw []byte, v any) error {
+	if !json.Valid(raw) {
+		return ErrInvalid
+	}
 	d := json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
 	if d.Decode(v) != nil {
@@ -59,7 +62,7 @@ func unique(refs []Ref) []Ref {
 func record(ctx context.Context, q query, w string, ref Ref) (Record, error) {
 	var r Record
 	var refs []byte
-	err := q.QueryRow(ctx, `SELECT id,owner_id,version,kind,position::text,payload,refs FROM workflow_records WHERE workspace_id=$1 AND id=$2 AND ($3='head' OR version=$3) ORDER BY position DESC LIMIT 1`, w, ref.ID, ref.Version).Scan(&r.ID, &r.Owner, &r.Version, &r.Kind, &r.Position, &r.Value, &refs)
+	err := q.QueryRow(ctx, `SELECT id,owner_id,version,kind,position::text,payload,refs FROM workflow_records WHERE workspace_id=$1 AND id=$2 AND ($3='head' OR version=$3) ORDER BY workflow_records.position DESC LIMIT 1`, w, ref.ID, ref.Version).Scan(&r.ID, &r.Owner, &r.Version, &r.Kind, &r.Position, &r.Value, &refs)
 	if err == nil {
 		err = json.Unmarshal(refs, &r.Refs)
 	}
@@ -311,7 +314,22 @@ func (s *Service) validation(ctx context.Context, q query, p access.Principal, w
 		problems = append(problems, prefixProblems(fmt.Sprintf("/nodes/%d/definition", i), ps)...)
 		checked = append(checked, rs...)
 	}
-	return Validation{Definition: r.Ref, Valid: len(problems) == 0, Problems: problems, Checked: unique(checked)}, nil
+	checked = unique(checked)
+	var missing string
+	err = q.QueryRow(ctx, `SELECT ref.id FROM jsonb_to_recordset($2::jsonb) ref(id text,version text) WHERE NOT EXISTS(
+ SELECT 1 FROM workflow_records WHERE workspace_id=$1 AND id=ref.id AND version=ref.version
+ UNION ALL SELECT 1 FROM context_records WHERE workspace_id=$1 AND resource_id=ref.id AND revision=ref.version
+ UNION ALL SELECT 1 FROM run_records WHERE workspace_id=$1 AND id=ref.id AND version=ref.version
+ UNION ALL SELECT 1 FROM shared_versions WHERE workspace_id=$1 AND resource_id=ref.id AND version=ref.version
+ UNION ALL SELECT 1 FROM shared_changes WHERE workspace_id=$1 AND resource_id=ref.id AND version=ref.version
+ UNION ALL SELECT 1 FROM run_runners WHERE workspace_id=$1 AND device_id=substring(ref.id from 8) AND ref.id LIKE 'runner:%' AND payload->>'version'=ref.version
+ ) LIMIT 1`, w, raw(checked)).Scan(&missing)
+	if err == nil {
+		problems = append(problems, Problem{"/references/" + strings.ReplaceAll(strings.ReplaceAll(missing, "~", "~0"), "/", "~1"), "reference_unavailable"})
+	} else if !notFound(err) {
+		return Validation{}, err
+	}
+	return Validation{Definition: r.Ref, Valid: len(problems) == 0, Problems: problems, Checked: checked}, nil
 }
 func (s *Service) Validate(ctx context.Context, p access.Principal, w string, ref Ref) (Validation, error) {
 	return s.validation(ctx, s.Store.Database(), p, w, ref)

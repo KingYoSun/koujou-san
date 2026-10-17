@@ -620,6 +620,19 @@ func TestMCPIntegration(t *testing.T) {
 		}
 	}
 	t.Logf("10,000 Contexts x three versions: one prohibition rule, first 100 permitted candidates in %s, opaque continuation present=%v", time.Since(started), bulk.Meta.NextCursor != nil)
+	workflowBefore, err := s.Workflows.Read(ctx, p, "mcp-one", workflows.Ref{ID: "run-definition:ui-command", Version: "head"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflowAfter, err := s.Workflows.Put(ctx, p, "mcp-one", workflowBefore.ID, workflows.Write{Mutation: mutation(workflowBefore.Version), Value: workflowBefore.Value})
+	if err != nil || workflowAfter.Data == nil {
+		t.Fatal("workflow update after Context bulk", workflowAfter, err)
+	}
+	workflowHead, err := s.Workflows.Read(ctx, p, "mcp-one", workflows.Ref{ID: workflowBefore.ID, Version: "head"})
+	if err != nil || workflowHead.Version != workflowAfter.Data.Version {
+		t.Fatal("workflow head sorted history positions as strings", workflowHead.Ref, err)
+	}
+	t.Log("workflow head after 30,000 Context versions selects the numeric latest position")
 	if os.Getenv("KOUJOU_TEST_MCP_UI") == "1" {
 		webTokens := issue("", "koujou offline_access")
 		originalJar := client.Jar

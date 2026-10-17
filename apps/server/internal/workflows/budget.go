@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math/big"
+	"sort"
 	"strings"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
@@ -88,6 +89,13 @@ func (s *Service) cost(ctx context.Context, q query, p access.Principal, w, id s
 			out.State = "unobserved"
 		}
 	}
+	out.Sources = unique(out.Sources)
+	sort.Slice(out.Sources, func(i, j int) bool {
+		if out.Sources[i].ID == out.Sources[j].ID {
+			return out.Sources[i].Version < out.Sources[j].Version
+		}
+		return out.Sources[i].ID < out.Sources[j].ID
+	})
 	if err = s.checkRefs(ctx, q, p, w, out.Sources); err != nil {
 		return out, err
 	}

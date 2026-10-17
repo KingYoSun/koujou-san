@@ -75,9 +75,9 @@ type CICommand struct {
 	RequiredJobs []string `json:"required_jobs"`
 }
 type WriteGuard struct {
-	Target   string   `json:"target"`
-	Commit   string   `json:"commit"`
-	Required []string `json:"required"`
+	Target   string       `json:"target"`
+	Commit   string       `json:"commit"`
+	Required []Dependency `json:"required"`
 	// Conditional is a declared connection capability, not a claim that arbitrary
 	// CLIs implement conditional external writes.
 	Conditional bool     `json:"conditional"`
@@ -124,23 +124,26 @@ type Execution struct {
 	Cost       *CostState                            `json:"cost,omitempty"`
 }
 type Task struct {
-	Node       string           `json:"node"`
-	Attempt    int              `json:"attempt"`
-	Definition *Ref             `json:"definition,omitempty"`
-	Run        *Ref             `json:"run,omitempty"`
-	State      string           `json:"state"`
-	Outcome    string           `json:"outcome,omitempty"`
-	Inputs     []Ref            `json:"inputs,omitempty"`
-	DecisionBy string           `json:"decision_by,omitempty"`
-	DecisionAt *time.Time       `json:"decision_at,omitempty"`
-	Prepared   *Prepared        `json:"prepared,omitempty"`
-	Repository *runs.Repository `json:"repository,omitempty"`
-	Retried    bool             `json:"retried,omitempty"`
-	Previous   *Ref             `json:"previous,omitempty"`
-	Unstarted  bool             `json:"-"`
+	Node              string           `json:"node"`
+	Attempt           int              `json:"attempt"`
+	Definition        *Ref             `json:"definition,omitempty"`
+	Run               *Ref             `json:"run,omitempty"`
+	State             string           `json:"state"`
+	Outcome           string           `json:"outcome,omitempty"`
+	Inputs            []Ref            `json:"inputs,omitempty"`
+	DecisionBy        string           `json:"decision_by,omitempty"`
+	DecisionAt        *time.Time       `json:"decision_at,omitempty"`
+	Prepared          *Prepared        `json:"prepared,omitempty"`
+	Repository        *runs.Repository `json:"repository,omitempty"`
+	Retried           bool             `json:"retried,omitempty"`
+	Previous          *Ref             `json:"previous,omitempty"`
+	Unstarted         bool             `json:"-"`
+	AssignmentProfile *Ref             `json:"assignment_profile,omitempty"`
+	Stale             bool             `json:"stale,omitempty"`
 }
 
 type Prepared struct {
+	Judgment bool               `json:"judgment"`
 	Spec     runs.Spec          `json:"spec"`
 	Manifest *contexts.Manifest `json:"manifest,omitempty"`
 	Sources  []Ref              `json:"sources"`

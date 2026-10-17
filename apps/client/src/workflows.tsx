@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { syncRequest, workspaceAccessLost } from "./auth";
 import { SyncHTTPError } from "./sync-error";
 import {
@@ -73,6 +74,7 @@ export function Workflows({
   const canEdit = role !== "viewer";
   const [kind, setKind] = useState("run-definition");
   const [id, setID] = useState("");
+  const [requestedVersion, setRequestedVersion] = useState("head");
   const [record, setRecord] = useState<DefinitionRecord>();
   const [draft, setDraft] = useState<Draft>();
   const [page, setPage] = useState<Page>();
@@ -86,11 +88,16 @@ export function Workflows({
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
   const actionIDs = useRef(new Map<string, string>());
-  const call = (path: string, body?: unknown) =>
-    syncRequest(base + path, native, {
+  const call = async (path: string, body?: unknown) => {
+    const epoch = answerScopeEpoch(namespace);
+    const result = await syncRequest(base + path, native, {
       method: body === undefined ? "GET" : "POST",
       body,
     });
+    if (!allowAnswerScope(namespace, epoch))
+      throw new SyncHTTPError(403, undefined);
+    return result;
+  };
   const act = async (work: () => Promise<void>) => {
     setBusy(true);
     setNotice("");
@@ -133,11 +140,12 @@ export function Workflows({
     const key = JSON.stringify({ path, version, value });
     if (!actionIDs.current.has(key))
       actionIDs.current.set(key, crypto.randomUUID());
-    return (await call(path, {
+    const result = (await call(path, {
       ...value,
       expected_version: version,
       operation_id: actionIDs.current.get(key)!,
     })) as { data: Ref };
+    return { data: { id: result.data.id, version: result.data.version } };
   };
   const persist = (value: Draft) => {
     setDraft(value);
@@ -197,6 +205,10 @@ export function Workflows({
   const fresh = (type: string, text?: string) => {
     const target = `${type}:${crypto.randomUUID()}`;
     setID(target);
+    setRequestedVersion("head");
+    setNotice(
+      "新しい定義の下書きをこの端末で編集中です。共有への保存・採用・実行はしていません。",
+    );
     setKind(type);
     setRecord(undefined);
     setAdoption(undefined);
@@ -327,7 +339,7 @@ export function Workflows({
     /* The raw editor retains invalid input until corrected. */
   }
   return (
-    <details className="team-details">
+    <details className="team-details workflow-editor">
       <summary>工程定義・検証・採用と実行</summary>
       <p>
         定義の保存・検証・採用と、実行開始を分けます。必要な固定入力と接続だけを指定します。
@@ -336,10 +348,17 @@ export function Workflows({
         <label>
           定義の種類
           <select
+            disabled={busy}
             value={kind}
             onChange={(e) => {
               setKind(e.target.value);
               setPage(undefined);
+              setID("");
+              setRecord(undefined);
+              setDraft(undefined);
+              setValidation(undefined);
+              setVerified(undefined);
+              setAdoption(undefined);
             }}
           >
             <option value="run-definition">Run定義</option>
@@ -367,6 +386,7 @@ export function Workflows({
         <label>
           定義ID
           <input
+            disabled={busy}
             value={id}
             onChange={(e) => {
               setID(e.target.value);
@@ -375,7 +395,18 @@ export function Workflows({
             }}
           />
         </label>
-        <button disabled={busy || !id} onClick={() => void act(() => load(id))}>
+        <label>
+          定義の版（headは現在版）
+          <input
+            disabled={busy}
+            value={requestedVersion}
+            onChange={(e) => setRequestedVersion(e.target.value)}
+          />
+        </label>
+        <button
+          disabled={busy || !id}
+          onClick={() => void act(() => load(id, requestedVersion))}
+        >
           定義を取得・更新
         </button>
         {canEdit && (
@@ -740,7 +771,6 @@ export function Workflows({
               disabled={busy}
               onClick={() =>
                 void act(async () => {
-                  const { invoke } = await import("@tauri-apps/api/core");
                   const result = await invoke<{ path: string }>(
                     "export_definition",
                     { workspace, id: record.id, version: record.version },

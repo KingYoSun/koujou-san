@@ -121,11 +121,14 @@ func (s *Service) Step(ctx context.Context, w, id string) error {
 				t.Run = &rr.Ref
 				t.Outcome = run.State
 				if run.Assessment != nil {
-					if run.Assessment.State != "valid" {
+					if run.Assessment.State != "valid" || run.State != "succeeded" {
 						t.Outcome = "INCONCLUSIVE"
 					} else if run.Assessment.Verdict != "" {
 						t.Outcome = run.Assessment.Verdict
 					}
+				}
+				if t.Stale {
+					t.Outcome = "STALE"
 				}
 				return s.transition(ctx, p, w, root, e, []Task{t}, "completed")
 			}
@@ -278,7 +281,15 @@ func (s *Service) transition(ctx context.Context, p access.Principal, w string, 
 				return Record{}, err
 			}
 			if t.Prepared != nil && t.State == "prepared" {
-				t.Prepared.Spec.Sources = unique(append(t.Prepared.Spec.Sources, ref, Ref{ID: taskID(old.ID, t), Version: ref.Version}))
+				fixedInput := false
+				for _, source := range t.Prepared.Spec.Sources {
+					if source.ID == taskID(old.ID, t) {
+						fixedInput = true
+					}
+				}
+				if !fixedInput {
+					t.Prepared.Spec.Sources = unique(append(t.Prepared.Spec.Sources, ref, Ref{ID: taskID(old.ID, t), Version: ref.Version}))
+				}
 				t.Inputs = t.Prepared.Spec.Sources
 			}
 			if err := s.saveTask(ctx, tx, w, ref, t, old.Refs); err != nil {
@@ -335,6 +346,14 @@ func (s *Service) launch(ctx context.Context, p access.Principal, w string, root
 			if d.DeviceID == "" {
 				return ErrState
 			}
+			profile, err := s.Capabilities(ctx, p, w, d.DeviceID, "head")
+			if err != nil {
+				return err
+			}
+			if t.AssignmentProfile != nil && *t.AssignmentProfile == profile.Ref && run.Preparation != "" {
+				return nil
+			}
+			t.AssignmentProfile = &profile.Ref
 			ref, err = accepted(s.Runs.Assign(ctx, p, w, ref.ID, runs.Assign{Mutation: operation(ref.ID, "assign:"+rr.Version, rr.Version), DeviceID: d.DeviceID, Required: d.Required, Repository: t.Repository}))
 			if err != nil {
 				return err
@@ -345,11 +364,16 @@ func (s *Service) launch(ctx context.Context, p access.Principal, w string, root
 			}
 			_ = json.Unmarshal(updated.Value, &run)
 			if run.Assignment == nil {
-				return nil
+				t.Run = &ref
+				e.State = "waiting"
+				e.Reason = "runner_preparation:" + run.Preparation
+				return s.transition(ctx, p, w, root, e, []Task{t}, "runner_wait")
 			}
 		}
 	}
 	t.Run = &ref
 	t.State = "running"
+	e.State = "running"
+	e.Reason = ""
 	return s.transition(ctx, p, w, root, e, []Task{t}, "assigned")
 }

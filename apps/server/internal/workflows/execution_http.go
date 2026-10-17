@@ -37,7 +37,12 @@ func (s *Service) registerExecution(mux *http.ServeMux) {
 			if !body(r, &req) || req.Execution.ID != id {
 				err = ErrInvalid
 			} else {
-				v, err = s.Preview(r.Context(), p, ws, req)
+				var input Prepared
+				input, err = s.Preview(r.Context(), p, ws, req)
+				v = input
+				if req.Format == "source" {
+					v = map[string]any{"input_utf8": string(raw(input.Spec.Input)), "sources": input.Sources, "manifest": input.Manifest}
+				}
 			}
 		case "impact":
 			var req ImpactRequest

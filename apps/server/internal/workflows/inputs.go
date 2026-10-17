@@ -106,7 +106,7 @@ func (s *Service) prepare(ctx context.Context, p access.Principal, w, id string,
 		}
 		refs = append(refs, ref)
 	}
-	out := Prepared{Spec: spec, Sources: refs}
+	out := Prepared{Spec: spec, Sources: refs, Judgment: spec.Derivation != nil || d.CI != nil}
 	if d.Selection != nil {
 		if d.Selection.Mode == "none" && len(spec.Input.Context) > 0 {
 			return out, ErrInvalid
@@ -140,6 +140,7 @@ func (s *Service) prepare(ctx context.Context, p access.Principal, w, id string,
 type Preview struct {
 	Execution Ref    `json:"execution"`
 	Node      string `json:"node"`
+	Format    string `json:"format,omitempty"`
 }
 
 func (s *Service) Preview(ctx context.Context, p access.Principal, w string, req Preview) (Prepared, error) {
@@ -166,6 +167,9 @@ func (s *Service) Preview(ctx context.Context, p access.Principal, w string, req
 		return Prepared{}, ErrInvalid
 	}
 	if t.Prepared != nil {
+		if err = s.checkRefs(ctx, s.Store.Database(), p, w, t.Inputs); err != nil {
+			return Prepared{}, err
+		}
 		return *t.Prepared, nil
 	}
 	d, _, err := s.definition(ctx, s.Store.Database(), p, w, e.Definition)

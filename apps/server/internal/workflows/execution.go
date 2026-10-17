@@ -19,6 +19,7 @@ type Start struct {
 	apicontract.Mutation
 	Adoption     Ref                                   `json:"adoption"`
 	Inputs       map[string]map[string]json.RawMessage `json:"inputs,omitempty"`
+	InputsUTF8   *string                               `json:"inputs_utf8,omitempty"`
 	Repositories map[string]runs.Repository            `json:"repositories,omitempty"`
 }
 type Decision struct {
@@ -72,6 +73,9 @@ func (s *Service) saveTask(ctx context.Context, tx pgx.Tx, w string, root Ref, t
 	return err
 }
 func (s *Service) saveExecution(ctx context.Context, tx pgx.Tx, w string, ref Ref, e Execution, refs []Ref) (Record, error) {
+	if e.Cost != nil {
+		refs = append(refs, e.Cost.Sources...)
+	}
 	_, err := tx.Exec(ctx, `INSERT INTO workflow_ready(workspace_id,execution_id,state) VALUES($1,$2,$3) ON CONFLICT(workspace_id,execution_id) DO UPDATE SET state=excluded.state,due_at=now()`, w, ref.ID, e.State)
 	if err != nil {
 		return Record{}, err
@@ -104,6 +108,11 @@ func (s *Service) adopted(ctx context.Context, q query, p access.Principal, w st
 	return d, unique(append(append(v.Checked, r.Refs...), r.Ref)), s.checkRefs(ctx, q, p, w, append(r.Refs, r.Ref))
 }
 func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, req Start) (apicontract.Response[apicontract.Reference], error) {
+	if req.InputsUTF8 != nil {
+		if req.Inputs != nil || decode([]byte(*req.InputsUTF8), &req.Inputs) != nil {
+			return apicontract.Response[apicontract.Reference]{}, ErrInvalid
+		}
+	}
 	if kind(id) != "workflow-execution" || req.ExpectedVersion != "0" {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
@@ -301,8 +310,8 @@ func (s *Service) beforeStart(ctx context.Context, tx pgx.Tx, w, run string) err
 				return err
 			}
 			for _, required := range d.Write.Required {
-				v := ts[required]
-				if v.State != "done" || (v.Outcome != "PASS" && v.Outcome != "approve" && v.Outcome != "succeeded") {
+				v := ts[required.Node]
+				if !match(v, required.On) {
 					return access.ErrForbidden
 				}
 			}
