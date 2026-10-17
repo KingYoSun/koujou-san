@@ -1,6 +1,6 @@
 # Issue #20の実装と検証
 
-状態: CI待ち。Scope revision 1。[有限な受入計画](2026-10-17-issue-20-plan.md)に対応する実装・局所検証・共通画面の往復を終え、[独立検品](2026-10-17-issue-20-inspection.md)は全条件PASS・blocker 0。PRの最終CIとマージ後照合は未完了。
+状態: Complete。Scope revision 1。[有限な受入計画](2026-10-17-issue-20-plan.md)に対応する実装・局所検証・共通画面の往復、[独立検品](2026-10-17-issue-20-inspection.md)、最終CIとマージ後照合を終え、#20をCloseした。
 
 ## 確認済み
 
@@ -45,6 +45,10 @@
 
 固定commit `4faefea045bf8443bb002ad61aae6d5cedbd1885`の独立検品は全AC/INVARをPASS、blocker 0件と判定した。独立のPG再実行も成功（package 8.857秒）。その後のローカル`test:database`も成功し、新規migrationを含む保存・停止・復元を確認した。既存migration 001〜015の差分は0。
 
-## 調査
+## マージ後照合と調査
+
+[PR #53](https://github.com/KingYoSun/koujou-san/pull/53)を最終head `bb1caeb1b44af9774d12e82e76270d60acd41b67` の全CI成功後にマージした。[CI 38997580620](https://github.com/KingYoSun/koujou-san/actions/runs/38997580620)の共有UI/server、Windows native、GitGuardianは成功。独立担当は実装commit `4faefea`と最終headまでの文書差分をPASS・blocker 0で照合済み。
+
+merge/main `fbb0637ff4f9de825a37a4dc808f7495517f6758` と最終headのtreeは `c70e54891590ae73f00f3738291154ae3bd312db` で一致し、差分0。AC-1〜10・INVAR-1〜3、必要な検品・CI・マージ後照合が揃い、2026-10-17に手動でCloseした。
 
 共通JSONと既存の永続化・Run契約を使う方式は[ADR 0020](../adr/0020-versioned-workflows.md)へ記録した。`.codegraph/`を使って既存Run・権限・Context・GitHub観測・exportを調べた。新しいworkflowファイルが索引にない場合は、未登録を確認してから直接読んだ。索引の作成・更新は行っていない。AGENTS.mdで参照するDESIGN.mdとADR 0014は現行checkoutに存在せず、既存の共通画面構成に沿って実装した。

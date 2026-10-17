@@ -85,6 +85,10 @@
 
 ## Issue #20の判定
 
-状態: In progress（CI待ち）。Scope revision 1。[計画](2026-10-17-issue-20-plan.md)の実装、専用PG・実Ory/MCP・ネイティブの局所試験と共通画面の定義往復を終え、[独立検品](2026-10-17-issue-20-inspection.md)は全条件PASS・blocker 0。[証跡](2026-10-17-issue-20-evidence.md)を固定し、PR CIとマージ後照合へ進める。本人の手動操作は依頼していない。最終CIとマージ後照合までは完了と扱わない。
+状態: Complete。Scope revision 1。[PR #53](https://github.com/KingYoSun/koujou-san/pull/53)を最終head `bb1caeb1b44af9774d12e82e76270d60acd41b67` の全CI・独立検品後にマージした。main `fbb0637ff4f9de825a37a4dc808f7495517f6758`と最終headのtreeは`c70e54891590ae73f00f3738291154ae3bd312db`で一致、差分0。[証跡](2026-10-17-issue-20-evidence.md)と[独立検品](2026-10-17-issue-20-inspection.md)が揃い、#20をCloseした。本人の手動操作は依頼していない。
 
-#21〜#34は未着手（#33は実スリープ確認の移管を反映済み）。工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #21の判定
+
+状態: In progress。Scope revision 1。[計画](2026-10-17-issue-21-plan.md)で、固定対象・選択/無注入・分離の宣言/確認/強制・条件別の判定と証拠・Stale・差分検品・人の例外判断・所在失効の有限な条件を整理した。実CLIの版とヘルプ、公式仕様を調べ、既存のRunとRunnerを使って実装を進める。未確認の分離を保証として扱わず、GUIやOSの既存受入を繰り返さない。
+
+#22〜#34は未着手（#33は実スリープ確認の移管を反映済み）。LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
