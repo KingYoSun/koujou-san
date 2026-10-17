@@ -311,7 +311,7 @@ func (s *Service) Bootstrap(ctx context.Context, email, password string) error {
 // ProvisionClients registers bundled clients without changing any identity.
 func (s *Service) ProvisionClients(ctx context.Context) error {
 	for _, client := range []map[string]any{
-		{"client_id": s.Config.WebClient, "client_secret": s.Config.WebSecret, "token_endpoint_auth_method": "client_secret_basic", "redirect_uris": []string{s.Config.Site + "/auth/callback"}},
+		{"client_id": s.Config.WebClient, "client_secret": s.Config.WebSecret, "token_endpoint_auth_method": "client_secret_basic", "redirect_uris": []string{s.Config.Site + "/auth/callback", s.Config.Site + "/auth/mcp/callback"}},
 		{"client_id": s.Config.NativeClient, "token_endpoint_auth_method": "none", "redirect_uris": []string{s.Config.NativeRedirect}},
 	} {
 		client["grant_types"] = []string{"authorization_code", "refresh_token"}

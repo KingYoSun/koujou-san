@@ -78,6 +78,9 @@ var workbenchSchema string
 //go:embed 020_hopper.sql
 var hopperSchema string
 
+//go:embed 021_client_operations.sql
+var clientOperationsSchema string
+
 type Store struct {
 	pool *pgxpool.Pool
 	// Accepted is installed once at startup. It may write an outbox in this same
@@ -91,7 +94,7 @@ func Open(ctx context.Context, url string) (*Store, error) {
 		return nil, errors.New("invalid PostgreSQL configuration")
 	}
 	if err = pool.Ping(ctx); err == nil {
-		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema, contextSchema, syncSchema, searchSchema, graphSchema, operationsSchema, catalogSchema, githubSchema, usageSchema, automationSchema, runsSchema, assignmentSchema, runnerQueueSchema, workflowSchema, inspectionSchema, publicationSchema, workbenchSchema, hopperSchema})
+		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema, contextSchema, syncSchema, searchSchema, graphSchema, operationsSchema, catalogSchema, githubSchema, usageSchema, automationSchema, runsSchema, assignmentSchema, runnerQueueSchema, workflowSchema, inspectionSchema, publicationSchema, workbenchSchema, hopperSchema, clientOperationsSchema})
 	}
 	if err != nil {
 		pool.Close()
@@ -106,6 +109,17 @@ func (s *Store) Ready(ctx context.Context) error { return s.pool.Ping(ctx) }
 // Database supplies the same pool to global identity/session services, whose
 // data is separate from Workspace mutations and the Ory-owned databases.
 func (s *Store) Database() *pgxpool.Pool { return s.pool }
+
+// ProjectionChanged ignores operation/usage bookkeeping, which does not change
+// Context candidates. The partial index bounds this lookup to projected data.
+func (s *Store) ProjectionChanged(ctx context.Context, w string, after, through int64) (bool, error) {
+	if after == through {
+		return false, nil
+	}
+	var changed bool
+	err := s.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM shared_changes WHERE workspace_id=$1 AND sequence>$2 AND sequence<=$3 AND (resource_id LIKE 'context:%' OR resource_id LIKE 'membership:%' OR resource_id LIKE 'relation:%'))`, w, after, through).Scan(&changed)
+	return changed, err
+}
 
 func migrate(ctx context.Context, pool *pgxpool.Pool, scripts []string) error {
 	return pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {

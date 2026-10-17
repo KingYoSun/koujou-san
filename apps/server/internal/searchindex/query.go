@@ -83,8 +83,21 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 	var after []string
 	if r.Cursor != "" {
 		c, err := s.open(r.Cursor)
-		if err != nil || c.User != subject || c.Workspace != w || c.Query != signature || c.Generation != s.generation || c.Position != cp.Position {
+		if err != nil || c.User != subject || c.Workspace != w || c.Query != signature || c.Generation != s.generation {
 			return failed(w, "invalid_request", "invalid_cursor"), nil
+		}
+		if c.Position != cp.Position {
+			var previous int64
+			if err = s.Store.Database().QueryRow(ctx, `SELECT sequence FROM shared_changes WHERE workspace_id=$1 AND position=$2`, w, c.Position).Scan(&previous); err != nil {
+				return failed(w, "invalid_request", "invalid_cursor"), nil
+			}
+			changed, err := s.Store.ProjectionChanged(ctx, w, previous, cp.Sequence)
+			if err != nil {
+				return failed(w, "unavailable", "storage_unavailable"), err
+			}
+			if changed {
+				return failed(w, "invalid_request", "invalid_cursor"), nil
+			}
 		}
 		after = c.After
 	}
@@ -258,7 +271,11 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 	if stale {
 		state, reason = "pending", "required_version_pending"
 	}
-	if cp.Position != current.Position {
+	changed, err := s.Store.ProjectionChanged(ctx, w, cp.Sequence, current.Sequence)
+	if err != nil {
+		return failed(w, "unavailable", "storage_unavailable"), err
+	}
+	if changed {
 		state, reason = "pending", "projection_pending"
 	}
 	result := apicontract.Response[Result]{Data: &Result{Items: items, Count: len(items), Evidence: contexts.CandidateEvidence{Engine: "bleve", Position: cp.Position, RequiredPosition: current.Position, State: state, Reason: reason}}, Meta: resultMeta(w, cp.Position, state, reason)}
@@ -270,6 +287,7 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 	}
 	return result, nil
 }
+
 func prefixIDs(ids []string) []string {
 	result := make([]string, len(ids))
 	for i, id := range ids {

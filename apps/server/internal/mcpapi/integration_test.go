@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/auth"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/automation"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/clientops"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/hopper"
@@ -72,6 +74,10 @@ func TestMCPIntegration(t *testing.T) {
 	defer store.Close()
 	cfg := auth.Environment()
 	cfg.Site = os.Getenv("KOUJOU_TEST_SITE")
+	selectionUI := os.Getenv("KOUJOU_TEST_CLIENT_SELECTION_UI") == "1"
+	if selectionUI {
+		cfg.Site = strings.Replace(cfg.Site, "127.0.0.1", "localhost", 1)
+	}
 	cfg.API = cfg.Site
 	endpoint := func(name string) string { return "http://127.0.0.1:" + os.Getenv("KOUJOU_TEST_"+name+"_PORT") }
 	cfg.Issuer = endpoint("HYDRA") + "/"
@@ -100,6 +106,7 @@ func TestMCPIntegration(t *testing.T) {
 	graph := graphindex.New(store, a, c, remote, graphindex.DefaultLimits(), cfg.Key)
 	defer graph.Close()
 	s := &Service{Auth: identity, Access: a, Contexts: c, Search: search, Graph: graph, Usage: usage.New(store, a), Automation: automation.New(store, a), Runs: runs.New(store, a, c)}
+	s.ClientOps = clientops.New(store, a, c, s.Usage)
 	s.Workflows = workflows.New(store, a, c, s.Runs)
 	inspectionService := inspections.New(store, a, c, s.Runs, s.Workflows)
 	publicationService := publications.New(store, a, s.Runs, &publicationUIBackend{})
@@ -108,12 +115,24 @@ func TestMCPIntegration(t *testing.T) {
 	publicationService.StartWorker(ctx)
 	s.Workflows.StartWorker(ctx)
 	githubMux := http.NewServeMux()
+	var selectionBrowser http.Handler
 	handler := func(runService *runs.Service) http.Handler {
 		if runService != s.Runs {
 			runService.BeforeStart = s.Runs.BeforeStart
 			runService.AssessResult = s.Runs.AssessResult
 		}
-		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, inspectionService.Register, publicationService.Register, workbenchService.Register, s.Hopper.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
+		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, inspectionService.Register, publicationService.Register, workbenchService.Register, s.Hopper.Register, s.ClientOps.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) {
+			mux.Handle("/github/", githubMux)
+			if selectionUI {
+				mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+					if selectionBrowser != nil {
+						selectionBrowser.ServeHTTP(w, r)
+					} else {
+						http.NotFound(w, r)
+					}
+				})
+			}
+		})
 	}
 	faults := &reconnectFixture{}
 	server := httptest.NewUnstartedServer(faults.handler(handler(s.Runs)))
@@ -121,6 +140,13 @@ func TestMCPIntegration(t *testing.T) {
 	server.Listener, err = net.Listen("tcp", "127.0.0.1:"+os.Getenv("KOUJOU_TEST_API_PORT"))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if selectionUI {
+		certificate, err := tls.LoadX509KeyPair("../../../../.cache/tls/cert.pem", "../../../../.cache/tls/key.pem")
+		if err != nil {
+			t.Fatal("development TLS fixture unavailable")
+		}
+		server.TLS = &tls.Config{Certificates: []tls.Certificate{certificate}}
 	}
 	server.StartTLS()
 	defer func() { server.Close() }()
@@ -356,7 +382,7 @@ func TestMCPIntegration(t *testing.T) {
 		return []byte(text.Text)
 	}
 	listed, err := session.ListTools(ctx, nil)
-	if err != nil || len(listed.Tools) != 24 {
+	if err != nil || len(listed.Tools) != 28 {
 		t.Fatal("tool catalogue", err)
 	}
 	call(session, "context_get", public, false)
@@ -603,6 +629,7 @@ func TestMCPIntegration(t *testing.T) {
 	}
 	defer session.Close()
 	// Seed a declared shared history: 10,000 Contexts with three fixed versions.
+	checkClientGraphPagination(t, s, p, mixed)
 	// One tag rule excludes half; no per-Context allow-list is constructed.
 	_, err = store.Database().Exec(ctx, `BEGIN;
  CREATE TEMP TABLE mcp_bulk AS SELECT n,v,s.sequence+(n-1)*3+v AS seq,'bulk-'||n AS id,'bulk-v'||v AS revision,
@@ -647,6 +674,12 @@ func TestMCPIntegration(t *testing.T) {
 		t.Fatal("workflow head sorted history positions as strings", workflowHead.Ref, err)
 	}
 	t.Log("workflow head after 30,000 Context versions selects the numeric latest position")
+	checkClientSelectionMCP(t, s, p, ordinary.Access, tokens.Access, client.Transport, session, editor, none, public, secret, call, request, cfg.Site)
+	if selectionUI {
+		fixture := newClientSelectionUI(t, ctx, s, client, cfg, p)
+		selectionBrowser = fixture.Handler
+		fixture.Wait(t, s, ctx)
+	}
 	if os.Getenv("KOUJOU_TEST_MCP_UI") == "1" {
 		webTokens := issue("", "koujou offline_access")
 		originalJar := client.Jar

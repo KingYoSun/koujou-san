@@ -18,10 +18,11 @@ type query interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Service struct {
-	tx     pgx.Tx
-	Store  *persistence.Store
-	Access *access.Service
-	Limits Limits
+	tx        pgx.Tx
+	selection bool
+	Store     *persistence.Store
+	Access    *access.Service
+	Limits    Limits
 }
 
 func New(store *persistence.Store, a *access.Service, limits Limits) *Service {
@@ -29,10 +30,19 @@ func New(store *persistence.Store, a *access.Service, limits Limits) *Service {
 }
 func (s *Service) InTransaction(tx pgx.Tx) *Service { copy := *s; copy.tx = tx; return &copy }
 
+// PutSelectionManifest uses the same immutable resolution for client selections.
+// Ordinary Put retains its existing requirement for a Run-bound Manifest.
+func (s *Service) PutSelectionManifest(ctx context.Context, p access.Principal, w, id string, req Write) (apicontract.Response[apicontract.Reference], error) {
+	copy := *s
+	copy.selection = true
+	return copy.Put(ctx, p, w, Identity{Kind: "manifest", ID: id}, req)
+}
+
 type Record struct {
-	Ref      Ref             `json:"ref"`
-	Value    json.RawMessage `json:"value"`
-	Position string          `json:"-"`
+	Ref          Ref             `json:"ref"`
+	Value        json.RawMessage `json:"value"`
+	Position     string          `json:"-"`
+	Dependencies []Ref           `json:"-"`
 }
 type Write struct {
 	apicontract.Mutation
@@ -141,6 +151,9 @@ func (s *Service) readChecked(ctx context.Context, q query, p access.Principal, 
 		resolved := s.resolve(ctx, q, p, w, ResolveRequest{Selection: Selection{Mode: "select", Include: []Ref{rec.Ref}}})
 		if !resolved.Ready {
 			return Record{}, invalid("forbidden", nil)
+		}
+		for _, placement := range resolved.Manifest.Placements {
+			rec.Dependencies = append(rec.Dependencies, placement.Ref)
 		}
 	}
 	return rec, nil
@@ -370,7 +383,7 @@ func (s *Service) prepare(ctx context.Context, tx pgx.Tx, p access.Principal, w 
 		if err := decodeValue(raw, &request); err != nil {
 			return nil, err
 		}
-		if request.RunID == "" {
+		if request.RunID == "" && !s.selection {
 			return nil, invalid("invalid_run", nil)
 		}
 		resolved := s.resolve(ctx, tx, p, w, request)

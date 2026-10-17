@@ -1,6 +1,6 @@
 # 現在状態
 
-更新日: 2026-10-17（JST）
+更新日: 2026-10-18（JST）
 
 開発環境の構築を終え、[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の実装を#3から番号順に進めている。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
 
@@ -109,8 +109,10 @@
 
 状態: Complete。Scope revision 1。[PR #59](https://github.com/KingYoSun/koujou-san/pull/59)を最終head `425e1c3b035125723d31cfa9bfc08258f77fde96`の全CIと独立検品PASS後にマージした。merge `e2d6245d2dc2d1bbe4c1691359e50f54a2a54c4e`とのtreeは`7fa301dfdcd1b3dc6953f7993e72482a459678f3`で一致、差分0。#25をCloseした。型付き評価・発行・連鎖・復旧・HTTP/MCPと共通画面の結果は[証跡](2026-10-17-issue-25-evidence.md)を参照する。
 
-## Issue #26の準備
+## Issue #26の判定
 
-状態: Planned。基準mainは#25マージ後の`e2d6245d2dc2d1bbe4c1691359e50f54a2a54c4e`。[計画](2026-10-18-issue-26-plan.md)へ、初期自動反映、Windows/Webのキー保存、操作ごとの変更可能な上限についてのユーザー回答を反映した。Manifest 6.28.9の所有する合成接続でtool・構造化出力・usageを確認している。製品のHost・共有操作履歴・共通反映はまだ実装していない。
+状態: In progress。Scope revision 1。基準mainは#25マージ後の`e2d6245d2dc2d1bbe4c1691359e50f54a2a54c4e`。本人による回答・明示引継ぎ、共有操作・送信意図・原応答・共通選択保存、専用MCP OAuth、共通UI、Windowsの暗号化保存と固定接続先を実装した。実PG/Ory/MCP、二つの所有モデルHTTP、共通画面の自動反映・明示採用・手動保存・none、WindowsのPKCE/DPAPI/更新/ログアウト、共通check/test/build、既存のusage/Workflow/Hopper回帰が成功した。
+
+残る接続の最終照合と独立検品・CI・マージ後照合を進める。Manifestの提供方式と本文ログはユーザー判断待ちであり、標準構成へ追加していない。[計画](2026-10-18-issue-26-plan.md)、[証跡](2026-10-18-issue-26-evidence.md)、[Gateway評価](2026-10-18-issue-26-gateway-probe.md)を参照する。所有モデルの合成結果を実LLMの意味判断品質へ読み替えない。
 
 #27〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。

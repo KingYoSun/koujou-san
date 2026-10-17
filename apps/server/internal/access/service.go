@@ -216,7 +216,7 @@ func (s *Service) check(ctx context.Context, q query, p Principal, w, target, ac
 		if m.Role != "admin" {
 			return ErrForbidden
 		}
-	case "update", "register", "price_write", "triage_write", "hopper_write":
+	case "update", "register", "price_write", "triage_write", "hopper_write", "selection_write":
 		if m.Role == "viewer" {
 			return ErrForbidden
 		}
@@ -230,7 +230,7 @@ func (s *Service) check(ctx context.Context, q query, p Principal, w, target, ac
 	if target == "" {
 		return nil
 	}
-	if action == "price_write" || action == "triage_write" || action == "hopper_write" {
+	if action == "price_write" || action == "triage_write" || action == "hopper_write" || action == "selection_write" {
 		action = "update"
 	}
 	allowed, err := resourceGrants(ctx, q, w, p, []string{target}, action)
@@ -300,8 +300,12 @@ func (s *Service) PutResource(ctx context.Context, tx pgx.Tx, r Resource, grants
 	}
 	return nil
 }
-func (s *Service) mutate(ctx context.Context, p Principal, w, id, kind, action string, m apicontract.Mutation, payload any, write func(pgx.Tx) (any, error)) (apicontract.Response[apicontract.Reference], error) {
-	if err := s.Check(ctx, p, w, "", action); err != nil {
+func (s *Service) mutate(ctx context.Context, p Principal, w, id, kind, action string, m apicontract.Mutation, payload any, write func(pgx.Tx) (any, error), within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
+	var q query = s.DB
+	if len(within) > 0 && within[0] != nil {
+		q = within[0]
+	}
+	if err := s.check(ctx, q, p, w, "", action); err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err
 	}
 	data, err := json.Marshal(payload)
@@ -337,7 +341,7 @@ func (s *Service) mutate(ctx context.Context, p Principal, w, id, kind, action s
 			return nil, err
 		}
 		return json.Marshal(state)
-	})
+	}, within...)
 }
 func (s *Service) revokeOwner(ctx context.Context, tx pgx.Tx, w, u string) error {
 	_, err := tx.Exec(ctx, "UPDATE access_devices SET enabled=false,generation=$3 WHERE workspace_id=$1 AND registered_by=$2", w, u, randomGeneration())

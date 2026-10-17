@@ -282,7 +282,7 @@ async function testDatabase(suite = "persistence", testName) {
       env[`KOUJOU_TEST_${name}_PORT`] = String(server.address().port);
       await new Promise((resolve) => server.close(resolve));
     }
-    env.KOUJOU_TEST_SITE = `https://127.0.0.1:${env.KOUJOU_TEST_API_PORT}`;
+    env.KOUJOU_TEST_SITE = `https://${env.KOUJOU_TEST_CLIENT_SELECTION_UI === "1" ? "localhost" : "127.0.0.1"}:${env.KOUJOU_TEST_API_PORT}`;
   }
   const compose = [
     "compose",
@@ -375,7 +375,10 @@ async function testDatabase(suite = "persistence", testName) {
       "-run",
       `^${testName ?? { auth: "TestOryIntegration", access: "TestAccessPostgres", contexts: "TestContextsPostgres", sharedsync: "TestSyncPostgres", searchindex: "TestSearchPostgres", graphindex: "TestGraphPostgres", mcpapi: "TestMCPIntegration", githubobserve: "TestGithubPostgres", persistence: "TestPostgres" }[suite]}$`,
       "-count=1",
-      ...(env.KOUJOU_TEST_MCP_UI === "1" ? ["-timeout=35m"] : []),
+      ...(env.KOUJOU_TEST_MCP_UI === "1" ||
+      env.KOUJOU_TEST_CLIENT_SELECTION_UI === "1"
+        ? ["-timeout=35m"]
+        : []),
       "-v",
     ]);
   } finally {
@@ -405,6 +408,13 @@ async function testDatabase(suite = "persistence", testName) {
 }
 
 const tasks = {
+  "test:clientops:ui": async () => {
+    env.KOUJOU_TEST_CLIENT_SELECTION_UI = "1";
+    await client("build");
+    await testDatabase("mcpapi");
+  },
+  "test:clientops": () =>
+    testDatabase("clientops", "TestClientOperationsPostgres"),
   "test:hopper": () => testDatabase("hopper", "TestHopperPostgres"),
   "test:hopper:ui": async () => {
     env.KOUJOU_TEST_HOPPER_UI = "1";

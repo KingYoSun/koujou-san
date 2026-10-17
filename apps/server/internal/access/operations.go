@@ -95,15 +95,15 @@ func (s *Service) OperationPrincipal(ctx context.Context, user, w, handle string
 
 // CreateOperation receives already-authorized Manifest placements from the
 // owning Context service. A bounded empty set is meaningful: Run.input=none.
-func (s *Service) CreateOperation(ctx context.Context, p Principal, w, id, purpose string, bounded bool, refs []VersionRef, m apicontract.Mutation) (apicontract.Response[apicontract.Reference], error) {
-	if purpose != "read" && purpose != "edit" && purpose != "price-edit" && purpose != "triage-edit" && purpose != "triage-manage" && purpose != "hopper-edit" && purpose != "hopper-manage" {
+func (s *Service) CreateOperation(ctx context.Context, p Principal, w, id, purpose string, bounded bool, refs []VersionRef, m apicontract.Mutation, within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
+	if purpose != "read" && purpose != "edit" && purpose != "price-edit" && purpose != "triage-edit" && purpose != "triage-manage" && purpose != "hopper-edit" && purpose != "hopper-manage" && purpose != "selection-edit" {
 		return apicontract.Response[apicontract.Reference]{}, ErrForbidden
 	}
 	if refs == nil {
 		refs = []VersionRef{}
 	}
 	action := "read"
-	if purpose == "edit" || purpose == "price-edit" || purpose == "triage-edit" || purpose == "hopper-edit" {
+	if purpose == "edit" || purpose == "price-edit" || purpose == "triage-edit" || purpose == "hopper-edit" || purpose == "selection-edit" {
 		action = "register"
 	}
 	if purpose == "triage-manage" || purpose == "hopper-manage" {
@@ -120,7 +120,7 @@ func (s *Service) CreateOperation(ctx context.Context, p Principal, w, id, purpo
 		raw, _ := json.Marshal(refs)
 		_, err := tx.Exec(ctx, `INSERT INTO access_operation_refs SELECT $1,$2,r.id,r.version FROM jsonb_to_recordset($3::jsonb) AS r(id text,version text) ON CONFLICT DO NOTHING`, w, id, raw)
 		return Operation{ID: id, Purpose: purpose, Bounded: bounded}, err
-	})
+	}, within...)
 }
 func (s *Service) CloseOperation(ctx context.Context, p Principal, w, id string, m apicontract.Mutation) (apicontract.Response[apicontract.Reference], error) {
 	var owner string
@@ -194,7 +194,7 @@ func (s *Service) CheckVersion(ctx context.Context, tx pgx.Tx, p Principal, w, i
 	return nil
 }
 func operationAction(op Operation, action string) bool {
-	return action == "read" || action == "get" || action == "search" || (action == "update" && op.Purpose == "edit") || (action == "price_write" && op.Purpose == "price-edit") || (action == "triage_write" && (op.Purpose == "triage-edit" || op.Purpose == "triage-manage")) || (action == "triage_manage" && op.Purpose == "triage-manage") || (action == "hopper_write" && (op.Purpose == "hopper-edit" || op.Purpose == "hopper-manage")) || (action == "hopper_manage" && op.Purpose == "hopper-manage")
+	return action == "read" || action == "get" || action == "search" || (action == "update" && op.Purpose == "edit") || (action == "price_write" && op.Purpose == "price-edit") || (action == "triage_write" && (op.Purpose == "triage-edit" || op.Purpose == "triage-manage")) || (action == "triage_manage" && op.Purpose == "triage-manage") || (action == "hopper_write" && (op.Purpose == "hopper-edit" || op.Purpose == "hopper-manage")) || (action == "hopper_manage" && op.Purpose == "hopper-manage") || (action == "selection_write" && op.Purpose == "selection-edit")
 }
 func identityVersionRefs(ids []string) []VersionRef {
 	refs := make([]VersionRef, 0, len(ids))
@@ -207,6 +207,7 @@ func identityVersionRefs(ids []string) []VersionRef {
 // OperationEvent is deliberately content-free: IDs, fixed versions and result
 // boundaries are enough to inspect delivery without persisting conversations.
 type OperationEvent struct {
+	QueryKey   string           `json:"query_key,omitempty"`
 	Refs       []VersionRef     `json:"refs"`
 	Range      string           `json:"range"`
 	Meta       apicontract.Meta `json:"meta"`
@@ -234,7 +235,9 @@ func versionQuery(w, op, user, refs string) string {
  LEFT JOIN shared_versions v ON v.workspace_id=@workspace AND v.resource_id=r.id
  LEFT JOIN LATERAL (SELECT payload FROM context_records WHERE workspace_id=@workspace AND resource_id=r.id AND revision=v.version LIMIT 1) c ON true
  LEFT JOIN LATERAL (SELECT payload FROM context_records WHERE workspace_id=@workspace AND resource_id=r.id AND revision=r.version LIMIT 1) f ON true
- WHERE (NOT o.bounded OR EXISTS(SELECT 1 FROM access_operation_refs a WHERE a.workspace_id=@workspace AND a.operation_id=o.id AND a.resource_id=r.id AND (r.version='' OR a.version=r.version)))
+ WHERE (NOT o.bounded OR EXISTS(SELECT 1 FROM access_operation_refs a WHERE a.workspace_id=@workspace AND a.operation_id=o.id AND a.resource_id=r.id AND (r.version='' OR a.version=r.version))
+ OR (r.id LIKE 'context:%' AND EXISTS(SELECT 1 FROM access_operation_scopes s JOIN context_records m ON m.workspace_id=s.workspace_id AND m.kind='membership' AND m.payload->'scope'->>'id'=s.scope_id AND m.payload->'context'->>'id'=substring(r.id from 9) AND m.payload->>'present'='true' JOIN shared_versions h ON h.workspace_id=m.workspace_id AND h.resource_id=m.resource_id AND h.version=m.revision AND NOT h.deleted WHERE s.workspace_id=@workspace AND s.operation_id=o.id)))
+ AND NOT EXISTS(SELECT 1 FROM access_operation_exclusions x WHERE x.workspace_id=@workspace AND x.operation_id=o.id AND x.resource_id=r.id)
  AND NOT (COALESCE(c.payload->'tags','[]'::jsonb) ?| ARRAY(SELECT jsonb_array_elements_text(COALESCE(p.payload->'denied_tags','[]'::jsonb))))
  AND NOT (COALESCE(f.payload->'tags','[]'::jsonb) ?| ARRAY(SELECT jsonb_array_elements_text(COALESCE(p.payload->'denied_tags','[]'::jsonb))))
  AND NOT EXISTS(SELECT 1 FROM context_records m JOIN shared_versions mv ON mv.workspace_id=m.workspace_id AND mv.resource_id=m.resource_id AND mv.version=m.revision AND NOT mv.deleted

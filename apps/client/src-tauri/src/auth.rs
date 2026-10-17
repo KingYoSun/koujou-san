@@ -13,6 +13,7 @@ use std::{
 };
 use tauri::{Manager, Url};
 use uuid::Uuid;
+pub mod mcp;
 
 #[derive(Deserialize)]
 struct Config {
@@ -40,6 +41,7 @@ struct Saved {
 }
 
 pub struct Auth {
+    mcp: bool,
     api: Url,
     client: Client,
     file: PathBuf,
@@ -85,6 +87,7 @@ impl Auth {
         }
         let client = build_client(&api, Some(Duration::from_secs(10)))?;
         Ok(Self {
+            mcp: false,
             api,
             client,
             file,
@@ -96,7 +99,7 @@ impl Auth {
     fn config(&self) -> Result<Config, String> {
         let config: Config = self
             .client
-            .get(self.api.join("auth/config").unwrap())
+            .get(self.api.join(self.resource().config).unwrap())
             .send()
             .map_err(|_| "api_unavailable")?
             .error_for_status()
@@ -300,7 +303,7 @@ impl Auth {
                 ("client_id", config.client_id.as_str()),
                 ("redirect_uri", &config.redirect_uri),
                 ("response_type", "code"),
-                ("scope", "openid offline_access email profile koujou"),
+                ("scope", self.resource().scope),
                 ("audience", &config.audience),
                 ("state", &state),
                 ("code_challenge", &challenge),
@@ -346,7 +349,7 @@ impl Auth {
                         ],
                     )?;
                     self.client
-                        .get(self.api.join("auth/me").unwrap())
+                        .get(self.api.join(self.resource().me).unwrap())
                         .bearer_auth(&tokens.access_token)
                         .send()
                         .map_err(|_| "api_unavailable")?
@@ -692,9 +695,16 @@ pub async fn login(app: tauri::AppHandle) -> Result<(), String> {
 }
 #[tauri::command]
 pub async fn logout(app: tauri::AppHandle) -> Result<Value, String> {
-    tauri::async_runtime::spawn_blocking(move || app.state::<Auth>().logout())
-        .await
-        .map_err(|_| "logout_task_failed")?
+    tauri::async_runtime::spawn_blocking(move || {
+        let mcp = mcp::logout(&app);
+        let mut result = app.state::<Auth>().logout()?;
+        if !mcp.is_ok_and(|v| v["oauth_tokens"] == "revoked") {
+            result["oauth_tokens"] = json!("unconfirmed")
+        };
+        Ok(result)
+    })
+    .await
+    .map_err(|_| "logout_task_failed")?
 }
 #[tauri::command]
 pub async fn api_request(
@@ -741,6 +751,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         .path()
         .app_local_data_dir()?
         .join(format!("auth-{key}.dpapi"));
+    mcp::setup(app, &api, &file)?;
     app.manage(Auth::new(&api, file).map_err(std::io::Error::other)?);
     Ok(())
 }

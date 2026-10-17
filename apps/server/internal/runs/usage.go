@@ -87,7 +87,7 @@ func (s *Service) registerUsage(mux *http.ServeMux) {
 			o.At = time.UnixMilli(*req.ObservedAtMS).UTC()
 			req.Value, _ = json.Marshal(o)
 		}
-		value, err := u.PutFromRun(ctx, access.Principal{UserID: owner}, workspace, usage.ObservationID(o), req.Write, usage.RunWrite{Actor: "device:" + p.DeviceID, Dependencies: deps, Check: check})
+		value, err := u.PutFromOwner(ctx, access.Principal{UserID: owner}, workspace, usage.ObservationID(o), req.Write, usage.OwnerWrite{Actor: "device:" + p.DeviceID, Dependencies: deps, Check: check})
 		if err == usage.ErrInvalid {
 			err = ErrInvalid
 		}

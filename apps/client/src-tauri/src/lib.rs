@@ -11,6 +11,12 @@ pub fn run() {
             auth::device_identifier,
             auth::device_enroll,
             auth::device_contact,
+            auth::mcp::mcp_login,
+            auth::mcp::mcp_status,
+            auth::mcp::mcp_request,
+            model_connection::model_connection_load,
+            model_connection::model_connection_save,
+            model_connection::model_connection_request,
             sync_store::sync_load,
             sync_store::sync_save,
             sync_store::sync_page,
@@ -38,6 +44,7 @@ pub mod auth;
 mod run_export;
 mod sync_store;
 
+mod model_connection;
 mod runner;
 
 pub fn run_background_runner() {
