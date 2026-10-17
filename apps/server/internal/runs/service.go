@@ -493,6 +493,14 @@ func (s *Service) Report(ctx context.Context, p access.Principal, w, id string, 
 		refs := append([]Ref{{ID: ref.ID, Version: ref.Version}}, deps...)
 		now := time.Now().UTC()
 		switch e.Type {
+		case "preparation-blocked":
+			if r.State != "queued" || r.StartedAt != nil || r.Assignment == nil {
+				return r, nil, ErrState
+			}
+			if e.Source != "local_configuration_missing" && e.Source != "input_binding_unsupported" && e.Source != "process_start_failed" {
+				return r, nil, ErrInvalid
+			}
+			r.Preparation = e.Source
 		case "prepared":
 			if r.Assignment == nil || r.State != "queued" || r.Assignment.PreparedAt != nil || r.CancelRequested {
 				return r, nil, ErrState
@@ -501,6 +509,7 @@ func (s *Service) Report(ctx context.Context, p access.Principal, w, id string, 
 				return r, nil, ErrInvalid
 			}
 			r.Assignment.PreparedAt = &now
+			r.Preparation = ""
 		case "renew":
 			if r.Assignment == nil {
 				return r, nil, ErrState
@@ -512,6 +521,7 @@ func (s *Service) Report(ctx context.Context, p access.Principal, w, id string, 
 			}
 			r.State = "running"
 			r.StartedAt = &now
+			r.Execution = e.Execution
 		case "output":
 			if r.State != "running" && r.State != "paused" {
 				return r, nil, ErrState
@@ -647,6 +657,6 @@ func (s *Service) Report(ctx context.Context, p access.Principal, w, id string, 
 		if err != nil {
 			return err
 		}
-		return s.checkAssignment(ctx, q, p, w, r, e.Generation, e.Type == "renew")
+		return s.checkAssignment(ctx, q, p, w, r, e.Generation, e.Type == "renew" || terminal(r.State))
 	})
 }

@@ -73,6 +73,10 @@
 
 ## Issue #17の判定
 
-状態: In progress（最終CI待ち）。Scope revision 1。[PR #50](https://github.com/KingYoSun/koujou-san/pull/50)で現在権限・端末能力・世代・固定入力による一意割当と、Runごとのworktree/branch自動作成を実装した。Windowsの実pathの差を修正し、二つの領域の分離、再準備での編集保持、元checkout不変を実画面・Git・HTTPで照合した。[検証記録](2026-10-17-issue-17-evidence.md)と[独立検品](2026-10-17-issue-17-inspection.md)の全末端PASS・blocker 0を照合した。残りは証跡込み最終headのCIとマージ後照合。
+状態: Complete。Scope revision 1。[PR #50](https://github.com/KingYoSun/koujou-san/pull/50)を最終head `25af101053c55f440ac188fe63e2a05f92404afd` の全CI成功後にマージした。main `bef3bf7402ce8f78f421616a27189e1f02acb512` と最終headのtreeは `f18a80be1d54845adcf6bcd1fff0263b88db4663` で一致、差分0。現在認可・端末能力・世代、実Git二worktree・Web/Windows、[独立検品](2026-10-17-issue-17-inspection.md)、マージ後照合が揃い、#17をCloseした。[検証記録](2026-10-17-issue-17-evidence.md)を参照する。
 
-#18〜#34は未着手。実CLI起動・Runner割当・工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #18の判定
+
+状態: In progress（受入・独立検品済み）。Scope revision 1。画面とは独立したRunnerを実装し、[計画](2026-10-17-issue-18-plan.md)の実接続とWindows/Webの受入を確認した。Windows/WSLの実CLI、二Pause、停止、専用worktree、Codex/Claudeの共通入力・判定、Manifestと無注入、二利用者のWeb回答、Windows設定の保存・Runner起動と画面終了後の実CLI完了を確認した。[検証記録](2026-10-17-issue-18-evidence.md)と[独立検品](2026-10-17-issue-18-inspection.md)を参照する。[PR #51](https://github.com/KingYoSun/koujou-san/pull/51)へ追加証跡を固定し、再検品で全条件とblockerなしを確認した。最終head CI・マージ後照合を行う。#18はその完了後にCloseする。
+
+#19〜#34は未着手。工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。

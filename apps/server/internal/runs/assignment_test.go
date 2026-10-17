@@ -279,6 +279,73 @@ func testAssignments(t *testing.T, s *Service, server *httptest.Server, key []by
 	if code != 403 {
 		t.Fatal("fixed input permission revocation bypassed", code)
 	}
+	contact("assign-one", c)
+	// #18: device-only queue/state transport, without GUI OAuth or raw inputs in the queue.
+	code, b = request("assign-one", "GET", base+"/runner/self", nil)
+	var self Runner
+	_ = json.Unmarshal(b, &self)
+	if code != 200 || self.DeviceID != "assign-one" || self.Version == "0" {
+		t.Fatal("device Runner self", code)
+	}
+	code, _ = request("admin", "GET", base+"/runner/assignments", nil)
+	if code != 403 {
+		t.Fatal("user forged device queue", code)
+	}
+	code, b = request("assign-one", "GET", base+"/runner/assignments", nil)
+	var queue RunnerQueue
+	_ = json.Unmarshal(b, &queue)
+	if code != 200 || len(queue.Items) == 0 || bytes.Contains(b, []byte("declared input")) {
+		t.Fatal("queue missing or copied input", code)
+	}
+	_, secondValue := head(second.ID)
+	second = accept("assign-one", base+"/executions/two/report", event(second, "1", "prepared", secondValue.Assignment.Generation, secondValue.Assignment.Area))
+	second = accept("assign-one", base+"/executions/two/report", event(second, "2", "started", secondValue.Assignment.Generation, nil))
+	pauseEvent := event(second, "3", "pause", secondValue.Assignment.Generation, nil)
+	pauseEvent.Pause = &PauseRequest{ID: "transport", Reason: "fixed question", Request: raw("question?")}
+	second = accept("assign-one", base+"/executions/two/report", pauseEvent)
+	second = accept("admin", base+"/executions/two/answer", Answer{Mutation: mutation(second.Version), PauseID: "transport", Value: raw("accepted by API")})
+	code, b = request("assign-one", "GET", base+"/executions/two/runner-state?generation="+secondValue.Assignment.Generation, nil)
+	var observed RunnerState
+	_ = json.Unmarshal(b, &observed)
+	if code != 200 || observed.Run != second || observed.Pause == nil || observed.Pause.State != "received" || observed.Value.State != "paused" {
+		t.Fatal("device lost accepted answer", code)
+	}
+	connectionReq := RunnerConnection{Mutation: mutation(second.Version), Generation: secondValue.Assignment.Generation, Unknown: true}
+	connectionRef := accept("assign-one", base+"/executions/two/connection", connectionReq)
+	code, b = request("assign-one", "GET", base+"/executions/two/runner-state?generation="+secondValue.Assignment.Generation, nil)
+	var connectionState RunnerState
+	_ = json.Unmarshal(b, &connectionState)
+	if code != 200 || connectionState.Value.ReportedThrough != "3" || connectionState.Value.Observation != "unknown" || connectionState.Value.State != "paused" || connectionState.Run != connectionRef {
+		t.Fatal("transport observation changed execution facts", code)
+	}
+	replayConnection := accept("assign-one", base+"/executions/two/connection", connectionReq)
+	if replayConnection != connectionRef {
+		t.Fatal("connection receipt changed")
+	}
+	code, _ = request("assign-one", "GET", base+"/executions/two/runner-state?generation=old", nil)
+	if code != 403 {
+		t.Fatal("stale Runner observed response", code)
+	}
+	// A lost final HTTP response can replay its receipt after the assignment
+	// lease expires; it cannot append new facts to a completed Run.
+	delivery := event(connectionRef, "4", "delivered", secondValue.Assignment.Generation, nil)
+	delivery.PauseID, delivery.ResponseID = "transport", observed.Pause.ResponseID
+	second = accept("assign-one", base+"/executions/two/report", delivery)
+	resume := event(second, "5", "resumed", secondValue.Assignment.Generation, nil)
+	resume.PauseID, resume.ResponseID = delivery.PauseID, delivery.ResponseID
+	second = accept("assign-one", base+"/executions/two/report", resume)
+	finish := event(second, "6", "finished", secondValue.Assignment.Generation, nil)
+	zero := 0
+	finish.ExitCode = &zero
+	second = accept("assign-one", base+"/executions/two/report", finish)
+	exec(`UPDATE run_records SET payload=jsonb_set(payload,'{assignment,expires_at}',to_jsonb($1::text)) WHERE workspace_id='assignment' AND id=$2 AND version=$3`, time.Now().Add(-time.Minute).UTC().Format(time.RFC3339Nano), second.ID, second.Version)
+	if replay := accept("assign-one", base+"/executions/two/report", finish); replay != second {
+		t.Fatal("terminal report receipt changed")
+	}
+	code, _ = request("assign-one", "POST", base+"/executions/two/report", event(second, "7", "known", secondValue.Assignment.Generation, nil))
+	if code != 409 {
+		t.Fatal("new report mutated terminal Run", code)
+	}
 	contact(a.DeviceID, c)
 	exec(`UPDATE access_members SET can_execute=false WHERE workspace_id='assignment' AND user_id='admin'`)
 	code, _ = request(a.DeviceID, "POST", base+"/executions/one/report", event(current.Ref, "5", "known", a.Generation, nil))

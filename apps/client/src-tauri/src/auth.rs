@@ -183,68 +183,6 @@ impl Auth {
         *tokens = refreshed;
         Ok(tokens.access_token.clone())
     }
-    pub(crate) fn runner_storage(&self, workspace: &str) -> Result<PathBuf, String> {
-        let profile = self.request("/auth/me", "GET", Value::Null)?;
-        let user = profile["user"]["id"]
-            .as_str()
-            .ok_or("authentication_required")?;
-        Ok(self
-            .file
-            .parent()
-            .ok_or("credential_directory_failed")?
-            .join(format!(
-                "runner-{}",
-                hex_name(&format!("{}\0{workspace}\0{user}", self.api))
-            )))
-    }
-    pub(crate) fn runner_request(
-        &self,
-        workspace: &str,
-        parts: &[&str],
-        method: &str,
-        body: Value,
-        query: &[(&str, &str)],
-    ) -> Result<Value, String> {
-        let profile = self.request("/auth/me", "GET", Value::Null)?;
-        let user = profile["user"]["id"]
-            .as_str()
-            .ok_or("authentication_required")?;
-        let saved = self.load_device(&self.device_file(workspace, user))?;
-        if saved.token.is_empty() {
-            return Err("device_not_registered".into());
-        }
-        let mut target = self.api.clone();
-        target
-            .path_segments_mut()
-            .map_err(|_| "invalid_API_path")?
-            .clear()
-            .extend(parts);
-        target.query_pairs_mut().extend_pairs(query.iter().copied());
-        let mut request = self
-            .client
-            .request(
-                reqwest::Method::from_bytes(method.as_bytes()).map_err(|_| "invalid_method")?,
-                target,
-            )
-            .bearer_auth(&saved.token);
-        if !body.is_null() {
-            request = request.json(&body)
-        }
-        let response = request.send().map_err(|_| "api_unavailable")?;
-        if !response.status().is_success() {
-            return Err(if response.status().as_u16() == 403 {
-                "forbidden"
-            } else {
-                "runner_request_failed"
-            }
-            .into());
-        }
-        let result: Value = response.json().map_err(|_| "invalid_runner_response")?;
-        if result.get("error").is_some() {
-            return Err("runner_request_rejected".into());
-        }
-        Ok(result)
-    }
     pub(crate) fn export_response(
         &self,
         workspace: &str,
@@ -1018,3 +956,6 @@ mod tests {
         assert!(!file.exists());
     }
 }
+
+mod runner;
+pub(crate) use runner::{DeviceClient, RuntimeBinding};

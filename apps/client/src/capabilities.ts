@@ -4,8 +4,8 @@ export type ClientCapabilities = {
   credentialAccessFromUI: false;
 };
 
-// Native detection describes the surface only. It grants no execution rights
-// and does not turn the unimplemented Runner into an available capability.
+// Native detection describes the surface only; each assigned Run needs its own
+// authorization and verified CLI capabilities. The UI grants no execution rights.
 export function clientCapabilities(native: boolean): ClientCapabilities {
   return {
     surface: native ? "native" : "web",

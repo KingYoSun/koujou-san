@@ -61,7 +61,7 @@ export function RunnerSettings({
     <details className="team-details">
       <summary>この端末のRunner設定</summary>
       <p>
-        接続ごとに確認した版・環境・CLIの認証主体への参照と、依頼を許可するメンバーを登録します。秘密値は入力しないでください。実CLIの起動はまだ接続していません。
+        接続ごとに確認した版・環境・CLIの認証主体への参照と、依頼を許可するメンバーを登録します。秘密値は入力しないでください。実行ファイルと入力方式は、この端末のCLI実行設定で対応付けます。
       </p>
       <fieldset disabled={busy}>
         <label>

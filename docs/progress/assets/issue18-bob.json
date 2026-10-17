@@ -1,0 +1,158 @@
+{
+  "head": {
+    "id": "run:bob-cli-dialogue",
+    "version": "WKHAZAM7PHNE7SMVH5VI7HDXUL",
+    "run_id": "run:bob-cli-dialogue",
+    "kind": "run",
+    "position": "265",
+    "value": {
+      "name": "bob-cli-dialogue",
+      "input": {
+        "id": "run-input:bob-cli-dialogue",
+        "version": "SMWURZOD6KTQWDSSG52SZTCZJW"
+      },
+      "state": "succeeded",
+      "execution": {
+        "stop": false,
+        "pause": true,
+        "version": "fixture-v1",
+        "environment": "windows",
+        "version_observed": true
+      },
+      "exit_code": 0,
+      "assignment": {
+        "input": {
+          "id": "run-input:bob-cli-dialogue",
+          "version": "SMWURZOD6KTQWDSSG52SZTCZJW"
+        },
+        "required": null,
+        "device_id": "0de624a8-cb1b-4813-9eb1-341b27a3beca",
+        "runner_id": "a5fc144d-74cd-4ca6-a1b4-fef29f145e1e",
+        "connection": {
+          "kind": "cli",
+          "users": [
+            "WJGKMPT7ZUNDKJK4CPL5QFXIK7"
+          ],
+          "target": "fixture-dialogue",
+          "subject": "owned-cli-reference",
+          "version": "fixture-v1",
+          "bindings": [
+            "stdin",
+            "file",
+            "argument"
+          ],
+          "confirmed": true,
+          "environment": "Windows",
+          "capabilities": [
+            "pause"
+          ],
+          "repositories": []
+        },
+        "expires_at": "2026-10-16T19:30:02.6804168Z",
+        "generation": "IQJAETETEQE2ZIQADY4WTZOQOC",
+        "prepared_at": "2026-10-16T19:27:18.4972037Z",
+        "requested_by": "WJGKMPT7ZUNDKJK4CPL5QFXIK7",
+        "runner_version": "QW6QKKWLS2HM536ASCLBA7VUOT"
+      },
+      "created_at": "2026-10-16T19:27:17.3696436Z",
+      "started_at": "2026-10-16T19:27:18.7037462Z",
+      "finished_at": "2026-10-16T19:28:02.7264148Z",
+      "observation": "known",
+      "requested_by": "WJGKMPT7ZUNDKJK4CPL5QFXIK7",
+      "cancel_requested": false,
+      "reported_through": "17",
+      "execution_requested_at": "2026-10-16T19:27:17.4076426Z"
+    },
+    "refs": [
+      {
+        "id": "run-input:bob-cli-dialogue",
+        "version": "SMWURZOD6KTQWDSSG52SZTCZJW"
+      }
+    ]
+  },
+  "pauses": {
+    "data": {
+      "run": {
+        "id": "run:bob-cli-dialogue",
+        "version": "WKHAZAM7PHNE7SMVH5VI7HDXUL"
+      },
+      "items": [
+        {
+          "id": "run-pause:bob-cli-dialogue:first",
+          "version": "64CVTOCAO4SU5SAMMMDNXQAAJS",
+          "run_id": "run:bob-cli-dialogue",
+          "kind": "pause",
+          "position": "253",
+          "value": {
+            "id": "first",
+            "state": "resolved",
+            "reason": "固定の質問",
+            "request": {
+              "question": "first"
+            },
+            "response": "CLI未設定の別クライアントから回答1",
+            "created_at": "2026-10-16T19:27:19.1281129Z",
+            "resumed_at": "2026-10-16T19:27:46.3099157Z",
+            "answered_at": "2026-10-16T19:27:45.8452489Z",
+            "answered_by": "V3BCQ64FUGUJB57HNXWD545TTK",
+            "response_id": "UFXSQFBM2YO2W74AWDLQYFPCNP",
+            "delivered_at": "2026-10-16T19:27:46.1920766Z",
+            "response_origin": {
+              "id": "V3BCQ64FUGUJB57HNXWD545TTK",
+              "kind": "user"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:bob-cli-dialogue",
+              "version": "DG4TYEFTCGTRKVTIZQ5VMTHVPJ"
+            }
+          ]
+        },
+        {
+          "id": "run-pause:bob-cli-dialogue:second",
+          "version": "S6EUV4H5HA6LUT7OQLUOBJS3WU",
+          "run_id": "run:bob-cli-dialogue",
+          "kind": "pause",
+          "position": "261",
+          "value": {
+            "id": "second",
+            "state": "resolved",
+            "reason": "固定の質問",
+            "request": {
+              "question": "second"
+            },
+            "response": "CLI未設定の別クライアントから回答2",
+            "created_at": "2026-10-16T19:27:46.4246005Z",
+            "resumed_at": "2026-10-16T19:28:02.2535435Z",
+            "answered_at": "2026-10-16T19:28:01.8557982Z",
+            "answered_by": "V3BCQ64FUGUJB57HNXWD545TTK",
+            "response_id": "YUAV6TP54EDD3REICKZW2DA3IO",
+            "delivered_at": "2026-10-16T19:28:02.059928Z",
+            "response_origin": {
+              "id": "V3BCQ64FUGUJB57HNXWD545TTK",
+              "kind": "user"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:bob-cli-dialogue",
+              "version": "TGMYWCHZI3OFL7YILD23B4YIZZ"
+            }
+          ]
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "runner-ui",
+      "position": null,
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  },
+  "client": "Separate Web editor, no CLI or execute permission",
+  "answersSentByUI": 2
+}

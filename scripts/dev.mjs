@@ -500,7 +500,16 @@ const tasks = {
   },
   "check:desktop": () => cargo("check", ["--workspace"]),
   "test:desktop": () => cargo("test", ["--workspace"]),
-  "build:desktop": () => client("tauri:build"),
+  "build:desktop": async () => {
+    await client("tauri:build");
+    await cargo("build", [
+      "--release",
+      "-p",
+      "koujou-san-desktop",
+      "--bin",
+      "koujou-san-runner",
+    ]);
+  },
   "dev:api": async () => {
     await prepareAuth();
     if (!env.KOUJOU_DATABASE_URL && env.KOUJOU_DB_PASSWORD) {
@@ -514,6 +523,12 @@ const tasks = {
   },
   "dev:desktop": async () => {
     await prepareAuth();
+    await cargo("build", [
+      "-p",
+      "koujou-san-desktop",
+      "--bin",
+      "koujou-san-runner",
+    ]);
     await client("tauri:dev");
   },
   "auth:bootstrap": async () => {
