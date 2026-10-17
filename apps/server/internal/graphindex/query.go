@@ -406,8 +406,21 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 	position := cursor{}
 	codec := apicontract.NewCursorCodec(s.Key, "koujou-graph-cursor-v1")
 	if r.Cursor != "" {
-		if codec.Open(r.Cursor, graphSchema, &position) != nil || position.User != subject || position.Workspace != w || position.Query != signature || position.Generation != active.Active || position.Position != cp.Position {
+		if codec.Open(r.Cursor, graphSchema, &position) != nil || position.User != subject || position.Workspace != w || position.Query != signature || position.Generation != active.Active {
 			return failed(w, "invalid_request", "invalid_cursor"), nil
+		}
+		if position.Position != cp.Position {
+			var previous int64
+			if err = s.Store.Database().QueryRow(ctx, `SELECT sequence FROM shared_changes WHERE workspace_id=$1 AND position=$2`, w, position.Position).Scan(&previous); err != nil {
+				return failed(w, "invalid_request", "invalid_cursor"), nil
+			}
+			changed, err := s.Store.ProjectionChanged(ctx, w, previous, cp.Sequence)
+			if err != nil {
+				return failed(w, "unavailable", "storage_unavailable"), err
+			}
+			if changed {
+				return failed(w, "invalid_request", "invalid_cursor"), nil
+			}
 		}
 	}
 	x := exploration{s: s, ctx: ctx, p: p, w: w, g: active.Active, r: r, nodes: map[string]vertex{}, edges: map[string]arcEdge{}, reasons: map[string]bool{}, grants: map[string]bool{}, loaded: map[string]vertex{}, checked: map[string]bool{}, until: position.After + r.Limit + 1}
@@ -428,10 +441,26 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 		} else {
 			x.reasons["stream_incomplete"] = true
 		}
-	} else if now.Active != active.Active || end != h {
+	} else if now.Active != active.Active {
 		x.reasons["projection_changed"] = true
+	} else if end != h {
+		next, err := parseCheckpoint(end)
+		if err != nil {
+			return failed(w, "unavailable", "graph_unavailable"), err
+		}
+		changed, err := s.Store.ProjectionChanged(ctx, w, cp.Sequence, next.Sequence)
+		if err != nil {
+			return failed(w, "unavailable", "storage_unavailable"), err
+		}
+		if changed {
+			x.reasons["projection_changed"] = true
+		}
 	}
-	if cp != required {
+	changed, err := s.Store.ProjectionChanged(ctx, w, cp.Sequence, required.Sequence)
+	if err != nil {
+		return failed(w, "unavailable", "storage_unavailable"), err
+	}
+	if changed {
 		x.reasons["projection_pending"] = true
 	}
 	if ctx.Err() != nil {
@@ -442,7 +471,11 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 		if err != nil {
 			return failed(w, "unavailable", "storage_unavailable"), err
 		}
-		if latest != required {
+		changed, err := s.Store.ProjectionChanged(ctx, w, required.Sequence, latest.Sequence)
+		if err != nil {
+			return failed(w, "unavailable", "storage_unavailable"), err
+		}
+		if changed {
 			x.reasons["projection_pending"] = true
 		}
 		ids := []string{}

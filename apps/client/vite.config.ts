@@ -28,11 +28,13 @@ export default defineConfig({
       ? { cert: readFileSync(certificate), key: readFileSync(key) }
       : undefined,
     proxy: {
-      "^/auth/(config|csrf|start|callback|me|logout|broker/|flow/)": apiProxy,
+      "^/auth/(config|csrf|start|callback|me|logout|broker/|flow/|mcp/)":
+        apiProxy,
       "/healthz": apiProxy,
       "/readyz": apiProxy,
       "/access/": apiProxy,
       "/contexts/": apiProxy,
+      "/client-operations/": apiProxy,
       "/sync/": apiProxy,
       "/search/": apiProxy,
       "/graph/": apiProxy,

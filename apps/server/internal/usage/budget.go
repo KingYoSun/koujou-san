@@ -40,7 +40,7 @@ func uniqueBudgetRefs(refs []access.VersionRef) []access.VersionRef {
 	}
 	return out
 }
-func ObserveRunCosts(ctx context.Context, q query, p access.Principal, w string, ids []string, b CostBudget) (CostState, error) {
+func ObserveCosts(ctx context.Context, q query, p access.Principal, w, kind string, ids []string, b CostBudget) (CostState, error) {
 	out := CostState{State: "observed", Currency: b.Currency, Valuation: b.Valuation, Sources: []access.VersionRef{}, Guarantee: "further_starts_only"}
 	required := map[string]bool{}
 	for _, id := range ids {
@@ -50,7 +50,10 @@ func ObserveRunCosts(ctx context.Context, q query, p access.Principal, w string,
 	total := new(big.Rat)
 	scale := 0
 	for run := range required {
-		entries, err := q.Query(ctx, `SELECT DISTINCT ON(e.projection_key) e.attribution_id,e.amount::text,e.currency,e.state,e.refs,EXISTS(SELECT 1 FROM usage_group_updates u WHERE u.workspace_id=e.workspace_id AND u.coverage_group=e.coverage_group AND u.position>e.position) FROM usage_entries e WHERE e.workspace_id=$1 AND e.attribution_kind='run' AND e.attribution_id=$2 AND e.kind=$3 ORDER BY e.projection_key,e.position DESC`, w, run, b.Valuation)
+		entries, err := q.Query(ctx, `WITH groups AS (SELECT DISTINCT coverage_group FROM usage_entries WHERE workspace_id=$1 AND attribution_kind=$4 AND attribution_id=$2 AND kind IN ('usage',$3))
+ SELECT $2::text,e.amount::text,COALESCE(e.currency,''),COALESCE(e.state,'unrated'),COALESCE(e.refs,'[]'::jsonb)||COALESCE(raw.refs,'[]'::jsonb),EXISTS(SELECT 1 FROM usage_group_updates u WHERE u.workspace_id=$1 AND u.coverage_group=g.coverage_group AND u.position>e.position)
+ FROM groups g LEFT JOIN LATERAL (SELECT refs FROM usage_entries WHERE workspace_id=$1 AND coverage_group=g.coverage_group AND kind='usage' ORDER BY position DESC LIMIT 1) raw ON true
+ LEFT JOIN LATERAL (SELECT DISTINCT ON(projection_key) * FROM usage_entries WHERE workspace_id=$1 AND coverage_group=g.coverage_group AND kind=$3 ORDER BY projection_key,position DESC) e ON true`, w, run, b.Valuation, kind)
 		if err != nil {
 			return out, err
 		}

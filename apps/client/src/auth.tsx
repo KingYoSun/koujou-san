@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { stopSyncActor } from "./sync-engine";
 import { allowAnswerActor, purgeStoredActor } from "./sync-store";
 import { SyncHTTPError } from "./sync-error";
+import { clearModelKeys } from "./model-connections";
 
 type User = {
   id: string;
@@ -117,6 +118,42 @@ export async function syncRequest(
   }
   if (status < 200 || status >= 300) throw new SyncHTTPError(status, body);
   return body;
+}
+
+export async function mcpRequest(
+  native: boolean,
+  workspace: string,
+  operation: string,
+  body: unknown,
+  client: string,
+): Promise<{ status: number; body: unknown }> {
+  if (native)
+    return invoke("mcp_request", { workspace, operation, body, client });
+  const csrf = await fetch("/auth/csrf").then(
+    (r) => r.json() as Promise<{ csrf: string }>,
+  );
+  const rpc = body as { method: string; params?: { name?: string } };
+  const response = await fetch("/mcp/host", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json, text/event-stream",
+      "MCP-Protocol-Version": "2026-07-28",
+      "Mcp-Method": rpc.method,
+      ...(rpc.method === "tools/call"
+        ? { "Mcp-Name": rpc.params?.name ?? "" }
+        : {}),
+      "X-CSRF-Token": csrf.csrf,
+      "X-Koujou-Workspace": workspace,
+      "X-Koujou-Operation": operation,
+      "X-Koujou-Client": client,
+    },
+    body: JSON.stringify(body),
+  });
+  return {
+    status: response.status,
+    body: response.status === 202 ? null : await response.json(),
+  };
 }
 
 export async function workspaceAccessLost(
@@ -377,6 +414,7 @@ export function Account({ native }: { native: boolean }) {
     }
   }
   async function logout() {
+    clearModelKeys();
     setBusy(true);
     try {
       const result = native

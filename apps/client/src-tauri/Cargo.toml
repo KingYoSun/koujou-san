@@ -21,6 +21,9 @@ serde_json = { version = "=1.0.154", features = ["arbitrary_precision"] }
 rusqlite = { version = "=0.40.2", features = ["bundled"] }
 uuid = { version = "=1.28.0", features = ["v4"] }
 reqwest = { version = "=0.13.5", default-features = false, features = ["blocking", "json", "form", "native-tls"] }
+rig-core = { git = "https://github.com/0xPlaygrounds/rig", rev = "c73622dfca02bfe55d29a6a0612e181119cab9b8", default-features = false }
+rig-agent = { git = "https://github.com/0xPlaygrounds/rig", rev = "c73622dfca02bfe55d29a6a0612e181119cab9b8", default-features = false }
+futures-util = "=0.3.34"
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "=0.62.2", features = ["Win32_Security_Cryptography", "Win32_System_Threading"] }

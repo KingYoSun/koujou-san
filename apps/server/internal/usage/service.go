@@ -79,34 +79,42 @@ func (s *Service) authorizeWrite(ctx context.Context, tx pgx.Tx, p access.Princi
 	}
 	return err
 }
-func (s *Service) Put(ctx context.Context, p access.Principal, w, id string, req Write) (apicontract.Response[apicontract.Reference], error) {
-	return s.put(ctx, p, w, id, req, nil)
+func (s *Service) Put(ctx context.Context, p access.Principal, w, id string, req Write, within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
+	return s.put(ctx, p, w, id, req, nil, within...)
 }
 
-// RunWrite adds the execution owner's current authorization and fixed input
+// OwnerWrite adds the owning domain's current authorization and fixed input
 // dependencies to the same transaction as the ordinary usage mutation.
-type RunWrite struct {
+type OwnerWrite struct {
 	Actor        string
 	Dependencies []Ref
 	Check        func(context.Context, pgx.Tx) error
 }
 
-func (s *Service) PutFromRun(ctx context.Context, p access.Principal, w, id string, req Write, guard RunWrite) (apicontract.Response[apicontract.Reference], error) {
+func (s *Service) PutFromOwner(ctx context.Context, p access.Principal, w, id string, req Write, guard OwnerWrite, within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
 	if kindOf(id) != "usage" || guard.Check == nil || guard.Actor == "" {
 		return apicontract.Response[apicontract.Reference]{}, access.ErrForbidden
 	}
-	if err := guard.Check(ctx, nil); err != nil {
+	var tx pgx.Tx
+	if len(within) > 0 {
+		tx = within[0]
+	}
+	if err := guard.Check(ctx, tx); err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err
 	}
-	return s.put(ctx, p, w, id, req, &guard)
+	return s.put(ctx, p, w, id, req, &guard, within...)
 }
 
-func (s *Service) put(ctx context.Context, p access.Principal, w, id string, req Write, guard *RunWrite) (apicontract.Response[apicontract.Reference], error) {
+func (s *Service) put(ctx context.Context, p access.Principal, w, id string, req Write, guard *OwnerWrite, within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
 	empty := apicontract.Response[apicontract.Reference]{}
 	if id == "" || strings.TrimPrefix(id, kindOf(id)+":") == "" {
 		return empty, ErrInvalid
 	}
-	if err := s.authorizeWrite(ctx, nil, p, w, id); err != nil {
+	var tx pgx.Tx
+	if len(within) > 0 {
+		tx = within[0]
+	}
+	if err := s.authorizeWrite(ctx, tx, p, w, id); err != nil {
 		return empty, err
 	}
 	kind := kindOf(id)
@@ -271,7 +279,7 @@ func (s *Service) put(ctx context.Context, p access.Principal, w, id string, req
 			}
 		}
 		return json.Marshal(Record{Ref: Ref{ID: id, Version: ref.Version}, Kind: kind, Position: seq, Value: raw})
-	})
+	}, within...)
 }
 
 func (s *Service) group(ctx context.Context, q query, w, g string) (consumption, error) {

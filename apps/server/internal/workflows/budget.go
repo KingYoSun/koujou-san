@@ -33,5 +33,5 @@ func (s *Service) cost(ctx context.Context, q query, p access.Principal, w, id s
 	for id := range required {
 		ids = append(ids, id)
 	}
-	return usage.ObserveRunCosts(ctx, q, p, w, ids, usage.CostBudget(b))
+	return usage.ObserveCosts(ctx, q, p, w, "run", ids, usage.CostBudget(b))
 }

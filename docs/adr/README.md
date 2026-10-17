@@ -41,3 +41,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0024: CLIの機械記録からRun別の利用量を取得する](0024-run-usage.md)
 
 - [0025: 型付き結果からの発行と、起点を保つ連鎖制御](0025-deterministic-hopper.md)
+
+- [0026: クライアントによるContext選択と共通の版付き保存](0026-client-context-selection.md)
