@@ -3,7 +3,7 @@
 - 状態: In progress。Scope revision 1、区分C。基準main: `a7c8b56151f51e876844ae2810f59d561b81a631`。
 - 固定条件は[計画](2026-10-17-issue-25-plan.md)のAC-1〜10・INVAR-1〜3。条件の追加・緩和はしていない。
 - 初期設定は、ユーザー回答に従い自動発行・通常の割当と開始、変更可能な起点別上限、未完了Issueへの関連付けと再発提案とした。
-- 共通UIの実操作と独立検品を終了した。最終head CI、merge後照合は、この時点では未完了。
+- 共通UIの実操作・独立検品・最終head CI・merge後照合を終了した。現在の判定は[current-state](current-state.md)を参照する。
 
 ## 実装の境界
 
@@ -83,3 +83,9 @@ Chrome、所有するOry/API/PGの共通Web画面で、一回の操作確認を�
 修正commit `5ae982f`の限定再検品はPASS、blocker 0件。[検品記録](2026-10-17-issue-25-inspection.md)に原本のFAILと解消根拠を残した。共通Workerと通常工程の専用PGも再実行して成功（`issue25-inspection-automation.log`、`issue25-inspection-workflows.log`）。`issue25-final-check.log`の静的検査・型・書式と、`issue25-final-test.log`のGo・共通UI 51試験も成功した。最終CIは別途確認する。
 
 PR #59の初回GitGuardianは、テスト用DB名`koujou_hopper_test`をGeneric Passwordとして検出した。該当行の実際の資格情報は環境変数から取得しており、秘密値の埋込みはなかった。既存のGraph試験と同じく環境変数の取得を別行へ分け、PR内の古い同一行も再走査対象に残らないよう、この専用ブランチのcommitを整理した。検品済みの製品コード・条件・観測結果は変更していない。元の検品commitはローカルのbackup refに保持する。
+
+## マージ後の照合
+
+最終head `425e1c3b035125723d31cfa9bfc08258f77fde96`の[CI 39043575375](https://github.com/KingYoSun/koujou-san/actions/runs/39043575375)でShared UI and server・Windows native clientが成功し、GitGuardianも成功した。旧headのCIは履歴整理によりcancelledとなり、成功の代わりには使っていない。
+
+[PR #59](https://github.com/KingYoSun/koujou-san/pull/59)は2026-10-17T15:14:28Zにマージされた。merge `e2d6245d2dc2d1bbe4c1691359e50f54a2a54c4e`と最終headのtreeは`7fa301dfdcd1b3dc6953f7993e72482a459678f3`で一致し、`git diff --exit-code HEAD origin/main`は差分0。検品後の製品コード変更はなく、試験の環境変数取得を一変数へ抽出した差分だけである。照合後にIssue #25を手動Closeし、親#2のチェックを更新した。

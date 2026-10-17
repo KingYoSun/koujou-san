@@ -106,6 +106,9 @@ jobs:
       - name: Test authenticated MCP with Ory and both projections
         run: pnpm run test:mcp
 
+      - name: Test client selection operations and history
+        run: pnpm run test:clientops
+
       - name: Build
         run: pnpm run build
 

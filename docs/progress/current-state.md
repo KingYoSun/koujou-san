@@ -1,6 +1,6 @@
 # 現在状態
 
-更新日: 2026-10-17（JST）
+更新日: 2026-10-18（JST）
 
 開発環境の構築を終え、[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の実装を#3から番号順に進めている。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
 
@@ -105,8 +105,14 @@
 
 状態: Complete。Scope revision 1。[PR #58](https://github.com/KingYoSun/koujou-san/pull/58)を最終head `daca90b4754c5b0017b22e6ba7ff1dbb3767b1bf`の全CI・独立検品PASS後にマージした。main `a7c8b56151f51e876844ae2810f59d561b81a631`とのtree一致・差分0を確認してCloseした。実CLI二件・固定個別単価・共通画面・受付応答喪失の修正と取得範囲は[証跡](2026-10-17-issue-24-evidence.md)を参照する。
 
-## Issue #25の準備
+## Issue #25の判定
 
-状態: Inspection pending。基準mainは#24マージ後の`a7c8b56151f51e876844ae2810f59d561b81a631`。[計画](2026-10-17-issue-25-plan.md)の三点への回答を反映し、自動発行・通常の割当と開始、変更可能な起点別上限、未完了Issueへの関連付けと再発提案を実装した。型付き条件、原子的な内部発行、重複・連鎖・明示再開、共有起票、Runner復帰後の割当、共通UI・HTTP・MCPを検証した。検品の3件を修正し、`5ae982f`の限定再検品はPASS、blocker 0件。[証跡](2026-10-17-issue-25-evidence.md)を参照する。最終CI・マージ後照合は未完了。
+状態: Complete。Scope revision 1。[PR #59](https://github.com/KingYoSun/koujou-san/pull/59)を最終head `425e1c3b035125723d31cfa9bfc08258f77fde96`の全CIと独立検品PASS後にマージした。merge `e2d6245d2dc2d1bbe4c1691359e50f54a2a54c4e`とのtreeは`7fa301dfdcd1b3dc6953f7993e72482a459678f3`で一致、差分0。#25をCloseした。型付き評価・発行・連鎖・復旧・HTTP/MCPと共通画面の結果は[証跡](2026-10-17-issue-25-evidence.md)を参照する。
 
-#26〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。LLM操作などは未実装であり、初期リリースの完成とは扱わない。
+## Issue #26の判定
+
+状態: In progress。Scope revision 1。基準mainは#25マージ後の`e2d6245d2dc2d1bbe4c1691359e50f54a2a54c4e`。本人による回答・明示引継ぎ、共有操作・送信意図・原応答・共通選択保存、専用MCP OAuth、共通UI、Windowsの暗号化保存と固定接続先を実装した。実PG/Ory/MCP、二つの所有モデルHTTP、共通画面の自動反映・明示採用・手動保存・none、WindowsのPKCE/DPAPI/更新/ログアウト、共通check/test/build、既存のusage/Workflow/Hopper回帰が成功した。
+
+既存HTTP方式の独立検品二件を修正し、`5352149`の再検品はblocker 0件となった。その後のユーザー判断により、Tauriへrig-core＋rig-agentを直接組み込んだ。追加検品でOAuth保存先のAPI・本人の分離不備を修正し、`475781a`の再検品もblocker 0件となった。native 10件、native全体30件、共通UI64件、root check/buildが成功した。[PR #60](https://github.com/KingYoSun/koujou-san/pull/60)はDraftで、本人の許可を得たChatGPT契約の新しいOAuth認証、gpt-6.1-solの二要求・一tool往復・JSON取得、端末内削除・提供元失効が成功した。実装head 6eadc78の全CIも成功し、試験用の上限・失敗記録と文書を更新した最終headのCI・マージ後照合を進める。Manifestは標準構成へ追加せず、本文ログは初期無効とする。[計画](2026-10-18-issue-26-plan.md)、[証跡](2026-10-18-issue-26-evidence.md)、[Gateway評価](2026-10-18-issue-26-gateway-probe.md)を参照する。所有モデルの合成結果を実LLMの意味判断品質へ読み替えない。
+
+#27〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。

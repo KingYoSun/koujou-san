@@ -9,6 +9,7 @@ import type { UI } from "./context-ui";
 import { ContextExplorer } from "./context-explorer";
 import { ContextEditor } from "./context-editor";
 import { ContextPreview } from "./context-preview";
+import { ClientSelection } from "./client-selection";
 export function ContextWorkspace({
   native,
   api,
@@ -162,6 +163,7 @@ export function ContextWorkspace({
         <ContextEditor ui={ui} />
         <ContextPreview ui={ui} />
       </div>
+      <ClientSelection key={`${api}/${user}/${workspace}`} ui={ui} />
     </section>
   );
 }

@@ -66,6 +66,7 @@ func (s *Service) RequestUser(w http.ResponseWriter, r *http.Request) (User, boo
 }
 
 func (s *Service) Register(mux *http.ServeMux) {
+	s.registerMCPClient(mux)
 	mux.HandleFunc("GET /auth/config", func(w http.ResponseWriter, r *http.Request) {
 		reply(w, 200, map[string]string{"issuer": s.Config.Issuer, "client_id": s.Config.NativeClient, "redirect_uri": s.Config.NativeRedirect, "api_url": s.Config.API, "site_url": s.Config.Site, "audience": s.Config.Audience})
 	})
@@ -99,20 +100,28 @@ func (s *Service) Register(mux *http.ServeMux) {
 }
 
 func (s *Service) start(w http.ResponseWriter, r *http.Request) {
+	s.startResource(w, r, false)
+}
+func (s *Service) startResource(w http.ResponseWriter, r *http.Request, mcp bool) {
+	flow := s.resourceFlow(mcp)
 	state, nonce, verifier := rand.Text(), rand.Text(), rand.Text()+rand.Text()
 	_, err := s.DB.Exec(r.Context(), "INSERT INTO auth_attempts VALUES($1,$2,$3,$4)", hash(state), s.seal([]byte(verifier)), nonce, time.Now().Add(15*time.Minute))
 	if err != nil {
 		failure(w, err)
 		return
 	}
-	cookie(w, "__Host-koujou-login", state, 900)
-	query := url.Values{"client_id": {s.Config.WebClient}, "redirect_uri": {s.Config.Site + "/auth/callback"}, "response_type": {"code"}, "scope": {"openid offline_access email profile koujou"}, "audience": {s.Config.Audience}, "state": {state}, "nonce": {nonce}, "code_challenge": {challenge(verifier)}, "code_challenge_method": {"S256"}}
+	cookie(w, flow.login, state, 900)
+	query := url.Values{"client_id": {s.Config.WebClient}, "redirect_uri": {flow.callback}, "response_type": {"code"}, "scope": {flow.scope}, "audience": {flow.audience}, "state": {state}, "nonce": {nonce}, "code_challenge": {challenge(verifier)}, "code_challenge_method": {"S256"}}
 	http.Redirect(w, r, s.Config.Issuer+"oauth2/auth?"+query.Encode(), 303)
 }
 
 func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
+	s.callbackResource(w, r, false)
+}
+func (s *Service) callbackResource(w http.ResponseWriter, r *http.Request, mcp bool) {
+	flow := s.resourceFlow(mcp)
 	state := r.URL.Query().Get("state")
-	if state == "" || subtle.ConstantTimeCompare([]byte(state), []byte(cookieValue(r, "__Host-koujou-login"))) != 1 {
+	if state == "" || subtle.ConstantTimeCompare([]byte(state), []byte(cookieValue(r, flow.login))) != 1 {
 		failure(w, ErrUnauthorized)
 		return
 	}
@@ -128,7 +137,7 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		failure(w, ErrUnauthorized)
 		return
 	}
-	tokens, err := s.exchange(r.Context(), url.Values{"grant_type": {"authorization_code"}, "code": {r.URL.Query().Get("code")}, "redirect_uri": {s.Config.Site + "/auth/callback"}, "code_verifier": {string(verifier)}}, true)
+	tokens, err := s.exchange(r.Context(), url.Values{"grant_type": {"authorization_code"}, "code": {r.URL.Query().Get("code")}, "redirect_uri": {flow.callback}, "code_verifier": {string(verifier)}}, true)
 	if err != nil {
 		failure(w, err)
 		return
@@ -138,12 +147,12 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		failure(w, ErrUnauthorized)
 		return
 	}
-	info, err := s.Inspect(r.Context(), tokens.Access)
+	info, err := s.inspect(r.Context(), tokens.Access, flow.audience, flow.requiredScope)
 	if err != nil || info.Subject != id.Subject {
 		failure(w, ErrUnauthorized)
 		return
 	}
-	if _, err = s.User(r.Context(), tokens.Access); err != nil {
+	if _, err = s.identityUser(r.Context(), info, err); err != nil {
 		failure(w, err)
 		return
 	}
@@ -158,16 +167,24 @@ func (s *Service) callback(w http.ResponseWriter, r *http.Request) {
 		failure(w, err)
 		return
 	}
-	cookie(w, "__Host-koujou-session", session, 7*86400)
-	cookie(w, "__Host-koujou-login", "", -1)
+	cookie(w, flow.session, session, 7*86400)
+	cookie(w, flow.login, "", -1)
+	if mcp {
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		_, _ = w.Write([]byte("MCPに接続しました。元のkoujou-san画面へ戻り、選択操作を続けてください。"))
+		return
+	}
 	http.Redirect(w, r, s.Config.Site+"/", 303)
 }
 
 func (s *Service) requestTokens(r *http.Request) (Tokens, error) {
+	return s.requestTokensNamed(r, "__Host-koujou-session")
+}
+func (s *Service) requestTokensNamed(r *http.Request, name string) (Tokens, error) {
 	if value := r.Header.Get("Authorization"); strings.HasPrefix(value, "Bearer ") {
 		return Tokens{Access: strings.TrimPrefix(value, "Bearer ")}, nil
 	}
-	id := cookieValue(r, "__Host-koujou-session")
+	id := cookieValue(r, name)
 	if id == "" {
 		return Tokens{}, ErrUnauthorized
 	}
@@ -217,11 +234,24 @@ func (s *Service) logout(w http.ResponseWriter, r *http.Request) {
 			oauth = "revoked"
 		}
 	}
-	if _, err = s.DB.Exec(r.Context(), "DELETE FROM auth_sessions WHERE id=$1", hash(cookieValue(r, "__Host-koujou-session"))); err != nil {
+	if cookieValue(r, s.resourceFlow(true).session) != "" {
+		mcpTokens, e := s.requestTokensNamed(r, s.resourceFlow(true).session)
+		if e != nil {
+			oauth = "unconfirmed"
+		} else {
+			refreshErr := s.Revoke(r.Context(), mcpTokens.Refresh, true)
+			accessErr := s.Revoke(r.Context(), mcpTokens.Access, true)
+			if refreshErr != nil || accessErr != nil {
+				oauth = "unconfirmed"
+			}
+		}
+	}
+	if _, err = s.DB.Exec(r.Context(), "DELETE FROM auth_sessions WHERE id IN ($1,$2)", hash(cookieValue(r, "__Host-koujou-session")), hash(cookieValue(r, s.resourceFlow(true).session))); err != nil {
 		failure(w, err)
 		return
 	}
 	cookie(w, "__Host-koujou-session", "", -1)
+	cookie(w, s.resourceFlow(true).session, "", -1)
 	kratos := "unconfirmed"
 	request, _ := http.NewRequestWithContext(r.Context(), "GET", s.Config.KratosPublic+"/self-service/logout/browser", nil)
 	request.Header.Set("Accept", "application/json")

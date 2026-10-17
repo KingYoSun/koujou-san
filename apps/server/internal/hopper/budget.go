@@ -27,5 +27,5 @@ func (s *Service) chainCost(ctx context.Context, tx pgx.Tx, p access.Principal, 
 	if err != nil {
 		return usage.CostState{}, err
 	}
-	return usage.ObserveRunCosts(ctx, tx, p, w, ids, b)
+	return usage.ObserveCosts(ctx, tx, p, w, "run", ids, b)
 }
