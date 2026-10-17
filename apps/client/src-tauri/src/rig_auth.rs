@@ -15,12 +15,19 @@ use tauri::ipc::Channel;
 
 #[derive(Clone)]
 pub(super) struct Store {
-    dir: PathBuf,
+    pub(super) dir: PathBuf,
 }
 impl Store {
     pub(super) fn new(file: &Path, id: &str) -> Self {
         Self {
-            dir: file.parent().unwrap().join("rig-oauth").join(hex_name(id)),
+            dir: file
+                .parent()
+                .unwrap()
+                .join("rig-oauth")
+                .join(hex_name(&format!(
+                    "{}:{id}",
+                    file.file_name().unwrap().to_string_lossy()
+                ))),
         }
     }
     fn path(&self, key: &str) -> PathBuf {
@@ -346,7 +353,7 @@ mod tests {
         tauri::async_runtime::block_on(async {
             let root =
                 std::env::temp_dir().join(format!("koujou-rig-auth-{}", uuid::Uuid::new_v4()));
-            let store = Store::new(&root.join("alice/metadata.dpapi"), "owned");
+            let store = Store::new(&root.join("api-one-alice.dpapi"), "owned");
             let secret = uuid::Uuid::new_v4().to_string();
             store.save("chatgpt", &secret).await.unwrap();
             assert_eq!(store.load("chatgpt").await.unwrap(), Some(secret.clone()));
@@ -357,24 +364,29 @@ mod tests {
                     .any(|b| b == secret.as_bytes())
             );
             assert!(
-                Store::new(&root.join("bob/metadata.dpapi"), "owned")
+                Store::new(&root.join("api-two-bob.dpapi"), "owned")
                     .load("chatgpt")
                     .await
                     .unwrap()
                     .is_none()
             );
             assert!(
-                Store::new(&root.join("alice/metadata.dpapi"), "another")
+                Store::new(&root.join("api-one-alice.dpapi"), "another")
                     .load("chatgpt")
                     .await
                     .unwrap()
                     .is_none()
             );
+            let other = Store::new(&root.join("api-two-bob.dpapi"), "owned");
+            other.save("chatgpt", "owned-other-token").await.unwrap();
+            assert_eq!(store.load("chatgpt").await.unwrap(), Some(secret.clone()));
+            other.delete("chatgpt").await.unwrap();
+            assert_eq!(store.load("chatgpt").await.unwrap(), Some(secret));
             store.delete("chatgpt").await.unwrap();
             assert!(!store.present("chatgpt"));
             fs::remove_dir(&store.dir).unwrap();
-            fs::remove_dir(root.join("alice/rig-oauth")).unwrap();
-            fs::remove_dir(root.join("alice")).unwrap();
+            fs::remove_dir(&other.dir).unwrap();
+            fs::remove_dir(root.join("rig-oauth")).unwrap();
             fs::remove_dir(root).unwrap();
         });
     }

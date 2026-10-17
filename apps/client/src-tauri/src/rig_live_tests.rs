@@ -75,9 +75,7 @@ fn live_subscription_two_request_trial() {
         }.await;
         let cleanup = rig_auth::sign_out(&provider, store.clone(), &http).await;
         store.delete(&provider).await.unwrap();
-        let directory = root
-            .join("rig-oauth")
-            .join(crate::auth::hex_name("owned-live"));
+        let directory = &store.dir;
         let lock = directory.join(format!("{provider}.lock"));
         if lock.exists() {
             fs::remove_file(lock).unwrap();

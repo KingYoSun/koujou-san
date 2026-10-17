@@ -219,7 +219,7 @@ fn subscription_response_case(incomplete: bool) {
         );
         assert_eq!(result["body"]["provider_raw"], original);
         store.delete("chatgpt").await.unwrap();
-        let directory = root.join("rig-oauth").join(crate::auth::hex_name("owned"));
+        let directory = &store.dir;
         fs::remove_file(directory.join("chatgpt.lock")).unwrap();
         fs::remove_dir(directory).unwrap();
         fs::remove_dir(root.join("rig-oauth")).unwrap();

@@ -13,7 +13,7 @@
 | AC-5 | 共通保存のHTTP/MCP receipt、元版競合、手動必須をPGで確認。ブラウザでAlphaの自動反映、Betaの採用待ちと明示採用、一項目を外した三項目の手動保存、キー未入力でのnone保存を確認。`issue26-selection-manual.png / issue26-selection-none.png` |
 | AC-6 | 送信意図と原応答のACK喪失、同一要求の再送、別クライアントの送信意図、遅い応答、依頼者以外の回答・引継ぎ拒否を確認。再接続だけでは要求を再送しない。`issue26-host-protocol-after.log`、PGの操作試験 |
 | AC-7 | `owned-alpha / owned-beta`で同じ四粒度の選択を保存。実モデルの不一致、tool不正、障害、要求・時間・費用上限、手動への復帰を確認。実LLMの意味判断品質を確認したとは扱わない |
-| AC-8 | 固定Gatewayのtool・構造化出力・明示モデル・許可fallback・本文記録切替・試行・相関・復旧・fetch送信先を観測。その後の指示によりManifest採用を保留し、[Tauri直接組込み](2026-10-18-issue-26-native-llm-comparison.md)を比較。採用方針は判断待ち、本文ログの初期無効は確定 |
+| AC-8 | 固定Gatewayのtool・構造化出力・明示モデル・許可fallback・本文記録切替・試行・相関・復旧・fetch送信先を観測。その後の指示により[Tauri直接組込み](2026-10-18-issue-26-native-llm-comparison.md)を比較し、ユーザーがrig-core＋rig-agentを選択した。本文ログの初期無効は確定 |
 | AC-9 | Windowsの実Oryを使うPKCE・DPAPI・再起動更新・専用resource・ログアウトが成功。登録モデルの実HTTPと暗号化保存、リダイレクト拒否が成功。Webは実ブラウザで専用MCP OAuth、二接続、再読込後のキー消去、保存・採用を確認。費用は操作へ帰属しRunへ加算しない |
 | INVAR-1〜3 | クライアントがモデルを呼び、サーバーに代行処理なし。保存・採用からRunは始まらず、モデル・MCPがなくても手動保存できる |
 
@@ -59,6 +59,8 @@ WindowsのDPAPI TokenStoreはAPI・利用者・接続で保存先を分け、SDK
 
 実契約trialは`live_subscription_two_request_trial`へ分離した。新しい接続先を明示し、合成データのみ、最大2回、APIキー課金へのfallbackなし。完了・失敗のいずれでも試験用認証を削除し、確認できた失効結果だけを保存する。通常のテストや起動からは実行しない。
 
+追加の独立検品で、OAuth保存先の計算が利用者別メタデータのファイル名を落とす不備を確認した。既存の試験は利用者ごとに別フォルダを置いていたため、この不備を検出できなかった。製品と同じ同一フォルダ・異なるファイル名へ試験を直すと、別利用者の読取り拒否が失敗した（`issue26-rig-actor-before.log`）。保存先にファイル名も含め、同じ接続IDでも利用者ごとに読取り・更新・削除を分離した。関連native 10件が成功した（`issue26-rig-actor-after.log`）。実契約の資格情報は使っていない。
+
 ## 失敗と修正の区別
 
 ブラウザでMCP初期化がHTTP 400となり、モデル要求は0件だった。採用したSDK/protocolの要求を照合し、stateless discovery、要求メタデータ、HTTP method/nameヘッダを追加した。`issue26-mcp-init-before.png`と、その後の選択・保存を対応させる。
@@ -77,4 +79,4 @@ WindowsのDPAPI TokenStoreはAPI・利用者・接続で保存先を分け、SDK
 
 採用保存中の手動編集は、所有DBのWorkspace streamを30秒だけロックして確認した。保存待ち中に入力をnoneへ変え、保存後にもnoneを保ち、差分確認の通知を表示した（`issue26-adopt-edit-lock.log / issue26-adopt-manual-edit.png`）。この確認に新しい製品用の遅延機構は追加していない。
 
-残作業は修正差分の独立再検品、組込みSDK/接続方式のユーザー判断、その判断に必要な実装・検証、最終headのCI、マージ後のtree照合、手動Close。#33へ移管したS3スリープと人の初見操作は未確認のまま維持し、今回の完了へ算入しない。
+残作業はOAuth保存先の修正差分の独立再検品、実契約への新規OAuth接続・合成要求の許可確認と試験、最終headのCI、マージ後のtree照合、手動Close。#33へ移管したS3スリープと人の初見操作は未確認のまま維持し、今回の完了へ算入しない。
