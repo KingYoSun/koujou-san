@@ -62,3 +62,21 @@ Run別取得は`usage/query.go`の`mode=run`で対象Runのキーを先に選び
 - その他の固定条件について、今回の範囲内でblockerとなる未達・回帰は確認しなかった。
 - 未確認: B1修正後の差分検品、最終HEADの必須CI、merge後の内容照合。最終CIやmerge後照合が未実施であることを、局所試験の成功で置き換えていない。
 - 検品記録はyomiyasuで推敲し、同梱lintは終了0。箇条書き比率の候補一件は、固定入力・観測・判定を並べる検品記録の用途に合うため維持した。新規文書への`git diff --no-index --check`も確認した。
+
+## B1修正後の差分検品
+
+2026-10-17、対象を`155c02cf547b72bf68abfe15d094a14897b9bbc1`へ固定した。前回HEAD `86819e6ac5bbe9894127dab50c96de7d9cad8d0a`からの差分、証跡末尾、`test-results/issue24-cumulative-ack-before.log`と`issue24-cumulative-ack-after.log`を入力に、B1・AC-6と影響するAC-3・INVAR-1だけを再検品した。前回の条件と禁止範囲は維持し、実CLI・ブラウザ・OS操作や追加試験は行っていない。
+
+`runner/usage.rs:392`は、同じ`resource_id`に先行する未受付行がないことを送信条件に加えている。途中計測Aの受付応答を失っても、同じ系列の後続計測は選ばれない。巡回がAへ戻り、同じpayload・operationで受付版を回収した後に、後続計測の初回送信がその版を使う。別resourceはこの条件に遮られず巡回できる。`journal.rs`の追加索引は未受付行のresource照合を支え、暗号化payload・実行queue・サーバーの契約は変えていない。
+
+| 再検品対象 | 確認した結果と証拠 | 判定 |
+| --- | --- | --- |
+| B1 / AC-6 | 変更前ログは、Aの同内容再送を期待した箇所で別operation・後続sequenceの計測が選ばれてFAIL。追加試験はAの応答喪失、Aの同内容再送とv1回収、次の途中値をv1で受付、終了値をv2で受付、未送信0件まで確認する。変更後ログで同試験が成功し、既存の別Run巡回試験も成功 | PASS、B1解消 |
+| AC-3 | 取得・累積系列・Usage ID・coverageの生成は差分に含まれず、変更は系列内の受付順だけ。追加試験でも、同じAの再送は同内容・同operation、後続計測は別operationと受付済み期待版を使う。既存の重複message・再利用・継続flag試験も成功 | PASS維持 |
+| INVAR-1 | 修正は計測queueの行選択と索引に限られ、Run報告・CLI起動・終了処理への差分はない。追加試験は最後まで`execution_frames`が0件であることを確認する。変更後の既存Runner試験も成功 | PASS維持 |
+
+`issue24-cumulative-ack-after.log`はRunner試験15成功・失敗0・4 ignoredを記録している。4件の実接続・所有環境試験を実行済みとは扱っていない。追加試験の受付応答は固定応答であり、前回検品した既存サーバーのCAS・receipt契約と合わせて判定した。サーバー・共通UIへの変更はなく、前回の実接続・画面証拠を再利用した。
+
+このHEADの独立検品の総合結果はPASS。B1は解消し、blockerは0件。AC-6をPASSへ更新し、他のAC・INVARは前回のPASSを維持する。前節のFAILは前回HEADの履歴として残す。最終HEADの必須CIとmerge後の内容照合は引き続き未確認であり、Issue全体の完了をこの検品だけで確定しない。
+
+追補もyomiyasuで推敲した。lint・`git diff --check`はいずれも終了0。lintの候補二件は、検品項目の箇条書きと既存契約に合わせた「版」の表記であるため維持した。
