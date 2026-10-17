@@ -23,7 +23,7 @@ API試験はTLSのHTTPサーバーを実際に停止し、同じアドレスと�
 | AC-7b | 未確認。S3対応は確認済み。本人の実施タイミングを得てから実OSのスリープと復帰を試す。 |
 | INVAR-1〜3 | 上記の停止・古い要求・権限取消で、通信断をPauseや完了へ変換せず、未受理回答の配送・同一Run再発行を行わないことを確認。 |
 
-ネイティブ画面の新しい「実行記録を照合」操作は未確認。実スリープと合わせて残しており、Issue #19の完了やmergeの条件を満たしたとは扱わない。
+追加のネイティブ画面起動は依頼せず、照合ボタンと同じネイティブ処理を実Ory/API・保存済みのRunで直接試験した。GUIの追加クリック自体は行っていない。既存の画面終了証跡と共通Web UIの実操作は再利用する。実スリープは未確認で、受入条件の扱いを確認中のためIssue #19は完了としない。
 
 ## 保存・順序・検証
 
@@ -34,6 +34,8 @@ API試験はTLSのHTTPサーバーを実際に停止し、同じアドレスと�
 修正後のhead `a5a618ac487402b5c6dad44df3d35966157002dd`で、実CLIと専用APIでもこの組合せを再現した。Runner消失後の保存済み出力（報告5）をcommitしてHTTP応答を失わせ、直後にAPIを停止した。DBの最後の変更が`run-event`、端末側の同じoperation IDは未確認のままであることを照合し、この時点で共有観測はUnknown・`session_unconfirmed=true`だった。再接続後も最後のrunningとUnknownを維持し、追加CLIは0。後から行うUnknown書込みに依存せず保持できることを確認した。
 
 Web保存の試験は、既存Context下書き1万件を保持したまま対象Pauseだけを読み戻す。API/利用者/Workspace/Pauseの分離、質問版の保持、失効時の保存待ちと遅着応答を確認した。WindowsではDPAPIの暗号化と旧同期DBの読戻し、journalの旧列構成と50件ずつの102件復旧、再発行拒否を確認した。
+
+ネイティブ照合の直接試験では、Runner停止後の古い接続期限で`forbidden`を再現した。照合時に保存済みの接続設定から現在の接続を更新し、同じ実Ory/API・保存記録で成功した。Runの共有版は不変、`command_started=false`・`continuation_verified=false`を確認し、CLIやGUIを起動していない。Tauriの登録名・引数と共通UIの呼出しも照合する。この試験は`runner::runtime::tests::live_reconcile_owned_record`で再実行できる。
 
 root check/test/buildとdesktop check/test/buildを実行した。rootの共通UIは11ファイル37試験、desktopは11試験成功。実Oryへの認証・端末登録は明示したignored試験を実行して成功。最終差分の検証・独立検品・CIは追記する。
 

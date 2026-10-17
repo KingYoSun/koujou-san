@@ -4122,6 +4122,20 @@
       },
       "additionalCLI": 0,
       "finalUnknownWriteDidNotArriveBeforeObservation": true
+    },
+    "nativeReconciliation": {
+      "command_started": false,
+      "local_phase": "unlocated",
+      "observation": {
+        "continuation_verified": false,
+        "direct_process": "not_found",
+        "reason": "stdio_session_not_reattached"
+      },
+      "queued_reconciliation": true,
+      "run": {
+        "id": "run:recovery-ack-final",
+        "version": "FJC4KFSK5KOAHNU277LLSRWGE5"
+      }
     }
   }
 }

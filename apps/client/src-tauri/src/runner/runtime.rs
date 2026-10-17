@@ -645,8 +645,14 @@ pub(super) fn reconcile(auth: &Auth, workspace: &str, id: &str) -> Result<Value,
     let journal = Journal::open(&binding.root)?;
     let id = format!("run:{}", id.strip_prefix("run:").unwrap_or(id));
     let (generation, phase) = journal.execution(&id)?.ok_or("execution_not_recorded")?;
+    let client = Arc::new(DeviceClient::open(binding)?);
+    publish(
+        &client,
+        &config(&client.binding.root)?,
+        &execution::settings(&client.binding.root)?,
+    )?;
     let api = Api {
-        client: Arc::new(DeviceClient::open(binding)?),
+        client,
         id: id.clone(),
         generation,
     };
@@ -666,6 +672,38 @@ pub(super) fn reconcile(auth: &Auth, workspace: &str, id: &str) -> Result<Value,
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "requires the explicitly owned Ory/API and saved native Run record"]
+    fn live_reconcile_owned_record() {
+        let fixture: Value = serde_json::from_slice(
+            &fs::read(std::env::var("KOUJOU_CONTEXT_UI_FIXTURE").unwrap()).unwrap(),
+        )
+        .unwrap();
+        let auth = Auth::new(
+            fixture["api"].as_str().unwrap(),
+            PathBuf::from(std::env::var("KOUJOU_NATIVE_TEST_FILE").unwrap()),
+        )
+        .unwrap();
+        let id = std::env::var("KOUJOU_RUNNER_TEST_ID").expect("select owned Run");
+        let path = format!("/runs/workspaces/runner-ui/records/{id}?version=head");
+        let before = auth.request(&path, "GET", Value::Null).unwrap();
+        let value = reconcile(&auth, "runner-ui", &id).unwrap();
+        assert_eq!(value["command_started"], false);
+        assert_eq!(value["observation"]["continuation_verified"], false);
+        assert_eq!(value["queued_reconciliation"], true);
+        assert_eq!(
+            auth.request(&path, "GET", Value::Null).unwrap()["version"],
+            before["version"]
+        );
+        fs::write(
+            std::env::var("KOUJOU_NATIVE_TEST_RESULT").unwrap(),
+            serde_json::to_vec_pretty(&value).unwrap(),
+        )
+        .unwrap();
+        println!(
+            "Native reconciliation checked current OAuth/device authorization and saved generation without starting a CLI or changing shared execution facts."
+        );
+    }
     #[test]
     #[ignore = "requires the explicitly owned native Runner/Ory fixture; used for fixed crash boundary testing"]
     fn live_reconnect_runner() {
