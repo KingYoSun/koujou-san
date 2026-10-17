@@ -1,12 +1,47 @@
-import { invoke } from "@tauri-apps/api/core";
+import { Channel, invoke } from "@tauri-apps/api/core";
 export type VersionRef = { id: string; version: string };
+export type ModelAuthPrompt = {
+  url?: string;
+  code?: string;
+  browser_opened?: boolean;
+  message?: string;
+};
+export async function signInModel(
+  native: boolean,
+  profile: ModelProfile,
+  onPrompt: (v: ModelAuthPrompt) => void,
+) {
+  if (!native || profile.auth !== "oauth")
+    throw new Error("native_model_auth_required");
+  const prompt = new Channel<ModelAuthPrompt>();
+  prompt.onmessage = onPrompt;
+  return invoke<ModelProfile>("model_connection_sign_in", {
+    id: profile.id,
+    revision: profile.revision,
+    prompt,
+  });
+}
+export async function signOutModel(native: boolean, profile: ModelProfile) {
+  if (!native || profile.auth !== "oauth")
+    throw new Error("native_model_auth_required");
+  return invoke<{ local_deleted: boolean; remote_revoked: boolean }>(
+    "model_connection_sign_out",
+    { id: profile.id, revision: profile.revision },
+  );
+}
+export async function openModelAuthorization(native: boolean, url: string) {
+  if (!native) throw new Error("native_model_auth_required");
+  return invoke("model_connection_open_authorization", { url });
+}
 export type ModelProfile = {
   id: string;
   name: string;
   endpoint: string;
   model: string;
   allowed_models: string[];
-  auth: "bearer" | "none";
+  auth: "bearer" | "none" | "oauth";
+  provider?: "compatible" | "chatgpt" | "copilot";
+  credentials_saved?: boolean;
   revision: string;
   contract: string;
   prices: Record<string, VersionRef>;
@@ -41,6 +76,7 @@ export function modelReady(
   actor: string,
   profile: ModelProfile,
 ) {
+  if (profile.auth === "oauth") return native && !!profile.credentials_saved;
   return (
     native ||
     profile.auth === "none" ||
@@ -77,6 +113,11 @@ export async function saveProfile(
   modelEndpoint(profile.endpoint);
   if (native)
     return invoke<ModelProfile>("model_connection_save", { profile, key });
+  if (
+    profile.auth === "oauth" ||
+    (profile.provider && profile.provider !== "compatible")
+  )
+    throw new Error("native_model_auth_required");
   const profiles = await loadProfiles(false, actor);
   const old = profiles.find((p) => p.id === profile.id);
   if (profile.auth === "bearer") {
@@ -122,6 +163,11 @@ export async function modelRequest(
       body,
       timeoutMs: timeout_ms,
     });
+  if (
+    profile.auth === "oauth" ||
+    (profile.provider && profile.provider !== "compatible")
+  )
+    throw new Error("native_model_auth_required");
   const current = (await loadProfiles(false, actor)).find(
     (p) => p.id === profile.id,
   );
@@ -142,10 +188,18 @@ export async function modelRequest(
       throw new Error("model_key_required");
     headers.Authorization = `Bearer ${stored.key}`;
   }
+  const outgoing = { ...(body as Record<string, unknown>) };
+  if (Array.isArray(outgoing.messages))
+    outgoing.messages = outgoing.messages.map((m: Record<string, unknown>) => {
+      const value = { ...m };
+      delete value.rig_message;
+      delete value.rig_connection;
+      return value;
+    });
   const response = await fetch(target, {
     method: "POST",
     headers,
-    body: JSON.stringify(body),
+    body: JSON.stringify(outgoing),
     credentials: "omit",
     redirect: "error",
     signal: AbortSignal.timeout(timeout_ms),

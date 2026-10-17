@@ -1,6 +1,6 @@
 # 0026: クライアントによるContext選択と共通の版付き保存
 
-- 状態: クライアント契約は採用。Gateway/組込みSDKの採用方針は判断待ち。本文ログの初期無効は確定。
+- 状態: クライアント契約とrigのTauri直接組込みを採用。本文ログは初期無効。実契約によるsubscription接続の確認は別記する。
 - 日付: 2026-10-18。
 - 根拠: Issue #26、設計書§6.10・6.11・12.4・14.3、[計画](../progress/2026-10-18-issue-26-plan.md)。
 
@@ -26,7 +26,9 @@ ADR 0010の送信禁止分類、現在権限、操作目的、明示したScope�
 
 ## 接続と資格情報
 
-モデル接続はOpenAI互換の非ストリーミングHTTPを使い、tool要求と厳密なJSON出力を渡す。要求モデルと許可する実モデル名を固定し、応答の実モデル名を照合する。GatewayがHTTP 200で説明文を返しても、モデル・出力schemaの確認に失敗すれば選択として採用しない。接続設定の保存だけではモデルへ要求しない。
+WebはOpenAI互換HTTPを維持し、Tauriはrig-core＋rig-agentを直接リンクする。sourceは暗号化TokenStoreへ接続できる`c73622dfca02bfe55d29a6a0612e181119cab9b8`へ固定し、SDKのCLI・harnessは含めない。共通Hostの一つの送信意図に対して、nativeのAgentRunを一モデル呼出しだけ進める。MCPと次の送信予約は共通Hostが担当し、SDKの自動tool実行・retryへ業務認可を委譲しない。
+
+tool要求と厳密なJSON出力を渡し、要求モデルと許可する実モデル名を固定する。応答の実モデル名を照合し、HTTP 200の説明文だけで成功にしない。nativeはJSONとResponses/SSEを共通応答へ対応付け、元の応答、モデルID、usage、要求ID、実際の送信先、SDK版を残す。途中終了のlength/content_filterを自然終了へ変えない。接続設定の保存だけではモデルへ要求しない。
 
 Webの接続用キーは画面内メモリだけに保持する。再読込後は再入力し、設定のメタデータだけを利用者・APIごとに保存する。Windowsでは利用者・APIごとにDPAPIで暗号化し、Context本文キャッシュ、通常API認証、MCP認証とは別の保存先を使う。接続先を変えた設定へ古いキーを流用せず、HTTPリダイレクトにも転送しない。
 
@@ -34,8 +36,10 @@ MCPは専用scopeとresourceを持つOAuth認証を使う。Webでは専用のHt
 
 モデルHTTPにはOry/MCPのtokenやcookie、Workspaceの操作handleを付けない。接続用キーをMCPや共有の操作記録へ保存しない。費用は操作IDに帰属させ、Runへ計上しない。モデル送信前に未確認の利用量を作り、応答後に同じ要求の観測として確定する。実モデルに対応する個別契約単価からの算定も、既存のusageサービスを使う。
 
+subscriptionのOAuthも、API・利用者・接続ごとのDPAPI TokenStoreに限定し、既存CLIやSDKの既定credential cacheを探さない。通常のモデル要求中は非対話の更新だけを許可し、ログインを自動で始めない。本人の明示操作で提供元の認証画面を開く。OAuth応答はモデル原応答のcapture対象から外す。SDKのnativeメッセージは同じ接続版でのみ復元し、Webへ引き継ぐ要求ではその内部envelopeを送らない。Goの共有形式をSDK内部checkpointへ置き換えない。
+
 ## Gatewayの評価と残る判断
 
 Manifest 6.28.9を固定して、tool、構造化出力、明示モデル、許可fallback、再試行、本文ログ無効、相関、再起動復旧を所有する上流HTTPで確認した。Autofix・telemetryを無効にした観測期間に、それらの送信先へのfetchはなかった。価格表などの外部取得はあった。実LLMの意味判断の品質、全期間・全通信方式の無通信を確認したとは扱わない。
 
-Manifestの採用は保留し、[Tauri組込みSDKの比較](../progress/2026-10-18-issue-26-native-llm-comparison.md)を行った。採用方針は未確定であり、本文ログは初期無効とする。依存と配布条件の確認結果、配置負担と観測の範囲は[Gateway評価](../progress/2026-10-18-issue-26-gateway-probe.md)へ記録する。判断前に標準構成へGatewayを追加しない。
+その後の[比較](../progress/2026-10-18-issue-26-native-llm-comparison.md)とユーザー判断により、Tauriはrigの直接組込みを採用した。Manifestと専用DBは標準構成へ追加しない。任意の互換接続先として利用できる。本文ログは初期無効とする。SDK追加依存は全targetの20件、初期Windowsのnormal/build graphでは18件で、MITを選択できる。Windows向けの11通知を`apps/client/public/third-party-rig.txt`へまとめ、Web build/Tauri assetへ含める。実契約で未確認の接続を、確認済みの対応として扱わない。

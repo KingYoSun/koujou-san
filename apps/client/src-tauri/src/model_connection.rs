@@ -1,12 +1,19 @@
 use crate::auth::{Auth, protect, unprotect};
-use reqwest::blocking::Client;
+#[cfg(all(test, windows))]
+#[path = "rig_live_tests.rs"]
+mod live;
+#[path = "rig_model.rs"]
+mod rig;
+#[path = "rig_auth.rs"]
+mod rig_auth;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
+#[cfg(test)]
+use serde_json::json;
 use std::{
     fs,
     path::{Path, PathBuf},
     sync::Mutex,
-    time::Duration,
 };
 use tauri::{Manager, Url};
 use uuid::Uuid;
@@ -22,6 +29,10 @@ pub struct Profile {
     allowed_models: Vec<String>,
     #[serde(default = "bearer")]
     auth: String,
+    #[serde(default = "compatible")]
+    provider: String,
+    #[serde(default)]
+    credentials_saved: bool,
     #[serde(default)]
     revision: String,
     #[serde(default)]
@@ -35,6 +46,9 @@ pub struct Profile {
 }
 fn bearer() -> String {
     "bearer".into()
+}
+fn compatible() -> String {
+    "compatible".into()
 }
 #[derive(Deserialize, Serialize)]
 struct Stored {
@@ -100,14 +114,28 @@ fn store(path: &Path, mut profile: Profile, key: String) -> Result<Profile, Stri
     let mut entries = load(path)?;
     let old = entries.iter().find(|e| e.profile.id == profile.id);
     // An edited destination needs its own key; never reuse another origin's key.
-    if profile.auth != "bearer" && profile.auth != "none" {
-        return Err("invalid_model_profile".into());
+    if profile.provider == "compatible" {
+        if profile.auth != "bearer" && profile.auth != "none" {
+            return Err("invalid_model_profile".into());
+        }
+    } else {
+        let expected = match profile.provider.as_str() {
+            "chatgpt" => "https://chatgpt.com/backend-api/codex",
+            "copilot" => "https://api.githubcopilot.com",
+            _ => return Err("invalid_model_provider".into()),
+        };
+        if profile.auth != "oauth" || profile.endpoint.trim_end_matches('/') != expected {
+            return Err("invalid_model_profile".into());
+        }
     }
-    let key = if profile.auth == "none" {
+    let key = if profile.auth == "none" || profile.auth == "oauth" {
         String::new()
     } else if key.is_empty() {
         let old = old.ok_or("model_key_required")?;
-        if old.profile.endpoint != profile.endpoint {
+        if old.profile.endpoint != profile.endpoint
+            || old.profile.auth != "bearer"
+            || old.key.is_empty()
+        {
             return Err("model_key_required".into());
         };
         old.key.clone()
@@ -115,6 +143,8 @@ fn store(path: &Path, mut profile: Profile, key: String) -> Result<Profile, Stri
         key
     };
     profile.revision = Uuid::new_v4().to_string();
+    profile.credentials_saved = profile.auth == "oauth"
+        && rig_auth::Store::new(path, &profile.id).present(&profile.provider);
     entries.retain(|e| e.profile.id != profile.id);
     entries.push(Stored {
         profile: profile.clone(),
@@ -130,7 +160,15 @@ pub async fn model_connection_load(app: tauri::AppHandle) -> Result<Vec<Profile>
         let _guard = CONNECTION_LOCK
             .lock()
             .map_err(|_| "model_storage_unavailable")?;
-        Ok(load(&path)?.into_iter().map(|e| e.profile).collect())
+        Ok(load(&path)?
+            .into_iter()
+            .map(|e| {
+                let mut p = e.profile;
+                p.credentials_saved =
+                    p.auth == "oauth" && rig_auth::Store::new(&path, &p.id).present(&p.provider);
+                p
+            })
+            .collect())
     })
     .await
     .map_err(|_| "model_storage_task_failed")?
@@ -151,7 +189,13 @@ pub async fn model_connection_save(
     .await
     .map_err(|_| "model_storage_task_failed")?
 }
-fn request(stored: &Stored, revision: &str, body: Value, timeout_ms: u64) -> Result<Value, String> {
+fn request(
+    stored: &Stored,
+    revision: &str,
+    body: Value,
+    timeout_ms: u64,
+    path: &Path,
+) -> Result<Value, String> {
     if revision != stored.profile.revision
         || body["model"].as_str() != Some(stored.profile.model.as_str())
         || body["stream"].as_bool() == Some(true)
@@ -159,34 +203,12 @@ fn request(stored: &Stored, revision: &str, body: Value, timeout_ms: u64) -> Res
     {
         return Err("model_connection_changed".into());
     }
-    let mut target = endpoint(&stored.profile.endpoint)?;
-    target.set_path(&format!(
-        "{}/chat/completions",
-        target.path().trim_end_matches('/')
-    ));
-    let mut builder = Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(Duration::from_millis(timeout_ms));
-    if matches!(target.host_str(), Some("localhost" | "127.0.0.1")) {
-        if let Ok(file) = std::env::var("KOUJOU_MODEL_CA_FILE") {
-            let b = fs::read(file).map_err(|_| "invalid_model_ca")?;
-            builder = builder.add_root_certificate(
-                reqwest::Certificate::from_pem(&b).map_err(|_| "invalid_model_ca")?,
-            )
-        }
-    }
-    let client = builder
-        .build()
-        .map_err(|_| "model_connection_unavailable")?;
-    let mut call = client.post(target).json(&body);
-    if stored.profile.auth == "bearer" {
-        call = call.bearer_auth(&stored.key)
-    }
-    let response = call.send().map_err(|_| "model_connection_unavailable")?;
-    let status = response.status().as_u16();
-    let text = response.text().map_err(|_| "invalid_model_response")?;
-    let value = serde_json::from_str::<Value>(&text).unwrap_or(Value::String(text));
-    Ok(json!({"status":status,"body":value}))
+    tauri::async_runtime::block_on(rig::request(
+        stored,
+        body,
+        timeout_ms,
+        rig_auth::Store::new(path, &stored.profile.id),
+    ))
 }
 #[tauri::command]
 pub async fn model_connection_request(
@@ -197,6 +219,7 @@ pub async fn model_connection_request(
     timeout_ms: u64,
 ) -> Result<Value, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let started = std::time::Instant::now();
         let path = binding(&app.state::<Auth>())?;
         let stored = {
             let _guard = CONNECTION_LOCK
@@ -207,15 +230,97 @@ pub async fn model_connection_request(
                 .find(|e| e.profile.id == id)
                 .ok_or("model_connection_unavailable")?
         };
-        request(&stored, &revision, body, timeout_ms)
+        let remaining = timeout_ms.saturating_sub(started.elapsed().as_millis() as u64);
+        request(&stored, &revision, body, remaining, &path)
     })
     .await
     .map_err(|_| "model_request_task_failed")?
 }
 
+fn current(app: &tauri::AppHandle, id: &str, revision: &str) -> Result<(Stored, PathBuf), String> {
+    let path = binding(&app.state::<Auth>())?;
+    let _guard = CONNECTION_LOCK
+        .lock()
+        .map_err(|_| "model_storage_unavailable")?;
+    let entry = load(&path)?
+        .into_iter()
+        .find(|e| e.profile.id == id && e.profile.revision == revision)
+        .ok_or("model_connection_changed")?;
+    Ok((entry, path))
+}
+#[tauri::command]
+pub async fn model_connection_sign_in(
+    app: tauri::AppHandle,
+    id: String,
+    revision: String,
+    prompt: tauri::ipc::Channel<Value>,
+) -> Result<Profile, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (entry, path) = current(&app, &id, &revision)?;
+        let http = rig::http(&entry.profile, 15 * 60 * 1000)?;
+        tauri::async_runtime::block_on(rig_auth::sign_in(
+            &entry.profile.provider,
+            rig_auth::Store::new(&path, &id),
+            &http,
+            prompt,
+        ))?;
+        let (_, now) = current(&app, &id, &revision)?;
+        if now != path {
+            return Err("model_connection_changed".into());
+        }
+        let _guard = CONNECTION_LOCK
+            .lock()
+            .map_err(|_| "model_storage_unavailable")?;
+        let mut entries = load(&path)?;
+        let saved = entries
+            .iter_mut()
+            .find(|e| e.profile.id == id && e.profile.revision == revision)
+            .ok_or("model_connection_changed")?;
+        saved.profile.revision = Uuid::new_v4().to_string();
+        saved.profile.credentials_saved = true;
+        let profile = saved.profile.clone();
+        save(&path, &entries)?;
+        Ok(profile)
+    })
+    .await
+    .map_err(|_| "model_sign_in_task_failed")?
+}
+#[tauri::command]
+pub async fn model_connection_sign_out(
+    app: tauri::AppHandle,
+    id: String,
+    revision: String,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let (entry, path) = current(&app, &id, &revision)?;
+        let http = rig::http(&entry.profile, 30000)?;
+        tauri::async_runtime::block_on(rig_auth::sign_out(
+            &entry.profile.provider,
+            rig_auth::Store::new(&path, &id),
+            &http,
+        ))
+    })
+    .await
+    .map_err(|_| "model_sign_out_task_failed")?
+}
+
+#[tauri::command]
+pub fn model_connection_open_authorization(url: String) -> Result<(), String> {
+    let parsed = Url::parse(&url).map_err(|_| "invalid_model_authorization_url")?;
+    if parsed.scheme() != "https"
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || !matches!(parsed.host_str(), Some("auth.openai.com" | "github.com"))
+    {
+        return Err("invalid_model_authorization_url".into());
+    }
+    crate::auth::open_browser(parsed.as_str())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
     fn profile(endpoint: &str) -> Profile {
         Profile {
             id: "owned".into(),
@@ -224,6 +329,8 @@ mod tests {
             model: "owned-model".into(),
             allowed_models: vec!["owned-model".into()],
             auth: "bearer".into(),
+            provider: compatible(),
+            credentials_saved: false,
             revision: "v1".into(),
             contract: String::new(),
             prices: json!({}),
@@ -306,11 +413,19 @@ mod tests {
                 &stored,
                 "another-version",
                 json!({"model":"owned-model"}),
-                2000
+                2000,
+                &std::env::temp_dir().join("koujou-owned-model-test.dpapi")
             )
             .is_err()
         );
-        let result = request(&stored, "v1", json!({"model":"owned-model"}), 2000).unwrap();
+        let result = request(
+            &stored,
+            "v1",
+            json!({"model":"owned-model","messages":[{"role":"user","content":"owned"}]}),
+            2000,
+            &std::env::temp_dir().join("koujou-owned-model-test.dpapi"),
+        )
+        .unwrap();
         assert_eq!(result["status"], 302);
         worker.join().unwrap();
         assert!(redirected.accept().is_err());

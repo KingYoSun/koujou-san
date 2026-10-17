@@ -1,6 +1,6 @@
 # Tauri内のLLM接続候補: rigとrust-genai
 
-2026-10-18のユーザー指示に基づく調査。Manifestの採用を保留し、Tauriへ直接組み込む二候補を、subscription認証とagent的な動作も含めて比較した。調査であり、製品依存や接続画面はまだ置き換えていない。中継先の本文ログは初期無効とする判断が確定した。
+2026-10-18のユーザー指示に基づく調査。Manifestの採用を保留し、Tauriへ直接組み込む二候補を、subscription認証とagent的な動作も含めて比較した。比較後、ユーザーはrig-core＋rig-agentの直接組込みを選択した。以下は候補比較時の結果であり、組込みの契約は[ADR 0026](../adr/0026-client-context-selection.md)、実施結果と実契約の確認状況は[証跡](2026-10-18-issue-26-evidence.md)へ記録する。本文ログの初期無効も確定した。
 
 ## 結論
 
@@ -15,7 +15,7 @@ tool反復の実行制御とsubscription認証を重視するなら、`rig-core 
 | rig | `rig-core 0.44.0 / rig-agent 0.44.0`、MIT、Rust 1.95以上 | `2d1071e0e0c602f994e9d6cfd8cf5faea6f53650` | `c73622dfca02bfe55d29a6a0612e181119cab9b8` |
 | rust-genai | `genai 0.7.0-rc.8`、MITまたはApache-2.0 | `8d9ee1248605ec885031b447a466737671abb0d9` | `aceafb8bc37a4199d7aff92dd12f816096025207`、`0.7.0-rc.9-WIP` |
 
-crates.ioの公開tarballを取得し、`.cargo_vcs_info.json`と実装を照合した。READMEの最新版だけで公開版の機能を判断していない。取得した二つの研究用checkoutにはCodeGraph索引がないため、通常検索を使った。koujou-sanの依存・lockfileは変更していない。
+crates.ioの公開tarballを取得し、`.cargo_vcs_info.json`と実装を照合した。READMEの最新版だけで公開版の機能を判断していない。取得した二つの研究用checkoutにはCodeGraph索引がないため、通常検索を使った。候補比較だけの段階では、製品の依存・lockfileを変更しなかった。
 
 ## 機能と組込み
 

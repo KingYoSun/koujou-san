@@ -651,7 +651,7 @@ pub(crate) fn unprotect(_: &[u8]) -> Result<Vec<u8>, String> {
     Err("Windows credential storage required".into())
 }
 
-fn open_browser(url: &str) -> Result<(), String> {
+pub(crate) fn open_browser(url: &str) -> Result<(), String> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
@@ -755,7 +755,7 @@ pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     app.manage(Auth::new(&api, file).map_err(std::io::Error::other)?);
     Ok(())
 }
-fn hex_name(value: &str) -> String {
+pub(crate) fn hex_name(value: &str) -> String {
     Sha256::digest(value.as_bytes())
         .iter()
         .map(|byte| format!("{byte:02x}"))

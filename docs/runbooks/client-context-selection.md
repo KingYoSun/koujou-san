@@ -6,6 +6,10 @@ WorkspaceのContext画面にある「Contextの選択と保存」を使う。ま
 
 Webのキーは画面を開いている間だけ保持し、再読込後は再入力する。Windowsでは暗号化保存する。Runで使うCLIの認証やモデル設定とは独立している。接続先を変更する場合は、その接続先のキーを設定する。Ory/MCPのtokenを接続用キーへ入力しない。
 
+Windowsはrigを直接組み込み、「接続先の種類」からAPI互換接続または提供元ログインを選ぶ。提供元ログインは設定を保存してから「モデル提供元へログイン」を押す。ブラウザで本人認証を完了し、device codeが表示された場合は指定画面で入力する。認証情報の保存だけではモデルへ要求しない。モデル要求中に対話的ログインを始めず、必要なら設定へ戻す。既存CLIの認証は使わない。
+
+「このモデル接続を切断」は当該接続の端末情報を削除する。提供元の失効が確認できたかを別に表示する。Copilotは端末情報の削除であり、GitHub側のgrantを失効したとは表示しない。利用できるモデル・契約は提供元に従う。実契約の確認状況は[証跡](../progress/2026-10-18-issue-26-evidence.md)を参照する。
+
 「MCPへ接続」で専用のOAuth認証を完了する。Webでは別画面が開くため、接続完了後に元の画面へ戻る。作業の目的、反映方式、必要なScopeや上限を指定し、「Contextの選択を依頼」を押す。ScopeをContextごとの許可一覧として使う必要はない。Workspaceの禁止分類と現在の権限は常に適用される。
 
 反映方式は、検証済み結果の自動反映、案を確認して採用、手動から選ぶ。手動で必須にした項目・順序・除外は保持される。案の項目を選び直した場合は「現在の選択を手動で保存」で保存する。「注入なし（明示）」もモデルに接続せず保存できる。
@@ -28,4 +32,4 @@ Webのキーは画面を開いている間だけ保持し、再読込後は再�
 - UI試験の終了は、同じ検証サーバーの`/__fixture/finish`へPOSTする。専用Docker projectは終了時に片付ける。
 - Windows側の変更は`pnpm run check:desktop`と`pnpm run test:desktop`で確認する。所有するOry fixtureでのネイティブ認証試験は`auth::mcp::tests::owned_native_mcp_pkce_refresh_and_logout`に限定して実行する。`KOUJOU_CLIENTOPS_NATIVE_API`にそのfixtureのURL、`KOUJOU_DEV_CA_FILE`に検証用CAを指定する。通常の開発アカウントや既存の秘密ファイルを使わない。
 
-Gateway/組込みSDKの採用方針は判断待ちである。本文ログは初期無効とする。候補の調査コマンドを、標準の開発起動や製品への同梱と混同しない。固定版と検証範囲は[評価記録](../progress/2026-10-18-issue-26-gateway-probe.md)を参照する。
+Tauriはrigの直接組込み、WebはHTTP接続を使う。本文ログは初期無効とし、Manifestを標準サービスへ追加しない。候補の調査コマンドを標準起動と混同しない。固定版と検証範囲は[SDK比較](../progress/2026-10-18-issue-26-native-llm-comparison.md)と[Gateway評価](../progress/2026-10-18-issue-26-gateway-probe.md)を参照する。

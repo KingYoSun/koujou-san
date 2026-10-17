@@ -32,6 +32,34 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe("client model credentials", () => {
+  it("drops native SDK message envelopes when handing an operation to Web HTTP", async () => {
+    storage();
+    const p = await saveProfile(false, "actor", make(), "owned-key");
+    const fetch = vi.fn<typeof globalThis.fetch>(
+      async () => new Response("{}", { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetch);
+    await modelRequest(
+      false,
+      "actor",
+      p,
+      {
+        model: "fixed",
+        messages: [
+          {
+            role: "assistant",
+            content: "owned",
+            rig_message: { private: "NATIVE_ONLY" },
+            rig_connection: ["native", "v1"],
+          },
+        ],
+      },
+      1000,
+    );
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body)).messages).toEqual(
+      [{ role: "assistant", content: "owned" }],
+    );
+  });
   it("keeps keys out of persistent metadata and separates them from app credentials", async () => {
     const entries = storage();
     const p = await saveProfile(false, "actor", make(), "owned-key");

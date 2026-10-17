@@ -113,6 +113,6 @@
 
 状態: In progress。Scope revision 1。基準mainは#25マージ後の`e2d6245d2dc2d1bbe4c1691359e50f54a2a54c4e`。本人による回答・明示引継ぎ、共有操作・送信意図・原応答・共通選択保存、専用MCP OAuth、共通UI、Windowsの暗号化保存と固定接続先を実装した。実PG/Ory/MCP、二つの所有モデルHTTP、共通画面の自動反映・明示採用・手動保存・none、WindowsのPKCE/DPAPI/更新/ログアウト、共通check/test/build、既存のusage/Workflow/Hopper回帰が成功した。
 
-残る接続の最終照合と独立検品・CI・マージ後照合を進める。Manifestの採用を保留し、[Tauri組込みSDKの比較](2026-10-18-issue-26-native-llm-comparison.md)を終えた。採用方針は判断待ちであり、本文ログは初期無効とする。[計画](2026-10-18-issue-26-plan.md)、[証跡](2026-10-18-issue-26-evidence.md)、[Gateway評価](2026-10-18-issue-26-gateway-probe.md)を参照する。所有モデルの合成結果を実LLMの意味判断品質へ読み替えない。
+既存HTTP方式の独立検品二件を修正し、`5352149`の再検品はblocker 0件となった。その後のユーザー判断により、Tauriへrig-core＋rig-agentを直接組み込んだ。native 10件、native全体30件、共通UI64件、root check/buildが成功した。実契約の新しいOAuth接続と最大2回の合成要求は本人の許可を確認中。組込み差分の独立検品・CI・マージ後照合を進める。Manifestは標準構成へ追加せず、本文ログは初期無効とする。[計画](2026-10-18-issue-26-plan.md)、[証跡](2026-10-18-issue-26-evidence.md)、[Gateway評価](2026-10-18-issue-26-gateway-probe.md)を参照する。所有モデルの合成結果を実LLMの意味判断品質へ読み替えない。
 
 #27〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。

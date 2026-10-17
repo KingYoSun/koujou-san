@@ -38,6 +38,27 @@
 | 別Origin HTTPSの共通画面 | 成功、313.66秒（画面操作の待機を含む）。`issue26-ui-cross-origin-2.log`。Webとモデルは別port、二モデルの20要求でcookie・MCP header受信0 |
 | Windows上の組込みSDK候補 | rig-core/rig-agent 0.44.0とgenai 0.7.0-rc.8で、それぞれ2モデル要求・1tool往復が成功。`issue26-sdk-probes.log`。製品への組込みや実OAuthの成功には数えない |
 
+## rigの直接組込み
+
+比較後、ユーザーがrig-core＋rig-agentを選択した。Tauriへ固定source `c73622dfca02bfe55d29a6a0612e181119cab9b8`を組み込み、直接HTTPだけだったnative経路を置き換えた。WebのHTTP経路は維持した。SDKのCLI/harness/Bevyは依存に含めない。
+
+共通Hostの送信意図一件に対してnativeのAgentRunを一モデル呼出しだけ進め、MCPの実行と次の共有予約はHostへ戻す。SDK内部のcheckpointを共有形式へ保存しない。原JSON、SSE、モデル、usage、HTTP要求ID、送信先、SDK版を残す。OAuth応答はモデルcaptureの対象から除外する。typed messageの再取得には本文を含むchoiceも必要であり、headerだけを保存して次のtool応答が拒否される初期実装を修正した（`issue26-rig-loop-diagnostic.log`、修正後の往復試験）。
+
+SSEのincomplete応答で、有効なJSON本文があってもlengthをstopへ変えない。変更前は`issue26-rig-partial-before.log`でstopとなる失敗を残し、修正後は既存Goの不完全応答拒否へ渡す。nativeの内部messageをWebのHTTPへ引き継がないことも、`issue26-web-native-envelope-before.log / issue26-web-native-envelope-after.log`で照合した。
+
+WindowsのDPAPI TokenStoreはAPI・利用者・接続で保存先を分け、SDKのFileTokenStoreはlockだけに使う。APIキーとOAuth tokenをWeb、共有記録、Ory/MCP、CLIへ渡さない。モデル呼出し中は非対話の更新だけを許可し、本人の明示ログインを別操作にした。ChatGPTの更新・失効、Copilotのsession交換・再利用・端末からの削除は所有プロトコルで確認した。実契約での本人認証・モデル利用は未確認であり、新しいOAuth接続と最大2回の合成要求の許可をユーザーへ確認中。
+
+| 組込み後の確認 | 結果 |
+| --- | --- |
+| nativeの関連試験 | Windowsで10件成功。SDKの二要求/一tool往復、SSEの元応答・usage・途中終了、OAuth capture除外、DPAPI分離、非対話更新、Copilot交換、登録先/リダイレクト拒否。`issue26-rig-native-final-local.log` |
+| native全体 | 30件成功・12件ignore。`issue26-rig-desktop-all.log`。新しい実契約trialはignoreし、本人の許可なく起動しない |
+| Host/接続 | 13件成功。`issue26-rig-host-web-tests.log` |
+| 共通UI全体 | 64件成功。`issue26-rig-client-all.log` |
+| root check/build | 成功。`issue26-rig-root-check.log / issue26-rig-root-build.log`。既存のbundleサイズ警告は継続 |
+| 追加依存 | 全targetで20件。初期Windowsのnormal/build graphは18件、MIT選択が可能。11の通知を`apps/client/public/third-party-rig.txt`へ同梱。build後のassetの存在を確認。`issue26-rig-added-licenses.json / issue26-rig-windows-dependencies.txt` |
+
+実契約trialは`live_subscription_two_request_trial`へ分離した。新しい接続先を明示し、合成データのみ、最大2回、APIキー課金へのfallbackなし。完了・失敗のいずれでも試験用認証を削除し、確認できた失効結果だけを保存する。通常のテストや起動からは実行しない。
+
 ## 失敗と修正の区別
 
 ブラウザでMCP初期化がHTTP 400となり、モデル要求は0件だった。採用したSDK/protocolの要求を照合し、stateless discovery、要求メタデータ、HTTP method/nameヘッダを追加した。`issue26-mcp-init-before.png`と、その後の選択・保存を対応させる。
