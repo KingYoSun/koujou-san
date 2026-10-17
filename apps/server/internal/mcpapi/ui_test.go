@@ -28,7 +28,7 @@ import (
 
 // Optional Computer Use fixture. Only this isolated test identity is forwarded;
 // no development-user credential or browser certificate exception is needed.
-func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob auth.Tokens, webTokens auth.Tokens, certificate []byte, cfg auth.Config, service *Service, githubMux *http.ServeMux) {
+func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob auth.Tokens, webTokens auth.Tokens, certificate []byte, cfg auth.Config, service *Service, githubMux *http.ServeMux, control func(string) error) {
 	t.Helper()
 	if os.Getenv("KOUJOU_TEST_MCP_UI") != "1" {
 		return
@@ -180,6 +180,11 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 
 			if strings.HasPrefix(r.URL.Path, "/__fixture/") && r.Method == "POST" {
 				switch strings.TrimPrefix(r.URL.Path, "/__fixture/") {
+				case "api-stop", "api-start", "drop-report-response":
+					if err := control(strings.TrimPrefix(r.URL.Path, "/__fixture/")); err != nil {
+						http.Error(w, "owned API control failed", 500)
+						return
+					}
 
 				case "deny-bob", "allow-bob":
 					allow := strings.HasSuffix(r.URL.Path, "allow-bob")

@@ -25,7 +25,34 @@ if "KOUJOU_FIXTURE_SECRET" in os.environ:
         os.environ["KOUJOU_FIXTURE_SECRET"], encoding="utf-8"
     )
 
-if mode == "dialogue":
+if mode == "reconnect":
+    initial = json.loads(sys.stdin.readline())
+    Path("launches.jsonl").open("a", encoding="utf-8").write(json.dumps({"pid": os.getpid(), "input": initial}) + "\n")
+    for number in range(10):
+        Path("heartbeat.json").write_text(json.dumps({"pid": os.getpid(), "number": number}), encoding="utf-8")
+        print(json.dumps({"number": number, "pid": os.getpid()}), flush=True)
+        time.sleep(1)
+    print("RECONNECT_STDERR_ORIGINAL", file=sys.stderr, flush=True)
+elif mode == "sleep":
+    initial = json.loads(sys.stdin.readline())
+    with Path("launches.jsonl").open("a", encoding="utf-8") as launches:
+        launches.write(json.dumps({"pid": os.getpid(), "input": initial}) + "\n")
+    for number in range(1800):
+        if Path("finish-sleep").exists():
+            break
+        observation = {"pid": os.getpid(), "number": number, "at": time.time()}
+        Path("heartbeat.json").write_text(json.dumps(observation), encoding="utf-8")
+        print(json.dumps(observation), flush=True)
+        time.sleep(1)
+    print("SLEEP_STDERR_ORIGINAL", file=sys.stderr, flush=True)
+elif mode == "orphan":
+    Path("external-effect.txt").write_text("existing effect survives owner loss", encoding="utf-8")
+    tick = 0
+    while not Path("finish-orphan").exists():
+        Path("heartbeat.json").write_text(json.dumps({"pid": os.getpid(), "tick": tick}), encoding="utf-8")
+        tick += 1
+        time.sleep(0.2)
+elif mode == "dialogue":
     initial = json.loads(sys.stdin.readline())
     print(json.dumps({"received_input": initial["input"]}, ensure_ascii=False), flush=True)
     answers = []

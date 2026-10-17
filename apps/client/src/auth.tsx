@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { stopSyncActor } from "./sync-engine";
-import { purgeStoredActor } from "./sync-store";
+import { allowAnswerActor, purgeStoredActor } from "./sync-store";
 import { SyncHTTPError } from "./sync-error";
 
 type User = {
@@ -341,6 +341,7 @@ export function Account({ native }: { native: boolean }) {
         await invoke("login");
         const value = (await apiRequest("/auth/me", true)) as { user: User };
         setUser(value.user);
+        allowAnswerActor(value.user.id);
         setStatus("ready");
         window.dispatchEvent(new Event("koujou-auth-changed"));
       } else {

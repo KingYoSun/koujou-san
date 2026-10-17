@@ -56,24 +56,27 @@ type Area struct {
 	Commit string `json:"commit"`
 }
 type Assignment struct {
-	Generation    string      `json:"generation"`
-	DeviceID      string      `json:"device_id"`
-	RunnerID      string      `json:"runner_id"`
-	RunnerVersion string      `json:"runner_version"`
-	RequestedBy   string      `json:"requested_by"`
-	Connection    Connection  `json:"connection"`
-	Required      []string    `json:"required"`
-	Input         Ref         `json:"input"`
-	Repository    *Repository `json:"repository,omitempty"`
-	Area          *Area       `json:"area,omitempty"`
-	PreparedAt    *time.Time  `json:"prepared_at,omitempty"`
-	ExpiresAt     time.Time   `json:"expires_at"`
+	SessionUnconfirmed bool        `json:"session_unconfirmed,omitempty"`
+	Generation         string      `json:"generation"`
+	DeviceID           string      `json:"device_id"`
+	RunnerID           string      `json:"runner_id"`
+	RunnerVersion      string      `json:"runner_version"`
+	RequestedBy        string      `json:"requested_by"`
+	Connection         Connection  `json:"connection"`
+	Required           []string    `json:"required"`
+	Input              Ref         `json:"input"`
+	Repository         *Repository `json:"repository,omitempty"`
+	Area               *Area       `json:"area,omitempty"`
+	PreparedAt         *time.Time  `json:"prepared_at,omitempty"`
+	ExpiresAt          time.Time   `json:"expires_at"`
 }
 type Assign struct {
 	apicontract.Mutation
-	DeviceID   string      `json:"device_id"`
-	Repository *Repository `json:"repository,omitempty"`
-	Required   []string    `json:"required"`
+	DeviceID       string      `json:"device_id"`
+	Repository     *Repository `json:"repository,omitempty"`
+	Required       []string    `json:"required"`
+	HandoffSource  *Ref        `json:"handoff_source,omitempty"`
+	AllowDuplicate bool        `json:"allow_duplicate,omitempty"`
 }
 type AssignedInput struct {
 	Run             Ref              `json:"run"`
@@ -219,6 +222,30 @@ func (s *Service) Assign(ctx context.Context, p access.Principal, w, id string, 
 			return r, nil, err
 		}
 		now := time.Now().UTC()
+		if r.Handoff != nil {
+			h := r.Handoff
+			source, head, err := loadRun(ctx, tx, w, h.Source.ID)
+			if err != nil {
+				return r, nil, err
+			}
+			if req.HandoffSource == nil || *req.HandoffSource != head.Ref {
+				return r, nil, ErrState
+			}
+			if _, err = s.sources(ctx, tx, p, w, []Ref{head.Ref}); err != nil {
+				return r, nil, err
+			}
+			judgment := "confirmed_end"
+			if source.Observation == "unknown" {
+				if !req.AllowDuplicate {
+					return r, nil, ErrState
+				}
+				judgment = "duplicate_possible"
+			} else if !terminal(source.State) {
+				return r, nil, ErrState
+			}
+			h.Decision = &HandoffDecision{Source: head.Ref, State: source.State, Observation: source.Observation, Judgment: judgment, By: p.UserID, At: now}
+			old.Refs = append(old.Refs, head.Ref)
+		}
 		a := &Assignment{Generation: rand.Text(), DeviceID: req.DeviceID, RunnerID: runner.RunnerID, RunnerVersion: runner.Version, RequestedBy: p.UserID, Connection: c, Required: req.Required, Input: r.Input, Repository: req.Repository, ExpiresAt: now.Add(assignmentLifetime)}
 		if req.Repository != nil {
 			digest := sha256.Sum256([]byte(w + "\x00" + ref.ID))

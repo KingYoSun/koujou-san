@@ -96,14 +96,19 @@ func TestMCPIntegration(t *testing.T) {
 	defer graph.Close()
 	s := &Service{Auth: identity, Access: a, Contexts: c, Search: search, Graph: graph, Usage: usage.New(store, a), Automation: automation.New(store, a), Runs: runs.New(store, a, c)}
 	githubMux := http.NewServeMux()
-	server := httptest.NewUnstartedServer(httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, s.Runs.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) }))
+	handler := func(runService *runs.Service) http.Handler {
+		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
+	}
+	faults := &reconnectFixture{}
+	server := httptest.NewUnstartedServer(faults.handler(handler(s.Runs)))
 	_ = server.Listener.Close()
 	server.Listener, err = net.Listen("tcp", "127.0.0.1:"+os.Getenv("KOUJOU_TEST_API_PORT"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	server.StartTLS()
-	defer server.Close()
+	defer func() { server.Close() }()
+	control := faults.control(t, &server, handler, databaseFixture(ctx, t, a, c))
 	client := server.Client()
 	client.Jar, _ = cookiejar.New(nil)
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
@@ -625,7 +630,7 @@ func TestMCPIntegration(t *testing.T) {
 		if _, err = store.Database().Exec(ctx, "INSERT INTO access_members(workspace_id,user_id,role,active) VALUES('mcp-one',$1,'editor',true)", bob.ID); err != nil {
 			t.Fatal(err)
 		}
-		inspectUI(t, client, cfg.Site, ordinary, bobTokens, webTokens, server.Certificate().Raw, cfg, s, githubMux)
+		inspectUI(t, client, cfg.Site, ordinary, bobTokens, webTokens, server.Certificate().Raw, cfg, s, githubMux, control)
 		_ = session.Close()
 		tokens = issue(cfg.MCPResource(), "koujou.mcp")
 		session, err = connect(tokens.Access, "mcp-one", handle)

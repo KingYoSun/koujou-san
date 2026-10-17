@@ -302,7 +302,7 @@ func artifactsValid(items []contexts.Fixed) bool {
 	return true
 }
 func (s *Service) Create(ctx context.Context, p access.Principal, w, id string, req Create) (apicontract.Response[apicontract.Reference], error) {
-	if id == "" || strings.TrimPrefix(id, "run:") == "" || req.ExpectedVersion != "0" || validate(req.Spec) != nil || !artifactsValid(req.Spec.Artifacts) {
+	if id == "" || strings.TrimPrefix(id, "run:") == "" || req.ExpectedVersion != "0" || validate(req.Spec) != nil || !artifactsValid(req.Spec.Artifacts) || req.Handoff && req.Spec.Previous == nil {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
 	return s.mutate(ctx, p, w, id, "register", "run-create", req.Mutation, req, func(tx pgx.Tx, ref apicontract.Reference) (Run, []Ref, error) {
@@ -358,6 +358,9 @@ func (s *Service) Create(ctx context.Context, p access.Principal, w, id string, 
 			}
 		}
 		r := Run{Name: spec.Name, Input: input, Previous: spec.Previous, RequestedBy: p.UserID, CreatedAt: time.Now().UTC(), State: "queued", Observation: "known", ReportedThrough: "0"}
+		if req.Handoff {
+			r.Handoff = &Handoff{Source: *spec.Previous, PreparedBy: p.UserID, PreparedAt: r.CreatedAt}
+		}
 		return r, []Ref{input}, nil
 	})
 }
@@ -384,7 +387,7 @@ func (s *Service) Action(ctx context.Context, p access.Principal, w, id, action 
 			return r, nil, ErrState
 		}
 		if action == "request-start" {
-			if r.ExecutionRequestedAt != nil || r.State != "queued" {
+			if r.ExecutionRequestedAt != nil || r.State != "queued" || r.Handoff != nil {
 				return r, nil, ErrState
 			}
 			now := time.Now().UTC()
@@ -634,7 +637,9 @@ func (s *Service) Report(ctx context.Context, p access.Principal, w, id string, 
 		default:
 			return r, nil, ErrInvalid
 		}
-		if e.Type != "unknown" && e.Type != "renew" {
+		if !terminal(r.State) && r.Assignment != nil && r.Assignment.SessionUnconfirmed {
+			r.Observation = "unknown"
+		} else if e.Type != "unknown" && e.Type != "renew" {
 			r.Observation = "known"
 		}
 		r.ReportedThrough = e.Sequence

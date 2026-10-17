@@ -17,6 +17,7 @@ pub fn run() {
             sync_store::sync_read,
             sync_store::sync_remove,
             sync_store::sync_purge_actor,
+            sync_store::run_answer_draft,
             sync_store::sync_request,
             run_export::export_run,
             runner::runner_configure,
@@ -25,6 +26,7 @@ pub fn run() {
             runner::runner_execution_save,
             runner::runner_start,
             runner::runner_status,
+            runner::reconcile_run,
             runner::runner_stop_accepting
         ])
         .run(tauri::generate_context!())

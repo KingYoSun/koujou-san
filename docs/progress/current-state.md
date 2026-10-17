@@ -77,6 +77,10 @@
 
 ## Issue #18の判定
 
-状態: In progress（受入・独立検品済み）。Scope revision 1。画面とは独立したRunnerを実装し、[計画](2026-10-17-issue-18-plan.md)の実接続とWindows/Webの受入を確認した。Windows/WSLの実CLI、二Pause、停止、専用worktree、Codex/Claudeの共通入力・判定、Manifestと無注入、二利用者のWeb回答、Windows設定の保存・Runner起動と画面終了後の実CLI完了を確認した。[検証記録](2026-10-17-issue-18-evidence.md)と[独立検品](2026-10-17-issue-18-inspection.md)を参照する。[PR #51](https://github.com/KingYoSun/koujou-san/pull/51)へ追加証跡を固定し、再検品で全条件とblockerなしを確認した。最終head CI・マージ後照合を行う。#18はその完了後にCloseする。
+状態: Complete。Scope revision 1。[PR #51](https://github.com/KingYoSun/koujou-san/pull/51)を最終head `0f7b89cb17a7f9a46ae6d2cc25e52218d33b64c0` の全CI・独立検品後にマージした。main `8e067b6552e3a7260dc959fe547c0422b8044ec3` と最終headのtreeは `f2d94bba17326c574321d5daf9ae2f3e29937c05` で一致、差分0。Windows/WSL実CLI、共通入力・判定でのCodex/Claude、二Pauseと停止、固定Manifestと無注入、Windows設定保存とGUI終了後の実行継続、[独立検品](2026-10-17-issue-18-inspection.md)、マージ後照合が揃い、#18をCloseした。[検証記録](2026-10-17-issue-18-evidence.md)を参照する。
 
-#19〜#34は未着手。工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #19の判定
+
+状態: Inspection pending。Scope revision 2。[計画](2026-10-17-issue-19-plan.md)に沿い、Windows/WSLのAPI切断・HTTPサーバー再作成、Runner消失、古い要求の起動拒否、二利用者の回答案、明示的な引継ぎを実装・検証した。[証跡](2026-10-17-issue-19-evidence.md)と[独立検品](2026-10-17-issue-19-inspection.md)を参照する。新しいネイティブ照合処理は実Ory/APIとの直接試験で確認し、追加のGUI起動依頼を取り下げた。実スリープは未確認と明記し、2026-10-17のユーザー承認で#33のリリース前受入へ移した。最終文書の検品・CI・マージ後照合を残す。
+
+#20〜#34は未着手。工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
