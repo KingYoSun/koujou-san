@@ -89,6 +89,6 @@
 
 ## Issue #21の判定
 
-状態: Inspection pending。Scope revision 1。固定対象・選択/無注入・分離情報・条件別の判定と証拠・Stale・差分検品・人の例外判断・所在失効を共通Runへ接続した。[証跡](2026-10-17-issue-21-evidence.md)の専用PG、二登録端末と別保存域の実CLI、実モデル、共通画面、保存/復元、Run/工程/nativeの回帰確認を終えた。物理的に別のPCで試験したとは扱わず、未確認の分離を保証へ格上げしない。固定成果物の独立検品、PR CIとマージ後照合を残す。
+状態: In progress（実装・独立検品完了、CI待ち）。Scope revision 1。固定commit `fec855c62631fa68e14265bf131ef910a637597d`の[独立検品](2026-10-17-issue-21-inspection.md)はAC-1〜8・INVAR-1〜3をPASS、blocker 0件と判定した。[証跡](2026-10-17-issue-21-evidence.md)の専用PG、二登録端末と別保存域の実CLI、実モデル、共通画面、保存/復元、Run/工程/nativeの確認を終えた。[PR #54](https://github.com/KingYoSun/koujou-san/pull/54)の最終headのCIとマージ後照合を残す。物理的に別のPCで試験したとは扱わず、未確認の分離を保証へ格上げしない。
 
 #22〜#34は未着手（#33は実スリープ確認の移管を反映済み）。LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。

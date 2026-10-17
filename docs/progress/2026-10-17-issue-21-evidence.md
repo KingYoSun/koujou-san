@@ -43,3 +43,7 @@ Codex CLI 0.162.1とClaude Code 2.1.300は、リポジトリ外の新規一時�
 - `pnpm run check:desktop`、`test:desktop`成功。nativeは11件成功、9件の明示実接続用試験を通常実行では除外し、そのうち今回の固定CLI受渡しは個別実行して成功。`test:database`も成功し、新migrationを含む保存・停止・復元を照合した。独立検品・CIの結果は完了後に追記する。
 
 ログは`test-results/issue21-*.log`、GUIを含む実Ory試験は`.cache/issue21-ui-run.log`、実モデルの秘密値を含み得る診断は`.cache/issue21-cli-probe/*-private.json`へ保存した。後者をGitや共有レポートへコピーしない。新規のinspectionコードがCodeGraphの索引にない場合は、未登録を確認してから直接読んだ。索引を新規作成・更新していない。参照指定のDESIGN.mdとADR 0014は現行checkoutに存在せず、既存の共通画面構成に沿った。
+
+## 独立検品
+
+固定commit `fec855c62631fa68e14265bf131ef910a637597d`を、実装会話を継承しない別担当が検品した。[検品記録](2026-10-17-issue-21-inspection.md)はAC-1〜8・INVAR-1〜3をすべてPASS、blocker 0件と判定した。独立実行のDB試験も成功（package 4.942秒）。実装コード、native受渡し、保存画像と既存ログを照合済み。次のcommitでは検品記録と状態・証跡の文書だけを更新し、コードは変更していない。
