@@ -24,6 +24,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/publications"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/serverllm"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/workflows"
 	"github.com/jackc/pgx/v5"
 )
@@ -98,6 +99,7 @@ func TestHopperSemanticPostgres(t *testing.T) {
 	must(auto.Put(ctx, p, "one", "control:hopper", automation.Write{Mutation: m("0"), Value: raw(ctrl)}))
 	template := must(wf.Put(ctx, p, "one", "run-definition:repair", workflows.Write{Mutation: m("0"), Value: raw(workflows.Definition{Schema: "run-definition-v1", Name: "repair", Spec: &runs.Spec{Input: runs.Input{Command: runs.Command{Kind: "cli", Target: "node", Parameters: raw([]string{"--version"}), Binding: map[string]string{"prompt": "stdin-json"}}}}, Selection: &contexts.Selection{Mode: "none"}})}))
 	var calls atomic.Int32
+	var malformedOnce atomic.Bool
 	model := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		if r.Header.Get("x-bf-vk") != "owned-semantic-key" || r.Header.Get("Cookie") != "" || r.Header.Get("Authorization") != "" {
@@ -126,9 +128,13 @@ func TestHopperSemanticPostgres(t *testing.T) {
 			t.Error("real CLI output was not provided as fixed evidence")
 		}
 		decision := SemanticDecision{Verdict: "true", Reason: "unresolved issue was explicitly deferred", Candidate: &Finding{Identity: "owned-other-bug", Title: "Deferred owned bug", Body: "Investigate the separately deferred issue.", Status: "needs_reproduction"}, Evidence: []Citation{citation}, Unknown: []string{}}
+		content := string(raw(decision))
+		if malformedOnce.Swap(false) {
+			content = `{"verdict":"false","reason":"missing required candidate","evidence":[],"unknown":[]}`
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("x-bifrost-request-id", r.Header.Get("x-request-id"))
-		_ = json.NewEncoder(w).Encode(map[string]any{"id": "owned-model-response", "model": "owned-model", "choices": []any{map[string]any{"message": map[string]any{"content": string(raw(decision))}, "finish_reason": "stop"}}, "usage": map[string]any{"prompt_tokens": 23, "completion_tokens": 9, "prompt_tokens_details": map[string]int{"cached_tokens": 0}, "completion_tokens_details": map[string]int{"reasoning_tokens": 0}}, "owned_raw_marker": "preserved"})
+		_ = json.NewEncoder(w).Encode(map[string]any{"id": "owned-model-response", "model": "owned-model", "choices": []any{map[string]any{"message": map[string]any{"content": content}, "finish_reason": "stop"}}, "usage": map[string]any{"prompt_tokens": 23, "completion_tokens": 9, "prompt_tokens_details": map[string]int{"cached_tokens": 0}, "completion_tokens_details": map[string]int{"reasoning_tokens": 0}}, "owned_raw_marker": "preserved"})
 	}))
 	defer model.Close()
 	dir := t.TempDir()
@@ -160,6 +166,8 @@ func TestHopperSemanticPostgres(t *testing.T) {
 	sem.Model = "openai/owned-model"
 	sem.Allowed = []string{"owned-model"}
 	sem.Limits.Seconds = 5
+	price := must(s.Usage.Put(ctx, p, "one", "price:owned-semantic", usage.Write{Mutation: m("0"), Value: raw(usage.Price{Connection: "owned", Model: "owned-model", Currency: "USD", From: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Source: "owned fictional tariff", Scale: 2, Rounding: "half_up", Rates: map[string]usage.Rate{"input": {Amount: "1", Per: "1", Unit: "token"}, "output": {Amount: "1", Per: "1", Unit: "token"}, "cache_read": {Amount: "0", Per: "1", Unit: "token"}, "reasoning": {Amount: "0", Per: "1", Unit: "token"}}})}))
+	sem.Prices = map[string]usage.Ref{"owned-model": {ID: price.ID, Version: price.Version}}
 	d.Semantic = &sem
 	pin := must(s.Put(ctx, p, "one", "hopper:semantic", Write{Mutation: m("0"), Value: raw(d)}))
 	must(s.Put(ctx, p, "one", "hopper-active:semantic", Write{Mutation: m("0"), Value: raw(Activation{Definition: pin, Enabled: true})}))
@@ -251,4 +259,89 @@ func TestHopperSemanticPostgres(t *testing.T) {
 		t.Fatal("usage", count, tokens, err)
 	}
 	t.Log("real owned Node output -> fixed model evidence -> server HTTP -> saved decision -> queued Run; original success, one model call and Hopper-only usage retained")
+	for _, scenario := range []string{"stopped", "depth", "evaluations", "period"} {
+		t.Run("no-send-"+scenario, func(t *testing.T) {
+			root := "owned-blocked-" + scenario
+			bounds := d.Bounds
+			depth, evaluations := 0, 0
+			started := time.Now().UTC()
+			if scenario == "depth" {
+				depth = bounds.Depth
+			}
+			if scenario == "evaluations" {
+				evaluations = bounds.Evaluations
+			}
+			if scenario == "period" {
+				started = started.Add(-time.Duration(bounds.Seconds+1) * time.Second)
+			}
+			sql(`INSERT INTO hopper_chains(workspace_id,id,bounds,stopped,evaluations,started_at) VALUES('one',$1,$2,$3,$4,$5)`, root, raw(bounds), scenario == "stopped", evaluations, started)
+			err := pgx.BeginFunc(ctx, store.Database(), func(tx pgx.Tx) error {
+				return s.AcceptSourceTx(ctx, tx, "one", Source{Event: root, Target: result, Kind: "run", Keys: []string{result.ID}, Root: root, Depth: depth, Facts: Facts{State: "succeeded"}}, pin)
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			job, err := auto.Claim(ctx, "hopper", root)
+			if err != nil || job == nil {
+				t.Fatal(job, err)
+			}
+			before := calls.Load()
+			value, err := s.Execute(ctx, *job)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err = auto.Finish(ctx, *job, value); err != nil {
+				t.Fatal(err)
+			}
+			r, err := s.Read(ctx, p, "one", value.Refs[0])
+			var e Evaluation
+			if err != nil || json.Unmarshal(r.Value, &e) != nil {
+				t.Fatal(err)
+			}
+			if calls.Load() != before || e.State != "blocked" || e.Semantic == nil || e.Semantic.Input != nil {
+				t.Fatalf("blocked chain acquired model input or sent request: calls=%d, evaluation=%+v", calls.Load()-before, e)
+			}
+		})
+	}
+	t.Run("retry-consumption-in-workspace-budget", func(t *testing.T) {
+		enqueue := func(event string) {
+			t.Helper()
+			if err := pgx.BeginFunc(ctx, store.Database(), func(tx pgx.Tx) error {
+				return s.AcceptSourceTx(ctx, tx, "one", Source{Event: event, Target: result, Kind: "run", Keys: []string{result.ID}, Root: event, Facts: Facts{State: "succeeded"}}, pin)
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		enqueue("owned-retry")
+		malformedOnce.Store(true)
+		before := calls.Load()
+		for range 2 {
+			if worked, err := auto.RunOne(ctx, "hopper", "owned-retry", s.Execute); err != nil || !worked {
+				t.Fatal(worked, err)
+			}
+		}
+		var response []byte
+		if err := store.Database().QueryRow(ctx, `SELECT result FROM automation_jobs WHERE workspace_id='one' AND event_id='owned-retry'`).Scan(&response); err != nil {
+			t.Fatal(err)
+		}
+		var result automation.Result
+		if json.Unmarshal(response, &result) != nil || calls.Load()-before != 2 || len(result.Usage) != 2 || result.UsageState != "complete" {
+			t.Fatalf("retry costs missing: %s, calls %d", response, calls.Load()-before)
+		}
+		controlVersion, err := auto.Read(ctx, p, "one", Ref{ID: "control:hopper", Version: "head"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ctrl.Budget = &automation.Budget{Amount: "80", Currency: "USD", Valuation: "estimated"}
+		must(auto.Put(ctx, p, "one", "control:hopper", automation.Write{Mutation: m(controlVersion.Version), Value: raw(ctrl)}))
+		enqueue("owned-after-budget")
+		job, err := auto.Claim(ctx, "hopper", "owned-budget")
+		if err != nil || job != nil {
+			t.Fatal("budget allowed further work", job, err)
+		}
+		var reason string
+		if err = store.Database().QueryRow(ctx, `SELECT reason FROM automation_jobs WHERE workspace_id='one' AND event_id='owned-after-budget'`).Scan(&reason); err != nil || reason != "cost_budget" {
+			t.Fatal(reason, err)
+		}
+	})
 }

@@ -130,39 +130,11 @@ func (s *Service) evaluate(ctx context.Context, tx pgx.Tx, w string, p access.Pr
 	if err := s.refs(ctx, tx, p, w, append(append([]Ref{}, e.Source.Refs...), e.Source.Target)); err != nil {
 		return err
 	}
-	if !e.DryRun {
-		if _, err := tx.Exec(ctx, `INSERT INTO hopper_chains(workspace_id,id,bounds) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, w, e.Root, raw(d.Bounds)); err != nil {
-			return err
-		}
-		var b []byte
-		var stopped bool
-		var evaluations, publications int
-		var started time.Time
-		if err := tx.QueryRow(ctx, `SELECT bounds,stopped,evaluations,publications,started_at FROM hopper_chains WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, w, e.Root).Scan(&b, &stopped, &evaluations, &publications, &started); err != nil {
-			return err
-		}
-		var bounds Bounds
-		_ = json.Unmarshal(b, &bounds)
-		if stopped || e.Depth >= bounds.Depth || publications >= bounds.Publications || evaluations >= bounds.Evaluations || time.Since(started) >= time.Duration(bounds.Seconds)*time.Second {
-			e.State = "blocked"
-			e.Reason = "chain_limit_or_stopped"
-			return nil
-		}
-		if bounds.Cost != nil {
-			cost, err := s.chainCost(ctx, tx, p, w, e.Root, *bounds.Cost)
-			if err != nil {
-				return err
-			}
-			e.Cost = &cost
-			if cost.State != "observed" {
-				e.State = "blocked"
-				e.Reason = "cost_" + cost.State
-				return nil
-			}
-		}
-		if _, err := tx.Exec(ctx, `UPDATE hopper_chains SET evaluations=evaluations+1 WHERE workspace_id=$1 AND id=$2`, w, e.Root); err != nil {
-			return err
-		}
+	if err := s.checkChain(ctx, tx, w, p, e, d, true); err != nil {
+		return err
+	}
+	if e.State == "blocked" {
+		return nil
 	}
 	semanticVerdict := "unknown"
 	if e.Semantic != nil {
@@ -319,4 +291,44 @@ func (s *Service) Start(ctx context.Context) {
 			}
 		}
 	}()
+}
+
+func (s *Service) checkChain(ctx context.Context, tx pgx.Tx, w string, p access.Principal, e *Evaluation, d Definition, reserve bool) error {
+	if !e.DryRun {
+		if _, err := tx.Exec(ctx, `INSERT INTO hopper_chains(workspace_id,id,bounds) VALUES($1,$2,$3) ON CONFLICT DO NOTHING`, w, e.Root, raw(d.Bounds)); err != nil {
+			return err
+		}
+		var b []byte
+		var stopped bool
+		var evaluations, publications int
+		var started time.Time
+		if err := tx.QueryRow(ctx, `SELECT bounds,stopped,evaluations,publications,started_at FROM hopper_chains WHERE workspace_id=$1 AND id=$2 FOR UPDATE`, w, e.Root).Scan(&b, &stopped, &evaluations, &publications, &started); err != nil {
+			return err
+		}
+		var bounds Bounds
+		_ = json.Unmarshal(b, &bounds)
+		if stopped || e.Depth >= bounds.Depth || publications >= bounds.Publications || evaluations >= bounds.Evaluations || time.Since(started) >= time.Duration(bounds.Seconds)*time.Second {
+			e.State = "blocked"
+			e.Reason = "chain_limit_or_stopped"
+			return nil
+		}
+		if bounds.Cost != nil {
+			cost, err := s.chainCost(ctx, tx, p, w, e.Root, *bounds.Cost)
+			if err != nil {
+				return err
+			}
+			e.Cost = &cost
+			if cost.State != "observed" {
+				e.State = "blocked"
+				e.Reason = "cost_" + cost.State
+				return nil
+			}
+		}
+		if reserve {
+			if _, err := tx.Exec(ctx, `UPDATE hopper_chains SET evaluations=evaluations+1 WHERE workspace_id=$1 AND id=$2`, w, e.Root); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

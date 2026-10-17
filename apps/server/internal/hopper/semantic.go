@@ -28,6 +28,20 @@ func (s *Service) semantic(ctx context.Context, j automation.Job, evaluation str
 	if !hasSemantic(d.Condition) || Evaluate(d.Condition, source.Facts) != "unknown" {
 		return nil, nil
 	}
+	preflight := Evaluation{Source: source, Root: source.Root, Depth: source.Depth, DryRun: source.DryRun}
+	err := pgx.BeginFunc(ctx, s.Store.Database(), func(tx pgx.Tx) error {
+		actor, _, err := s.checkSemanticJob(ctx, tx, j, source)
+		if err != nil {
+			return err
+		}
+		return s.checkChain(ctx, tx, j.Workspace, actor, &preflight, d, false)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if preflight.State == "blocked" {
+		return &SemanticOutcome{State: preflight.State, Reason: preflight.Reason, Usage: []Ref{}, Costs: []Ref{}, UsageState: "not_applicable"}, nil
+	}
 	for _, required := range d.Required {
 		if required.State == "unfetched" || required.State == "missing" {
 			return &SemanticOutcome{State: "input_waiting", Reason: "required_evidence_unavailable", Usage: []Ref{}, Costs: []Ref{}, UsageState: "not_applicable"}, nil
@@ -56,7 +70,7 @@ func (s *Service) semantic(ctx context.Context, j automation.Job, evaluation str
 			return nil, ErrInvalid
 		}
 		if previous.Outcome != nil && previous.Outcome.State != "failed" {
-			return previous.Outcome, nil
+			return previous.Outcome, s.semanticUsage(ctx, j.Workspace, evaluation, previous.Outcome)
 		}
 	}
 	connection, err := s.Gateway.Connection(j.Workspace, d.Semantic.Connection, d.Semantic.Revision)
@@ -92,14 +106,11 @@ func (s *Service) semantic(ctx context.Context, j automation.Job, evaluation str
 			return ErrInvalid
 		}
 		maxAttempts = control.MaxAttempts
-		if !source.DryRun && d.Bounds.Cost != nil {
-			cost, err := s.chainCost(ctx, tx, actor, j.Workspace, source.Root, *d.Bounds.Cost)
-			if err != nil {
-				return err
-			}
-			if cost.State != "observed" {
-				return access.ErrForbidden
-			}
+		if err = s.checkChain(ctx, tx, j.Workspace, actor, &preflight, d, false); err != nil {
+			return err
+		}
+		if preflight.State == "blocked" {
+			return ErrState
 		}
 		if d.Semantic.Cost != nil {
 			cost, err := s.semanticCost(ctx, tx, actor, j.Workspace, evaluation, *d.Semantic.Cost)
@@ -133,6 +144,10 @@ func (s *Service) semantic(ctx context.Context, j automation.Job, evaluation str
 		return r, err
 	})
 	if err != nil {
+		if preflight.State == "blocked" {
+			outcome.State, outcome.Reason = preflight.State, preflight.Reason
+			return outcome, nil
+		}
 		return nil, err
 	}
 	if !made {
@@ -187,7 +202,13 @@ func (s *Service) semantic(ctx context.Context, j automation.Job, evaluation str
 		outcome.Costs = costs
 		outcome.UsageState = "missing"
 		if len(costs) > 0 {
-			outcome.UsageState = "complete"
+			var rated bool
+			if err = tx.QueryRow(saveCtx, `SELECT payload->>'state'='rated' FROM usage_records WHERE workspace_id=$1 AND id=$2 AND version=$3`, j.Workspace, costs[0].ID, costs[0].Version).Scan(&rated); err != nil {
+				return Record{}, err
+			}
+			if rated {
+				outcome.UsageState = "complete"
+			}
 		}
 		attempt.Outcome = outcome
 		refs := append(append(append([]Ref{}, prepared.Refs...), prepared.Ref), append(usage, costs...)...)
@@ -204,7 +225,7 @@ func (s *Service) semantic(ctx context.Context, j automation.Job, evaluation str
 	if outcome.State == "failed" && j.Attempts < maxAttempts {
 		return nil, errors.New("retry_semantic_request")
 	}
-	return outcome, nil
+	return outcome, s.semanticUsage(ctx, j.Workspace, evaluation, outcome)
 }
 
 func (s *Service) recheckSemantic(ctx context.Context, tx pgx.Tx, p access.Principal, w string, e *Evaluation, d Definition) error {

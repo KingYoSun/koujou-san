@@ -26,6 +26,35 @@ func (s *Service) semanticCost(ctx context.Context, tx pgx.Tx, p access.Principa
 	return usage.ObserveCosts(ctx, tx, p, w, "hopper", ids, b)
 }
 
+// The adopted evaluation owns every attempt, including unobserved reservations.
+// Reusing a saved response must retain earlier retries' consumption as well.
+func (s *Service) semanticUsage(ctx context.Context, w, evaluation string, outcome *SemanticOutcome) error {
+	rows, err := s.Store.Database().Query(ctx, `SELECT r.payload,u.resource_id,h.version FROM hopper_model_attempts a LEFT JOIN hopper_records r ON r.workspace_id=a.workspace_id AND r.id=a.resource_id AND r.version=a.response_version LEFT JOIN usage_events u ON u.workspace_id=a.workspace_id AND u.event_id=a.resource_id AND u.source LIKE 'server-model:%' LEFT JOIN shared_versions h ON h.workspace_id=u.workspace_id AND h.resource_id=u.resource_id WHERE a.workspace_id=$1 AND a.evaluation_id=$2 ORDER BY a.number`, w, evaluation)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	outcome.Usage, outcome.Costs, outcome.UsageState = []Ref{}, []Ref{}, "complete"
+	for rows.Next() {
+		var payload []byte
+		var id, version *string
+		if err = rows.Scan(&payload, &id, &version); err != nil {
+			return err
+		}
+		var attempt modelAttempt
+		if len(payload) == 0 || json.Unmarshal(payload, &attempt) != nil || attempt.Outcome == nil || attempt.Outcome.UsageState != "complete" {
+			outcome.UsageState = "missing"
+		}
+		if id != nil && version != nil {
+			outcome.Usage = append(outcome.Usage, Ref{ID: *id, Version: *version})
+		}
+		if attempt.Outcome != nil {
+			outcome.Costs = append(outcome.Costs, attempt.Outcome.Costs...)
+		}
+	}
+	return rows.Err()
+}
+
 func (s *Service) observeSemantic(ctx context.Context, tx pgx.Tx, p access.Principal, w string, d Definition, evaluation string, intent Ref, input Record, reply modelreply.Reply, response *serverllm.Response, provisional bool) ([]Ref, []Ref, error) {
 	quantities := reply.Quantities()
 	request, coverage, state := "", "unknown", "provisional"

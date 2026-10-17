@@ -52,6 +52,16 @@ type SemanticDecision struct {
 	Evidence  []Citation `json:"evidence"`
 	Unknown   []string   `json:"unknown"`
 }
+
+func (d *SemanticDecision) UnmarshalJSON(data []byte) error {
+	var keys map[string]json.RawMessage
+	if json.Unmarshal(data, &keys) != nil || keys["candidate"] == nil {
+		return ErrInvalid
+	}
+	type decision SemanticDecision
+	return decode(data, (*decision)(d))
+}
+
 type SemanticEvidence struct {
 	Ref   Ref             `json:"ref"`
 	Value json.RawMessage `json:"value"`
