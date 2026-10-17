@@ -38,11 +38,16 @@ impl Api {
         self.request("connection","POST",json!({"operation_id":Uuid::new_v4().to_string(),"expected_version":state["run"]["version"],"generation":self.generation,"unknown":unknown}))?;
         Ok(())
     }
-    fn drain(&self, journal: &Journal) -> Result<(), String> {
+    fn drain(&self, journal: &Journal, recovering: bool) -> Result<(), String> {
         for _ in 0..32 {
             let Some((position, operation, mut body)) = journal.pending(&self.id)? else {
                 return Ok(());
             };
+            // An attempted delivery was persisted only after the pipe write
+            // succeeded. A crash before that point leaves delivery unconfirmed.
+            if recovering && body["type"] == "delivered" && body.get("operation_id").is_none() {
+                return Err("cli_delivery_unconfirmed".into());
+            }
             for retry in 0..2 {
                 if body.get("operation_id").is_none() || retry > 0 {
                     let state = self.state()?;
@@ -72,7 +77,33 @@ impl Api {
     }
     fn event(&self, journal: &Journal, value: Value) -> Result<(), String> {
         journal.enqueue(&self.id, &value)?;
-        self.drain(journal)
+        self.drain(journal, false)
+    }
+    fn reconcile(&self, journal: &Journal) -> Result<(), String> {
+        self.connection(true)?;
+        let identity = journal.identity(&self.id)?;
+        journal.annotate(
+            &self.id,
+            "last_observation",
+            observation::inspect(identity.as_ref()),
+        )?;
+        self.drain(journal, true)?;
+        if journal.pending(&self.id)?.is_some() {
+            return Ok(());
+        }
+        let state = self.state()?;
+        let ended = matches!(
+            state["value"]["state"].as_str(),
+            Some("succeeded" | "failed" | "cancelled")
+        );
+        if !ended {
+            self.connection(true)?;
+        }
+        journal.phase(
+            &self.id,
+            if ended { "completed" } else { "unlocated" },
+            None,
+        )
     }
 }
 fn publish(
@@ -129,6 +160,9 @@ fn reader(
             }
             let position = journal.log(&id, channel, &bytes)?;
             if channel == "stdout" {
+                if let Some(session) = protocol::session(&protocol, &bytes) {
+                    journal.annotate(&id, "provider_session", json!(session))?;
+                }
                 if let Some(report) = protocol::result(&protocol, &bytes, structured) {
                     journal.result(&id, &report)?;
                 }
@@ -143,12 +177,19 @@ fn reader(
     })
 }
 fn run_one(
-    api: Api,
+    api: &Api,
     journal: Journal,
     config: Configuration,
     profiles: execution::ExecutionSettings,
 ) -> Result<(), String> {
     let root = &api.client.binding.root;
+    let initial = api.state()?;
+    if initial["value"]["state"] != "queued"
+        || initial["value"]["observation"] == "unknown"
+        || !initial["value"]["started_at"].is_null()
+    {
+        return Err("execution_start_unconfirmed".into());
+    }
     api.connection(false)?;
     let assigned = api.request("assigned-input", "GET", Value::Null)?;
     journal.input(&api.id, &assigned)?;
@@ -217,7 +258,14 @@ fn run_one(
     {
         return Err("assignment_changed".into());
     }
-    if api.state()?["value"]["cancel_requested"] == true {
+    let state = api.state()?;
+    if state["value"]["state"] != "queued"
+        || state["value"]["observation"] == "unknown"
+        || !state["value"]["started_at"].is_null()
+    {
+        return Err("execution_start_unconfirmed".into());
+    }
+    if state["value"]["cancel_requested"] == true {
         api.event(&journal, json!({"type":"cancelled"}))?;
         journal.phase(&api.id, "completed", None)?;
         return Ok(());
@@ -234,7 +282,17 @@ fn run_one(
             return Ok(());
         }
     };
-    journal.phase(&api.id, "running", Some(child.id()))?;
+    let process = observation::snapshot(child.id()).unwrap_or_else(|_| json!({"pid":child.id()}));
+    #[cfg(test)]
+    if std::env::var("KOUJOU_TEST_CRASH_AFTER_SPAWN").as_deref() == Ok(api.id.as_str()) {
+        fs::write(
+            root.join("fixture-crash.json"),
+            serde_json::to_vec(&json!({"run":api.id,"pid":child.id(),"process":process})).unwrap(),
+        )
+        .unwrap();
+        std::process::exit(77);
+    }
+    journal.started(&api.id, child.id(), &json!({"process":process,"protocol":prepared.protocol,"environment":assigned["assignment"]["connection"]["environment"],"session_kind":"anonymous_stdio","transfer_verified":false}))?;
     journal.enqueue(&api.id,&json!({"type":"started","execution":{"environment":if adapter.wsl.is_empty(){"windows".to_owned()}else{format!("wsl:{}",adapter.wsl)},"version":assigned["assignment"]["connection"]["version"],"version_observed":observed_version,"pause":prepared.protocol=="jsonl-v1","stop":prepared.stop_supported&&adapter.wsl.is_empty()}}))?;
     let device = assigned["assignment"]["device_id"]
         .as_str()
@@ -264,7 +322,8 @@ fn run_one(
         "stderr",
         false,
     );
-    let mut online = api.drain(&journal).is_ok();
+    let mut online = api.drain(&journal, false).is_ok();
+    let mut disconnected = !online;
     let mut stdin = child.stdin.take();
     if let Some(input) = stdin.as_mut() {
         if input
@@ -280,6 +339,7 @@ fn run_one(
     }
     let mut renewal = Instant::now();
     let mut stopped = false;
+    let mut last_observation = SystemTime::now();
     loop {
         if let Some(status) = child.try_wait().map_err(|_| "cli_status_unavailable")? {
             stdout.join().map_err(|_| "cli_output_unavailable")??;
@@ -288,7 +348,7 @@ fn run_one(
             // The source process has ended; unsent facts remain durable until accepted.
             loop {
                 let _ = api.connection(!online);
-                if api.drain(&journal).is_ok() && journal.pending(&api.id)?.is_none() {
+                if api.drain(&journal, false).is_ok() && journal.pending(&api.id)?.is_none() {
                     journal.phase(&api.id, "completed", None)?;
                     return Ok(());
                 }
@@ -296,12 +356,30 @@ fn run_one(
                 thread::sleep(Duration::from_secs(1));
             }
         }
+        let now = SystemTime::now();
+        if now.duration_since(last_observation).unwrap_or_default() >= Duration::from_secs(30) {
+            online = false;
+        }
+        last_observation = now;
         if renewal.elapsed() >= Duration::from_secs(30) || !online {
+            disconnected |= !online;
             online = api.connection(!online).is_ok();
             renewal = Instant::now();
         }
         if online {
-            online = api.drain(&journal).is_ok();
+            online = api.drain(&journal, false).is_ok();
+        }
+        if online && disconnected {
+            online = api
+                .event(
+                    &journal,
+                    json!({"type":"known","source":"same_process_observed"}),
+                )
+                .is_ok();
+            if online {
+                journal.phase(&api.id, "running", Some(child.id()))?;
+                disconnected = false;
+            }
         }
         if let Ok(state) = api.state() {
             if state["value"]["cancel_requested"] == true
@@ -335,9 +413,11 @@ fn run_one(
                         journal.phase(&api.id, "unconfirmed", None)?;
                         return Err("cli_delivery_unconfirmed".into());
                     }
-                    online = api.drain(&journal).is_ok();
+                    online = api.drain(&journal, false).is_ok();
                 }
             }
+        } else {
+            online = false;
         }
         if !online {
             journal.phase(&api.id, "unconfirmed", None)?;
@@ -360,8 +440,8 @@ fn serve(binding: RuntimeBinding) -> Result<(), String> {
     let journal = Journal::open(&root)?;
     let mut jobs: HashMap<String, thread::JoinHandle<()>> = HashMap::new();
     let mut contact = Instant::now() - Duration::from_secs(60);
-    let recovered = journal.recover_unknown()?;
-    let mut recovered = recovered.into_iter().collect::<HashMap<_, _>>();
+    journal.recover_unknown()?;
+    let mut recovery_after = String::new();
     let mut connected = false;
     loop {
         jobs.retain(|_, job| !job.is_finished());
@@ -374,14 +454,33 @@ fn serve(binding: RuntimeBinding) -> Result<(), String> {
             }
         }
         if connected {
-            recovered.retain(|id, generation| {
+            let recovered = journal.recovery_page(&recovery_after)?;
+            recovery_after = if recovered.len() == 50 {
+                recovered.last().unwrap().0.clone()
+            } else {
+                String::new()
+            };
+            for (id, generation) in recovered {
+                if jobs.contains_key(&id) {
+                    continue;
+                }
                 let api = Api {
                     client: client.clone(),
                     id: id.clone(),
                     generation: generation.clone(),
                 };
-                api.connection(true).is_err()
-            });
+                if let Err(e) = api.reconcile(&journal) {
+                    if matches!(
+                        e.as_str(),
+                        "forbidden"
+                            | "cli_delivery_unconfirmed"
+                            | "state_conflict"
+                            | "invalid_request"
+                    ) {
+                        journal.phase(&id, "unlocated", None)?;
+                    }
+                }
+            }
         }
         let stopping = root.join("stop-accepting").exists();
         if !stopping && connected {
@@ -421,6 +520,13 @@ fn serve(binding: RuntimeBinding) -> Result<(), String> {
                     if !journal.begin(id, generation, &hash)? {
                         continue;
                     }
+                    if state["value"]["state"] != "queued"
+                        || state["value"]["observation"] == "unknown"
+                        || !state["value"]["started_at"].is_null()
+                    {
+                        journal.phase(id, "unknown", None)?;
+                        continue;
+                    }
                     let api = Api {
                         client: client.clone(),
                         id: id.to_owned(),
@@ -433,8 +539,9 @@ fn serve(binding: RuntimeBinding) -> Result<(), String> {
                     jobs.insert(
                         id.to_owned(),
                         thread::spawn(move || {
-                            if run_one(api, own.clone(), cfg, settings).is_err() {
+                            if run_one(&api, own.clone(), cfg, settings).is_err() {
                                 let _ = own.phase(&run, "unknown", None);
+                                let _ = api.connection(true);
                             }
                         }),
                     );
@@ -525,4 +632,38 @@ pub(super) fn status(auth: &Auth, workspace: &str) -> Result<Value, String> {
         .and_then(|s| serde_json::from_slice::<Value>(&s).ok())
         .unwrap_or(Value::Null);
     Ok(json!({"running":running,"last_observation":value}))
+}
+pub(super) fn reconcile(auth: &Auth, workspace: &str, id: &str) -> Result<Value, String> {
+    let binding = auth.runner_binding(workspace)?;
+    let journal = Journal::open(&binding.root)?;
+    let id = format!("run:{}", id.strip_prefix("run:").unwrap_or(id));
+    let (generation, phase) = journal.execution(&id)?.ok_or("execution_not_recorded")?;
+    let api = Api {
+        client: Arc::new(DeviceClient::open(binding)?),
+        id: id.clone(),
+        generation,
+    };
+    // A local PID is never a substitute for current server authorization.
+    let state = api.state()?;
+    let identity = journal.identity(&id)?;
+    let observation = observation::inspect(identity.as_ref());
+    let queued = matches!(phase.as_str(), "unknown" | "unconfirmed" | "unlocated");
+    if queued {
+        journal.phase(&id, "unknown", None)?;
+    }
+    Ok(
+        json!({"run":state["run"],"local_phase":phase,"observation":observation,"queued_reconciliation":queued,"command_started":false}),
+    )
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+    #[test]
+    #[ignore = "requires the explicitly owned native Runner/Ory fixture; used for fixed crash boundary testing"]
+    fn live_reconnect_runner() {
+        let file = std::env::var("KOUJOU_RUNNER_TEST_BINDING").expect("select owned test binding");
+        let binding: RuntimeBinding = serde_json::from_slice(&fs::read(file).unwrap()).unwrap();
+        serve(binding).unwrap();
+    }
 }

@@ -348,6 +348,7 @@ pub async fn runner_execution_save(
 }
 
 mod journal;
+mod observation;
 mod protocol;
 mod runtime;
 pub(crate) fn background_entry() {
@@ -364,6 +365,18 @@ pub async fn runner_status(app: tauri::AppHandle, workspace: String) -> Result<V
     tauri::async_runtime::spawn_blocking(move || runtime::status(&app.state::<Auth>(), &workspace))
         .await
         .map_err(|_| "runner_task_failed")?
+}
+#[tauri::command]
+pub async fn reconcile_run(
+    app: tauri::AppHandle,
+    workspace: String,
+    id: String,
+) -> Result<Value, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        runtime::reconcile(&app.state::<Auth>(), &workspace, &id)
+    })
+    .await
+    .map_err(|_| "runner_task_failed")?
 }
 #[tauri::command]
 pub async fn runner_stop_accepting(

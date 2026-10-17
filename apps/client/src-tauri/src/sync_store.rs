@@ -59,7 +59,7 @@ fn open(auth: &Auth, user: &str, workspace: &str) -> Result<rusqlite::Connection
     fs::create_dir_all(legacy.parent().unwrap()).map_err(storage_error)?;
     let mut db =
         rusqlite::Connection::open(legacy.with_extension("sqlite")).map_err(storage_error)?;
-    db.execute_batch("PRAGMA secure_delete=ON; CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value BLOB NOT NULL); CREATE TABLE IF NOT EXISTS records(key TEXT PRIMARY KEY,payload BLOB NOT NULL,dirty INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS record_drafts ON records(dirty,key);").map_err(storage_error)?;
+    db.execute_batch("PRAGMA secure_delete=ON; CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value BLOB NOT NULL); CREATE TABLE IF NOT EXISTS records(key TEXT PRIMARY KEY,payload BLOB NOT NULL,dirty INTEGER NOT NULL); CREATE INDEX IF NOT EXISTS record_drafts ON records(dirty,key); CREATE TABLE IF NOT EXISTS answers(key TEXT PRIMARY KEY,payload BLOB NOT NULL);").map_err(storage_error)?;
     let initialized = db
         .query_row("SELECT 1 FROM meta WHERE key='format'", [], |_| Ok(true))
         .optional()
@@ -130,6 +130,66 @@ fn load(auth: &Auth, user: &str, workspace: &str) -> Result<Option<Value>, Strin
         .map_err(storage_error)?;
     raw.map(|bytes| decoded(&api, user, workspace, bytes))
         .transpose()
+}
+fn answer_draft(
+    auth: &Auth,
+    user: &str,
+    workspace: &str,
+    key: &str,
+    action: &str,
+    value: Value,
+) -> Result<Option<Value>, String> {
+    use rusqlite::{OptionalExtension, params};
+    if user.is_empty() || workspace.is_empty() || key.is_empty() {
+        return Err("invalid_answer_draft".into());
+    }
+    let _lock = CACHE_LOCK.lock().map_err(storage_error)?;
+    let db = open(auth, user, workspace)?;
+    let (_, api) = auth.sync_binding(user, workspace);
+    match action {
+        "read" => {
+            let data: Option<Vec<u8>> = db
+                .query_row("SELECT payload FROM answers WHERE key=?1", [key], |r| {
+                    r.get(0)
+                })
+                .optional()
+                .map_err(storage_error)?;
+            data.map(|raw| decoded(&api, user, workspace, raw))
+                .transpose()
+        }
+        "save" => {
+            db.execute("INSERT INTO answers VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET payload=excluded.payload",params![key,encrypted(&api,user,workspace,value)?]).map_err(storage_error)?;
+            Ok(None)
+        }
+        "remove" => {
+            db.execute("DELETE FROM answers WHERE key=?1", [key])
+                .map_err(storage_error)?;
+            Ok(None)
+        }
+        _ => Err("invalid_answer_draft".into()),
+    }
+}
+#[tauri::command]
+pub async fn run_answer_draft(
+    app: tauri::AppHandle,
+    user: String,
+    workspace: String,
+    key: String,
+    action: String,
+    value: Value,
+) -> Result<Option<Value>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        answer_draft(
+            &app.state::<Auth>(),
+            &user,
+            &workspace,
+            &key,
+            &action,
+            value,
+        )
+    })
+    .await
+    .map_err(|_| "sync_task_failed")?
 }
 fn save(
     auth: &Auth,
@@ -470,6 +530,44 @@ mod tests {
                 .contains("unsent draft")
         );
         let restarted = Auth::new("https://localhost:8080/", root.join("oauth.dpapi")).unwrap();
+        let answer = json!({"pauseVersion":"fixed-question","value":"SYNTHETIC_PRIVATE_ANSWER","json":false});
+        answer_draft(
+            &auth,
+            "alice",
+            "one",
+            "run-pause:one:first",
+            "save",
+            answer.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            answer_draft(
+                &restarted,
+                "alice",
+                "one",
+                "run-pause:one:first",
+                "read",
+                Value::Null
+            )
+            .unwrap(),
+            Some(answer)
+        );
+        assert!(
+            answer_draft(
+                &auth,
+                "bob",
+                "one",
+                "run-pause:one:first",
+                "read",
+                Value::Null
+            )
+            .unwrap()
+            .is_none()
+        );
+        assert!(
+            !String::from_utf8_lossy(&fs::read(legacy.with_extension("sqlite")).unwrap())
+                .contains("SYNTHETIC_PRIVATE_ANSWER")
+        );
         let changed = json!({"key":"sentence:s204","draft":{"value":{"text":"changed"}}});
         save(
             &restarted,
@@ -509,6 +607,18 @@ mod tests {
         fs::write(&broken, encrypted(&api, "alice", "broken", old).unwrap()).unwrap();
         assert!(load(&auth, "alice", "broken").unwrap().is_some());
         remove(&auth, "alice", "one").unwrap();
+        assert!(
+            answer_draft(
+                &restarted,
+                "alice",
+                "one",
+                "run-pause:one:first",
+                "read",
+                Value::Null
+            )
+            .unwrap()
+            .is_none()
+        );
         assert!(
             read(&auth, "alice", "one", "sentence:s204")
                 .unwrap()

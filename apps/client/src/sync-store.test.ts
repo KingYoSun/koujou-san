@@ -1,12 +1,86 @@
 import "fake-indexeddb/auto";
 import { IDBFactory, IDBObjectStore } from "fake-indexeddb";
 import { beforeEach, expect, it, vi } from "vitest";
-import { purgeStoredActor, syncStorage } from "./sync-store";
+import {
+  allowAnswerActor,
+  allowAnswerScope,
+  answerScopeEpoch,
+  readAnswerDraft,
+  saveAnswerDraft,
+  purgeStoredActor,
+  syncStorage,
+} from "./sync-store";
 import type { SavedSync, SyncItem } from "./sync-engine";
 
 const n = { api: "https://api.test/", user: "alice", workspace: "one" };
 beforeEach(() => {
   globalThis.indexedDB = new IDBFactory();
+  allowAnswerActor(n.user);
+  allowAnswerScope(n);
+});
+
+it("restores only the requested Pause draft, preserves its version and serializes writes before purge", async () => {
+  const draft = {
+    pauseVersion: "question-version",
+    value: "offline answer",
+    json: false,
+  };
+  const other = { ...n, workspace: "other-answers" };
+  allowAnswerScope(other);
+  await seed(legacy(10_000));
+  const scan = vi.spyOn(IDBObjectStore.prototype, "openCursor");
+  await saveAnswerDraft(false, n, "run-pause:one:first", draft);
+  await saveAnswerDraft(false, n, "run-pause:one:second", {
+    ...draft,
+    value: "second question",
+  });
+  await saveAnswerDraft(false, other, "run-pause:one:first", draft);
+  expect(await readAnswerDraft(false, n, "run-pause:one:first")).toEqual(draft);
+  expect(
+    await readAnswerDraft(
+      false,
+      { ...n, api: "https://other.test/" },
+      "run-pause:one:first",
+    ),
+  ).toBeUndefined();
+  expect(scan).not.toHaveBeenCalled();
+  scan.mockRestore();
+  await syncStorage(false).load(n);
+  expect(
+    (await syncStorage(false).read(n, "sentence:s09999"))?.draft,
+  ).toBeDefined();
+  expect((await readAnswerDraft(false, n, "run-pause:one:second"))?.value).toBe(
+    "second question",
+  );
+  const pending = saveAnswerDraft(false, n, "run-pause:one:first", {
+    ...draft,
+    value: "last keystroke",
+  });
+  const oldQuery = answerScopeEpoch(n);
+  await syncStorage(false).remove(n);
+  await pending;
+  expect(allowAnswerScope(n, oldQuery)).toBe(false);
+  await saveAnswerDraft(false, n, "run-pause:one:first", draft);
+  allowAnswerScope(n);
+  expect(
+    await readAnswerDraft(false, n, "run-pause:one:first"),
+  ).toBeUndefined();
+  expect(await readAnswerDraft(false, other, "run-pause:one:first")).toEqual(
+    draft,
+  );
+  const pendingLogout = saveAnswerDraft(
+    false,
+    other,
+    "run-pause:one:first",
+    draft,
+  );
+  await purgeStoredActor(false, n.user);
+  await pendingLogout;
+  await saveAnswerDraft(false, other, "run-pause:one:first", draft);
+  allowAnswerActor(n.user);
+  expect(
+    await readAnswerDraft(false, other, "run-pause:one:first"),
+  ).toBeUndefined();
 });
 function legacy(count: number): SavedSync {
   const state: SavedSync = {

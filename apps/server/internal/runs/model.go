@@ -56,6 +56,20 @@ type Link struct {
 	Previous Ref `json:"previous"`
 	Next     Ref `json:"next"`
 }
+type Handoff struct {
+	Source     Ref              `json:"source"`
+	PreparedBy string           `json:"prepared_by"`
+	PreparedAt time.Time        `json:"prepared_at"`
+	Decision   *HandoffDecision `json:"decision,omitempty"`
+}
+type HandoffDecision struct {
+	Source      Ref       `json:"source"`
+	State       string    `json:"state"`
+	Observation string    `json:"observation"`
+	Judgment    string    `json:"judgment"`
+	By          string    `json:"by"`
+	At          time.Time `json:"at"`
+}
 type ExecutionInfo struct {
 	Environment     string `json:"environment"`
 	Version         string `json:"version"`
@@ -64,6 +78,7 @@ type ExecutionInfo struct {
 	Stop            bool   `json:"stop"`
 }
 type Run struct {
+	Handoff              *Handoff       `json:"handoff,omitempty"`
 	Execution            *ExecutionInfo `json:"execution,omitempty"`
 	Assignment           *Assignment    `json:"assignment,omitempty"`
 	Preparation          string         `json:"preparation,omitempty"`
@@ -125,7 +140,8 @@ type Record struct {
 }
 type Create struct {
 	apicontract.Mutation
-	Spec Spec `json:"spec"`
+	Spec    Spec `json:"spec"`
+	Handoff bool `json:"handoff,omitempty"`
 }
 type Answer struct {
 	apicontract.Mutation

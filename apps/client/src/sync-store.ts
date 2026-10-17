@@ -27,6 +27,85 @@ export interface SyncStorage {
 }
 const namespace = (n: SyncNamespace) => [n.api, n.user, n.workspace];
 const legacyKey = (n: SyncNamespace) => JSON.stringify(namespace(n));
+export type AnswerDraft = {
+  pauseVersion: string;
+  value: string;
+  json: boolean;
+};
+const answerWrites = new Map<string, Promise<void>>();
+const closedAnswerActors = new Set<string>();
+const closedAnswerScopes = new Set<string>();
+const answerScopeEpochs = new Map<string, number>();
+export const answerScopeEpoch = (n: SyncNamespace) =>
+  answerScopeEpochs.get(legacyKey(n)) ?? 0;
+export function allowAnswerActor(user: string) {
+  closedAnswerActors.delete(user);
+}
+export function allowAnswerScope(
+  n: SyncNamespace,
+  observedEpoch = answerScopeEpoch(n),
+) {
+  if (observedEpoch !== answerScopeEpoch(n)) return false;
+  closedAnswerScopes.delete(legacyKey(n));
+  return true;
+}
+const answerKey = (n: SyncNamespace, key: string) =>
+  JSON.stringify([...namespace(n), "pause-answer", key]);
+export async function readAnswerDraft(
+  native: boolean,
+  n: SyncNamespace,
+  key: string,
+): Promise<AnswerDraft | undefined> {
+  await answerWrites.get(n.user)?.catch(() => {});
+  if (closedAnswerActors.has(n.user) || closedAnswerScopes.has(legacyKey(n)))
+    return;
+  if (native)
+    return (
+      (await invoke<AnswerDraft | null>("run_answer_draft", {
+        ...n,
+        key,
+        action: "read",
+        value: null,
+      })) ?? undefined
+    );
+  return transaction<AnswerDraft | undefined>(["states"], false, (tx, done) => {
+    const request = tx.objectStore("states").get(answerKey(n, key));
+    request.onsuccess = () => done(request.result as AnswerDraft | undefined);
+  });
+}
+export function saveAnswerDraft(
+  native: boolean,
+  n: SyncNamespace,
+  key: string,
+  value?: AnswerDraft,
+): Promise<void> {
+  const work = (answerWrites.get(n.user) ?? Promise.resolve())
+    .catch(() => {})
+    .then(async () => {
+      if (
+        closedAnswerActors.has(n.user) ||
+        closedAnswerScopes.has(legacyKey(n))
+      )
+        return;
+      if (native) {
+        await invoke("run_answer_draft", {
+          ...n,
+          key,
+          action: value ? "save" : "remove",
+          value: value ?? null,
+        });
+        return;
+      }
+      await transaction<void>(["states"], true, (tx, done) => {
+        const store = tx.objectStore("states");
+        if (value) store.put(value, answerKey(n, key));
+        else store.delete(answerKey(n, key));
+        done();
+      });
+    });
+  answerWrites.set(n.user, work);
+  return work;
+}
 export function localEntry(value: SavedSync, key: string): LocalEntry {
   return {
     key,
@@ -230,6 +309,9 @@ export function syncStorage(native: boolean): SyncStorage {
       );
     },
     async remove(n) {
+      closedAnswerScopes.add(legacyKey(n));
+      answerScopeEpochs.set(legacyKey(n), answerScopeEpoch(n) + 1);
+      await answerWrites.get(n.user)?.catch(() => {});
       if (native) {
         await invoke("sync_remove", args(n));
         return;
@@ -239,6 +321,10 @@ export function syncStorage(native: boolean): SyncStorage {
         true,
         (tx, done) => {
           tx.objectStore("states").delete(legacyKey(n));
+          const prefix = legacyKey(n).slice(0, -1) + ",";
+          tx.objectStore("states").delete(
+            IDBKeyRange.bound(prefix, prefix + "\uffff"),
+          );
           tx.objectStore("meta").delete(namespace(n));
           tx.objectStore("records").delete(range(n));
           done();
@@ -249,6 +335,8 @@ export function syncStorage(native: boolean): SyncStorage {
   return storage;
 }
 export async function purgeStoredActor(native: boolean, user: string) {
+  closedAnswerActors.add(user);
+  await answerWrites.get(user)?.catch(() => {});
   if (native) {
     await invoke("sync_purge_actor", { user });
     return;

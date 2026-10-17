@@ -1,9 +1,17 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { syncRequest } from "./auth";
 import { SyncHTTPError } from "./sync-error";
 import { RunnerSettings } from "./runner-settings";
 import { ExecutionSettings } from "./execution-settings";
+import {
+  allowAnswerScope,
+  answerScopeEpoch,
+  readAnswerDraft,
+  saveAnswerDraft,
+  syncStorage,
+} from "./sync-store";
+import type { AnswerDraft, SyncNamespace } from "./sync-store";
 
 type Ref = { id: string; version: string };
 type RecordVersion = Ref & { run_id: string; kind: string; value: unknown };
@@ -31,6 +39,10 @@ type Assignment = {
   prepared_at?: string;
 };
 type Run = {
+  handoff?: {
+    source: Ref;
+    decision?: { source: Ref; judgment: string; by: string; at: string };
+  };
   active_pause?: Ref;
   execution?: {
     environment: string;
@@ -88,6 +100,105 @@ const stateNames: Record<string, string> = {
 };
 const show = (value: unknown) => JSON.stringify(value, null, 2);
 
+function PauseAnswer({
+  native,
+  namespace,
+  record,
+  busy,
+  send,
+}: {
+  native: boolean;
+  namespace: SyncNamespace;
+  record: RecordVersion;
+  busy: boolean;
+  send: (draft: AnswerDraft) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState<AnswerDraft>();
+  const [notice, setNotice] = useState("");
+  const { api, user, workspace } = namespace;
+  useEffect(() => {
+    let active = true;
+    const scope = { api, user, workspace };
+    readAnswerDraft(native, scope, record.id)
+      .then((saved) => {
+        if (active)
+          setDraft(
+            saved ?? { pauseVersion: record.version, value: "", json: false },
+          );
+      })
+      .catch(() => {
+        if (active) setNotice("端末内の回答案を読み戻せません。");
+      });
+    return () => {
+      active = false;
+    };
+  }, [native, api, user, workspace, record.id, record.version]);
+  if (!draft)
+    return <p role="status">{notice || "端末内の回答案を確認しています…"}</p>;
+  const stale =
+    (record.value as Pause).state !== "waiting" ||
+    draft.pauseVersion !== record.version;
+  if (stale && !draft.value) return null;
+  const change = (value: AnswerDraft) => {
+    setDraft(value);
+    setNotice("端末へ保存しています…");
+    void saveAnswerDraft(native, namespace, record.id, value)
+      .then(() =>
+        setNotice("この端末に回答案を保存しました。自動送信しません。"),
+      )
+      .catch(() => setNotice("回答案の保存を確認できません。"));
+  };
+  return (
+    <fieldset disabled={busy}>
+      {stale && (
+        <p>質問の状態が変わりました。保存済みの回答案は送信できません。</p>
+      )}
+      <label>
+        質問への回答
+        <textarea
+          rows={3}
+          readOnly={stale}
+          value={draft.value}
+          onChange={(e) => change({ ...draft, value: e.target.value })}
+        />
+      </label>
+      <label>
+        <input
+          type="checkbox"
+          disabled={stale}
+          checked={draft.json}
+          onChange={(e) => change({ ...draft, json: e.target.checked })}
+        />
+        構造化JSONで回答
+      </label>
+      {notice && <p role="status">{notice}</p>}
+      {!stale && (
+        <button disabled={!draft.value} onClick={() => void send(draft)}>
+          回答を送信
+        </button>
+      )}
+      {draft.value && (
+        <button
+          onClick={() => {
+            void saveAnswerDraft(native, namespace, record.id)
+              .then(() => {
+                setDraft({
+                  pauseVersion: record.version,
+                  value: "",
+                  json: false,
+                });
+                setNotice("回答案を削除しました。");
+              })
+              .catch(() => setNotice("回答案の削除を確認できません。"));
+          }}
+        >
+          この回答案を削除
+        </button>
+      )}
+    </fieldset>
+  );
+}
+
 export function RunStatus({ value }: { value: Run }) {
   return (
     <>
@@ -135,12 +246,14 @@ export function RunStatus({ value }: { value: Run }) {
 
 export function RunRecords({
   native,
+  api,
   workspace,
   user,
   role,
   canExecute,
 }: {
   native: boolean;
+  api: string;
   workspace: string;
   user: string;
   role: string;
@@ -160,8 +273,6 @@ export function RunRecords({
   const [kind, setKind] = useState("pause"),
     [input, setInput] = useState<InputSpec | null>(null);
   const [contextText, setContextText] = useState<string | undefined>();
-  const [answer, setAnswer] = useState(""),
-    [jsonAnswer, setJsonAnswer] = useState(false);
   const [name, setName] = useState(""),
     [commandKind, setCommandKind] = useState("cli");
   const [target, setTarget] = useState(""),
@@ -173,9 +284,14 @@ export function RunRecords({
   const [contextBinding, setContextBinding] = useState("stdin"),
     [previous, setPrevious] = useState<Ref | null>(null);
   const [newID, setNewID] = useState<string>(() => crypto.randomUUID());
+  const [handoff, setHandoff] = useState(false);
+  const [outputs, setOutputs] = useState<RecordVersion[]>([]);
+  const [handoffSource, setHandoffSource] = useState<RecordVersion>();
+  const [allowDuplicate, setAllowDuplicate] = useState(false);
   const pending = useRef<{ key: string; id: string } | null>(null);
   const runValue = current?.value as Run | undefined;
   const canEdit = role !== "viewer";
+  const namespace = { api, user, workspace };
   const call = (path: string, body?: unknown) =>
     syncRequest(`${base}${path}`, native, {
       method: body === undefined ? "GET" : "POST",
@@ -193,17 +309,32 @@ export function RunRecords({
     try {
       await work();
     } catch (error) {
-      setPage(null);
-      setList(null);
-      setCurrent(null);
-      setInput(null);
-      setContextText(undefined);
       if (
         (error instanceof SyncHTTPError &&
           (error.status === 401 || error.status === 403)) ||
         /forbidden|authentication_required/.test(String(error))
       ) {
-        setAnswer("");
+        setPage(null);
+        setList(null);
+        setCurrent(null);
+        setInput(null);
+        setContextText(undefined);
+        // A denied execution action alone does not revoke Workspace reading.
+        let revoked = error instanceof SyncHTTPError && error.status === 401;
+        if (!revoked) {
+          try {
+            await syncRequest(
+              `/access/workspaces/${encodeURIComponent(workspace)}/members`,
+              native,
+              { method: "GET" },
+            );
+          } catch (probe) {
+            revoked =
+              probe instanceof SyncHTTPError &&
+              (probe.status === 401 || probe.status === 403);
+          }
+        }
+        if (revoked) await syncStorage(native).remove(namespace);
         pending.current = null;
         setNotice("現在の閲覧・編集・実行依頼の権限を確認してください。");
       } else
@@ -237,23 +368,30 @@ export function RunRecords({
     });
     setID(record.id);
     setCurrent(record);
+    setHandoffSource(undefined);
+    setAllowDuplicate(false);
+    const value = record.value as Run;
+    if (value.handoff) {
+      setHandoffSource(
+        await read({ id: value.handoff.source.id, version: "head" }),
+      );
+    }
     setPage(null);
     setInput(null);
     setContextText(undefined);
-    setAnswer("");
   };
   const records = async (after = "") => {
     if (!current) return;
-    setPage(
-      await query({
-        run_id: current.id,
-        version: current.version,
-        kind,
-        after,
-        limit: 50,
-        snapshot: after ? page?.snapshot : undefined,
-      }),
-    );
+    const epoch = answerScopeEpoch(namespace);
+    const fetched = await query({
+      run_id: current.id,
+      version: current.version,
+      kind,
+      after,
+      limit: 50,
+      snapshot: after ? page?.snapshot : undefined,
+    });
+    if (allowAnswerScope(namespace, epoch)) setPage(fetched);
   };
   const loadInput = async (ref: Ref) => {
     const spec = (await read(ref)).value as InputSpec;
@@ -277,6 +415,7 @@ export function RunRecords({
   const create = async () => {
     let runID = newID;
     let manifest: { kind: string; id: string; revision: string } | undefined;
+    let fixedBase: { manifest: Ref; input_utf8: string } | undefined;
     if (manifestID || manifestVersion) {
       if (!manifestID || !manifestVersion)
         throw Error("fixed Manifest required");
@@ -284,21 +423,44 @@ export function RunRecords({
         `/contexts/workspaces/${encodeURIComponent(workspace)}/manifest/${encodeURIComponent(manifestID)}?revision=${encodeURIComponent(manifestVersion)}`,
         native,
         { method: "GET" },
-      )) as { data: { value: { run_id: string } } };
-      runID = resolved.data.value.run_id;
-      manifest = {
-        kind: "manifest",
-        id: manifestID,
-        revision: manifestVersion,
-      };
+      )) as { data: { value: { run_id: string; input_utf8?: string } } };
+      if (handoff) {
+        if (resolved.data.value.input_utf8 !== undefined)
+          fixedBase = {
+            manifest: {
+              id: `manifest:${manifestID}`,
+              version: manifestVersion,
+            },
+            input_utf8: resolved.data.value.input_utf8,
+          };
+      } else {
+        runID = resolved.data.value.run_id;
+        manifest = {
+          kind: "manifest",
+          id: manifestID,
+          revision: manifestVersion,
+        };
+      }
     }
+    const context =
+      handoff && (fixedBase || outputs.length)
+        ? {
+            ...(fixedBase ? { base: fixedBase } : {}),
+            outputs: outputs.map((r) => ({
+              ref: { id: r.id, version: r.version },
+              output: r.value,
+            })),
+          }
+        : undefined;
     const binding: Record<string, string> = {};
-    if (manifest) binding.context = contextBinding;
+    if (manifest || context) binding.context = contextBinding;
     if (prompt) binding.prompt = promptBinding;
     const result = await mutate(runID, "create", "0", {
+      ...(handoff ? { handoff: true } : {}),
       spec: {
         name,
         input: {
+          ...(context ? { context } : {}),
           ...(prompt ? { prompt } : {}),
           command: {
             kind: commandKind,
@@ -309,10 +471,26 @@ export function RunRecords({
         },
         ...(manifest ? { manifest } : {}),
         ...(previous ? { previous } : {}),
+        ...(handoff
+          ? {
+              sources: [
+                ...(manifestID
+                  ? [{ id: `manifest:${manifestID}`, version: manifestVersion }]
+                  : []),
+                ...outputs.map((r) => ({ id: r.id, version: r.version })),
+              ],
+              artifacts: outputs.flatMap(
+                (r) => (r.value as { artifacts?: unknown[] }).artifacts ?? [],
+              ),
+            }
+          : {}),
       },
     });
     await load(result.data.id);
     setNewID(crypto.randomUUID());
+    setHandoff(false);
+    setOutputs([]);
+    setPrevious(null);
     setNotice("Runを作成しました。開始は依頼していません。");
   };
   return (
@@ -388,6 +566,16 @@ export function RunRecords({
             {current.id} · {current.version}
           </p>
           <RunStatus value={runValue} />
+          {runValue.handoff?.decision && (
+            <p>
+              引継ぎ判断:{" "}
+              {runValue.handoff.decision.judgment === "duplicate_possible"
+                ? "元実行との重複可能性を了承"
+                : "元実行の終了を確認"}{" "}
+              / {runValue.handoff.decision.by} / {runValue.handoff.decision.at}{" "}
+              / 元Run版: {runValue.handoff.decision.source.version}
+            </p>
+          )}
           {runValue.preparation && (
             <p role="status">
               準備待ち・設定不足:{" "}
@@ -432,6 +620,25 @@ export function RunRecords({
                   {runValue.assignment.area.id} / 固定commit:{" "}
                   {runValue.assignment.area.commit}
                 </p>
+              )}
+              {native && (
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      const result = await invoke<{
+                        observation: { direct_process: string };
+                        queued_reconciliation: boolean;
+                      }>("reconcile_run", { workspace, id: current.id });
+                      await load(current.id);
+                      setNotice(
+                        `この端末の記録を照合しました。プロセス: ${result.observation.direct_process === "running" ? "同じ起動を観測" : "継続を確認できません"}。${result.queued_reconciliation ? "Runnerの報告照合を待ちます。" : ""}セッションの再接続は未確認です。新しいCLIは起動していません。`,
+                      );
+                    })
+                  }
+                >
+                  この端末の実行記録を照合
+                </button>
               )}
               {native && (
                 <button
@@ -496,11 +703,42 @@ export function RunRecords({
                 <p>
                   端末の現在の許可と確認済み能力を照合します。repositoryを使うRunには別worktree・branchを自動作成します。割当だけではCLIは起動しません。
                 </p>
+                {runValue.handoff && handoffSource && (
+                  <>
+                    <p>
+                      引継ぎ元の現在の状態:{" "}
+                      {stateNames[(handoffSource.value as Run).state]} /{" "}
+                      {(handoffSource.value as Run).observation === "unknown"
+                        ? "不明"
+                        : "確認済み"}{" "}
+                      · {handoffSource.version}
+                    </p>
+                    {(handoffSource.value as Run).observation === "unknown" && (
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={allowDuplicate}
+                          onChange={(e) => setAllowDuplicate(e.target.checked)}
+                        />
+                        元の実行が継続し、重複する可能性を認識して新Runの割当を依頼する
+                      </label>
+                    )}
+                  </>
+                )}
                 <button
                   disabled={busy || !deviceID || (!!repoID && !commit)}
                   onClick={() =>
                     void run(async () => {
                       await mutate(current.id, "assign", current.version, {
+                        ...(runValue.handoff && handoffSource
+                          ? {
+                              handoff_source: {
+                                id: handoffSource.id,
+                                version: handoffSource.version,
+                              },
+                              allow_duplicate: allowDuplicate,
+                            }
+                          : {}),
                         device_id: deviceID,
                         required: required.split(/\s+/).filter(Boolean),
                         ...(repoID
@@ -533,29 +771,52 @@ export function RunRecords({
             {canEdit && (
               <button
                 disabled={busy}
-                onClick={() =>
-                  setPrevious({ id: current.id, version: current.version })
-                }
+                onClick={() => {
+                  setPrevious({ id: current.id, version: current.version });
+                  setHandoff(false);
+                  setOutputs([]);
+                }}
               >
                 現在のRunを新しいRunの関連元にする
               </button>
             )}
-            {canExecute && !runValue.execution_requested_at && (
+            {canEdit && (
               <button
                 disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    await mutate(current.id, "request-start", current.version);
-                    await load(current.id);
-                    setNotice(
-                      "入力確定・開始依頼を保存しました。起動はまだ確認していません。",
-                    );
-                  })
-                }
+                onClick={() => {
+                  setPrevious({ id: current.id, version: current.version });
+                  setHandoff(true);
+                  setOutputs([]);
+                  setNotice(
+                    "別Runへの引継ぎを準備します。必要な固定出力を選び、新しい入力を指定してください。開始は依頼していません。",
+                  );
+                }}
               >
-                入力確定・開始依頼
+                別Runへの引継ぎを準備
               </button>
             )}
+            {canExecute &&
+              !runValue.handoff &&
+              !runValue.execution_requested_at && (
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void run(async () => {
+                      await mutate(
+                        current.id,
+                        "request-start",
+                        current.version,
+                      );
+                      await load(current.id);
+                      setNotice(
+                        "入力確定・開始依頼を保存しました。起動はまだ確認していません。",
+                      );
+                    })
+                  }
+                >
+                  入力確定・開始依頼
+                </button>
+              )}
             {canExecute &&
               !["succeeded", "failed", "cancelled"].includes(
                 runValue.state,
@@ -724,62 +985,51 @@ export function RunRecords({
                           )}
                           {canEdit &&
                             kind === "pause" &&
-                            pause.state === "waiting" &&
                             pause.response_kind !== "event" && (
-                              <fieldset disabled={busy}>
-                                <label>
-                                  質問への回答
-                                  <textarea
-                                    value={answer}
-                                    onChange={(e) => setAnswer(e.target.value)}
-                                    rows={3}
-                                  />
-                                </label>
-                                <label>
-                                  <input
-                                    type="checkbox"
-                                    checked={jsonAnswer}
-                                    onChange={(e) =>
-                                      setJsonAnswer(e.target.checked)
-                                    }
-                                  />
-                                  構造化JSONで回答
-                                </label>
-                                <button
-                                  disabled={!answer}
-                                  onClick={() =>
-                                    void run(async () => {
-                                      const latest = await read({
-                                        id: current.id,
-                                        version: "head",
-                                      });
-                                      const latestRun = latest.value as Run;
-                                      if (
-                                        latestRun.state !== "paused" ||
-                                        latestRun.active_pause?.id !== record.id
-                                      )
-                                        throw Error("pause_changed");
-                                      await mutate(
-                                        current.id,
-                                        "answer",
-                                        latest.version,
-                                        {
-                                          pause_id: pause.id,
-                                          value: jsonAnswer
-                                            ? JSON.parse(answer)
-                                            : answer,
-                                        },
-                                      );
-                                      await load(current.id);
-                                      setNotice(
-                                        "回答を受領しました。配送と実行再開はまだ確認していません。",
-                                      );
-                                    })
-                                  }
-                                >
-                                  回答を送信
-                                </button>
-                              </fieldset>
+                              <PauseAnswer
+                                key={record.id}
+                                native={native}
+                                namespace={namespace}
+                                record={record}
+                                busy={busy}
+                                send={(draft) =>
+                                  run(async () => {
+                                    const latest = await read({
+                                      id: current.id,
+                                      version: "head",
+                                    });
+                                    const latestRun = latest.value as Run;
+                                    if (
+                                      latestRun.state !== "paused" ||
+                                      latestRun.active_pause?.id !==
+                                        record.id ||
+                                      latestRun.active_pause.version !==
+                                        draft.pauseVersion
+                                    )
+                                      throw Error("pause_changed");
+                                    await mutate(
+                                      current.id,
+                                      "answer",
+                                      latest.version,
+                                      {
+                                        pause_id: pause.id,
+                                        value: draft.json
+                                          ? JSON.parse(draft.value)
+                                          : draft.value,
+                                      },
+                                    );
+                                    await saveAnswerDraft(
+                                      native,
+                                      namespace,
+                                      record.id,
+                                    );
+                                    await load(current.id);
+                                    setNotice(
+                                      "回答を受領しました。配送と実行再開はまだ確認していません。",
+                                    );
+                                  })
+                                }
+                              />
                             )}
                         </>
                       ) : (
@@ -788,6 +1038,35 @@ export function RunRecords({
                             {record.kind} · {record.id} · {record.version}
                           </summary>
                           <pre>{show(record.value)}</pre>
+                          {canEdit && record.kind === "output" && (
+                            <button
+                              disabled={busy}
+                              onClick={() => {
+                                const same =
+                                  handoff && previous?.id === current.id;
+                                setPrevious({
+                                  id: current.id,
+                                  version: current.version,
+                                });
+                                setHandoff(true);
+                                setOutputs((old) => [
+                                  ...(same
+                                    ? old.filter(
+                                        (r) =>
+                                          r.id !== record.id ||
+                                          r.version !== record.version,
+                                      )
+                                    : []),
+                                  record,
+                                ]);
+                                setNotice(
+                                  "この固定出力を引継ぎ入力へ追加しました。新Runの入力欄で確認してください。",
+                                );
+                              }}
+                            >
+                              この固定出力を新Runへ引き継ぐ
+                            </button>
+                          )}
                         </details>
                       )}
                     </li>
@@ -889,9 +1168,49 @@ export function RunRecords({
             )}
             {previous && (
               <p>
-                関連元: {previous.id} · {previous.version}
-                <button onClick={() => setPrevious(null)}>関連元を外す</button>
+                {handoff ? "引継ぎ元" : "関連元"}: {previous.id} ·{" "}
+                {previous.version}
+                <button
+                  onClick={() => {
+                    setPrevious(null);
+                    setHandoff(false);
+                    setOutputs([]);
+                  }}
+                >
+                  関連元を外す
+                </button>
               </p>
+            )}
+            {handoff && (
+              <>
+                <p>
+                  選択した固定出力: {outputs.length}
+                  件。元Runの全履歴や作業領域は取り込みません。開始時に元実行の終了・重複可能性を確認します。
+                </p>
+                <ul>
+                  {outputs.map((r) => (
+                    <li key={`${r.id}:${r.version}`}>
+                      {r.id} · {r.version}
+                      <button
+                        onClick={() =>
+                          setOutputs((old) => old.filter((v) => v !== r))
+                        }
+                      >
+                        引継ぎから外す
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {!!outputs.length && !manifestID && (
+                  <label>
+                    Contextの受け渡し方法
+                    <input
+                      value={contextBinding}
+                      onChange={(e) => setContextBinding(e.target.value)}
+                    />
+                  </label>
+                )}
+              </>
             )}
             <p>
               元Runの会話・履歴は自動で取り込みません。Context・promptを省略し、commandだけでも作成できます。

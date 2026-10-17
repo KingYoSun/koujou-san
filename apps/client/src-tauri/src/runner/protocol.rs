@@ -58,6 +58,15 @@ pub(super) fn frames(
     result
 }
 
+pub(super) fn session(protocol: &str, bytes: &[u8]) -> Option<String> {
+    let value: Value = serde_json::from_slice(bytes).ok()?;
+    let id = match (protocol, value["type"].as_str()) {
+        ("codex-jsonl", Some("thread.started")) => value.get("thread_id"),
+        ("claude-jsonl", Some("system")) if value["subtype"] == "init" => value.get("session_id"),
+        _ => None,
+    }?;
+    id.as_str().map(str::to_owned)
+}
 pub(super) fn result(protocol: &str, bytes: &[u8], structured: bool) -> Option<Value> {
     let value: Value = serde_json::from_slice(bytes).ok()?;
     if protocol == "jsonl-v1" && value["koujou_event"]["type"] == "result" {
@@ -90,6 +99,27 @@ mod tests {
     use super::*;
     #[test]
     fn original_output_and_explicit_protocol_have_different_jobs() {
+        assert_eq!(
+            session(
+                "codex-jsonl",
+                br#"{"type":"thread.started","thread_id":"fixed-thread"}"#
+            ),
+            Some("fixed-thread".into())
+        );
+        assert_eq!(
+            session(
+                "claude-jsonl",
+                br#"{"type":"system","subtype":"init","session_id":"fixed-session"}"#
+            ),
+            Some("fixed-session".into())
+        );
+        assert!(
+            session(
+                "jsonl-v1",
+                br#"{"type":"system","subtype":"init","session_id":"untrusted"}"#
+            )
+            .is_none()
+        );
         let ordinary = b"Do you need a reply?\n";
         let plain = frames(
             "plain", "device", "run:one", 1, "stdout", "fixture", ordinary,

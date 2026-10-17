@@ -347,6 +347,96 @@ func testAssignments(t *testing.T, s *Service, server *httptest.Server, key []by
 		t.Fatal("new report mutated terminal Run", code)
 	}
 	contact(a.DeviceID, c)
+	t.Run("reconnect-handoff-is-explicit-and-late-output-stays-at-origin", func(t *testing.T) {
+		origin := plain("reconnect-origin")
+		origin = accept("admin", base+"/executions/reconnect-origin/assign", assign(origin, "assign-one"))
+		_, state := head(origin.ID)
+		generation := state.Assignment.Generation
+		origin = accept("assign-one", base+"/executions/reconnect-origin/report", event(origin, "1", "prepared", generation, state.Assignment.Area))
+		origin = accept("assign-one", base+"/executions/reconnect-origin/report", event(origin, "2", "started", generation, nil))
+		output := event(origin, "3", "output", generation, nil)
+		output.Channel, output.Source, output.Value = "stdout", "fixed-cli", raw("selected artifact only")
+		output.Artifacts = selected.Spec.Artifacts
+		for _, sequence := range []string{"4", "1"} {
+			bad := output
+			bad.Mutation = mutation(origin.Version)
+			bad.Sequence = sequence
+			if code, _ := request("assign-one", "POST", base+"/executions/reconnect-origin/report", bad); code != 400 {
+				t.Fatal("gap or reversed report accepted", sequence, code)
+			}
+		}
+		origin = accept("assign-one", base+"/executions/reconnect-origin/report", output)
+		if replay := accept("assign-one", base+"/executions/reconnect-origin/report", output); replay != origin {
+			t.Fatal("report receipt replay changed")
+		}
+		duplicate := output
+		duplicate.Mutation = mutation(origin.Version)
+		if code, _ := request("assign-one", "POST", base+"/executions/reconnect-origin/report", duplicate); code != 400 {
+			t.Fatal("duplicate sequence appended", code)
+		}
+		outputRef := Ref{ID: "run-output:reconnect-origin:3", Version: origin.Version}
+		origin = accept("assign-one", base+"/executions/reconnect-origin/report", event(origin, "4", "unknown", generation, nil))
+		prepare := func(id string, source Ref) Ref {
+			return accept("editor", base+"/executions/"+id+"/create", Create{Mutation: mutation("0"), Handoff: true, Spec: Spec{Previous: &source, Sources: []Ref{outputRef}, Artifacts: output.Artifacts, Input: Input{Context: raw("selected artifact only"), Prompt: raw("explicit new input"), Command: Command{Kind: "cli", Target: "fixture", Binding: map[string]string{"context": "stdin", "prompt": "stdin"}}}}})
+		}
+		next := prepare("reconnect-next", origin)
+		_, queued := head(next.ID)
+		if queued.ExecutionRequestedAt != nil || queued.Handoff == nil {
+			t.Fatal("handoff preparation started execution")
+		}
+		if code, _ := request("admin", "POST", base+"/executions/reconnect-next/request-start", mutation(next.Version)); code != 409 {
+			t.Fatal("unjudged handoff started", code)
+		}
+		req := assign(next, "assign-two")
+		req.HandoffSource = &origin
+		if code, _ := request("admin", "POST", base+"/executions/reconnect-next/assign", req); code != 409 {
+			t.Fatal("unknown source silently duplicated", code)
+		}
+		req.Mutation = mutation(next.Version)
+		req.AllowDuplicate = true
+		wrong := Ref{ID: origin.ID, Version: outputRef.Version}
+		req.HandoffSource = &wrong
+		if code, _ := request("admin", "POST", base+"/executions/reconnect-next/assign", req); code != 409 {
+			t.Fatal("stale source accepted", code)
+		}
+		req.Mutation = mutation(next.Version)
+		req.HandoffSource = &origin
+		if code, _ := request("viewer", "POST", base+"/executions/reconnect-next/assign", req); code != 403 {
+			t.Fatal("handoff granted execute", code)
+		}
+		next = accept("admin", base+"/executions/reconnect-next/assign", req)
+		before, nextState := head(next.ID)
+		if nextState.Input == state.Input || nextState.Assignment.Area.ID == state.Assignment.Area.ID {
+			t.Fatal("handoff reused input or worktree")
+		}
+		h := nextState.Handoff
+		if h.Decision == nil || h.Decision.Judgment != "duplicate_possible" || h.Decision.By != "admin" || h.Decision.Source != origin {
+			t.Fatal("missing explicit duplicate judgment")
+		}
+		late := event(origin, "5", "output", generation, nil)
+		late.Channel, late.Source, late.Value = "stdout", "fixed-cli", raw("late original output")
+		origin = accept("assign-one", base+"/executions/reconnect-origin/report", late)
+		finish := event(origin, "6", "finished", generation, nil)
+		finish.ExitCode = &zero
+		origin = accept("assign-one", base+"/executions/reconnect-origin/report", finish)
+		after, _ := head(next.ID)
+		if before.Ref != after.Ref || !bytes.Equal(before.Value, after.Value) {
+			t.Fatal("late origin advanced next Run")
+		}
+		endedNext := prepare("confirmed-handoff", origin)
+		confirmed := assign(endedNext, "assign-two")
+		confirmed.HandoffSource = &origin
+		endedNext = accept("admin", base+"/executions/confirmed-handoff/assign", confirmed)
+		_, final := head(endedNext.ID)
+		if final.Handoff.Decision.Judgment != "confirmed_end" {
+			t.Fatal("confirmed end lost")
+		}
+		// History and explicit fixed artifacts survive, without inheriting all input/history.
+		input, err := s.input(ctx, db, "assignment", final)
+		if err != nil || string(input.Input.Context) != `"selected artifact only"` || len(input.Sources) != 1 || input.Sources[0] != outputRef || len(input.Artifacts) != 1 {
+			t.Fatal("handoff fixed input changed", err)
+		}
+	})
 	exec(`UPDATE access_members SET can_execute=false WHERE workspace_id='assignment' AND user_id='admin'`)
 	code, _ = request(a.DeviceID, "POST", base+"/executions/one/report", event(current.Ref, "5", "known", a.Generation, nil))
 	if code != 403 {

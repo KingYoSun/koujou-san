@@ -1,0 +1,3532 @@
+{
+  "scope": "owned synthetic Windows/WSL CLI and isolated Ory/PostgreSQL API",
+  "actualOsSleep": false,
+  "records": {
+    "network-win": {
+      "final": {
+        "id": "run:network-win",
+        "version": "WFXBIEIWXYSRI4YCVXYW7HAU6R",
+        "run_id": "run:network-win",
+        "kind": "run",
+        "position": "29",
+        "value": {
+          "name": "復旧受入 network-win",
+          "input": {
+            "id": "run-input:network-win",
+            "version": "5AJLZ7UUIIELCCQY6LLXJJBYRY"
+          },
+          "state": "succeeded",
+          "execution": {
+            "stop": false,
+            "pause": true,
+            "version": "fixture-v1",
+            "environment": "windows",
+            "version_observed": true
+          },
+          "exit_code": 0,
+          "assignment": {
+            "input": {
+              "id": "run-input:network-win",
+              "version": "5AJLZ7UUIIELCCQY6LLXJJBYRY"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "reconnect-windows",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:13:34.8332667Z",
+            "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+            "prepared_at": "2026-10-17T01:11:24.4991926Z",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "OE4RKFOI3HJ75XVPCWEN4JKVTC"
+          },
+          "created_at": "2026-10-17T01:11:23.5282072Z",
+          "started_at": "2026-10-17T01:11:24.7339359Z",
+          "finished_at": "2026-10-17T01:11:34.9289625Z",
+          "observation": "known",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": false,
+          "reported_through": "15",
+          "execution_requested_at": "2026-10-17T01:11:23.5547062Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:network-win",
+            "version": "5AJLZ7UUIIELCCQY6LLXJJBYRY"
+          }
+        ]
+      },
+      "local": {
+        "execution": [
+          "RE4STZZLMTBXNVLUSUFNMYFUMF",
+          "completed",
+          46040
+        ],
+        "frames": [
+          {
+            "position": 1,
+            "operation": "5f37308b-4739-4994-b900-0fb069b136b7",
+            "body": {
+              "expected_version": "TOKES7VAXY27A2GDNTYRDCQNCK",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "5f37308b-4739-4994-b900-0fb069b136b7",
+              "prepared_area": null,
+              "sequence": "1",
+              "type": "prepared"
+            },
+            "sent": true
+          },
+          {
+            "position": 2,
+            "operation": "7601ff05-bd9a-4db1-9657-a5e6f89a9d80",
+            "body": {
+              "execution": {
+                "environment": "windows",
+                "pause": true,
+                "stop": false,
+                "version": "fixture-v1",
+                "version_observed": true
+              },
+              "expected_version": "KIS37A5MCXRP3GIUMC3I7VR77P",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "7601ff05-bd9a-4db1-9657-a5e6f89a9d80",
+              "sequence": "2",
+              "type": "started"
+            },
+            "sent": true
+          },
+          {
+            "position": 3,
+            "operation": "1304c379-9d7a-4716-a47d-b5db4d7f437b",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "MWU4M44UDEV5NTHUPFUZL6GJSW",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "1304c379-9d7a-4716-a47d-b5db4d7f437b",
+              "sequence": "3",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 0, \"pid\": 46040}\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 4,
+            "operation": "f296fd92-1ce2-4ce8-a885-3aeb05232525",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "NSBWGZHIIYPBT3D62BOB2IS4FJ",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "f296fd92-1ce2-4ce8-a885-3aeb05232525",
+              "sequence": "4",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 1, \"pid\": 46040}\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 5,
+            "operation": "754ad008-9e7d-4ecb-885b-907a5e980825",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "B22HA2FPGPYADNK5IQ2VL6G2Q5",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "754ad008-9e7d-4ecb-885b-907a5e980825",
+              "sequence": "5",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 2, \"pid\": 46040}\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 6,
+            "operation": "98c48248-f674-4eef-bce9-07b382fee206",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "YFEUJLMU6VVLXKO6QRYL6N57TN",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "98c48248-f674-4eef-bce9-07b382fee206",
+              "sequence": "6",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 3, \"pid\": 46040}\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 7,
+            "operation": "c18f3373-7927-47b7-84e7-c3b70a2bb247",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "6LY5KZ5VLU4FQ63XU6MJGENBZU",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "c18f3373-7927-47b7-84e7-c3b70a2bb247",
+              "sequence": "7",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 4, \"pid\": 46040}\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 8,
+            "operation": "aad74c26-9158-49a2-89b1-ffc7a86ed41b",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "FLIM7L3XSZ77Z7SNXNLWJJG5GD",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "aad74c26-9158-49a2-89b1-ffc7a86ed41b",
+              "sequence": "8",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 5, \"pid\": 46040}\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 9,
+            "operation": "4793deaf-035c-4200-992a-b288c5391a7c",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "USVBYDDZV3ZXKJJER2KPIOQ5QO",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "4793deaf-035c-4200-992a-b288c5391a7c",
+              "sequence": "9",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 6, \"pid\": 46040}\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 10,
+            "operation": "3d31e086-d9f8-404c-aed7-f3b48a554c5e",
+            "body": {
+              "expected_version": "RBU67K5U4JOJJMJFMUZOHQ74MZ",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "3d31e086-d9f8-404c-aed7-f3b48a554c5e",
+              "sequence": "10",
+              "source": "same_process_observed",
+              "type": "known"
+            },
+            "sent": true
+          },
+          {
+            "position": 11,
+            "operation": "4fbca1ee-9228-4c81-a3ce-b4ab5b17067a",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "CLDK6LNERPZV7LSCDWTJZE5NYS",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "4fbca1ee-9228-4c81-a3ce-b4ab5b17067a",
+              "sequence": "11",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 7, \"pid\": 46040}\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 12,
+            "operation": "19d6f86f-0cb9-42ba-881e-82ef7fcbcb11",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "LIMORHCPTQOCVO46DP6P3AU33W",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "19d6f86f-0cb9-42ba-881e-82ef7fcbcb11",
+              "sequence": "12",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 8, \"pid\": 46040}\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 13,
+            "operation": "88ce0da8-9467-4d08-8282-acf0864a3135",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "TITGMZIYJEGYCOX4BTWYLPO7A4",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "88ce0da8-9467-4d08-8282-acf0864a3135",
+              "sequence": "13",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 9, \"pid\": 46040}\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 14,
+            "operation": "ad44b36c-68ca-41cc-8f5b-b3dfe1934a93",
+            "body": {
+              "channel": "stderr",
+              "expected_version": "V6MTJL3UKER3RAGXPAPKBU6IXO",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "ad44b36c-68ca-41cc-8f5b-b3dfe1934a93",
+              "sequence": "14",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "RECONNECT_STDERR_ORIGINAL\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 15,
+            "operation": "e122a989-2c94-44c9-876f-06715359b47b",
+            "body": {
+              "exit_code": 0,
+              "expected_version": "MARD54PNDDPNQIUJZYJ52VW7X5",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "e122a989-2c94-44c9-876f-06715359b47b",
+              "report": null,
+              "sequence": "15",
+              "type": "finished"
+            },
+            "sent": true
+          }
+        ],
+        "logs": [
+          {
+            "position": 1,
+            "channel": "stdout",
+            "raw": "{\"number\": 0, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 2,
+            "channel": "stdout",
+            "raw": "{\"number\": 1, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 3,
+            "channel": "stdout",
+            "raw": "{\"number\": 2, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 4,
+            "channel": "stdout",
+            "raw": "{\"number\": 3, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 5,
+            "channel": "stdout",
+            "raw": "{\"number\": 4, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 6,
+            "channel": "stdout",
+            "raw": "{\"number\": 5, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 7,
+            "channel": "stdout",
+            "raw": "{\"number\": 6, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 8,
+            "channel": "stdout",
+            "raw": "{\"number\": 7, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 9,
+            "channel": "stdout",
+            "raw": "{\"number\": 8, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 10,
+            "channel": "stdout",
+            "raw": "{\"number\": 9, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 11,
+            "channel": "stderr",
+            "raw": "RECONNECT_STDERR_ORIGINAL\r\n"
+          }
+        ],
+        "identity": {
+          "environment": "Windows",
+          "process": {
+            "created": "134366730846726447",
+            "pid": 46040,
+            "running": true
+          },
+          "protocol": "jsonl-v1",
+          "session_kind": "anonymous_stdio",
+          "transfer_verified": false
+        }
+      },
+      "during": {
+        "execution": [
+          "RE4STZZLMTBXNVLUSUFNMYFUMF",
+          "unconfirmed",
+          46040
+        ],
+        "frames": [
+          {
+            "position": 1,
+            "operation": "5f37308b-4739-4994-b900-0fb069b136b7",
+            "body": {
+              "expected_version": "TOKES7VAXY27A2GDNTYRDCQNCK",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "5f37308b-4739-4994-b900-0fb069b136b7",
+              "prepared_area": null,
+              "sequence": "1",
+              "type": "prepared"
+            },
+            "sent": true
+          },
+          {
+            "position": 2,
+            "operation": "7601ff05-bd9a-4db1-9657-a5e6f89a9d80",
+            "body": {
+              "execution": {
+                "environment": "windows",
+                "pause": true,
+                "stop": false,
+                "version": "fixture-v1",
+                "version_observed": true
+              },
+              "expected_version": "KIS37A5MCXRP3GIUMC3I7VR77P",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "7601ff05-bd9a-4db1-9657-a5e6f89a9d80",
+              "sequence": "2",
+              "type": "started"
+            },
+            "sent": true
+          },
+          {
+            "position": 3,
+            "operation": "1304c379-9d7a-4716-a47d-b5db4d7f437b",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "MWU4M44UDEV5NTHUPFUZL6GJSW",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "1304c379-9d7a-4716-a47d-b5db4d7f437b",
+              "sequence": "3",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 0, \"pid\": 46040}\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 4,
+            "operation": "f296fd92-1ce2-4ce8-a885-3aeb05232525",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "NSBWGZHIIYPBT3D62BOB2IS4FJ",
+              "generation": "RE4STZZLMTBXNVLUSUFNMYFUMF",
+              "operation_id": "f296fd92-1ce2-4ce8-a885-3aeb05232525",
+              "sequence": "4",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 1, \"pid\": 46040}\r\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 5,
+            "operation": "754ad008-9e7d-4ecb-885b-907a5e980825",
+            "body": {
+              "channel": "stdout",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 2, \"pid\": 46040}\r\n"
+            },
+            "sent": false
+          },
+          {
+            "position": 6,
+            "operation": "98c48248-f674-4eef-bce9-07b382fee206",
+            "body": {
+              "channel": "stdout",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 3, \"pid\": 46040}\r\n"
+            },
+            "sent": false
+          },
+          {
+            "position": 7,
+            "operation": "c18f3373-7927-47b7-84e7-c3b70a2bb247",
+            "body": {
+              "channel": "stdout",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 4, \"pid\": 46040}\r\n"
+            },
+            "sent": false
+          },
+          {
+            "position": 8,
+            "operation": "aad74c26-9158-49a2-89b1-ffc7a86ed41b",
+            "body": {
+              "channel": "stdout",
+              "source": "reconnect-windows",
+              "type": "output",
+              "value": "{\"number\": 5, \"pid\": 46040}\r\n"
+            },
+            "sent": false
+          }
+        ],
+        "logs": [
+          {
+            "position": 1,
+            "channel": "stdout",
+            "raw": "{\"number\": 0, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 2,
+            "channel": "stdout",
+            "raw": "{\"number\": 1, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 3,
+            "channel": "stdout",
+            "raw": "{\"number\": 2, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 4,
+            "channel": "stdout",
+            "raw": "{\"number\": 3, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 5,
+            "channel": "stdout",
+            "raw": "{\"number\": 4, \"pid\": 46040}\r\n"
+          },
+          {
+            "position": 6,
+            "channel": "stdout",
+            "raw": "{\"number\": 5, \"pid\": 46040}\r\n"
+          }
+        ],
+        "identity": {
+          "environment": "Windows",
+          "process": {
+            "created": "134366730846726447",
+            "pid": 46040,
+            "running": true
+          },
+          "protocol": "jsonl-v1",
+          "session_kind": "anonymous_stdio",
+          "transfer_verified": false
+        }
+      },
+      "numbered": [
+        {
+          "number": 0,
+          "pid": 46040
+        },
+        {
+          "number": 1,
+          "pid": 46040
+        },
+        {
+          "number": 2,
+          "pid": 46040
+        },
+        {
+          "number": 3,
+          "pid": 46040
+        },
+        {
+          "number": 4,
+          "pid": 46040
+        },
+        {
+          "number": 5,
+          "pid": 46040
+        },
+        {
+          "number": 6,
+          "pid": 46040
+        },
+        {
+          "number": 7,
+          "pid": 46040
+        },
+        {
+          "number": 8,
+          "pid": 46040
+        },
+        {
+          "number": 9,
+          "pid": 46040
+        }
+      ],
+      "outputs": [
+        {
+          "id": "run-output:network-win:3",
+          "version": "NSBWGZHIIYPBT3D62BOB2IS4FJ",
+          "run_id": "run:network-win",
+          "kind": "output",
+          "position": "14",
+          "value": {
+            "at": "2026-10-17T01:11:25.0546774Z",
+            "value": "{\"number\": 0, \"pid\": 46040}\r\n",
+            "source": "reconnect-windows",
+            "channel": "stdout",
+            "sequence": "3"
+          },
+          "refs": [
+            {
+              "id": "run:network-win",
+              "version": "NSBWGZHIIYPBT3D62BOB2IS4FJ"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-win:4",
+          "version": "7ZPVQBYWPGOWQD3ECOLU75PMQ2",
+          "run_id": "run:network-win",
+          "kind": "output",
+          "position": "15",
+          "value": {
+            "at": "2026-10-17T01:11:25.8966747Z",
+            "value": "{\"number\": 1, \"pid\": 46040}\r\n",
+            "source": "reconnect-windows",
+            "channel": "stdout",
+            "sequence": "4"
+          },
+          "refs": [
+            {
+              "id": "run:network-win",
+              "version": "7ZPVQBYWPGOWQD3ECOLU75PMQ2"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-win:5",
+          "version": "VNNVFBPEAN3XMT5UUSJYIQDGVI",
+          "run_id": "run:network-win",
+          "kind": "output",
+          "position": "17",
+          "value": {
+            "at": "2026-10-17T01:11:30.5435134Z",
+            "value": "{\"number\": 2, \"pid\": 46040}\r\n",
+            "source": "reconnect-windows",
+            "channel": "stdout",
+            "sequence": "5"
+          },
+          "refs": [
+            {
+              "id": "run:network-win",
+              "version": "VNNVFBPEAN3XMT5UUSJYIQDGVI"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-win:6",
+          "version": "6LY5KZ5VLU4FQ63XU6MJGENBZU",
+          "run_id": "run:network-win",
+          "kind": "output",
+          "position": "19",
+          "value": {
+            "at": "2026-10-17T01:11:30.9481166Z",
+            "value": "{\"number\": 3, \"pid\": 46040}\r\n",
+            "source": "reconnect-windows",
+            "channel": "stdout",
+            "sequence": "6"
+          },
+          "refs": [
+            {
+              "id": "run:network-win",
+              "version": "6LY5KZ5VLU4FQ63XU6MJGENBZU"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-win:7",
+          "version": "FLIM7L3XSZ77Z7SNXNLWJJG5GD",
+          "run_id": "run:network-win",
+          "kind": "output",
+          "position": "20",
+          "value": {
+            "at": "2026-10-17T01:11:30.9993006Z",
+            "value": "{\"number\": 4, \"pid\": 46040}\r\n",
+            "source": "reconnect-windows",
+            "channel": "stdout",
+            "sequence": "7"
+          },
+          "refs": [
+            {
+              "id": "run:network-win",
+              "version": "FLIM7L3XSZ77Z7SNXNLWJJG5GD"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-win:8",
+          "version": "USVBYDDZV3ZXKJJER2KPIOQ5QO",
+          "run_id": "run:network-win",
+          "kind": "output",
+          "position": "21",
+          "value": {
+            "at": "2026-10-17T01:11:31.0562044Z",
+            "value": "{\"number\": 5, \"pid\": 46040}\r\n",
+            "source": "reconnect-windows",
+            "channel": "stdout",
+            "sequence": "8"
+          },
+          "refs": [
+            {
+              "id": "run:network-win",
+              "version": "USVBYDDZV3ZXKJJER2KPIOQ5QO"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-win:9",
+          "version": "RBU67K5U4JOJJMJFMUZOHQ74MZ",
+          "run_id": "run:network-win",
+          "kind": "output",
+          "position": "22",
+          "value": {
+            "at": "2026-10-17T01:11:31.1087037Z",
+            "value": "{\"number\": 6, \"pid\": 46040}\r\n",
+            "source": "reconnect-windows",
+            "channel": "stdout",
+            "sequence": "9"
+          },
+          "refs": [
+            {
+              "id": "run:network-win",
+              "version": "RBU67K5U4JOJJMJFMUZOHQ74MZ"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-win:11",
+          "version": "LIMORHCPTQOCVO46DP6P3AU33W",
+          "run_id": "run:network-win",
+          "kind": "output",
+          "position": "24",
+          "value": {
+            "at": "2026-10-17T01:11:32.0316081Z",
+            "value": "{\"number\": 7, \"pid\": 46040}\r\n",
+            "source": "reconnect-windows",
+            "channel": "stdout",
+            "sequence": "11"
+          },
+          "refs": [
+            {
+              "id": "run:network-win",
+              "version": "LIMORHCPTQOCVO46DP6P3AU33W"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-win:12",
+          "version": "TITGMZIYJEGYCOX4BTWYLPO7A4",
+          "run_id": "run:network-win",
+          "kind": "output",
+          "position": "25",
+          "value": {
+            "at": "2026-10-17T01:11:32.8824953Z",
+            "value": "{\"number\": 8, \"pid\": 46040}\r\n",
+            "source": "reconnect-windows",
+            "channel": "stdout",
+            "sequence": "12"
+          },
+          "refs": [
+            {
+              "id": "run:network-win",
+              "version": "TITGMZIYJEGYCOX4BTWYLPO7A4"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-win:13",
+          "version": "Q636EAB5GM3SZ2WY7HVEG6GM2V",
+          "run_id": "run:network-win",
+          "kind": "output",
+          "position": "26",
+          "value": {
+            "at": "2026-10-17T01:11:33.992486Z",
+            "value": "{\"number\": 9, \"pid\": 46040}\r\n",
+            "source": "reconnect-windows",
+            "channel": "stdout",
+            "sequence": "13"
+          },
+          "refs": [
+            {
+              "id": "run:network-win",
+              "version": "Q636EAB5GM3SZ2WY7HVEG6GM2V"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-win:14",
+          "version": "MARD54PNDDPNQIUJZYJ52VW7X5",
+          "run_id": "run:network-win",
+          "kind": "output",
+          "position": "28",
+          "value": {
+            "at": "2026-10-17T01:11:34.8774634Z",
+            "value": "RECONNECT_STDERR_ORIGINAL\r\n",
+            "source": "reconnect-windows",
+            "channel": "stderr",
+            "sequence": "14"
+          },
+          "refs": [
+            {
+              "id": "run:network-win",
+              "version": "MARD54PNDDPNQIUJZYJ52VW7X5"
+            }
+          ]
+        }
+      ],
+      "launches": [
+        {
+          "pid": 46040,
+          "input": {
+            "input": {
+              "context": {
+                "order": [
+                  2,
+                  1
+                ],
+                "source": "fixed reconnect input"
+              },
+              "prompt": "再起動しても固定する入力"
+            },
+            "parameters": [
+              "reconnect"
+            ],
+            "type": "input"
+          }
+        }
+      ]
+    },
+    "network-wsl": {
+      "final": {
+        "id": "run:network-wsl",
+        "version": "5I3JUMF63XSKIDPK6K7M5L45YX",
+        "run_id": "run:network-wsl",
+        "kind": "run",
+        "position": "53",
+        "value": {
+          "name": "復旧受入 network-wsl",
+          "input": {
+            "id": "run-input:network-wsl",
+            "version": "D6OZAVOLUSXSZYAHMJWYNTLS3F"
+          },
+          "state": "succeeded",
+          "execution": {
+            "stop": false,
+            "pause": true,
+            "version": "fixture-v1",
+            "environment": "wsl:Ubuntu-22.04",
+            "version_observed": true
+          },
+          "exit_code": 0,
+          "assignment": {
+            "input": {
+              "id": "run-input:network-wsl",
+              "version": "D6OZAVOLUSXSZYAHMJWYNTLS3F"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "reconnect-wsl",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "WSL Ubuntu-22.04",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:14:05.5106906Z",
+            "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+            "prepared_at": "2026-10-17T01:11:54.3838281Z",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "OE4RKFOI3HJ75XVPCWEN4JKVTC"
+          },
+          "created_at": "2026-10-17T01:11:35.2933484Z",
+          "started_at": "2026-10-17T01:11:55.0263103Z",
+          "finished_at": "2026-10-17T01:12:05.6076884Z",
+          "observation": "known",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": false,
+          "reported_through": "15",
+          "execution_requested_at": "2026-10-17T01:11:35.3194144Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:network-wsl",
+            "version": "D6OZAVOLUSXSZYAHMJWYNTLS3F"
+          }
+        ]
+      },
+      "local": {
+        "execution": [
+          "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+          "completed",
+          51224
+        ],
+        "frames": [
+          {
+            "position": 16,
+            "operation": "31e8594f-20e0-4d8d-bce7-431defe17726",
+            "body": {
+              "expected_version": "2QHGTSL5MSS2E6DTBQTPGH5KIF",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "31e8594f-20e0-4d8d-bce7-431defe17726",
+              "prepared_area": null,
+              "sequence": "1",
+              "type": "prepared"
+            },
+            "sent": true
+          },
+          {
+            "position": 17,
+            "operation": "6f618779-bd30-4afd-88cd-0e0b3cbf357d",
+            "body": {
+              "execution": {
+                "environment": "wsl:Ubuntu-22.04",
+                "pause": true,
+                "stop": false,
+                "version": "fixture-v1",
+                "version_observed": true
+              },
+              "expected_version": "CZDBWT63LB4YAK4IUITLGEMEJI",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "6f618779-bd30-4afd-88cd-0e0b3cbf357d",
+              "sequence": "2",
+              "type": "started"
+            },
+            "sent": true
+          },
+          {
+            "position": 18,
+            "operation": "9e757568-fb4e-4cfc-b225-52d07b799537",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "LGOYDW2U5QULHWPKLFB55ETUYE",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "9e757568-fb4e-4cfc-b225-52d07b799537",
+              "sequence": "3",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 0, \"pid\": 219774}\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 19,
+            "operation": "0879c770-22e8-4e9c-94a6-a86796b1e534",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "JL5U2IWFAX2RQVY2BOXDZSOBBN",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "0879c770-22e8-4e9c-94a6-a86796b1e534",
+              "sequence": "4",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 1, \"pid\": 219774}\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 20,
+            "operation": "1cd0b4a4-fd91-4d83-a4e4-2bc25c4212d9",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "L6OIWRWXYEJRUFGPGL2YGX2ONQ",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "1cd0b4a4-fd91-4d83-a4e4-2bc25c4212d9",
+              "sequence": "5",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 2, \"pid\": 219774}\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 21,
+            "operation": "a3159fd7-771d-404a-b06a-672cc3af727d",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "KTAEIY2B65YHWCWYBFPJNY5VBU",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "a3159fd7-771d-404a-b06a-672cc3af727d",
+              "sequence": "6",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 3, \"pid\": 219774}\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 22,
+            "operation": "2d62fb76-8f17-4b2d-8399-92d06b57afd4",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "IHQJQDOU776IGGADUI5KWNQUFX",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "2d62fb76-8f17-4b2d-8399-92d06b57afd4",
+              "sequence": "7",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 4, \"pid\": 219774}\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 23,
+            "operation": "bca13ae6-3ecb-4596-b789-238fbdbd94d4",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "2MHTTQ2CIN66OZ5VSHBEK4CAKW",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "bca13ae6-3ecb-4596-b789-238fbdbd94d4",
+              "sequence": "8",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 5, \"pid\": 219774}\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 24,
+            "operation": "cf5cc128-9064-4c19-9fd2-0d1ac97cb64a",
+            "body": {
+              "expected_version": "QQHL3R4BY5NPETTD6NIPO7DNUI",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "cf5cc128-9064-4c19-9fd2-0d1ac97cb64a",
+              "sequence": "9",
+              "source": "same_process_observed",
+              "type": "known"
+            },
+            "sent": true
+          },
+          {
+            "position": 25,
+            "operation": "e438c837-fb7e-45f8-aaa7-c70ea94a3ebd",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "EKUX7IVLT34IIFHX5RKXZNPYVQ",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "e438c837-fb7e-45f8-aaa7-c70ea94a3ebd",
+              "sequence": "10",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 6, \"pid\": 219774}\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 26,
+            "operation": "d4fbe3da-7aa2-4b98-aa5f-046895bacebb",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "QY6D7AYF5HG5G7MQZLSGG6D6GY",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "d4fbe3da-7aa2-4b98-aa5f-046895bacebb",
+              "sequence": "11",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 7, \"pid\": 219774}\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 27,
+            "operation": "7d893f31-8ce2-4c34-bbf1-19438d39ad94",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "4RD3DLLB3UCU7DG6KBUEVPVVKG",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "7d893f31-8ce2-4c34-bbf1-19438d39ad94",
+              "sequence": "12",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 8, \"pid\": 219774}\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 28,
+            "operation": "97580aaa-6eab-499e-821b-71ced39112c0",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "CTABEPQMW3BQY4UXWDN2672E6S",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "97580aaa-6eab-499e-821b-71ced39112c0",
+              "sequence": "13",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 9, \"pid\": 219774}\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 29,
+            "operation": "b3c71e73-d517-40ea-822d-f4898d2222fb",
+            "body": {
+              "channel": "stderr",
+              "expected_version": "BC3XDRDTMGGD2KAWQTN7P4ODPN",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "b3c71e73-d517-40ea-822d-f4898d2222fb",
+              "sequence": "14",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "RECONNECT_STDERR_ORIGINAL\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 30,
+            "operation": "0c05c57a-5da9-406f-a535-85f0a120ba9e",
+            "body": {
+              "exit_code": 0,
+              "expected_version": "OMUBICVULSYXD4E2FMS2QGTHZV",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "0c05c57a-5da9-406f-a535-85f0a120ba9e",
+              "report": null,
+              "sequence": "15",
+              "type": "finished"
+            },
+            "sent": true
+          }
+        ],
+        "logs": [
+          {
+            "position": 12,
+            "channel": "stdout",
+            "raw": "{\"number\": 0, \"pid\": 219774}\n"
+          },
+          {
+            "position": 13,
+            "channel": "stdout",
+            "raw": "{\"number\": 1, \"pid\": 219774}\n"
+          },
+          {
+            "position": 14,
+            "channel": "stdout",
+            "raw": "{\"number\": 2, \"pid\": 219774}\n"
+          },
+          {
+            "position": 15,
+            "channel": "stdout",
+            "raw": "{\"number\": 3, \"pid\": 219774}\n"
+          },
+          {
+            "position": 16,
+            "channel": "stdout",
+            "raw": "{\"number\": 4, \"pid\": 219774}\n"
+          },
+          {
+            "position": 17,
+            "channel": "stdout",
+            "raw": "{\"number\": 5, \"pid\": 219774}\n"
+          },
+          {
+            "position": 18,
+            "channel": "stdout",
+            "raw": "{\"number\": 6, \"pid\": 219774}\n"
+          },
+          {
+            "position": 19,
+            "channel": "stdout",
+            "raw": "{\"number\": 7, \"pid\": 219774}\n"
+          },
+          {
+            "position": 20,
+            "channel": "stdout",
+            "raw": "{\"number\": 8, \"pid\": 219774}\n"
+          },
+          {
+            "position": 21,
+            "channel": "stdout",
+            "raw": "{\"number\": 9, \"pid\": 219774}\n"
+          },
+          {
+            "position": 22,
+            "channel": "stderr",
+            "raw": "RECONNECT_STDERR_ORIGINAL\n"
+          }
+        ],
+        "identity": {
+          "environment": "WSL Ubuntu-22.04",
+          "process": {
+            "created": "134366731149553190",
+            "pid": 51224,
+            "running": true
+          },
+          "protocol": "jsonl-v1",
+          "session_kind": "anonymous_stdio",
+          "transfer_verified": false
+        }
+      },
+      "during": {
+        "execution": [
+          "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+          "unconfirmed",
+          51224
+        ],
+        "frames": [
+          {
+            "position": 16,
+            "operation": "31e8594f-20e0-4d8d-bce7-431defe17726",
+            "body": {
+              "expected_version": "2QHGTSL5MSS2E6DTBQTPGH5KIF",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "31e8594f-20e0-4d8d-bce7-431defe17726",
+              "prepared_area": null,
+              "sequence": "1",
+              "type": "prepared"
+            },
+            "sent": true
+          },
+          {
+            "position": 17,
+            "operation": "6f618779-bd30-4afd-88cd-0e0b3cbf357d",
+            "body": {
+              "execution": {
+                "environment": "wsl:Ubuntu-22.04",
+                "pause": true,
+                "stop": false,
+                "version": "fixture-v1",
+                "version_observed": true
+              },
+              "expected_version": "CZDBWT63LB4YAK4IUITLGEMEJI",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "6f618779-bd30-4afd-88cd-0e0b3cbf357d",
+              "sequence": "2",
+              "type": "started"
+            },
+            "sent": true
+          },
+          {
+            "position": 18,
+            "operation": "9e757568-fb4e-4cfc-b225-52d07b799537",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "LGOYDW2U5QULHWPKLFB55ETUYE",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "9e757568-fb4e-4cfc-b225-52d07b799537",
+              "sequence": "3",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 0, \"pid\": 219774}\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 19,
+            "operation": "0879c770-22e8-4e9c-94a6-a86796b1e534",
+            "body": {
+              "channel": "stdout",
+              "expected_version": "JL5U2IWFAX2RQVY2BOXDZSOBBN",
+              "generation": "W7BRVGIG3XQ4LEIJL7QQXUXJCT",
+              "operation_id": "0879c770-22e8-4e9c-94a6-a86796b1e534",
+              "sequence": "4",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 1, \"pid\": 219774}\n"
+            },
+            "sent": true
+          },
+          {
+            "position": 20,
+            "operation": "1cd0b4a4-fd91-4d83-a4e4-2bc25c4212d9",
+            "body": {
+              "channel": "stdout",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 2, \"pid\": 219774}\n"
+            },
+            "sent": false
+          },
+          {
+            "position": 21,
+            "operation": "a3159fd7-771d-404a-b06a-672cc3af727d",
+            "body": {
+              "channel": "stdout",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 3, \"pid\": 219774}\n"
+            },
+            "sent": false
+          },
+          {
+            "position": 22,
+            "operation": "2d62fb76-8f17-4b2d-8399-92d06b57afd4",
+            "body": {
+              "channel": "stdout",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 4, \"pid\": 219774}\n"
+            },
+            "sent": false
+          },
+          {
+            "position": 23,
+            "operation": "bca13ae6-3ecb-4596-b789-238fbdbd94d4",
+            "body": {
+              "channel": "stdout",
+              "source": "reconnect-wsl",
+              "type": "output",
+              "value": "{\"number\": 5, \"pid\": 219774}\n"
+            },
+            "sent": false
+          }
+        ],
+        "logs": [
+          {
+            "position": 12,
+            "channel": "stdout",
+            "raw": "{\"number\": 0, \"pid\": 219774}\n"
+          },
+          {
+            "position": 13,
+            "channel": "stdout",
+            "raw": "{\"number\": 1, \"pid\": 219774}\n"
+          },
+          {
+            "position": 14,
+            "channel": "stdout",
+            "raw": "{\"number\": 2, \"pid\": 219774}\n"
+          },
+          {
+            "position": 15,
+            "channel": "stdout",
+            "raw": "{\"number\": 3, \"pid\": 219774}\n"
+          },
+          {
+            "position": 16,
+            "channel": "stdout",
+            "raw": "{\"number\": 4, \"pid\": 219774}\n"
+          },
+          {
+            "position": 17,
+            "channel": "stdout",
+            "raw": "{\"number\": 5, \"pid\": 219774}\n"
+          }
+        ],
+        "identity": {
+          "environment": "WSL Ubuntu-22.04",
+          "process": {
+            "created": "134366731149553190",
+            "pid": 51224,
+            "running": true
+          },
+          "protocol": "jsonl-v1",
+          "session_kind": "anonymous_stdio",
+          "transfer_verified": false
+        }
+      },
+      "numbered": [
+        {
+          "number": 0,
+          "pid": 219774
+        },
+        {
+          "number": 1,
+          "pid": 219774
+        },
+        {
+          "number": 2,
+          "pid": 219774
+        },
+        {
+          "number": 3,
+          "pid": 219774
+        },
+        {
+          "number": 4,
+          "pid": 219774
+        },
+        {
+          "number": 5,
+          "pid": 219774
+        },
+        {
+          "number": 6,
+          "pid": 219774
+        },
+        {
+          "number": 7,
+          "pid": 219774
+        },
+        {
+          "number": 8,
+          "pid": 219774
+        },
+        {
+          "number": 9,
+          "pid": 219774
+        }
+      ],
+      "outputs": [
+        {
+          "id": "run-output:network-wsl:3",
+          "version": "JL5U2IWFAX2RQVY2BOXDZSOBBN",
+          "run_id": "run:network-wsl",
+          "kind": "output",
+          "position": "36",
+          "value": {
+            "at": "2026-10-17T01:11:55.6372926Z",
+            "value": "{\"number\": 0, \"pid\": 219774}\n",
+            "source": "reconnect-wsl",
+            "channel": "stdout",
+            "sequence": "3"
+          },
+          "refs": [
+            {
+              "id": "run:network-wsl",
+              "version": "JL5U2IWFAX2RQVY2BOXDZSOBBN"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-wsl:4",
+          "version": "ABDSUJN7BDTX7NGGZY7T7A6HGI",
+          "run_id": "run:network-wsl",
+          "kind": "output",
+          "position": "37",
+          "value": {
+            "at": "2026-10-17T01:11:56.5242793Z",
+            "value": "{\"number\": 1, \"pid\": 219774}\n",
+            "source": "reconnect-wsl",
+            "channel": "stdout",
+            "sequence": "4"
+          },
+          "refs": [
+            {
+              "id": "run:network-wsl",
+              "version": "ABDSUJN7BDTX7NGGZY7T7A6HGI"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-wsl:5",
+          "version": "5EKQNVLBPQYZJEJAHER5BBATWN",
+          "run_id": "run:network-wsl",
+          "kind": "output",
+          "position": "39",
+          "value": {
+            "at": "2026-10-17T01:12:00.6798985Z",
+            "value": "{\"number\": 2, \"pid\": 219774}\n",
+            "source": "reconnect-wsl",
+            "channel": "stdout",
+            "sequence": "5"
+          },
+          "refs": [
+            {
+              "id": "run:network-wsl",
+              "version": "5EKQNVLBPQYZJEJAHER5BBATWN"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-wsl:6",
+          "version": "IHQJQDOU776IGGADUI5KWNQUFX",
+          "run_id": "run:network-wsl",
+          "kind": "output",
+          "position": "41",
+          "value": {
+            "at": "2026-10-17T01:12:01.0820254Z",
+            "value": "{\"number\": 3, \"pid\": 219774}\n",
+            "source": "reconnect-wsl",
+            "channel": "stdout",
+            "sequence": "6"
+          },
+          "refs": [
+            {
+              "id": "run:network-wsl",
+              "version": "IHQJQDOU776IGGADUI5KWNQUFX"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-wsl:7",
+          "version": "2MHTTQ2CIN66OZ5VSHBEK4CAKW",
+          "run_id": "run:network-wsl",
+          "kind": "output",
+          "position": "42",
+          "value": {
+            "at": "2026-10-17T01:12:01.1376076Z",
+            "value": "{\"number\": 4, \"pid\": 219774}\n",
+            "source": "reconnect-wsl",
+            "channel": "stdout",
+            "sequence": "7"
+          },
+          "refs": [
+            {
+              "id": "run:network-wsl",
+              "version": "2MHTTQ2CIN66OZ5VSHBEK4CAKW"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-wsl:8",
+          "version": "QQHL3R4BY5NPETTD6NIPO7DNUI",
+          "run_id": "run:network-wsl",
+          "kind": "output",
+          "position": "43",
+          "value": {
+            "at": "2026-10-17T01:12:01.1931037Z",
+            "value": "{\"number\": 5, \"pid\": 219774}\n",
+            "source": "reconnect-wsl",
+            "channel": "stdout",
+            "sequence": "8"
+          },
+          "refs": [
+            {
+              "id": "run:network-wsl",
+              "version": "QQHL3R4BY5NPETTD6NIPO7DNUI"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-wsl:10",
+          "version": "QY6D7AYF5HG5G7MQZLSGG6D6GY",
+          "run_id": "run:network-wsl",
+          "kind": "output",
+          "position": "45",
+          "value": {
+            "at": "2026-10-17T01:12:01.5763088Z",
+            "value": "{\"number\": 6, \"pid\": 219774}\n",
+            "source": "reconnect-wsl",
+            "channel": "stdout",
+            "sequence": "10"
+          },
+          "refs": [
+            {
+              "id": "run:network-wsl",
+              "version": "QY6D7AYF5HG5G7MQZLSGG6D6GY"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-wsl:11",
+          "version": "4RD3DLLB3UCU7DG6KBUEVPVVKG",
+          "run_id": "run:network-wsl",
+          "kind": "output",
+          "position": "48",
+          "value": {
+            "at": "2026-10-17T01:12:02.6864655Z",
+            "value": "{\"number\": 7, \"pid\": 219774}\n",
+            "source": "reconnect-wsl",
+            "channel": "stdout",
+            "sequence": "11"
+          },
+          "refs": [
+            {
+              "id": "run:network-wsl",
+              "version": "4RD3DLLB3UCU7DG6KBUEVPVVKG"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-wsl:12",
+          "version": "CTABEPQMW3BQY4UXWDN2672E6S",
+          "run_id": "run:network-wsl",
+          "kind": "output",
+          "position": "49",
+          "value": {
+            "at": "2026-10-17T01:12:03.5340015Z",
+            "value": "{\"number\": 8, \"pid\": 219774}\n",
+            "source": "reconnect-wsl",
+            "channel": "stdout",
+            "sequence": "12"
+          },
+          "refs": [
+            {
+              "id": "run:network-wsl",
+              "version": "CTABEPQMW3BQY4UXWDN2672E6S"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-wsl:13",
+          "version": "ONIFTXSM62GGEBZGWQSKHPVI7R",
+          "run_id": "run:network-wsl",
+          "kind": "output",
+          "position": "50",
+          "value": {
+            "at": "2026-10-17T01:12:04.6588018Z",
+            "value": "{\"number\": 9, \"pid\": 219774}\n",
+            "source": "reconnect-wsl",
+            "channel": "stdout",
+            "sequence": "13"
+          },
+          "refs": [
+            {
+              "id": "run:network-wsl",
+              "version": "ONIFTXSM62GGEBZGWQSKHPVI7R"
+            }
+          ]
+        },
+        {
+          "id": "run-output:network-wsl:14",
+          "version": "OMUBICVULSYXD4E2FMS2QGTHZV",
+          "run_id": "run:network-wsl",
+          "kind": "output",
+          "position": "52",
+          "value": {
+            "at": "2026-10-17T01:12:05.5556881Z",
+            "value": "RECONNECT_STDERR_ORIGINAL\n",
+            "source": "reconnect-wsl",
+            "channel": "stderr",
+            "sequence": "14"
+          },
+          "refs": [
+            {
+              "id": "run:network-wsl",
+              "version": "OMUBICVULSYXD4E2FMS2QGTHZV"
+            }
+          ]
+        }
+      ],
+      "launches": [
+        {
+          "pid": 219774,
+          "input": {
+            "input": {
+              "context": {
+                "order": [
+                  2,
+                  1
+                ],
+                "source": "fixed reconnect input"
+              },
+              "prompt": "再起動しても固定する入力"
+            },
+            "parameters": [
+              "reconnect"
+            ],
+            "type": "input"
+          }
+        }
+      ]
+    },
+    "boundary": {
+      "checkpoint": {
+        "pid": 73332,
+        "process": {
+          "created": "134366731600691571",
+          "pid": 73332,
+          "running": true
+        },
+        "run": "run:boundary-orphan"
+      },
+      "before": {
+        "execution": [
+          "273YKGLODXMOZZF34H4NZMVRK4",
+          "starting",
+          null
+        ],
+        "frames": [
+          {
+            "position": 31,
+            "operation": "311bda8b-70d5-48ea-a2e3-d95908ba25bc",
+            "body": {
+              "expected_version": "GXJVXQTIBE4F2FN2W2PV6VDUK5",
+              "generation": "273YKGLODXMOZZF34H4NZMVRK4",
+              "operation_id": "311bda8b-70d5-48ea-a2e3-d95908ba25bc",
+              "prepared_area": null,
+              "sequence": "1",
+              "type": "prepared"
+            },
+            "sent": true
+          }
+        ],
+        "logs": [],
+        "identity": null
+      },
+      "after": {
+        "execution": [
+          "273YKGLODXMOZZF34H4NZMVRK4",
+          "unlocated",
+          null
+        ],
+        "frames": [
+          {
+            "position": 31,
+            "operation": "311bda8b-70d5-48ea-a2e3-d95908ba25bc",
+            "body": {
+              "expected_version": "GXJVXQTIBE4F2FN2W2PV6VDUK5",
+              "generation": "273YKGLODXMOZZF34H4NZMVRK4",
+              "operation_id": "311bda8b-70d5-48ea-a2e3-d95908ba25bc",
+              "prepared_area": null,
+              "sequence": "1",
+              "type": "prepared"
+            },
+            "sent": true
+          }
+        ],
+        "logs": [],
+        "identity": {
+          "last_observation": {
+            "continuation_verified": false,
+            "direct_process": "unverifiable",
+            "reason": "stdio_session_not_reattached"
+          }
+        }
+      },
+      "heartbeat": {
+        "pid": 73332,
+        "tick": 8
+      },
+      "final": {
+        "id": "run:boundary-orphan",
+        "version": "AOFT6IYKNJVNYYFWUEOVBFCABJ",
+        "run_id": "run:boundary-orphan",
+        "kind": "run",
+        "position": "59",
+        "value": {
+          "name": "復旧受入 boundary-orphan",
+          "input": {
+            "id": "run-input:boundary-orphan",
+            "version": "ANQA3B6WQJVBQBLOWJ73R3C6C3"
+          },
+          "state": "queued",
+          "assignment": {
+            "input": {
+              "id": "run-input:boundary-orphan",
+              "version": "ANQA3B6WQJVBQBLOWJ73R3C6C3"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "orphan-fixture",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:14:41.5412065Z",
+            "generation": "273YKGLODXMOZZF34H4NZMVRK4",
+            "prepared_at": "2026-10-17T01:12:39.9091057Z",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "TS5QCIHJZFLD5SITQMMCA4HP5U"
+          },
+          "created_at": "2026-10-17T01:12:01.9376167Z",
+          "observation": "unknown",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": false,
+          "reported_through": "1",
+          "execution_requested_at": "2026-10-17T01:12:01.9678951Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:boundary-orphan",
+            "version": "ANQA3B6WQJVBQBLOWJ73R3C6C3"
+          }
+        ]
+      },
+      "existingEffect": "existing effect survives owner loss",
+      "noNewLaunch": true
+    },
+    "owner-loss": {
+      "running": {
+        "id": "run:lost-owner",
+        "version": "HKWPWLF7DV7W2WENYTTOK6EQFP",
+        "run_id": "run:lost-owner",
+        "kind": "run",
+        "position": "65",
+        "value": {
+          "name": "復旧受入 lost-owner",
+          "input": {
+            "id": "run-input:lost-owner",
+            "version": "246QVOO7ICXTJHBS5VLCCQIDQK"
+          },
+          "state": "running",
+          "execution": {
+            "stop": true,
+            "pause": true,
+            "version": "fixture-v1",
+            "environment": "windows",
+            "version_observed": true
+          },
+          "assignment": {
+            "input": {
+              "id": "run-input:lost-owner",
+              "version": "246QVOO7ICXTJHBS5VLCCQIDQK"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "orphan-fixture",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:15:07.3766368Z",
+            "generation": "TCOMPOFDQRJHBWPGPMPRH3D252",
+            "prepared_at": "2026-10-17T01:13:07.4448708Z",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "UEJJDPEJGVZXK6VOJHHCZWWNNA"
+          },
+          "created_at": "2026-10-17T01:13:07.2277615Z",
+          "started_at": "2026-10-17T01:13:07.65038Z",
+          "observation": "known",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": false,
+          "reported_through": "2",
+          "execution_requested_at": "2026-10-17T01:13:07.2588834Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:lost-owner",
+            "version": "246QVOO7ICXTJHBS5VLCCQIDQK"
+          }
+        ]
+      },
+      "before": {
+        "execution": [
+          "TCOMPOFDQRJHBWPGPMPRH3D252",
+          "running",
+          81924
+        ],
+        "frames": [
+          {
+            "position": 32,
+            "operation": "378a6e3b-89d9-4e09-999f-0ffa62c1b5c6",
+            "body": {
+              "expected_version": "YOIVECBGQNM2SRSFPFK25CVGVK",
+              "generation": "TCOMPOFDQRJHBWPGPMPRH3D252",
+              "operation_id": "378a6e3b-89d9-4e09-999f-0ffa62c1b5c6",
+              "prepared_area": null,
+              "sequence": "1",
+              "type": "prepared"
+            },
+            "sent": true
+          },
+          {
+            "position": 33,
+            "operation": "2ae632d0-768b-4698-9c13-118d20040d7c",
+            "body": {
+              "execution": {
+                "environment": "windows",
+                "pause": true,
+                "stop": true,
+                "version": "fixture-v1",
+                "version_observed": true
+              },
+              "expected_version": "5G7FMX3G2LDHEYIW6X73L5UY7O",
+              "generation": "TCOMPOFDQRJHBWPGPMPRH3D252",
+              "operation_id": "2ae632d0-768b-4698-9c13-118d20040d7c",
+              "sequence": "2",
+              "type": "started"
+            },
+            "sent": true
+          }
+        ],
+        "logs": [],
+        "identity": {
+          "environment": "Windows",
+          "process": {
+            "created": "134366731875948388",
+            "pid": 81924,
+            "running": true
+          },
+          "protocol": "jsonl-v1",
+          "session_kind": "anonymous_stdio",
+          "transfer_verified": false
+        }
+      },
+      "tick1": {
+        "pid": 81924,
+        "tick": 329
+      },
+      "tick2": {
+        "pid": 81924,
+        "tick": 333
+      },
+      "unknown": {
+        "id": "run:lost-owner",
+        "version": "EAKPPIAF62H5FIUYRESMGQQHI2",
+        "run_id": "run:lost-owner",
+        "kind": "run",
+        "position": "68",
+        "value": {
+          "name": "復旧受入 lost-owner",
+          "input": {
+            "id": "run-input:lost-owner",
+            "version": "246QVOO7ICXTJHBS5VLCCQIDQK"
+          },
+          "state": "running",
+          "execution": {
+            "stop": true,
+            "pause": true,
+            "version": "fixture-v1",
+            "environment": "windows",
+            "version_observed": true
+          },
+          "assignment": {
+            "input": {
+              "id": "run-input:lost-owner",
+              "version": "246QVOO7ICXTJHBS5VLCCQIDQK"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "orphan-fixture",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:16:14.9927385Z",
+            "generation": "TCOMPOFDQRJHBWPGPMPRH3D252",
+            "prepared_at": "2026-10-17T01:13:07.4448708Z",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "UEJJDPEJGVZXK6VOJHHCZWWNNA"
+          },
+          "created_at": "2026-10-17T01:13:07.2277615Z",
+          "started_at": "2026-10-17T01:13:07.65038Z",
+          "observation": "unknown",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": false,
+          "reported_through": "2",
+          "execution_requested_at": "2026-10-17T01:13:07.2588834Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:lost-owner",
+            "version": "246QVOO7ICXTJHBS5VLCCQIDQK"
+          }
+        ]
+      },
+      "local": {
+        "execution": [
+          "TCOMPOFDQRJHBWPGPMPRH3D252",
+          "unlocated",
+          81924
+        ],
+        "frames": [
+          {
+            "position": 32,
+            "operation": "378a6e3b-89d9-4e09-999f-0ffa62c1b5c6",
+            "body": {
+              "expected_version": "YOIVECBGQNM2SRSFPFK25CVGVK",
+              "generation": "TCOMPOFDQRJHBWPGPMPRH3D252",
+              "operation_id": "378a6e3b-89d9-4e09-999f-0ffa62c1b5c6",
+              "prepared_area": null,
+              "sequence": "1",
+              "type": "prepared"
+            },
+            "sent": true
+          },
+          {
+            "position": 33,
+            "operation": "2ae632d0-768b-4698-9c13-118d20040d7c",
+            "body": {
+              "execution": {
+                "environment": "windows",
+                "pause": true,
+                "stop": true,
+                "version": "fixture-v1",
+                "version_observed": true
+              },
+              "expected_version": "5G7FMX3G2LDHEYIW6X73L5UY7O",
+              "generation": "TCOMPOFDQRJHBWPGPMPRH3D252",
+              "operation_id": "2ae632d0-768b-4698-9c13-118d20040d7c",
+              "sequence": "2",
+              "type": "started"
+            },
+            "sent": true
+          }
+        ],
+        "logs": [],
+        "identity": {
+          "environment": "Windows",
+          "last_observation": {
+            "continuation_verified": false,
+            "direct_process": "running",
+            "reason": "stdio_session_not_reattached"
+          },
+          "process": {
+            "created": "134366731875948388",
+            "pid": 81924,
+            "running": true
+          },
+          "protocol": "jsonl-v1",
+          "session_kind": "anonymous_stdio",
+          "transfer_verified": false
+        }
+      },
+      "additionalCLI": 0
+    },
+    "cancelled-start": {
+      "queued": {
+        "id": "run:cancelled-before-reconnect-two",
+        "version": "2UJPC4EB3QRT7SF5S24IH6WKRI",
+        "run_id": "run:cancelled-before-reconnect-two",
+        "kind": "run",
+        "position": "102",
+        "value": {
+          "name": "復旧受入 cancelled-before-reconnect-two",
+          "input": {
+            "id": "run-input:cancelled-before-reconnect-two",
+            "version": "FJATQAHR5UFCA4NLWRB2W2SYMC"
+          },
+          "state": "queued",
+          "assignment": {
+            "input": {
+              "id": "run-input:cancelled-before-reconnect-two",
+              "version": "FJATQAHR5UFCA4NLWRB2W2SYMC"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "orphan-fixture",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:17:05.7819836Z",
+            "generation": "BQFFMPYROFKWJLZCM24X3VGXSM",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "OSVQUFWQQ4ASMQ362VS6OQCF24"
+          },
+          "created_at": "2026-10-17T01:15:05.7519804Z",
+          "observation": "known",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": false,
+          "reported_through": "0",
+          "execution_requested_at": "2026-10-17T01:15:05.7819836Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:cancelled-before-reconnect-two",
+            "version": "FJATQAHR5UFCA4NLWRB2W2SYMC"
+          }
+        ]
+      },
+      "final": {
+        "id": "run:cancelled-before-reconnect-two",
+        "version": "HROSW5HP7MWIN7YMZB27XS2O2V",
+        "run_id": "run:cancelled-before-reconnect-two",
+        "kind": "run",
+        "position": "107",
+        "value": {
+          "name": "復旧受入 cancelled-before-reconnect-two",
+          "input": {
+            "id": "run-input:cancelled-before-reconnect-two",
+            "version": "FJATQAHR5UFCA4NLWRB2W2SYMC"
+          },
+          "state": "queued",
+          "assignment": {
+            "input": {
+              "id": "run-input:cancelled-before-reconnect-two",
+              "version": "FJATQAHR5UFCA4NLWRB2W2SYMC"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "orphan-fixture",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:17:06.2003294Z",
+            "generation": "BQFFMPYROFKWJLZCM24X3VGXSM",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "OSVQUFWQQ4ASMQ362VS6OQCF24"
+          },
+          "created_at": "2026-10-17T01:15:05.7519804Z",
+          "observation": "unknown",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": true,
+          "reported_through": "0",
+          "execution_requested_at": "2026-10-17T01:15:05.7819836Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:cancelled-before-reconnect-two",
+            "version": "FJATQAHR5UFCA4NLWRB2W2SYMC"
+          }
+        ]
+      },
+      "additionalCLI": 0
+    },
+    "revoked-start": {
+      "denied": {
+        "id": "run:revoked-before-start",
+        "version": "MVEAMNV3O5XRVU35LANZ23HFYW",
+        "run_id": "run:revoked-before-start",
+        "kind": "run",
+        "position": "412",
+        "value": {
+          "name": "復旧受入 revoked-before-start",
+          "input": {
+            "id": "run-input:revoked-before-start",
+            "version": "WANTXOEGV3MO654Z2FK3MSDEYW"
+          },
+          "state": "queued",
+          "assignment": {
+            "input": {
+              "id": "run-input:revoked-before-start",
+              "version": "WANTXOEGV3MO654Z2FK3MSDEYW"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "orphan-fixture",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:23:51.5162822Z",
+            "generation": "CQAQPSA3DEEIK4YM6QRE2QEW3A",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "I4LEYJ5ZL5BPHAYDHPDB7CT6HP"
+          },
+          "created_at": "2026-10-17T01:21:51.4784529Z",
+          "observation": "known",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": false,
+          "reported_through": "0",
+          "execution_requested_at": "2026-10-17T01:21:51.5162822Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:revoked-before-start",
+            "version": "WANTXOEGV3MO654Z2FK3MSDEYW"
+          }
+        ]
+      },
+      "additionalCLI": 0,
+      "localExecution": null,
+      "permissionRestored": true
+    },
+    "stop": {
+      "before": {
+        "id": "run:stop-after-outage",
+        "version": "YFJU4EHCSWNVRV4P3LT7NAZLNO",
+        "run_id": "run:stop-after-outage",
+        "kind": "run",
+        "position": "376",
+        "value": {
+          "name": "復旧受入 stop-after-outage",
+          "input": {
+            "id": "run-input:stop-after-outage",
+            "version": "3P3DWQH6HG3NX5M3HI6CBNPXOT"
+          },
+          "state": "running",
+          "execution": {
+            "stop": true,
+            "pause": true,
+            "version": "fixture-v1",
+            "environment": "windows",
+            "version_observed": true
+          },
+          "assignment": {
+            "input": {
+              "id": "run-input:stop-after-outage",
+              "version": "3P3DWQH6HG3NX5M3HI6CBNPXOT"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "orphan-fixture",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:23:30.2279771Z",
+            "generation": "RGH6XHZCX5IFKWXTKLEWJHF2P5",
+            "prepared_at": "2026-10-17T01:21:30.3011987Z",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "7OAVBUJMHDNMM37JRLO5YPBFA2"
+          },
+          "created_at": "2026-10-17T01:21:29.9811081Z",
+          "started_at": "2026-10-17T01:21:30.5145309Z",
+          "observation": "known",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": false,
+          "reported_through": "2",
+          "execution_requested_at": "2026-10-17T01:21:30.0239898Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:stop-after-outage",
+            "version": "3P3DWQH6HG3NX5M3HI6CBNPXOT"
+          }
+        ]
+      },
+      "local": {
+        "execution": [
+          "RGH6XHZCX5IFKWXTKLEWJHF2P5",
+          "running",
+          90868
+        ],
+        "frames": [
+          {
+            "position": 91,
+            "operation": "f40a8ebf-8460-47f8-8095-1c7ee0eb499e",
+            "body": {
+              "expected_version": "7THX4PQQ5ONAT2ZXLHYPBVLEIQ",
+              "generation": "RGH6XHZCX5IFKWXTKLEWJHF2P5",
+              "operation_id": "f40a8ebf-8460-47f8-8095-1c7ee0eb499e",
+              "prepared_area": null,
+              "sequence": "1",
+              "type": "prepared"
+            },
+            "sent": true
+          },
+          {
+            "position": 92,
+            "operation": "892867e5-db45-4d7d-bb8d-1ee75b3655c8",
+            "body": {
+              "execution": {
+                "environment": "windows",
+                "pause": true,
+                "stop": true,
+                "version": "fixture-v1",
+                "version_observed": true
+              },
+              "expected_version": "MSIOCHSJCEXUOQZ23GUU3D42KY",
+              "generation": "RGH6XHZCX5IFKWXTKLEWJHF2P5",
+              "operation_id": "892867e5-db45-4d7d-bb8d-1ee75b3655c8",
+              "sequence": "2",
+              "type": "started"
+            },
+            "sent": true
+          }
+        ],
+        "logs": [],
+        "identity": {
+          "environment": "Windows",
+          "process": {
+            "created": "134366736904522161",
+            "pid": 90868,
+            "running": true
+          },
+          "protocol": "jsonl-v1",
+          "session_kind": "anonymous_stdio",
+          "transfer_verified": false
+        }
+      },
+      "first": {
+        "pid": 90868,
+        "tick": 1
+      },
+      "second": {
+        "pid": 90868,
+        "tick": 10
+      },
+      "restored": {
+        "id": "run:stop-after-outage",
+        "version": "YFJU4EHCSWNVRV4P3LT7NAZLNO",
+        "run_id": "run:stop-after-outage",
+        "kind": "run",
+        "position": "376",
+        "value": {
+          "name": "復旧受入 stop-after-outage",
+          "input": {
+            "id": "run-input:stop-after-outage",
+            "version": "3P3DWQH6HG3NX5M3HI6CBNPXOT"
+          },
+          "state": "running",
+          "execution": {
+            "stop": true,
+            "pause": true,
+            "version": "fixture-v1",
+            "environment": "windows",
+            "version_observed": true
+          },
+          "assignment": {
+            "input": {
+              "id": "run-input:stop-after-outage",
+              "version": "3P3DWQH6HG3NX5M3HI6CBNPXOT"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "orphan-fixture",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:23:30.2279771Z",
+            "generation": "RGH6XHZCX5IFKWXTKLEWJHF2P5",
+            "prepared_at": "2026-10-17T01:21:30.3011987Z",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "7OAVBUJMHDNMM37JRLO5YPBFA2"
+          },
+          "created_at": "2026-10-17T01:21:29.9811081Z",
+          "started_at": "2026-10-17T01:21:30.5145309Z",
+          "observation": "known",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": false,
+          "reported_through": "2",
+          "execution_requested_at": "2026-10-17T01:21:30.0239898Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:stop-after-outage",
+            "version": "3P3DWQH6HG3NX5M3HI6CBNPXOT"
+          }
+        ]
+      },
+      "final": {
+        "id": "run:stop-after-outage",
+        "version": "DALMME7QEOVCDBNAWX4JPU7356",
+        "run_id": "run:stop-after-outage",
+        "kind": "run",
+        "position": "381",
+        "value": {
+          "name": "復旧受入 stop-after-outage",
+          "input": {
+            "id": "run-input:stop-after-outage",
+            "version": "3P3DWQH6HG3NX5M3HI6CBNPXOT"
+          },
+          "state": "cancelled",
+          "execution": {
+            "stop": true,
+            "pause": true,
+            "version": "fixture-v1",
+            "environment": "windows",
+            "version_observed": true
+          },
+          "assignment": {
+            "input": {
+              "id": "run-input:stop-after-outage",
+              "version": "3P3DWQH6HG3NX5M3HI6CBNPXOT"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "orphan-fixture",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:23:33.2746986Z",
+            "generation": "RGH6XHZCX5IFKWXTKLEWJHF2P5",
+            "prepared_at": "2026-10-17T01:21:30.3011987Z",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "7OAVBUJMHDNMM37JRLO5YPBFA2"
+          },
+          "created_at": "2026-10-17T01:21:29.9811081Z",
+          "started_at": "2026-10-17T01:21:30.5145309Z",
+          "finished_at": "2026-10-17T01:21:33.322197Z",
+          "observation": "known",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": true,
+          "reported_through": "3",
+          "execution_requested_at": "2026-10-17T01:21:30.0239898Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:stop-after-outage",
+            "version": "3P3DWQH6HG3NX5M3HI6CBNPXOT"
+          }
+        ]
+      },
+      "effectRetained": true
+    },
+    "pause": {
+      "head": {
+        "id": "run:offline-answer-final",
+        "version": "RZ3YQEUWTPNEZWN6OUXGQX345Z",
+        "run_id": "run:offline-answer-final",
+        "kind": "run",
+        "position": "279",
+        "value": {
+          "name": "復旧受入 offline-answer-final",
+          "input": {
+            "id": "run-input:offline-answer-final",
+            "version": "5XOBKI6W6KTBWJSSPNQMQSUHOY"
+          },
+          "state": "succeeded",
+          "execution": {
+            "stop": false,
+            "pause": true,
+            "version": "fixture-v1",
+            "environment": "windows",
+            "version_observed": true
+          },
+          "exit_code": 0,
+          "assignment": {
+            "input": {
+              "id": "run-input:offline-answer-final",
+              "version": "5XOBKI6W6KTBWJSSPNQMQSUHOY"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "pause-fixture",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [
+                "pause"
+              ],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:20:40.0530471Z",
+            "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+            "prepared_at": "2026-10-17T01:17:49.9748021Z",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "ZVDHBQPWUP3ZHRTVPHG4QR5AYI"
+          },
+          "created_at": "2026-10-17T01:17:48.8400647Z",
+          "started_at": "2026-10-17T01:17:50.2460544Z",
+          "finished_at": "2026-10-17T01:18:40.122166Z",
+          "observation": "known",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": false,
+          "reported_through": "17",
+          "execution_requested_at": "2026-10-17T01:17:48.8700636Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:offline-answer-final",
+            "version": "5XOBKI6W6KTBWJSSPNQMQSUHOY"
+          }
+        ]
+      },
+      "pause": [
+        {
+          "id": "run-pause:offline-answer-final:first",
+          "version": "S75RND7YIDA7JGWNTUL5PCJY4K",
+          "run_id": "run:offline-answer-final",
+          "kind": "pause",
+          "position": "230",
+          "value": {
+            "id": "first",
+            "state": "resolved",
+            "reason": "固定の質問",
+            "request": {
+              "question": "first"
+            },
+            "response": "別利用者による正式回答",
+            "created_at": "2026-10-17T01:17:50.7538266Z",
+            "resumed_at": "2026-10-17T01:18:14.6914889Z",
+            "answered_at": "2026-10-17T01:18:14.1801157Z",
+            "answered_by": "JONNEVZL75SHPPA2U7U4KMNNU3",
+            "response_id": "5I5PE5YRTG4IYEG5BXCXPPLKTN",
+            "delivered_at": "2026-10-17T01:18:14.5103317Z",
+            "response_origin": {
+              "id": "JONNEVZL75SHPPA2U7U4KMNNU3",
+              "kind": "user"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "6C5KE65BBFIJGSQ6F2LUYSZF5Z"
+            }
+          ]
+        },
+        {
+          "id": "run-pause:offline-answer-final:second",
+          "version": "AKUHIXZZM3NOX36QYYWTK6RCKI",
+          "run_id": "run:offline-answer-final",
+          "kind": "pause",
+          "position": "275",
+          "value": {
+            "id": "second",
+            "state": "resolved",
+            "reason": "固定の質問",
+            "request": {
+              "question": "second"
+            },
+            "response": "二つ目の質問への明示回答",
+            "created_at": "2026-10-17T01:18:14.8575574Z",
+            "resumed_at": "2026-10-17T01:18:39.5106157Z",
+            "answered_at": "2026-10-17T01:18:38.7582679Z",
+            "answered_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "response_id": "EYA3USEJZAFYGIGMUOJXDQUGHI",
+            "delivered_at": "2026-10-17T01:18:39.1349765Z",
+            "response_origin": {
+              "id": "C6H6G24RMIQY7VBRJFHBBWAI35",
+              "kind": "user"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "KNIXRFH3F6MV76LTW4SCLZNYK5"
+            }
+          ]
+        }
+      ],
+      "output": [
+        {
+          "id": "run-output:offline-answer-final:3",
+          "version": "WN6PBT42B7UAO55UMMPBYEV3AV",
+          "run_id": "run:offline-answer-final",
+          "kind": "output",
+          "position": "190",
+          "value": {
+            "at": "2026-10-17T01:17:50.592424Z",
+            "value": "{\"received_input\": {\"context\": {\"order\": [2, 1], \"source\": \"fixed reconnect input\"}, \"prompt\": \"再起動しても固定する入力\"}}\r\n",
+            "source": "pause-fixture",
+            "channel": "stdout",
+            "sequence": "3"
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "WN6PBT42B7UAO55UMMPBYEV3AV"
+            }
+          ]
+        },
+        {
+          "id": "run-output:offline-answer-final:4",
+          "version": "XSVJNE4NA7CVTT7PO25XNLP7ZW",
+          "run_id": "run:offline-answer-final",
+          "kind": "output",
+          "position": "191",
+          "value": {
+            "at": "2026-10-17T01:17:50.6714226Z",
+            "value": "{\"koujou_event\": {\"type\": \"pause\", \"pause\": {\"id\": \"first\", \"reason\": \"固定の質問\", \"request\": {\"question\": \"first\"}}}}\r\n",
+            "source": "pause-fixture",
+            "channel": "stdout",
+            "sequence": "4"
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "XSVJNE4NA7CVTT7PO25XNLP7ZW"
+            }
+          ]
+        },
+        {
+          "id": "run-output:offline-answer-final:7",
+          "version": "22ZR4VDWF5HMNNN22LC73GPXWY",
+          "run_id": "run:offline-answer-final",
+          "kind": "output",
+          "position": "229",
+          "value": {
+            "at": "2026-10-17T01:18:14.6100811Z",
+            "value": "{\"koujou_event\": {\"type\": \"resumed\", \"pause_id\": \"first\", \"response_id\": \"5I5PE5YRTG4IYEG5BXCXPPLKTN\"}}\r\n",
+            "source": "pause-fixture",
+            "channel": "stdout",
+            "sequence": "7"
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "22ZR4VDWF5HMNNN22LC73GPXWY"
+            }
+          ]
+        },
+        {
+          "id": "run-output:offline-answer-final:9",
+          "version": "43RYE6HPF65UO4GMUSOACNWALK",
+          "run_id": "run:offline-answer-final",
+          "kind": "output",
+          "position": "231",
+          "value": {
+            "at": "2026-10-17T01:18:14.7778624Z",
+            "value": "{\"koujou_event\": {\"type\": \"pause\", \"pause\": {\"id\": \"second\", \"reason\": \"固定の質問\", \"request\": {\"question\": \"second\"}}}}\r\n",
+            "source": "pause-fixture",
+            "channel": "stdout",
+            "sequence": "9"
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "43RYE6HPF65UO4GMUSOACNWALK"
+            }
+          ]
+        },
+        {
+          "id": "run-output:offline-answer-final:12",
+          "version": "J2R6R2RHEQEAR5SCO7VIGJVRTS",
+          "run_id": "run:offline-answer-final",
+          "kind": "output",
+          "position": "273",
+          "value": {
+            "at": "2026-10-17T01:18:39.258068Z",
+            "value": "{\"koujou_event\": {\"type\": \"resumed\", \"pause_id\": \"second\", \"response_id\": \"EYA3USEJZAFYGIGMUOJXDQUGHI\"}}\r\n",
+            "source": "pause-fixture",
+            "channel": "stdout",
+            "sequence": "12"
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "J2R6R2RHEQEAR5SCO7VIGJVRTS"
+            }
+          ]
+        },
+        {
+          "id": "run-output:offline-answer-final:13",
+          "version": "4MJKFJ26ON4OMVSUHF3OFRCDIK",
+          "run_id": "run:offline-answer-final",
+          "kind": "output",
+          "position": "274",
+          "value": {
+            "at": "2026-10-17T01:18:39.4056216Z",
+            "value": "DIALOGUE_STDERR_ORIGINAL\r\n",
+            "source": "pause-fixture",
+            "channel": "stderr",
+            "sequence": "13"
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "4MJKFJ26ON4OMVSUHF3OFRCDIK"
+            }
+          ]
+        },
+        {
+          "id": "run-output:offline-answer-final:15",
+          "version": "7L5JCY5DTSLLBKNZY6UTNLVEEC",
+          "run_id": "run:offline-answer-final",
+          "kind": "output",
+          "position": "276",
+          "value": {
+            "at": "2026-10-17T01:18:39.6189741Z",
+            "value": "{\"koujou_event\": {\"type\": \"result\", \"report\": {\"decision\": \"PASS\", \"answers\": [\"別利用者による正式回答\", \"二つ目の質問への明示回答\"]}}}\r\n",
+            "source": "pause-fixture",
+            "channel": "stdout",
+            "sequence": "15"
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "7L5JCY5DTSLLBKNZY6UTNLVEEC"
+            }
+          ]
+        },
+        {
+          "id": "run-output:offline-answer-final:16",
+          "version": "MKCOKBIERKOEPNANUYYEYBYA7V",
+          "run_id": "run:offline-answer-final",
+          "kind": "output",
+          "position": "277",
+          "value": {
+            "at": "2026-10-17T01:18:39.7066922Z",
+            "value": "DIALOGUE_COMPLETED\r\n",
+            "source": "pause-fixture",
+            "channel": "stdout",
+            "sequence": "16"
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "MKCOKBIERKOEPNANUYYEYBYA7V"
+            }
+          ]
+        }
+      ],
+      "event": [
+        {
+          "id": "run-event:offline-answer-final:1",
+          "version": "CH26GBKK4IQPLIZQQ24JDIBT67",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "188",
+          "value": {
+            "at": "2026-10-17T01:17:49.9748021Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "prepared",
+              "sequence": "1",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "280e224d-aa58-42fc-ad30-ca328e3658a5",
+              "expected_version": "FQMO3I2T5WPBI3VMDQ26YKV5IQ"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "CH26GBKK4IQPLIZQQ24JDIBT67"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:2",
+          "version": "WQIO5RPDBLNDG5QI7WJ2E3VG7U",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "189",
+          "value": {
+            "at": "2026-10-17T01:17:50.2460544Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "started",
+              "sequence": "2",
+              "execution": {
+                "stop": false,
+                "pause": true,
+                "version": "fixture-v1",
+                "environment": "windows",
+                "version_observed": true
+              },
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "31667c8f-31f1-411d-ba2d-32b043e5c495",
+              "expected_version": "CH26GBKK4IQPLIZQQ24JDIBT67"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "WQIO5RPDBLNDG5QI7WJ2E3VG7U"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:3",
+          "version": "WN6PBT42B7UAO55UMMPBYEV3AV",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "190",
+          "value": {
+            "at": "2026-10-17T01:17:50.592424Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "output",
+              "value": "{\"received_input\": {\"context\": {\"order\": [2, 1], \"source\": \"fixed reconnect input\"}, \"prompt\": \"再起動しても固定する入力\"}}\r\n",
+              "source": "pause-fixture",
+              "channel": "stdout",
+              "sequence": "3",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "36aa6b27-008c-431a-b72c-caa5346d14f5",
+              "expected_version": "WQIO5RPDBLNDG5QI7WJ2E3VG7U"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "WN6PBT42B7UAO55UMMPBYEV3AV"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:4",
+          "version": "XSVJNE4NA7CVTT7PO25XNLP7ZW",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "191",
+          "value": {
+            "at": "2026-10-17T01:17:50.6714226Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "output",
+              "value": "{\"koujou_event\": {\"type\": \"pause\", \"pause\": {\"id\": \"first\", \"reason\": \"固定の質問\", \"request\": {\"question\": \"first\"}}}}\r\n",
+              "source": "pause-fixture",
+              "channel": "stdout",
+              "sequence": "4",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "db00abf3-3ff3-424a-86c6-f3f79d206f8e",
+              "expected_version": "WN6PBT42B7UAO55UMMPBYEV3AV"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "XSVJNE4NA7CVTT7PO25XNLP7ZW"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:5",
+          "version": "6C5KE65BBFIJGSQ6F2LUYSZF5Z",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "192",
+          "value": {
+            "at": "2026-10-17T01:17:50.7538266Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "pause",
+              "pause": {
+                "id": "first",
+                "reason": "固定の質問",
+                "request": {
+                  "question": "first"
+                }
+              },
+              "sequence": "5",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "d9e119c3-f91b-455b-b325-c5377f598ba4",
+              "expected_version": "XSVJNE4NA7CVTT7PO25XNLP7ZW"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "6C5KE65BBFIJGSQ6F2LUYSZF5Z"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:6",
+          "version": "JEKGE7YSZDVBLNQK6UWF2HUHPE",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "228",
+          "value": {
+            "at": "2026-10-17T01:18:14.5103317Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "delivered",
+              "pause_id": "first",
+              "sequence": "6",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "response_id": "5I5PE5YRTG4IYEG5BXCXPPLKTN",
+              "operation_id": "5794164e-d49c-4018-87cc-73c4bd438437",
+              "expected_version": "HMZZVHI5DT3FJ46P2QQD7PP4KQ"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "JEKGE7YSZDVBLNQK6UWF2HUHPE"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:7",
+          "version": "22ZR4VDWF5HMNNN22LC73GPXWY",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "229",
+          "value": {
+            "at": "2026-10-17T01:18:14.6100811Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "output",
+              "value": "{\"koujou_event\": {\"type\": \"resumed\", \"pause_id\": \"first\", \"response_id\": \"5I5PE5YRTG4IYEG5BXCXPPLKTN\"}}\r\n",
+              "source": "pause-fixture",
+              "channel": "stdout",
+              "sequence": "7",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "21d2afba-2aba-4b11-8552-24fc214cb8c1",
+              "expected_version": "JEKGE7YSZDVBLNQK6UWF2HUHPE"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "22ZR4VDWF5HMNNN22LC73GPXWY"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:8",
+          "version": "S75RND7YIDA7JGWNTUL5PCJY4K",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "230",
+          "value": {
+            "at": "2026-10-17T01:18:14.6914889Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "resumed",
+              "pause_id": "first",
+              "sequence": "8",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "response_id": "5I5PE5YRTG4IYEG5BXCXPPLKTN",
+              "operation_id": "712fbe4d-e21d-4e69-bdc7-0f164351e5bc",
+              "expected_version": "22ZR4VDWF5HMNNN22LC73GPXWY"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "S75RND7YIDA7JGWNTUL5PCJY4K"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:9",
+          "version": "43RYE6HPF65UO4GMUSOACNWALK",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "231",
+          "value": {
+            "at": "2026-10-17T01:18:14.7778624Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "output",
+              "value": "{\"koujou_event\": {\"type\": \"pause\", \"pause\": {\"id\": \"second\", \"reason\": \"固定の質問\", \"request\": {\"question\": \"second\"}}}}\r\n",
+              "source": "pause-fixture",
+              "channel": "stdout",
+              "sequence": "9",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "b0b85ba0-086c-4a97-b2a3-73d73737ea5a",
+              "expected_version": "S75RND7YIDA7JGWNTUL5PCJY4K"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "43RYE6HPF65UO4GMUSOACNWALK"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:10",
+          "version": "KNIXRFH3F6MV76LTW4SCLZNYK5",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "232",
+          "value": {
+            "at": "2026-10-17T01:18:14.8575574Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "pause",
+              "pause": {
+                "id": "second",
+                "reason": "固定の質問",
+                "request": {
+                  "question": "second"
+                }
+              },
+              "sequence": "10",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "ef821b20-6b86-492f-a715-7263b5aabd1d",
+              "expected_version": "43RYE6HPF65UO4GMUSOACNWALK"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "KNIXRFH3F6MV76LTW4SCLZNYK5"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:11",
+          "version": "G7QDBY5VBNCXQIHEV2WGOZEWG7",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "272",
+          "value": {
+            "at": "2026-10-17T01:18:39.1349765Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "delivered",
+              "pause_id": "second",
+              "sequence": "11",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "response_id": "EYA3USEJZAFYGIGMUOJXDQUGHI",
+              "operation_id": "4a8d11ea-3ac8-4d14-887d-ed7081916cdd",
+              "expected_version": "3552LKWTVMPBDO7MG4UWKKWKVW"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "G7QDBY5VBNCXQIHEV2WGOZEWG7"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:12",
+          "version": "J2R6R2RHEQEAR5SCO7VIGJVRTS",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "273",
+          "value": {
+            "at": "2026-10-17T01:18:39.258068Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "output",
+              "value": "{\"koujou_event\": {\"type\": \"resumed\", \"pause_id\": \"second\", \"response_id\": \"EYA3USEJZAFYGIGMUOJXDQUGHI\"}}\r\n",
+              "source": "pause-fixture",
+              "channel": "stdout",
+              "sequence": "12",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "344be4bc-449f-4ba8-9708-f4525e9bea74",
+              "expected_version": "G7QDBY5VBNCXQIHEV2WGOZEWG7"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "J2R6R2RHEQEAR5SCO7VIGJVRTS"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:13",
+          "version": "4MJKFJ26ON4OMVSUHF3OFRCDIK",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "274",
+          "value": {
+            "at": "2026-10-17T01:18:39.4056216Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "output",
+              "value": "DIALOGUE_STDERR_ORIGINAL\r\n",
+              "source": "pause-fixture",
+              "channel": "stderr",
+              "sequence": "13",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "46d73d9f-1028-45c0-a5ea-91baccc3a954",
+              "expected_version": "J2R6R2RHEQEAR5SCO7VIGJVRTS"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "4MJKFJ26ON4OMVSUHF3OFRCDIK"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:14",
+          "version": "AKUHIXZZM3NOX36QYYWTK6RCKI",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "275",
+          "value": {
+            "at": "2026-10-17T01:18:39.5106157Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "resumed",
+              "pause_id": "second",
+              "sequence": "14",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "response_id": "EYA3USEJZAFYGIGMUOJXDQUGHI",
+              "operation_id": "2959752a-e962-4c91-8be2-efc1b5a85f64",
+              "expected_version": "4MJKFJ26ON4OMVSUHF3OFRCDIK"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "AKUHIXZZM3NOX36QYYWTK6RCKI"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:15",
+          "version": "7L5JCY5DTSLLBKNZY6UTNLVEEC",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "276",
+          "value": {
+            "at": "2026-10-17T01:18:39.6189741Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "output",
+              "value": "{\"koujou_event\": {\"type\": \"result\", \"report\": {\"decision\": \"PASS\", \"answers\": [\"別利用者による正式回答\", \"二つ目の質問への明示回答\"]}}}\r\n",
+              "source": "pause-fixture",
+              "channel": "stdout",
+              "sequence": "15",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "7676bea0-47b6-41ac-a6ee-dc8e5a3b7099",
+              "expected_version": "AKUHIXZZM3NOX36QYYWTK6RCKI"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "7L5JCY5DTSLLBKNZY6UTNLVEEC"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:16",
+          "version": "MKCOKBIERKOEPNANUYYEYBYA7V",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "277",
+          "value": {
+            "at": "2026-10-17T01:18:39.7066922Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "output",
+              "value": "DIALOGUE_COMPLETED\r\n",
+              "source": "pause-fixture",
+              "channel": "stdout",
+              "sequence": "16",
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "4af00a71-4ef5-4926-aad6-24e2376b4243",
+              "expected_version": "7L5JCY5DTSLLBKNZY6UTNLVEEC"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "MKCOKBIERKOEPNANUYYEYBYA7V"
+            }
+          ]
+        },
+        {
+          "id": "run-event:offline-answer-final:17",
+          "version": "RZ3YQEUWTPNEZWN6OUXGQX345Z",
+          "run_id": "run:offline-answer-final",
+          "kind": "event",
+          "position": "279",
+          "value": {
+            "at": "2026-10-17T01:18:40.122166Z",
+            "actor": "device:4ffd642d-5673-4425-8656-73b65209b42c",
+            "event": {
+              "type": "finished",
+              "report": {
+                "answers": [
+                  "別利用者による正式回答",
+                  "二つ目の質問への明示回答"
+                ],
+                "decision": "PASS"
+              },
+              "sequence": "17",
+              "exit_code": 0,
+              "generation": "6ZTXNNCNP5EVWBRPM3KBHQRSZR",
+              "operation_id": "301db6f2-23b5-4408-a6ca-09639a8b95d0",
+              "expected_version": "3CJQAM5SWGNRDZN3XF4BLWQG3E"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:offline-answer-final",
+              "version": "RZ3YQEUWTPNEZWN6OUXGQX345Z"
+            }
+          ]
+        }
+      ]
+    },
+    "ui-fixed-handoff": {
+      "head": {
+        "id": "run:4fcb6bce-9c00-4ede-92a8-392356ba9949",
+        "version": "MJ6T6GWPAIIOUYE5PV62UBHQRK",
+        "run_id": "run:4fcb6bce-9c00-4ede-92a8-392356ba9949",
+        "kind": "run",
+        "position": "320",
+        "value": {
+          "name": "固定成果物からの引継ぎ受入",
+          "input": {
+            "id": "run-input:4fcb6bce-9c00-4ede-92a8-392356ba9949",
+            "version": "FUP7JABD5YS2NDIDHLPCEYPCN7"
+          },
+          "state": "succeeded",
+          "handoff": {
+            "source": {
+              "id": "run:network-win",
+              "version": "WFXBIEIWXYSRI4YCVXYW7HAU6R"
+            },
+            "decision": {
+              "at": "2026-10-17T01:19:25.9701313Z",
+              "by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+              "state": "succeeded",
+              "source": {
+                "id": "run:network-win",
+                "version": "WFXBIEIWXYSRI4YCVXYW7HAU6R"
+              },
+              "judgment": "confirmed_end",
+              "observation": "known"
+            },
+            "prepared_at": "2026-10-17T01:19:16.950434Z",
+            "prepared_by": "C6H6G24RMIQY7VBRJFHBBWAI35"
+          },
+          "previous": {
+            "id": "run:network-win",
+            "version": "WFXBIEIWXYSRI4YCVXYW7HAU6R"
+          },
+          "execution": {
+            "stop": false,
+            "pause": true,
+            "version": "fixture-v1",
+            "environment": "windows",
+            "version_observed": true
+          },
+          "exit_code": 0,
+          "assignment": {
+            "input": {
+              "id": "run-input:4fcb6bce-9c00-4ede-92a8-392356ba9949",
+              "version": "FUP7JABD5YS2NDIDHLPCEYPCN7"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "reconnect-windows",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:22:58.4210541Z",
+            "generation": "Y4L4TAAWJNPBNHFRILRSO5TDLO",
+            "prepared_at": "2026-10-17T01:20:47.5591437Z",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "B7WDFKTNKYGQFJ2BMHLFN7H5FV"
+          },
+          "created_at": "2026-10-17T01:19:16.950434Z",
+          "started_at": "2026-10-17T01:20:47.91432Z",
+          "finished_at": "2026-10-17T01:20:58.7196467Z",
+          "observation": "known",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": false,
+          "reported_through": "14",
+          "execution_requested_at": "2026-10-17T01:19:25.9701313Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:4fcb6bce-9c00-4ede-92a8-392356ba9949",
+            "version": "FUP7JABD5YS2NDIDHLPCEYPCN7"
+          },
+          {
+            "id": "run:network-win",
+            "version": "WFXBIEIWXYSRI4YCVXYW7HAU6R"
+          }
+        ]
+      },
+      "input": {
+        "id": "run-input:4fcb6bce-9c00-4ede-92a8-392356ba9949",
+        "version": "FUP7JABD5YS2NDIDHLPCEYPCN7",
+        "run_id": "run:4fcb6bce-9c00-4ede-92a8-392356ba9949",
+        "kind": "input",
+        "position": "282",
+        "value": {
+          "name": "固定成果物からの引継ぎ受入",
+          "input": {
+            "prompt": "選択した固定成果物を使う新しい指示",
+            "command": {
+              "kind": "cli",
+              "target": "reconnect-windows",
+              "binding": {
+                "prompt": "stdin",
+                "context": "stdin"
+              },
+              "parameters": [
+                "reconnect"
+              ]
+            },
+            "context": {
+              "outputs": [
+                {
+                  "ref": {
+                    "id": "run-output:network-win:3",
+                    "version": "NSBWGZHIIYPBT3D62BOB2IS4FJ"
+                  },
+                  "output": {
+                    "at": "2026-10-17T01:11:25.0546774Z",
+                    "value": "{\"number\": 0, \"pid\": 46040}\r\n",
+                    "source": "reconnect-windows",
+                    "channel": "stdout",
+                    "sequence": "3"
+                  }
+                }
+              ]
+            }
+          },
+          "sources": [
+            {
+              "id": "run-output:network-win:3",
+              "version": "NSBWGZHIIYPBT3D62BOB2IS4FJ"
+            }
+          ],
+          "previous": {
+            "id": "run:network-win",
+            "version": "WFXBIEIWXYSRI4YCVXYW7HAU6R"
+          }
+        },
+        "refs": [
+          {
+            "id": "run-output:network-win:3",
+            "version": "NSBWGZHIIYPBT3D62BOB2IS4FJ"
+          },
+          {
+            "id": "run:network-win",
+            "version": "NSBWGZHIIYPBT3D62BOB2IS4FJ"
+          },
+          {
+            "id": "run:network-win",
+            "version": "5AJLZ7UUIIELCCQY6LLXJJBYRY"
+          },
+          {
+            "id": "run:network-win",
+            "version": "WFXBIEIWXYSRI4YCVXYW7HAU6R"
+          },
+          {
+            "id": "run-input:network-win",
+            "version": "5AJLZ7UUIIELCCQY6LLXJJBYRY"
+          },
+          {
+            "id": "run:4fcb6bce-9c00-4ede-92a8-392356ba9949",
+            "version": "FUP7JABD5YS2NDIDHLPCEYPCN7"
+          }
+        ]
+      }
+    },
+    "ui-unknown-handoff": {
+      "head": {
+        "id": "run:06ad996f-bbfc-4fef-991a-55ab4c26c827",
+        "version": "QR3LBKSNEVBZ5RDLUWC4DSASJW",
+        "run_id": "run:06ad996f-bbfc-4fef-991a-55ab4c26c827",
+        "kind": "run",
+        "position": "342",
+        "value": {
+          "name": "Unknown元実行の明示やり直し",
+          "input": {
+            "id": "run-input:06ad996f-bbfc-4fef-991a-55ab4c26c827",
+            "version": "MB5VXMT5PSKC4WN4E5E5PYA6Y4"
+          },
+          "state": "succeeded",
+          "handoff": {
+            "source": {
+              "id": "run:lost-owner",
+              "version": "EAKPPIAF62H5FIUYRESMGQQHI2"
+            },
+            "decision": {
+              "at": "2026-10-17T01:20:56.2964527Z",
+              "by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+              "state": "running",
+              "source": {
+                "id": "run:lost-owner",
+                "version": "EAKPPIAF62H5FIUYRESMGQQHI2"
+              },
+              "judgment": "duplicate_possible",
+              "observation": "unknown"
+            },
+            "prepared_at": "2026-10-17T01:20:13.4009164Z",
+            "prepared_by": "C6H6G24RMIQY7VBRJFHBBWAI35"
+          },
+          "previous": {
+            "id": "run:lost-owner",
+            "version": "EAKPPIAF62H5FIUYRESMGQQHI2"
+          },
+          "execution": {
+            "stop": false,
+            "pause": true,
+            "version": "fixture-v1",
+            "environment": "windows",
+            "version_observed": true
+          },
+          "exit_code": 0,
+          "assignment": {
+            "input": {
+              "id": "run-input:06ad996f-bbfc-4fef-991a-55ab4c26c827",
+              "version": "MB5VXMT5PSKC4WN4E5E5PYA6Y4"
+            },
+            "required": [],
+            "device_id": "4ffd642d-5673-4425-8656-73b65209b42c",
+            "runner_id": "081375c2-0983-4176-af3e-a6278f2cc67f",
+            "connection": {
+              "kind": "cli",
+              "users": [
+                "C6H6G24RMIQY7VBRJFHBBWAI35"
+              ],
+              "target": "reconnect-windows",
+              "subject": "owned-reconnect-cli",
+              "version": "fixture-v1",
+              "bindings": [
+                "stdin"
+              ],
+              "confirmed": true,
+              "environment": "Windows",
+              "capabilities": [],
+              "repositories": []
+            },
+            "expires_at": "2026-10-17T01:23:08.3485548Z",
+            "generation": "TM3IAQPJBMOMVDFNTWHI4NHKTL",
+            "prepared_at": "2026-10-17T01:20:57.5209109Z",
+            "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+            "runner_version": "7YA57XTDKXSIKF2BAAW3GQOHIG"
+          },
+          "created_at": "2026-10-17T01:20:13.4009164Z",
+          "started_at": "2026-10-17T01:20:58.0811195Z",
+          "finished_at": "2026-10-17T01:21:08.5325776Z",
+          "observation": "known",
+          "requested_by": "C6H6G24RMIQY7VBRJFHBBWAI35",
+          "cancel_requested": false,
+          "reported_through": "14",
+          "execution_requested_at": "2026-10-17T01:20:56.2964527Z"
+        },
+        "refs": [
+          {
+            "id": "run-input:06ad996f-bbfc-4fef-991a-55ab4c26c827",
+            "version": "MB5VXMT5PSKC4WN4E5E5PYA6Y4"
+          },
+          {
+            "id": "run:lost-owner",
+            "version": "EAKPPIAF62H5FIUYRESMGQQHI2"
+          }
+        ]
+      },
+      "input": {
+        "id": "run-input:06ad996f-bbfc-4fef-991a-55ab4c26c827",
+        "version": "MB5VXMT5PSKC4WN4E5E5PYA6Y4",
+        "run_id": "run:06ad996f-bbfc-4fef-991a-55ab4c26c827",
+        "kind": "input",
+        "position": "284",
+        "value": {
+          "name": "Unknown元実行の明示やり直し",
+          "input": {
+            "prompt": "選択した固定成果物を使う新しい指示",
+            "command": {
+              "kind": "cli",
+              "target": "reconnect-windows",
+              "binding": {
+                "prompt": "stdin"
+              },
+              "parameters": [
+                "reconnect"
+              ]
+            }
+          },
+          "previous": {
+            "id": "run:lost-owner",
+            "version": "EAKPPIAF62H5FIUYRESMGQQHI2"
+          }
+        },
+        "refs": [
+          {
+            "id": "run:lost-owner",
+            "version": "EAKPPIAF62H5FIUYRESMGQQHI2"
+          },
+          {
+            "id": "run-input:lost-owner",
+            "version": "246QVOO7ICXTJHBS5VLCCQIDQK"
+          },
+          {
+            "id": "run:lost-owner",
+            "version": "246QVOO7ICXTJHBS5VLCCQIDQK"
+          },
+          {
+            "id": "run:06ad996f-bbfc-4fef-991a-55ab4c26c827",
+            "version": "MB5VXMT5PSKC4WN4E5E5PYA6Y4"
+          }
+        ]
+      }
+    }
+  }
+}
