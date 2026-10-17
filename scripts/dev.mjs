@@ -222,10 +222,13 @@ async function prepareBifrost() {
           randomBytes(16).toString("hex");
       // Fill an existing empty setting rather than appending a duplicate key.
       const empty = new RegExp(`^${key}=\\r?$`, "gm");
-      local = empty.test(local)
-        ? local.replace(empty, `${key}=${env[key]}`)
-        : `${local}\n${key}=${env[key]}\n`;
-      changed = true;
+      const hasEmpty = empty.test(local);
+      if (hasEmpty || !stored) {
+        local = hasEmpty
+          ? local.replace(empty, `${key}=${env[key]}`)
+          : `${local}\n${key}=${env[key]}\n`;
+        changed = true;
+      }
     }
   }
   if (!env.KOUJOU_SERVER_LLM_CONFIG) {
