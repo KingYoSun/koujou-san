@@ -11,6 +11,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/auth"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/githubobserve"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/inspections"
 	"github.com/jackc/pgx/v5"
 	"io"
 	"net/http"
@@ -28,7 +29,7 @@ import (
 
 // Optional Computer Use fixture. Only this isolated test identity is forwarded;
 // no development-user credential or browser certificate exception is needed.
-func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob auth.Tokens, webTokens auth.Tokens, certificate []byte, cfg auth.Config, service *Service, githubMux *http.ServeMux, control func(string) error) {
+func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob auth.Tokens, webTokens auth.Tokens, certificate []byte, cfg auth.Config, service *Service, inspectionService *inspections.Service, githubMux *http.ServeMux, control func(string) error) {
 	t.Helper()
 	if os.Getenv("KOUJOU_TEST_MCP_UI") != "1" {
 		return
@@ -64,6 +65,7 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 	}
 	principal := access.Principal{UserID: user.ID}
 	refreshRunner := prepareRunnerUI(t, client, target, tokens, service, user.ID)
+	prepareInspectionUI(t, inspectionService, principal, cfg.Key)
 	write := func(kind, id string, value any) contexts.Ref {
 		raw, _ := json.Marshal(value)
 		result, err := service.Contexts.Put(ctx, principal, "mcp-one", contexts.Identity{Kind: kind, ID: id}, contexts.Write{Mutation: apicontract.Mutation{OperationID: "ui-fixture-" + id, ExpectedVersion: "0"}, Value: raw})
@@ -256,7 +258,7 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 			traceLock.Lock()
 			trace = append(trace, entry)
 			traceLock.Unlock()
-			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/usage/", "/automation/", "/runs/", "/workflows/", "/healthz", "/readyz"} {
+			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/usage/", "/automation/", "/runs/", "/workflows/", "/inspections/", "/healthz", "/readyz"} {
 				if strings.HasPrefix(r.URL.Path, prefix) {
 					token, err := bearer()
 					if err != nil {

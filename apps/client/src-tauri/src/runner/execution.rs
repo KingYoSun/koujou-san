@@ -488,6 +488,99 @@ fn process_command(adapter: &Adapter, cwd: &str, args: &[String]) -> Result<Comm
 mod tests {
     use super::*;
     #[test]
+    #[ignore = "requires the owned PostgreSQL inspection handoff"]
+    fn fixed_inspection_handoff_keeps_commits_and_inputs_separate() {
+        use std::io::Write;
+        let fixture = std::env::var("KOUJOU_TEST_INSPECTION_FIXTURE").unwrap();
+        let handoff: Value = serde_json::from_slice(&fs::read(fixture).unwrap()).unwrap();
+        let original = PathBuf::from(handoff["source"].as_str().unwrap());
+        let before = git(&original, &["status", "--porcelain"]).unwrap();
+        let commit = git(&original, &["rev-parse", "HEAD"]).unwrap();
+        let root = std::env::temp_dir().join(format!("koujou-inspection-{}", Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let script = r#"const fs=require('node:fs');let input='';process.stdin.on('data',b=>input+=b);process.stdin.on('end',()=>{const value=JSON.parse(input);const artifact=fs.readFileSync('artifact.txt','utf8');if(artifact!=='FIXED-INSPECTION-ARTIFACT\n')process.exit(2);for(const name of ['uncommitted.txt','cli-auth.txt','implementation-history.txt'])if(fs.existsSync(name))process.exit(3);console.log(JSON.stringify({observed_input:value,artifact,report:{inspection:value.prompt.inspection,manifest_digest:value.prompt.manifest_digest,verdict:'PASS',criteria_results:value.prompt.criteria.map(c=>({criterion_id:c.id,verdict:'PASS',executed:true,evidence_refs:[],unverified:[]})),unverified:[]}}));});"#;
+        let adapter = Adapter {
+            program: "node".into(),
+            arguments: vec!["-e".into(), script.into()],
+            stdin_json: true,
+            protocol: "plain".into(),
+            ..Default::default()
+        };
+        let mut observed = Vec::new();
+        for (index, assigned) in handoff["assignments"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .enumerate()
+        {
+            let storage = root.join(format!("device-{index}"));
+            fs::create_dir_all(&storage).unwrap();
+            let repo = storage.join("repository");
+            git(
+                &storage,
+                &[
+                    "clone",
+                    "--no-local",
+                    &git_path(&original).unwrap(),
+                    &git_path(&repo).unwrap(),
+                ],
+            )
+            .unwrap();
+            let area = Area {
+                id: assigned["assignment"]["area"]["id"]
+                    .as_str()
+                    .unwrap()
+                    .into(),
+                branch: assigned["assignment"]["area"]["branch"]
+                    .as_str()
+                    .unwrap()
+                    .into(),
+                commit: assigned["assignment"]["area"]["commit"]
+                    .as_str()
+                    .unwrap()
+                    .into(),
+            };
+            assert_eq!(area.commit, commit);
+            let worktree = prepare_area(&repo, &storage.join("areas"), &area).unwrap();
+            let mut prepared = prepare(&storage, assigned, &adapter, Some(&worktree)).unwrap();
+            let mut child = prepared.command.spawn().unwrap();
+            child
+                .stdin
+                .take()
+                .unwrap()
+                .write_all(&prepared.input)
+                .unwrap();
+            let result = child.wait_with_output().unwrap();
+            assert!(result.status.success(), "owned inspector failed");
+            let result: Value = serde_json::from_slice(&result.stdout).unwrap();
+            assert_eq!(
+                result["observed_input"],
+                Value::Object(
+                    assigned["spec"]["input"]
+                        .as_object()
+                        .unwrap()
+                        .iter()
+                        .filter(|(key, _)| key.as_str() != "command")
+                        .map(|(k, v)| (k.clone(), v.clone()))
+                        .collect::<serde_json::Map<_, _>>()
+                )
+            );
+            assert_eq!(git(&worktree, &["rev-parse", "HEAD"]).unwrap(), commit);
+            assert!(
+                git(&worktree, &["status", "--porcelain"])
+                    .unwrap()
+                    .is_empty()
+            );
+            observed.push(result);
+        }
+        assert!(observed[0]["observed_input"].get("context").is_none());
+        assert!(observed[1]["observed_input"].get("context").is_some());
+        assert_eq!(git(&original, &["status", "--porcelain"]).unwrap(), before);
+        assert_eq!(git(&original, &["rev-parse", "HEAD"]).unwrap(), commit);
+        assert!(root.starts_with(std::env::temp_dir()));
+        fs::remove_dir_all(root).unwrap();
+    }
+    #[test]
     fn declared_inputs_keep_values_and_reject_unsupported_routes() {
         let root = std::env::temp_dir().join(format!("koujou-input-{}", Uuid::new_v4()));
         let base = json!({"run":{"id":"run:fixed"},"assignment":{},"spec":{"input":{"command":{"binding":{"context":"stdin","prompt":"stdin"}},"context":{"order":[2,1]},"prompt":"value {context} 日本語"}}});

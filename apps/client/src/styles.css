@@ -504,3 +504,18 @@ button:disabled {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+.table-scroll {
+  overflow-x: auto;
+}
+.inspection-results {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.inspection-results :is(th, td) {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}

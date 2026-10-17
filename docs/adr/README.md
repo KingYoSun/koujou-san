@@ -31,3 +31,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0019: 切断後の実行照合と新Runへの引継ぎ](0019-execution-reconciliation.md)
 
 - [0020: 固定版の工程定義とRun間の進行](0020-versioned-workflows.md)
+
+- [0021: 固定入力での独立検品と証拠の記録](0021-fixed-inspection-evidence.md)

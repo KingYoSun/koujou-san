@@ -35,6 +35,7 @@ Codexのworktree向けに `.codex/environments/environment.toml` のsetupにも 
 | `pnpm run test:access` | 試験専用DBによるWorkspace・端末の認可と失効 |
 | `pnpm run test:runs` | 試験専用DBによるRun入力・二Pause・原出力・派生判定・export |
 | `pnpm run test:workflows` | 試験専用DBによる版付き定義・工程進行・入力・判断・予算・外部条件 |
+| `pnpm run test:inspections` | 試験専用DBによる固定検品入力・条件別判定・証拠・失効・例外判断 |
 | `pnpm run test:automation` | 試験専用DBによる受理・永続Worker・Triage方針と優先度 |
 | `pnpm run test:usage` | 試験専用DBによる利用量・料金版・費用評価・認可・集計 |
 | `pnpm run test:github` | 試験専用DBと固定応答によるGitHub観測・権限・復旧 |

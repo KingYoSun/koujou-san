@@ -5,6 +5,7 @@ import { ContextWorkspace } from "./context-workspace";
 import { Automation } from "./automation";
 import { RunRecords } from "./runs";
 import { Workflows } from "./workflows";
+import { Inspections } from "./inspections";
 import { UsagePricing } from "./usage-pricing";
 import { GithubObservations } from "./github-observations";
 import { DeliveryPolicy } from "./delivery-policy";
@@ -436,6 +437,17 @@ export function Team({ native }: { native: boolean }) {
           {apiIdentity && (
             <Workflows
               key={`workflows/${apiIdentity}/${me.id}/${selected}`}
+              native={native}
+              api={apiIdentity}
+              workspace={selected}
+              user={me.id}
+              role={current.role}
+              canExecute={current.can_execute}
+            />
+          )}
+          {apiIdentity && (
+            <Inspections
+              key={`inspections/${apiIdentity}/${me.id}/${selected}`}
               native={native}
               api={apiIdentity}
               workspace={selected}

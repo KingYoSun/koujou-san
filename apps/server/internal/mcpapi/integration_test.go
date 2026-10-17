@@ -27,6 +27,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/inspections"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
@@ -97,10 +98,11 @@ func TestMCPIntegration(t *testing.T) {
 	defer graph.Close()
 	s := &Service{Auth: identity, Access: a, Contexts: c, Search: search, Graph: graph, Usage: usage.New(store, a), Automation: automation.New(store, a), Runs: runs.New(store, a, c)}
 	s.Workflows = workflows.New(store, a, c, s.Runs)
+	inspectionService := inspections.New(store, a, c, s.Runs, s.Workflows)
 	s.Workflows.StartWorker(ctx)
 	githubMux := http.NewServeMux()
 	handler := func(runService *runs.Service) http.Handler {
-		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
+		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, inspectionService.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
 	}
 	faults := &reconnectFixture{}
 	server := httptest.NewUnstartedServer(faults.handler(handler(s.Runs)))
@@ -647,7 +649,7 @@ func TestMCPIntegration(t *testing.T) {
 		if _, err = store.Database().Exec(ctx, "INSERT INTO access_members(workspace_id,user_id,role,active) VALUES('mcp-one',$1,'editor',true)", bob.ID); err != nil {
 			t.Fatal(err)
 		}
-		inspectUI(t, client, cfg.Site, ordinary, bobTokens, webTokens, server.Certificate().Raw, cfg, s, githubMux, control)
+		inspectUI(t, client, cfg.Site, ordinary, bobTokens, webTokens, server.Certificate().Raw, cfg, s, inspectionService, githubMux, control)
 		_ = session.Close()
 		tokens = issue(cfg.MCPResource(), "koujou.mcp")
 		session, err = connect(tokens.Access, "mcp-one", handle)
