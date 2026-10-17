@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS execution_identity(run_id TEXT PRIMARY KEY,payload BL
 CREATE TABLE IF NOT EXISTS execution_responses(run_id TEXT NOT NULL,response_id TEXT NOT NULL,PRIMARY KEY(run_id,response_id));
 CREATE TABLE IF NOT EXISTS execution_usage(event_id TEXT PRIMARY KEY,run_id TEXT NOT NULL,resource_id TEXT NOT NULL,payload BLOB NOT NULL,sent INTEGER NOT NULL DEFAULT 0);
 CREATE INDEX IF NOT EXISTS execution_usage_pending ON execution_usage(sent);
+CREATE INDEX IF NOT EXISTS execution_usage_resource_pending ON execution_usage(resource_id) WHERE sent=0;
 CREATE TABLE IF NOT EXISTS execution_usage_versions(resource_id TEXT PRIMARY KEY,version TEXT NOT NULL);").map_err(|_|"journal_unavailable")?;
         Ok(value)
     }

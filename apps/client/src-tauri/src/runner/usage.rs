@@ -387,7 +387,9 @@ fn send_pending(
     let after = journal
         .usage_cursor
         .load(std::sync::atomic::Ordering::Relaxed);
-    let row:Option<(i64,String,String,String,Vec<u8>)>=db.query_row("SELECT rowid,event_id,run_id,resource_id,payload FROM execution_usage WHERE sent=0 AND rowid>? ORDER BY rowid LIMIT 1",[after],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))).optional().map_err(|_|"usage_journal_unavailable")?;
+    // Retry the oldest unacknowledged value in each cumulative series first.
+    // Other series may advance while one waits for authorization or its receipt.
+    let row:Option<(i64,String,String,String,Vec<u8>)>=db.query_row("SELECT e.rowid,e.event_id,e.run_id,e.resource_id,e.payload FROM execution_usage e WHERE e.sent=0 AND e.rowid>? AND NOT EXISTS (SELECT 1 FROM execution_usage p WHERE p.resource_id=e.resource_id AND p.sent=0 AND p.rowid<e.rowid) ORDER BY e.rowid LIMIT 1",[after],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))).optional().map_err(|_|"usage_journal_unavailable")?;
     let Some((position, event, run, id, data)) = row else {
         if after > 0 {
             journal

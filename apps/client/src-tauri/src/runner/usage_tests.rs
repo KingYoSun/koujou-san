@@ -155,6 +155,79 @@ fn unsent_encrypted_usage_survives_reopen_and_lost_ack_with_same_operation() {
 }
 
 #[test]
+fn lost_provisional_ack_is_recovered_before_sending_the_final_cumulative_value() {
+    let (root, journal, mut meter) = fixture("claude-jsonl", "2.1.300", json!({"mode":"live"}));
+    meter
+        .observe(
+            &journal,
+            1,
+            br#"{"type":"system","subtype":"init","session_id":"owned"}"#,
+        )
+        .unwrap();
+    meter.observe(&journal,2,br#"{"type":"assistant","message":{"id":"request","model":"a","usage":{"input_tokens":10}}}"#).unwrap();
+    meter
+        .observe(
+            &journal,
+            3,
+            br#"{"type":"result","modelUsage":{"a":{"inputTokens":10,"outputTokens":8}}}"#,
+        )
+        .unwrap();
+    meter.finish(&journal).unwrap();
+    assert_eq!(rows(&journal).len(), 3);
+    let mut accepted = Value::Null;
+    assert!(
+        send_pending(&journal, |_, body| {
+            assert_eq!(body["expected_version"], "0");
+            assert_eq!(body["value"]["measurement"]["state"], "provisional");
+            accepted = body;
+            Err("accepted_but_response_lost".into())
+        })
+        .is_err()
+    );
+    send_pending(&journal, |_, body| {
+        assert_eq!(body, accepted);
+        Ok(json!({"data":{"version":"v1"}}))
+    })
+    .unwrap();
+    send_pending(&journal, |_, body| {
+        assert_eq!(body["expected_version"], "v1");
+        assert_ne!(body["operation_id"], accepted["operation_id"]);
+        assert_eq!(body["value"]["measurement"]["state"], "provisional");
+        Ok(json!({"data":{"version":"v2"}}))
+    })
+    .unwrap();
+    send_pending(&journal, |_, body| {
+        assert_eq!(body["expected_version"], "v2");
+        assert_eq!(body["value"]["measurement"]["state"], "final");
+        assert_eq!(body["value"]["quantities"]["output"]["value"], "8");
+        Ok(json!({"data":{"version":"v3"}}))
+    })
+    .unwrap();
+    assert_eq!(
+        journal
+            .db()
+            .unwrap()
+            .query_row(
+                "SELECT count(*) FROM execution_usage WHERE sent=0",
+                [],
+                |r| r.get::<_, i64>(0)
+            )
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        journal
+            .db()
+            .unwrap()
+            .query_row("SELECT count(*) FROM execution_frames", [], |r| r
+                .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+    cleanup(root);
+}
+
+#[test]
 fn codex_without_a_model_source_keeps_quantities_and_marks_the_model_missing() {
     let (root, journal, mut meter) = fixture("codex-jsonl", "0.162.1", json!({}));
     meter
