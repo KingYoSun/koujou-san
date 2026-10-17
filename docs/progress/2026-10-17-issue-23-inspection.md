@@ -48,3 +48,21 @@
 **INCONCLUSIVE**。AC-1〜4・6〜7とINVAR-1〜3は、上記の範囲と証拠でPASS。AC-5は本人観測待ちのためINCONCLUSIVE。確認済み範囲の実装上のblockerは0件だが、全条件達成・Ready・Completeとは判定しない。
 
 本人の初見操作と証拠付き回答、再実行中のUI suite終了、最終HEADの必須CI、merge後照合は未完了である。本人観測を追加した時点でAC-5を照合する。成果物に修正が入る場合は対象commitを固定し直し、その差分と影響条件を再確認する。
+
+## Scope revision 2の差分追補（2026-10-17）
+
+対象HEADを`0ec38a411da3bec5470cca5cf91d0decc8316736`へ固定し、元の検品対象`4487a0c4c717ee075964a875a35fea5ce23c47d2`からの差分を照合した。変更はADRと進捗文書の5ファイルだけで、実装・テスト・migration・設定に変更はない。上記のScope revision 1のINCONCLUSIVEは、当時の条件と証拠による記録として維持する。
+
+ユーザーが「#33へ移し、未確認と記録して先へ進む」を明示選択したことを今回の入力として受けた。[#23本文](https://github.com/KingYoSun/koujou-san/issues/23)のScope revision 2と[#33本文](https://github.com/KingYoSun/koujou-san/issues/33)のScope revision 3を読取りで確認し、計画・ADR・証跡との一致を照合した。#23 AC-5は完了条件から除外され、固定ビルドのHumanReviewRun、説明なしの初見操作、目的・期待操作・対象版・判断点の把握、理由と証拠付き回答、依頼・役割・画面状態の事前固定という確認内容を#33 AC-4が引き継いでいる。移管先は未確認と明記され、未実施ならリリース受入を完了しない条件も残っている。
+
+| Scope revision 2の対象 | 差分照合の結果 | 最終判定 |
+| --- | --- | --- |
+| AC-1〜4・6〜7 | 条件と実装に変更なし。上記の独立PG試験・状態別UI試験・段階別GUI観測を継続して根拠にする | PASS |
+| INVAR-1〜3 | 条件と実装に変更なし。上記の認可・保存・入力不変と表示分離の証拠を維持する | PASS |
+| 元AC-5、移管先#33 AC-4の初見操作 | ユーザー承認により#23の判定対象外へ移管。本人の観測は未実施のまま | INCONCLUSIVE（#23の完了条件外） |
+
+`test-results/issue23-ui-timeout.log:97`の`UI inspection timed out`と、続く`TestMCPIntegration`のFAIL（1902.67秒）を確認した。これにより前回「未確認」としたsuiteの終了結果はFAILと確定した。suite全体を成功とは判定しない。本人観測待ちでの終了は、既存の段階別観測・独立PG試験・表示試験の成功を失効させる証拠ではなく、残る条件について新たな実装blockerはない。
+
+差分照合ではコード・GUI操作・再試験を行っていない。専用環境と秘密fixtureの削除は実装側の終了記録として受け、共有環境の追加操作はしていない。記録更新前のhead `a8fdd60e67bda147a588e9073d7f079cc2532b86`のCI成功は証跡に記録されているが、今回の対象HEADの最終CIとmerge後照合は未完了として残す。
+
+**Scope revision 2で#23に残る条件の独立検品はPASS、実装上のblockerは0件。** この判定は#33の初見操作をPASSに変更せず、#23の最終CI・merge後照合の完了も意味しない。
