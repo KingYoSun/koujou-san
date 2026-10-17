@@ -231,8 +231,19 @@ func TestHopperSemanticPostgres(t *testing.T) {
 	d.Semantic = &sem
 	pin := must(s.Put(ctx, p, "one", "hopper:semantic", Write{Mutation: m("0"), Value: raw(d)}))
 	must(s.Put(ctx, p, "one", "hopper-active:semantic", Write{Mutation: m("0"), Value: raw(Activation{Definition: pin, Enabled: true})}))
-	origin := must(rs.Create(ctx, p, "one", "run:origin", runs.Create{Mutation: m("0"), Spec: runs.Spec{Input: runs.Input{Command: runs.Command{Kind: "cli", Target: "node", Parameters: raw([]string{"-e", "process.stdout.write('DEFERRED_OWNED_BUG: another problem was deferred as outside the agreed scope')"})}}}}))
-	stdout, err := exec.CommandContext(ctx, "node", "-e", "process.stdout.write('DEFERRED_OWNED_BUG: another problem was deferred as outside the agreed scope')").Output()
+	script := `const parseCount = value => Number(value);
+const actual = parseCount('not-a-number');
+process.stdout.write([
+ 'Primary task: completed successfully.',
+ 'DEFERRED_OWNED_BUG: parseCount accepts non-numeric input.',
+ 'Contract: parseCount must throw invalid_count for non-numeric input.',
+ 'Owned code: const parseCount = value => Number(value);',
+ 'Observed: parseCount on not-a-number returned ' + String(actual) + ' without throwing.',
+ 'Expected: throw invalid_count.',
+ 'Disposition: this observed failure is outside the primary task and remains unresolved; create follow-up reproduction work.'
+].join('\n'));`
+	origin := must(rs.Create(ctx, p, "one", "run:origin", runs.Create{Mutation: m("0"), Spec: runs.Spec{Input: runs.Input{Command: runs.Command{Kind: "cli", Target: "node", Parameters: raw([]string{"-e", script})}}}}))
+	stdout, err := exec.CommandContext(ctx, "node", "-e", script).Output()
 	if err != nil {
 		t.Fatal(err)
 	}

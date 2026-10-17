@@ -44,6 +44,20 @@ Chromeで接続取得、時間上限の編集・版保存、有効化、固定�
 
 ## 残る確認
 
-最終固定commitの独立検品・CI、実providerでの意味判断、マージ後照合が残る。実provider試験は未実行で、接続先・認証と消費枠の本人判断が必要である。未実行の条件を成功や達成とは記録しない。
+固定`7c4766da3d83ff2771312447d4ca2e366c981830`のコード検品はblocker 0件、CI `39079911131`も三件とも成功した。次節の実接続で発見した設定・入力fixtureの修正差分は、改めて固定して検品・CIを確認する。実providerの陽性ケースからの発行と、マージ後照合は未確認であり、完了とは扱わない。
 
 PRは[Draft #61](https://github.com/KingYoSun/koujou-san/pull/61)。先行CI `39079414493`は`infra/README.md`の整形漏れで失敗した。同じ失敗をローカルでも確認し、Prettierを適用した。最新headで再確認する。
+
+## OpenAI APIの二要求
+
+本人がOpenAI APIの専用キー設定と合成入力の最大二要求を許可し、Git管理外の`provider.env`へキーを保存した。既存CLIやクライアントOAuthの秘密値は使っていない。モデルは公式の[モデル仕様](https://developers.openai.com/api/docs/models/gpt-6.1-sol)と、本人のAPIで取得したモデル一覧で`gpt-6.1-sol`を確認した。Chat Completionsと構造化応答の対応範囲で、入力4 KiB・出力2048 token・30秒・fallbackなしとした。
+
+第一要求は404。私の上流`base_url`設定に`/v1`を含めたため、Bifrostの`/v1/chat/completions`と重複した。採用・発行はなく、利用量は欠測として保持した。`issue27-openai-live-first.log/json`。所有providerのパス検証が緩かったため、この不備を隔離probeで見逃していた。厳密なパス検証を追加し、変更前404・変更後成功を`issue27-gateway-path-before.log / after.log`で確認した。
+
+設定ファイルの変更だけでも確実に再読込みするよう、`infra:llm:up`へ`--force-recreate`を追加した。上流OpenAIのbase URLは省略して既定値へ戻した。
+
+第二要求は200で、実モデルは`gpt-6.1-sol`、入力366・出力429 token、cache 0・reasoning 194。モデルは疑いの候補と固定引用を返したが、「別の問題を見送った」という抽象的な合成文だけでは、問題の内容・対象・再現手順等が不明だった。未知点を残したため、製品は不成立にせず判断不能で保持し、発行しなかった。`issue27-openai-live-second.log/json`。実接続と判断不能の経路は確認できたが、陽性ケースの発行成功とは扱わない。
+
+陽性fixtureを、契約・所有コード・実際のNaN観測・見送り理由を持つNode出力へ修正した。`unknown`は条件判断を妨げる証拠不足を表すことをschemaで明確にし、疑いの同定と、確認・外部追跡の判断を初期指示で分けた。未知点がある応答を判断不能にする処理は維持する。通常PG試験と4 KiBの所有HTTP入口が成功し、所有HTTPの送信数は一回だった。`issue27-concrete-evidence-owned.log / issue27-concrete-live-entry-owned.log/json`。
+
+承認された二要求は使い切った。修正した陽性入力を実providerへ送る前に、追加枠の判断を確認する。

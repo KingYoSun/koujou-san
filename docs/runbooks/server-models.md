@@ -35,6 +35,8 @@ pnpm run infra:llm:stop
 
 `key_file`はWorker用virtual keyのファイルで、上流providerのキーとは異なる。`ca_file`を指定すればそのCAを追加する。ファイルパスは絶対パスを使う。`workspaces`は許可するWorkspace IDを指定し、Contextごとの許可一覧を作らない。本文の送信禁止分類はWorkspaceの共有ポリシーで管理する。`models`は要求名と実応答名を対応させる。fallback先も登録し、Hopper定義で使うものだけを明示する。
 
+API側の`endpoint`と、Bifrostが上流へ接続する`network_config.base_url`は別の設定である。OpenAI providerの`base_url`は省略して既定値を使う。Bifrost側が`/v1/chat/completions`を付けるため、上流設定へ`/v1`を重ねない。
+
 APIは`KOUJOU_SERVER_LLM_CONFIG`のJSONを要求ごとに読む。`dev:api`はroot基準の設定パスを解決する。それ以外の起動では絶対パスを指定する。接続内容が変わると公開revisionが変わるため、Hopper定義で接続を選び直し、新しい版を保存・有効化する。APIのセッションやMCP tokenをGatewayへ転送しない。Gatewayへのredirectも追跡しない。
 
 Gateway設定JSONは`source_of_truth=config.json`である。管理画面だけで変更した設定を、永続する設定として扱わない。設定・provider環境変数の変更後は、`infra:llm:up`でコンテナを再作成する。providerの認証、モデルへの要求と料金は、利用者が明示した接続だけで確認する。

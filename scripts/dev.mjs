@@ -670,6 +670,7 @@ const tasks = {
       "up",
       "-d",
       "--wait",
+      "--force-recreate",
       "bifrost",
     ]);
   },
