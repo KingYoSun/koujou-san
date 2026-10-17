@@ -182,7 +182,22 @@ func (b *sourceBuilder) event(ctx context.Context, out *batch, id, revision stri
 			out.DeletedLogicals = append(out.DeletedLogicals, identity(b.W, ref))
 			return nil
 		}
-		return b.node(ctx, out, ref)
+		if err := b.node(ctx, out, ref); err != nil {
+			return err
+		}
+		return b.lineage(ctx, out, id, revision)
+	case orchestrationKind(strings.SplitN(id, ":", 2)[0]):
+		k, logical, _ := strings.Cut(id, ":")
+		ref := contexts.Ref{Kind: k, ID: logical, Revision: revision}
+		out.CurrentLogicals = append(out.CurrentLogicals, identity(b.W, ref))
+		if deleted {
+			out.DeletedLogicals = append(out.DeletedLogicals, identity(b.W, ref))
+			return nil
+		}
+		if err := b.node(ctx, out, ref); err != nil {
+			return err
+		}
+		return b.lineage(ctx, out, id, revision)
 	}
 	return nil
 }

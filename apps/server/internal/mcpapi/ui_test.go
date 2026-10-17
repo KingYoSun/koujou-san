@@ -66,6 +66,10 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 	principal := access.Principal{UserID: user.ID}
 	refreshRunner := prepareRunnerUI(t, client, target, tokens, service, user.ID)
 	prepareInspectionUI(t, inspectionService, principal, cfg.Key)
+	var hopperFixture func(http.ResponseWriter, *http.Request) bool
+	if os.Getenv("KOUJOU_TEST_HOPPER_UI") == "1" {
+		hopperFixture = prepareHopperUI(t, ctx, service, principal)
+	}
 	write := func(kind, id string, value any) contexts.Ref {
 		raw, _ := json.Marshal(value)
 		result, err := service.Contexts.Put(ctx, principal, "mcp-one", contexts.Identity{Kind: kind, ID: id}, contexts.Write{Mutation: apicontract.Mutation{OperationID: "ui-fixture-" + id, ExpectedVersion: "0"}, Value: raw})
@@ -172,6 +176,9 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 		}
 		files := http.FileServer(http.Dir("../../../client/dist"))
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if hopperFixture != nil && hopperFixture(w, r) {
+				return
+			}
 			if workbenchFixture != nil && workbenchFixture(w, r) {
 				return
 			}
@@ -262,7 +269,7 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 			traceLock.Lock()
 			trace = append(trace, entry)
 			traceLock.Unlock()
-			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/usage/", "/automation/", "/runs/", "/workflows/", "/inspections/", "/publications/", "/workbench/", "/healthz", "/readyz"} {
+			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/usage/", "/automation/", "/runs/", "/workflows/", "/inspections/", "/publications/", "/workbench/", "/hopper/", "/healthz", "/readyz"} {
 				if strings.HasPrefix(r.URL.Path, prefix) {
 					token, err := bearer()
 					if err != nil {

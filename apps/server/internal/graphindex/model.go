@@ -129,6 +129,9 @@ func identity(w string, r contexts.Ref) string { r.Revision = ""; return key(w, 
 func unitKind(k string) bool {
 	return k == "sentence" || k == "paragraph" || k == "section" || k == "document"
 }
+func orchestrationKind(k string) bool {
+	return k == "hopper-result" || k == "publication" || k == "workflow-execution"
+}
 func resource(r contexts.Ref) string {
 	if unitKind(r.Kind) {
 		return "context:" + r.ID

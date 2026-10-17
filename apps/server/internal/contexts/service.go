@@ -18,14 +18,16 @@ type query interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Service struct {
+	tx     pgx.Tx
 	Store  *persistence.Store
 	Access *access.Service
 	Limits Limits
 }
 
 func New(store *persistence.Store, a *access.Service, limits Limits) *Service {
-	return &Service{store, a, limits}
+	return &Service{Store: store, Access: a, Limits: limits}
 }
+func (s *Service) InTransaction(tx pgx.Tx) *Service { copy := *s; copy.tx = tx; return &copy }
 
 type Record struct {
 	Ref      Ref             `json:"ref"`
@@ -190,7 +192,11 @@ func (s *Service) Put(ctx context.Context, p access.Principal, w string, i Ident
 	if i.ID == "" {
 		return apicontract.Response[apicontract.Reference]{}, invalid("invalid_reference", nil)
 	}
-	if err := s.authorizeWrite(ctx, s.Store.Database(), p, w, i); err != nil {
+	var q query = s.Store.Database()
+	if s.tx != nil {
+		q = s.tx
+	}
+	if err := s.authorizeWrite(ctx, q, p, w, i); err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err
 	}
 	scope := persistence.Scope{ActorID: "user:" + p.UserID, Grant: apicontract.Grant{WorkspaceID: w, CanRead: true, CanUpdate: true}, Recheck: func(tx pgx.Tx) *apicontract.Problem {
@@ -220,7 +226,7 @@ func (s *Service) Put(ctx context.Context, p access.Principal, w string, i Ident
 			}
 		}
 		return canonical(Record{Ref: Ref{i.Kind, i.ID, version.Version}, Value: value}), nil
-	})
+	}, s.tx)
 }
 func (s *Service) prepare(ctx context.Context, tx pgx.Tx, p access.Principal, w string, i Identity, raw json.RawMessage, operation string) (json.RawMessage, error) {
 	old, oldErr := s.read(ctx, tx, p, w, Ref{i.Kind, i.ID, "head"})
@@ -508,5 +514,8 @@ func (s *Service) resolve(ctx context.Context, q query, p access.Principal, w st
 	return result
 }
 func (s *Service) Preview(ctx context.Context, p access.Principal, w string, r ResolveRequest) Resolution {
+	if s.tx != nil {
+		return s.resolve(ctx, s.tx, p, w, r)
+	}
 	return s.resolve(ctx, s.Store.Database(), p, w, r)
 }

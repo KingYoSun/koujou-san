@@ -154,7 +154,13 @@ func (s *Service) Process(ctx context.Context, w, id string) error {
 		return saveErr
 	}
 	p := access.Principal{UserID: request.Actor.User}
-	spec := runs.Spec{Name: request.Input.Name, Input: runs.Input{Command: runs.Command{Kind: "server-connector", Target: request.Input.Connection, Parameters: raw(map[string]any{"repository_connection": request.Input.Connection, "title": request.Input.Title, "body": request.Body})}}, Sources: unique(append([]Ref{request.Draft, request.Accepted}, rec.Refs...)), Derivation: &runs.Contract{Name: "ExternalIssueCreation", Version: "github-issues-v1"}}
+	sources := []Ref{request.Draft, request.Accepted}
+	for _, ref := range rec.Refs {
+		if fixed(ref) {
+			sources = append(sources, ref)
+		}
+	}
+	spec := runs.Spec{Name: request.Input.Name, Input: runs.Input{Command: runs.Command{Kind: "server-connector", Target: request.Input.Connection, Parameters: raw(map[string]any{"repository_connection": request.Input.Connection, "title": request.Input.Title, "body": request.Body})}}, Sources: unique(sources), Derivation: &runs.Contract{Name: "ExternalIssueCreation", Version: "github-issues-v1"}}
 	created, err := accepted(s.Runs.CreateForConnector(ctx, p, w, request.Run, runs.Create{Mutation: apicontract.Mutation{OperationID: request.Run + ":create", ExpectedVersion: "0"}, Spec: spec}))
 	if err != nil {
 		return err

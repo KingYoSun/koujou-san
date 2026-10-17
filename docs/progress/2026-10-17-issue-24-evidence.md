@@ -55,3 +55,9 @@ Windows Codex `0.162.1`とClaude Code `2.1.300`を、専用Ory/API/PGのWorkspac
 同じresourceでは最古の未受付行だけを送信対象にし、別resourceは引き続き巡回するよう修正した。resource別の未受付索引も追加した。応答を失った計測を同じ内容・operationで再送して受付版を回収し、後続の途中値・終了値を正しい期待版で共有へ届けることを確認した。拒否された別Runは保留し、許可されたRunは送信できる。元の実行queueには書き込まない。
 
 変更後の`runner::`試験は15成功・4 ignored、失敗0（`test-results/issue24-cumulative-ack-after.log`）。実CLI・ブラウザ・OSの確認は再実施していない。差分の独立検品と最終CI・merge後照合は、この時点では未完了。
+
+## 完了時の照合
+
+`155c02c`の差分検品は全条件PASS、blocker 0。その後は検品追補と進捗記録だけを変更した。最終head `daca90b4754c5b0017b22e6ba7ff1dbb3767b1bf`の[CI 39026136641](https://github.com/KingYoSun/koujou-san/actions/runs/39026136641)で共通UI・サーバー、Windowsネイティブ、GitGuardianが成功した。
+
+[PR #58](https://github.com/KingYoSun/koujou-san/pull/58)を2026-10-17 10:53:35 UTCにマージした。main `a7c8b56151f51e876844ae2810f59d561b81a631`と最終headのtreeは`ab5d04c8ebe94a50b2394aa9731b3e7055fb9acf`で一致し、差分0。#24を手動Closeし、親#2の一覧も完了へ更新した。元の試行失敗・取得範囲・未取得内訳は上記のまま保持する。

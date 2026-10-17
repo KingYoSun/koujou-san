@@ -85,6 +85,9 @@ jobs:
       - name: Test durable automation and triage state
         run: pnpm run test:automation
 
+      - name: Test deterministic Hopper publication and lineage
+        run: pnpm run test:hopper
+
       - name: Test usage pricing and cost history
         run: pnpm run test:usage
 

@@ -253,7 +253,8 @@ async function infra(command) {
 
 async function testDatabase(suite = "persistence", testName) {
   const authentication = suite === "auth" || suite === "mcpapi";
-  const graph = suite === "graphindex" || suite === "mcpapi";
+  const graph =
+    suite === "graphindex" || suite === "mcpapi" || suite === "hopper";
   await resolveGo();
   if (!env.KOUJOU_DB_PASSWORD) throw new Error("Run pnpm run setup first.");
   const project = `koujou-san-db-test-${randomBytes(6).toString("hex")}`;
@@ -404,6 +405,13 @@ async function testDatabase(suite = "persistence", testName) {
 }
 
 const tasks = {
+  "test:hopper": () => testDatabase("hopper", "TestHopperPostgres"),
+  "test:hopper:ui": async () => {
+    env.KOUJOU_TEST_HOPPER_UI = "1";
+    env.KOUJOU_TEST_MCP_UI = "1";
+    await client("build");
+    await testDatabase("mcpapi");
+  },
   "test:workbench": () => testDatabase("workbench", "TestWorkbenchPostgres"),
   "test:workbench:ui": async () => {
     env.KOUJOU_TEST_WORKBENCH_UI = "1";

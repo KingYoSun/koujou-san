@@ -119,17 +119,7 @@ func (s *Service) Step(ctx context.Context, w, id string) error {
 			if terminal(run.State) {
 				t.State = "done"
 				t.Run = &rr.Ref
-				t.Outcome = run.State
-				if run.Assessment != nil {
-					if run.Assessment.State != "valid" || run.State != "succeeded" {
-						t.Outcome = "INCONCLUSIVE"
-					} else if run.Assessment.Verdict != "" {
-						t.Outcome = run.Assessment.Verdict
-					}
-				}
-				if t.Stale {
-					t.Outcome = "STALE"
-				}
+				t.Outcome = runOutcome(run, t.Stale)
 				return s.transition(ctx, p, w, root, e, []Task{t}, "completed")
 			}
 		}

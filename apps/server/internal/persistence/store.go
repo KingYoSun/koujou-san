@@ -75,6 +75,9 @@ var publicationSchema string
 //go:embed 019_workbench.sql
 var workbenchSchema string
 
+//go:embed 020_hopper.sql
+var hopperSchema string
+
 type Store struct {
 	pool *pgxpool.Pool
 	// Accepted is installed once at startup. It may write an outbox in this same
@@ -88,7 +91,7 @@ func Open(ctx context.Context, url string) (*Store, error) {
 		return nil, errors.New("invalid PostgreSQL configuration")
 	}
 	if err = pool.Ping(ctx); err == nil {
-		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema, contextSchema, syncSchema, searchSchema, graphSchema, operationsSchema, catalogSchema, githubSchema, usageSchema, automationSchema, runsSchema, assignmentSchema, runnerQueueSchema, workflowSchema, inspectionSchema, publicationSchema, workbenchSchema})
+		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema, contextSchema, syncSchema, searchSchema, graphSchema, operationsSchema, catalogSchema, githubSchema, usageSchema, automationSchema, runsSchema, assignmentSchema, runnerQueueSchema, workflowSchema, inspectionSchema, publicationSchema, workbenchSchema, hopperSchema})
 	}
 	if err != nil {
 		pool.Close()
@@ -164,7 +167,9 @@ func rejected[T any](workspace, code, reason string) apicontract.Response[T] {
 // Apply invokes the domain callback only for an authorized, unreplayed mutation.
 // The callback writes its own tables and returns the committed state for projections.
 // ExpectedVersion "0" means an ID that has never been created in this Workspace.
-func (s *Store) Apply(ctx context.Context, scope Scope, command Command, apply func(pgx.Tx, apicontract.Reference) (json.RawMessage, error)) (apicontract.Response[apicontract.Reference], error) {
+// A supplied transaction lets an orchestration owner reserve an action and use
+// the normal domain mutation atomically. The caller owns commit/rollback.
+func (s *Store) Apply(ctx context.Context, scope Scope, command Command, apply func(pgx.Tx, apicontract.Reference) (json.RawMessage, error), within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
 	if problem := apicontract.Authorize(scope.Grant, command.WorkspaceID, true); problem != nil {
 		return rejected[apicontract.Reference](command.WorkspaceID, problem.Code, "not_accessed"), nil
 	}
@@ -191,7 +196,7 @@ func (s *Store) Apply(ctx context.Context, scope Scope, command Command, apply f
 		return rejected[apicontract.Reference](command.WorkspaceID, problem.Code, "not_accessed"), nil
 	}
 	response := rejected[apicontract.Reference](command.WorkspaceID, "unavailable", "storage_unavailable")
-	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	perform := func(tx pgx.Tx) error {
 		origin := rand.Text()
 		if _, err := tx.Exec(ctx, "INSERT INTO shared_streams (workspace_id,origin,position) VALUES ($1,$2,$2) ON CONFLICT DO NOTHING", command.WorkspaceID, origin); err != nil {
 			return err
@@ -236,6 +241,10 @@ func (s *Store) Apply(ctx context.Context, scope Scope, command Command, apply f
 		if err != nil {
 			return err
 		}
+		// Nested domain writes may have advanced this already-locked stream.
+		if err = tx.QueryRow(ctx, "SELECT sequence FROM shared_streams WHERE workspace_id=$1", command.WorkspaceID).Scan(&sequence); err != nil {
+			return err
+		}
 		position = rand.Text()
 		sequence++
 		if _, err = tx.Exec(ctx, "INSERT INTO shared_versions VALUES ($1,$2,$3,$4) ON CONFLICT (workspace_id,resource_id) DO UPDATE SET version=EXCLUDED.version,deleted=EXCLUDED.deleted", reference.WorkspaceID, reference.ID, reference.Version, command.Deleted); err != nil {
@@ -260,7 +269,12 @@ func (s *Store) Apply(ctx context.Context, scope Scope, command Command, apply f
 		}
 		_, err = tx.Exec(ctx, "INSERT INTO shared_receipts VALUES ($1,$2,$3,$4,$5)", reference.WorkspaceID, scope.ActorID, command.Mutation.OperationID, command.Mutation.RequestDigest, result)
 		return err
-	})
+	}
+	if len(within) > 0 && within[0] != nil {
+		err = perform(within[0])
+	} else {
+		err = pgx.BeginFunc(ctx, s.pool, perform)
+	}
 	if err != nil {
 		return rejected[apicontract.Reference](command.WorkspaceID, "unavailable", "storage_unavailable"), err
 	}

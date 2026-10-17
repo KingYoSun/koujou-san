@@ -96,17 +96,17 @@ func (s *Service) OperationPrincipal(ctx context.Context, user, w, handle string
 // CreateOperation receives already-authorized Manifest placements from the
 // owning Context service. A bounded empty set is meaningful: Run.input=none.
 func (s *Service) CreateOperation(ctx context.Context, p Principal, w, id, purpose string, bounded bool, refs []VersionRef, m apicontract.Mutation) (apicontract.Response[apicontract.Reference], error) {
-	if purpose != "read" && purpose != "edit" && purpose != "price-edit" && purpose != "triage-edit" && purpose != "triage-manage" {
+	if purpose != "read" && purpose != "edit" && purpose != "price-edit" && purpose != "triage-edit" && purpose != "triage-manage" && purpose != "hopper-edit" && purpose != "hopper-manage" {
 		return apicontract.Response[apicontract.Reference]{}, ErrForbidden
 	}
 	if refs == nil {
 		refs = []VersionRef{}
 	}
 	action := "read"
-	if purpose == "edit" || purpose == "price-edit" || purpose == "triage-edit" {
+	if purpose == "edit" || purpose == "price-edit" || purpose == "triage-edit" || purpose == "hopper-edit" {
 		action = "register"
 	}
-	if purpose == "triage-manage" {
+	if purpose == "triage-manage" || purpose == "hopper-manage" {
 		action = "manage"
 	}
 	return s.mutate(ctx, p, w, "operation:"+id, "llm-operation", action, m, struct {
@@ -194,7 +194,7 @@ func (s *Service) CheckVersion(ctx context.Context, tx pgx.Tx, p Principal, w, i
 	return nil
 }
 func operationAction(op Operation, action string) bool {
-	return action == "read" || action == "get" || action == "search" || (action == "update" && op.Purpose == "edit") || (action == "price_write" && op.Purpose == "price-edit") || (action == "triage_write" && (op.Purpose == "triage-edit" || op.Purpose == "triage-manage")) || (action == "triage_manage" && op.Purpose == "triage-manage")
+	return action == "read" || action == "get" || action == "search" || (action == "update" && op.Purpose == "edit") || (action == "price_write" && op.Purpose == "price-edit") || (action == "triage_write" && (op.Purpose == "triage-edit" || op.Purpose == "triage-manage")) || (action == "triage_manage" && op.Purpose == "triage-manage") || (action == "hopper_write" && (op.Purpose == "hopper-edit" || op.Purpose == "hopper-manage")) || (action == "hopper_manage" && op.Purpose == "hopper-manage")
 }
 func identityVersionRefs(ids []string) []VersionRef {
 	refs := make([]VersionRef, 0, len(ids))
@@ -250,7 +250,7 @@ func ReadFilterSQL(refs string) string {
 	return `NOT EXISTS(SELECT 1 FROM jsonb_to_recordset(` + refs + `) AS need(id text,version text)
  LEFT JOIN access_resources ar ON ar.workspace_id=$1 AND ar.id=need.id
  LEFT JOIN access_resource_grants ag ON ag.workspace_id=ar.workspace_id AND ag.resource_id=ar.id AND ag.user_id=$2
- WHERE ar.id IS NULL OR (ar.restricted AND NOT COALESCE(ag.can_read,false)))
+ WHERE ar.id IS NULL OR (ar.restricted AND NOT COALESCE(ag.can_read,false)) OR (need.id LIKE 'github:%' AND NOT EXISTS(SELECT 1 FROM github_bindings gb WHERE gb.workspace_id=$1 AND gb.target_id=substring(need.id from 8))))
  AND ($3='' OR NOT EXISTS(SELECT 1 FROM jsonb_to_recordset(` + refs + `) AS need(id text,version text)
  WHERE NOT EXISTS(SELECT 1 FROM (` + versionQuery("$1", "$3", "$2", refs) + `) permitted WHERE permitted.id=need.id AND permitted.version=need.version)))`
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/automation"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/hopper"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/inspections"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
@@ -102,6 +103,7 @@ func TestMCPIntegration(t *testing.T) {
 	s.Workflows = workflows.New(store, a, c, s.Runs)
 	inspectionService := inspections.New(store, a, c, s.Runs, s.Workflows)
 	publicationService := publications.New(store, a, s.Runs, &publicationUIBackend{})
+	s.Hopper = hopper.New(store, a, s.Automation, s.Runs, s.Workflows, publicationService, graph)
 	workbenchService := workbench.New(store, a, s.Runs, s.Workflows)
 	publicationService.StartWorker(ctx)
 	s.Workflows.StartWorker(ctx)
@@ -111,7 +113,7 @@ func TestMCPIntegration(t *testing.T) {
 			runService.BeforeStart = s.Runs.BeforeStart
 			runService.AssessResult = s.Runs.AssessResult
 		}
-		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, inspectionService.Register, publicationService.Register, workbenchService.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
+		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, inspectionService.Register, publicationService.Register, workbenchService.Register, s.Hopper.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
 	}
 	faults := &reconnectFixture{}
 	server := httptest.NewUnstartedServer(faults.handler(handler(s.Runs)))
@@ -354,7 +356,7 @@ func TestMCPIntegration(t *testing.T) {
 		return []byte(text.Text)
 	}
 	listed, err := session.ListTools(ctx, nil)
-	if err != nil || len(listed.Tools) != 19 {
+	if err != nil || len(listed.Tools) != 24 {
 		t.Fatal("tool catalogue", err)
 	}
 	call(session, "context_get", public, false)
@@ -416,6 +418,7 @@ func TestMCPIntegration(t *testing.T) {
 	defer editor.Close()
 	checkUsageMCP(t, s, p, ordinary.Access, session, editor, none, func(handle string) (*mcp.ClientSession, error) { return connect(tokens.Access, "mcp-one", handle) }, call, request, cfg.Site)
 	checkAutomationMCP(t, s, p, ordinary.Access, session, editor, none, func(handle string) (*mcp.ClientSession, error) { return connect(tokens.Access, "mcp-one", handle) }, call, request, cfg.Site)
+	checkHopperMCP(t, s, p, ordinary.Access, session, editor, none, secret, func(handle string) (*mcp.ClientSession, error) { return connect(tokens.Access, "mcp-one", handle) }, call, request, cfg.Site)
 	checkRunsMCP(t, s, p, session, none, call, request, cfg.Site, ordinary.Access)
 	checkWorkflowsMCP(t, s, p, session, none, fixed, call, request, cfg.Site, ordinary.Access)
 	write := contexts.Write{Mutation: mutation(public.Revision), Value: json.RawMessage(`{"kind":"sentence","text":"edited from ordinary HTTP"}`)}

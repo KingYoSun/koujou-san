@@ -23,7 +23,7 @@ func failed(w, code, reason string) apicontract.Response[Result] {
 	return apicontract.Response[Result]{Error: &apicontract.Problem{Code: code}, Meta: meta(w, "", "pending", reason)}
 }
 func (s *Service) request(r Request) (Request, error) {
-	if r.Root.ID == "" || !(unitKind(r.Root.Kind) || r.Root.Kind == "scope" || r.Root.Kind == "run") || r.Root.Revision == "head" {
+	if r.Root.ID == "" || !(unitKind(r.Root.Kind) || r.Root.Kind == "scope" || r.Root.Kind == "run" || orchestrationKind(r.Root.Kind)) || r.Root.Revision == "head" {
 		return r, errInput
 	}
 	if r.Direction == "" {
@@ -83,6 +83,36 @@ func (x *exploration) allow(ids []string) error {
 		return nil
 	}
 	grants, err := x.s.Access.Readable(x.ctx, x.p, x.w, unknown)
+	if err != nil {
+		return err
+	}
+	// Orchestration nodes carry current provenance restrictions just as their
+	// domain reads do. Check only this bounded candidate batch, never all records.
+	rows, err := x.s.Store.Database().Query(x.ctx, `WITH wanted AS (SELECT unnest($4::text[]) AS id), checked AS (
+ SELECT n.id,r.refs FROM wanted n JOIN shared_versions h ON h.workspace_id=$1 AND h.resource_id=n.id
+ JOIN LATERAL (
+ SELECT refs FROM hopper_records r WHERE r.workspace_id=$1 AND r.id=n.id AND r.version=h.version
+ UNION ALL SELECT refs FROM publication_records r WHERE r.workspace_id=$1 AND r.id=n.id AND r.version=h.version
+ UNION ALL SELECT refs FROM workflow_records r WHERE r.workspace_id=$1 AND r.id=n.id AND r.version=h.version
+ UNION ALL SELECT r.refs||COALESCE(i.refs,'[]'::jsonb) FROM run_records r LEFT JOIN run_records i ON i.workspace_id=r.workspace_id AND i.id=r.payload->'input'->>'id' AND i.version=r.payload->'input'->>'version' WHERE r.workspace_id=$1 AND r.id=n.id AND r.version=h.version) r ON true)
+ SELECT c.id,`+access.ReadFilterSQL("c.refs")+` FROM checked c`, x.w, x.p.UserID, x.p.OperationID, unknown)
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var id string
+		var allowed bool
+		if err = rows.Scan(&id, &allowed); err != nil {
+			break
+		}
+		if !allowed {
+			delete(grants, id)
+		}
+	}
+	if err == nil {
+		err = rows.Err()
+	}
+	rows.Close()
 	if err != nil {
 		return err
 	}
@@ -500,4 +530,4 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 const nodeSourcesSQL = `WITH wanted AS (SELECT * FROM jsonb_to_recordset($2::jsonb) AS t(k text,kind text,id text,rev text))
  SELECT t.k FROM wanted t JOIN shared_versions v ON v.workspace_id=$1 AND v.resource_id=CASE WHEN t.kind IN ('sentence','paragraph','section','document') THEN 'context:' ELSE t.kind||':' END||t.id
  WHERE (t.rev='' OR EXISTS(SELECT 1 FROM context_records r WHERE r.workspace_id=$1 AND r.resource_id=v.resource_id AND r.revision=t.rev AND r.kind=t.kind)
- OR (t.kind='run' AND (v.version=t.rev OR EXISTS(SELECT 1 FROM graph_relations r WHERE r.workspace_id=$1 AND ((r.payload->'from'->>'kind'='run' AND r.payload->'from'->>'id'=t.id AND r.payload->'from'->>'revision'=t.rev) OR (r.payload->'to'->>'kind'='run' AND r.payload->'to'->>'id'=t.id AND r.payload->'to'->>'revision'=t.rev))))))`
+ OR (t.kind='run' AND (v.version=t.rev OR EXISTS(SELECT 1 FROM graph_relations r WHERE r.workspace_id=$1 AND ((r.payload->'from'->>'kind'='run' AND r.payload->'from'->>'id'=t.id AND r.payload->'from'->>'revision'=t.rev) OR (r.payload->'to'->>'kind'='run' AND r.payload->'to'->>'id'=t.id AND r.payload->'to'->>'revision'=t.rev))))) OR (t.kind IN ('hopper-result','publication','workflow-execution') AND EXISTS(SELECT 1 FROM shared_changes c WHERE c.workspace_id=$1 AND c.resource_id=t.kind||':'||t.id AND c.version=t.rev)))`

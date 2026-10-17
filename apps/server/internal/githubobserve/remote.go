@@ -69,16 +69,17 @@ type appToken = githubapp.Token
 // Remote is owned by the single observation worker. HTTP calls are serialized,
 // including token exchange, page retrieval and webhook-triggered reconciliations.
 type Remote struct {
-	config   *Config
-	client   *http.Client
-	base     string
-	tokens   map[string]appToken
-	cache    map[string]cachedResponse
-	resumeAt time.Time
+	config       *Config
+	client       *http.Client
+	base         string
+	tokens       map[string]appToken
+	cache        map[string]cachedResponse
+	workflowRuns map[string]int64
+	resumeAt     time.Time
 }
 
 func newRemote(c *Config) *Remote {
-	return &Remote{config: c, client: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, base: "https://api.github.com", tokens: map[string]appToken{}, cache: map[string]cachedResponse{}}
+	return &Remote{config: c, client: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, base: "https://api.github.com", tokens: map[string]appToken{}, cache: map[string]cachedResponse{}, workflowRuns: map[string]int64{}}
 }
 func (r *Remote) request(ctx context.Context, method, path, token string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, r.base+path, body)
@@ -182,6 +183,32 @@ func (r *Remote) get(ctx context.Context, t Target, path string, into any) error
 }
 func (r *Remote) observe(ctx context.Context, t Target) (Snapshot, error) {
 	prefix := "/repos/" + t.Repository
+	if t.WorkflowID > 0 {
+		path := fmt.Sprintf("%s/actions/workflows/%d/runs?per_page=1", prefix, t.WorkflowID)
+		if t.Event != "" {
+			path += "&event=" + t.Event
+		}
+		var listing struct {
+			Runs []source `json:"workflow_runs"`
+		}
+		if err := r.get(ctx, t, path, &listing); err != nil {
+			return Snapshot{}, err
+		}
+		if len(listing.Runs) != 1 || listing.Runs[0].ID < 1 || listing.Runs[0].WorkflowID != t.WorkflowID {
+			return Snapshot{}, errors.New("workflow_result_unavailable")
+		}
+		run := listing.Runs[0].ID
+		if old := r.workflowRuns[t.ID]; old != 0 && old != run {
+			previous := fmt.Sprintf("%s/actions/runs/%d", prefix, old)
+			for key := range r.cache {
+				if key == previous || strings.HasPrefix(key, previous+"/") {
+					delete(r.cache, key)
+				}
+			}
+		}
+		r.workflowRuns[t.ID] = run
+		t.ExternalID = strconv.FormatInt(run, 10)
+	}
 	path := prefix
 	switch t.Kind {
 	case "issue":

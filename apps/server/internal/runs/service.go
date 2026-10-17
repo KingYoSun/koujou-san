@@ -22,6 +22,7 @@ type query interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Service struct {
+	tx       pgx.Tx
 	Store    *persistence.Store
 	Access   *access.Service
 	Contexts *contexts.Service
@@ -33,6 +34,13 @@ type Service struct {
 
 func New(store *persistence.Store, a *access.Service, c *contexts.Service) *Service {
 	return &Service{Store: store, Access: a, Contexts: c}
+}
+
+// InTransaction returns an isolated service view, never a shared mutable binding.
+func (s *Service) InTransaction(tx pgx.Tx) *Service {
+	copy := *s
+	copy.tx = tx
+	return &copy
 }
 func runID(id string) string { return "run:" + strings.TrimPrefix(id, "run:") }
 func contextRef(r contexts.Ref) Ref {
@@ -223,7 +231,7 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, action,
 		}
 		return s.refs(ctx, q, p, w, deps)
 	}
-	if err := check(nil); err != nil {
+	if err := check(s.tx); err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err
 	}
 	actor := "user:" + p.UserID
@@ -246,7 +254,7 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, action,
 		}
 		// Shared synchronization receives a small head, never all output or inputs.
 		return raw(Record{Ref: Ref{ID: root, Version: ref.Version}, RunID: root, Kind: "run", Value: raw(r), Refs: unique(refs)}), nil
-	})
+	}, s.tx)
 }
 func loadRun(ctx context.Context, q query, w, id string) (Run, Record, error) {
 	r, err := record(ctx, q, w, Ref{ID: runID(id), Version: "head"})
@@ -321,6 +329,19 @@ func (s *Service) SourcesTx(ctx context.Context, tx pgx.Tx, p access.Principal, 
 				return nil, ErrInvalid
 			}
 			out = append(out, manifestRefs(rec.Ref, manifest)...)
+		} else if strings.HasPrefix(r.ID, "hopper-") || strings.HasPrefix(r.ID, "hopper:") || strings.HasPrefix(r.ID, "publication") || strings.HasPrefix(r.ID, "workflow-") || strings.HasPrefix(r.ID, "inspection-") {
+			var dependencies []byte
+			if err := tx.QueryRow(ctx, `SELECT refs FROM hopper_records WHERE workspace_id=$1 AND id=$2 AND version=$3
+ UNION ALL SELECT refs FROM publication_records WHERE workspace_id=$1 AND id=$2 AND version=$3
+ UNION ALL SELECT refs FROM workflow_records WHERE workspace_id=$1 AND id=$2 AND version=$3
+ UNION ALL SELECT refs FROM inspection_records WHERE workspace_id=$1 AND id=$2 AND version=$3 LIMIT 1`, w, r.ID, r.Version).Scan(&dependencies); err != nil {
+				return nil, err
+			}
+			var refs []Ref
+			if err := json.Unmarshal(dependencies, &refs); err != nil {
+				return nil, err
+			}
+			out = append(out, refs...)
 		}
 	}
 	if err := s.refs(ctx, tx, p, w, out); err != nil {
