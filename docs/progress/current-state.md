@@ -93,8 +93,12 @@
 
 ## Issue #22の準備
 
-状態: In progress。Scope revision 1。本文末尾へ照合用HTMLコメントを自動追加するユーザー判断を[計画](2026-10-17-issue-22-plan.md)へ反映した。共有受付・外部作成・結果不明の照合を、共通Runとサーバー側Connectorへ接続する。観測Appの読取り専用許可は拡大しない。
+状態: Complete。Scope revision 1。共有受付・外部作成・結果不明の照合を共通Runとサーバー側Connectorへ接続し、許可された実Appで作成・GET確認・外部編集を検証した。観測Appの読取り専用許可は変更していない。
 
-[PR #55](https://github.com/KingYoSun/koujou-san/pull/55)で固定接続・共通画面・実GitHub接続を検証した。許可を得た一リポジトリ限定の起票Appにより、検証Issue #56の作成・GET確認・外部編集の観測・Closeが成功した。[独立検品](2026-10-17-issue-22-inspection.md)は実接続の追加証拠を含め全AC・INVAR PASS、blocker 0件。head `571bcf2`のCIは全件成功。最終headのCI・マージ後照合が残る。詳細は[証跡](2026-10-17-issue-22-evidence.md)を参照する。
+[PR #55](https://github.com/KingYoSun/koujou-san/pull/55)を最終head `3550469`の全CI・全条件の独立検品PASS後にマージした。main `a12eade`と最終headのtree一致・diff 0を確認してIssueを手動Closeした。詳細は[証跡](2026-10-17-issue-22-evidence.md)を参照する。
 
-#23〜#34は未着手（#33は実スリープ確認の移管を反映済み）。LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #23の準備
+
+状態: In progress。ユーザー判断に従い「作業と判断」へ一覧・詳細・回答を集約し、[PR #57](https://github.com/KingYoSun/koujou-san/pull/57)を作成した。共有PGと状態別UI試験、二アカウントから実CLIへの回答、受付/配送/継続の別表示、理由付き差し戻しと新Run関連を確認した。[独立検品](2026-10-17-issue-23-inspection.md)ではAC-5以外がPASS、実装上のblockerは0件。AC-5の本人観測は、ユーザー承認により未確認のまま#33 AC-4へ移管した（Scope revision 2）。UI suiteは本人観測待ちで有効期限に達してFAIL終了し、全体成功とは扱わない。移管後の独立検品照合、最終head CI・マージ後照合が残る。[証跡](2026-10-17-issue-23-evidence.md)を参照する。
+
+#24〜#34は未着手（#33は実スリープ確認の移管を反映済み）。LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。

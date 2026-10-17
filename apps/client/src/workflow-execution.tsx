@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { syncRequest, workspaceAccessLost } from "./auth";
 import { syncStorage, answerScopeEpoch, allowAnswerScope } from "./sync-store";
@@ -44,6 +44,8 @@ export function WorkflowExecution({
   definition,
   canEdit,
   canExecute,
+  selected,
+  onOpenRun,
 }: {
   native: boolean;
   api: string;
@@ -52,6 +54,8 @@ export function WorkflowExecution({
   definition?: Ref;
   canEdit: boolean;
   canExecute: boolean;
+  selected?: Ref;
+  onOpenRun?: (ref: Ref) => void;
 }) {
   const base = `/workflows/workspaces/${encodeURIComponent(workspace)}`;
   const [id, setID] = useState("");
@@ -145,6 +149,9 @@ export function WorkflowExecution({
       `/records/${encodeURIComponent("adoption:" + definition.id)}?version=head`,
     )) as Ref;
   };
+  useEffect(() => {
+    if (selected) void act(() => load(selected.id));
+  }, [selected?.id, selected?.version]);
   return (
     <section aria-label="工程の実行と判断">
       <h3>採用した工程の実行</h3>
@@ -265,8 +272,16 @@ export function WorkflowExecution({
                 </p>
                 {r.value.run && (
                   <p>
-                    Run: {r.value.run.id}@{r.value.run.version}
-                    （Run一覧から入力・Pause・原出力を確認できます）
+                    {onOpenRun ? (
+                      <button onClick={() => onOpenRun(r.value.run!)}>
+                        この工程の入力・質問・結果を確認
+                      </button>
+                    ) : (
+                      <>
+                        Run: {r.value.run.id}@{r.value.run.version}
+                        （Run一覧から入力・Pause・原出力を確認できます）
+                      </>
+                    )}
                   </p>
                 )}
                 {r.value.definition && (

@@ -38,6 +38,8 @@ Codexのworktree向けに `.codex/environments/environment.toml` のsetupにも 
 | `pnpm run test:inspections` | 試験専用DBによる固定検品入力・条件別判定・証拠・失効・例外判断 |
 | `pnpm run test:publications` | 試験専用DBと固定GitHub HTTPによる起票受付・外部確認・結果不明の照合 |
 | `pnpm run test:publications:live` | 明示した起票Appと検証用repoでの作成・再取得・外部編集・検証IssueのClose |
+| `pnpm run test:workbench` | 試験専用DBによる作業一覧・現在権限・回付・回答・差し戻しとRun関連 |
+| `pnpm run test:workbench:ui` | 実Ory・二アカウント・所有CLIで作業と判断を実操作する専用環境 |
 | `pnpm run test:automation` | 試験専用DBによる受理・永続Worker・Triage方針と優先度 |
 | `pnpm run test:usage` | 試験専用DBによる利用量・料金版・費用評価・認可・集計 |
 | `pnpm run test:github` | 試験専用DBと固定応答によるGitHub観測・権限・復旧 |
