@@ -81,6 +81,10 @@
 
 ## Issue #19の判定
 
-状態: Inspection pending。Scope revision 2。[計画](2026-10-17-issue-19-plan.md)に沿い、Windows/WSLのAPI切断・HTTPサーバー再作成、Runner消失、古い要求の起動拒否、二利用者の回答案、明示的な引継ぎを実装・検証した。[証跡](2026-10-17-issue-19-evidence.md)と[独立検品](2026-10-17-issue-19-inspection.md)を参照する。新しいネイティブ照合処理は実Ory/APIとの直接試験で確認し、追加のGUI起動依頼を取り下げた。実スリープは未確認と明記し、2026-10-17のユーザー承認で#33のリリース前受入へ移した。最終文書の検品・CI・マージ後照合を残す。
+状態: Complete。Scope revision 2。[PR #52](https://github.com/KingYoSun/koujou-san/pull/52)を最終head `ff3e61efd113a281ef81de27ac335a3ea5d2bfcd`の全CI・独立検品後にマージした。main `7c6b43eaaa273dacbd62de432bf716a74c178ed0`と最終headのtreeは`7d79405800b16ef9d0d06f87dd323c5ee6a3a5a3`で一致、差分0。[証跡](2026-10-17-issue-19-evidence.md)と[独立検品](2026-10-17-issue-19-inspection.md)が揃い、#19をCloseした。実スリープは未確認のまま、本人の承認で#33 AC-11へ移した。
 
-#20〜#34は未着手。工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #20の判定
+
+状態: In progress。Scope revision 1。[計画](2026-10-17-issue-20-plan.md)に、版付き定義・静的検証・順次/並列/分岐/差し戻し・参照入力・明示適用・CI/操作直前条件・MCP・exportの有限な検証を整理した。工程を編集できるメンバーが判断待ちへ回答でき、後続の開始前にも元の実行依頼者の許可を確認する方針を本人が承認済み。既存のRun/保存/権限/Context/観測を再利用して実装する。
+
+#21〜#34は未着手（#33は実スリープ確認の移管を反映済み）。工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
