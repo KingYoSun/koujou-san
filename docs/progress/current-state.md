@@ -111,8 +111,10 @@
 
 ## Issue #26の判定
 
-状態: In progress。Scope revision 1。基準mainは#25マージ後の`e2d6245d2dc2d1bbe4c1691359e50f54a2a54c4e`。本人による回答・明示引継ぎ、共有操作・送信意図・原応答・共通選択保存、専用MCP OAuth、共通UI、Windowsの暗号化保存と固定接続先を実装した。実PG/Ory/MCP、二つの所有モデルHTTP、共通画面の自動反映・明示採用・手動保存・none、WindowsのPKCE/DPAPI/更新/ログアウト、共通check/test/build、既存のusage/Workflow/Hopper回帰が成功した。
+状態: Complete。Scope revision 1。[PR #60](https://github.com/KingYoSun/koujou-san/pull/60)を最終head `ee3d485778e362fb2c9f94f188efd18dfebb677a`の全CIと独立検品blocker 0件の確認後にマージした。merge `4638bbd61510a365a03bb134d2a2415ec521fc45`とのtreeは`c7ba875a22d813a8f8522619d738dff4bacbb7f5`で一致、差分0。#26をCloseし、親#2を更新した。共有操作・MCP・共通画面、Rigの直接組込み、ChatGPT契約の新しいOAuthと二要求・一tool往復・JSON取得を確認した。失敗試行、実契約の確認範囲、認証情報の削除・失効は[証跡](2026-10-18-issue-26-evidence.md)、判定は[独立検品](2026-10-18-issue-26-inspection.md)を参照する。
 
-既存HTTP方式の独立検品二件を修正し、`5352149`の再検品はblocker 0件となった。その後のユーザー判断により、Tauriへrig-core＋rig-agentを直接組み込んだ。追加検品でOAuth保存先のAPI・本人の分離不備を修正し、`475781a`の再検品もblocker 0件となった。native 10件、native全体30件、共通UI64件、root check/buildが成功した。[PR #60](https://github.com/KingYoSun/koujou-san/pull/60)はDraftで、本人の許可を得たChatGPT契約の新しいOAuth認証、gpt-6.1-solの二要求・一tool往復・JSON取得、端末内削除・提供元失効が成功した。実装head 6eadc78の全CIも成功し、試験用の上限・失敗記録と文書を更新した最終headのCI・マージ後照合を進める。Manifestは標準構成へ追加せず、本文ログは初期無効とする。[計画](2026-10-18-issue-26-plan.md)、[証跡](2026-10-18-issue-26-evidence.md)、[Gateway評価](2026-10-18-issue-26-gateway-probe.md)を参照する。所有モデルの合成結果を実LLMの意味判断品質へ読み替えない。
+## Issue #27の準備
 
-#27〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。
+状態: In progress。Scope revision 1。基準mainは#26マージ後の`4638bbd61510a365a03bb134d2a2415ec521fc45`。Bifrost HTTP 2.3.0を固定した[隔離probe](2026-10-18-issue-27-gateway-probe.md)を終えた。本人の回答により、標準構成の任意サービスとして同梱する。入力1 MiB・出力4096 token・一要求120秒・Worker最大2試行・Workspace同時2評価を変更可能な初期値とする。元結果・必要な証拠の変更だけ関係する評価を自動再評価し、定義・Context更新による過去全件の自動再評価はしない。[計画](2026-10-18-issue-27-plan.md)に条件と終了範囲を固定し、実装へ進む。
+
+#28〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。
