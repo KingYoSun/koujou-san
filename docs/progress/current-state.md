@@ -105,8 +105,12 @@
 
 状態: Complete。Scope revision 1。[PR #58](https://github.com/KingYoSun/koujou-san/pull/58)を最終head `daca90b4754c5b0017b22e6ba7ff1dbb3767b1bf`の全CI・独立検品PASS後にマージした。main `a7c8b56151f51e876844ae2810f59d561b81a631`とのtree一致・差分0を確認してCloseした。実CLI二件・固定個別単価・共通画面・受付応答喪失の修正と取得範囲は[証跡](2026-10-17-issue-24-evidence.md)を参照する。
 
-## Issue #25の準備
+## Issue #25の判定
 
-状態: Inspection pending。基準mainは#24マージ後の`a7c8b56151f51e876844ae2810f59d561b81a631`。[計画](2026-10-17-issue-25-plan.md)の三点への回答を反映し、自動発行・通常の割当と開始、変更可能な起点別上限、未完了Issueへの関連付けと再発提案を実装した。型付き条件、原子的な内部発行、重複・連鎖・明示再開、共有起票、Runner復帰後の割当、共通UI・HTTP・MCPを検証した。検品の3件を修正し、`5ae982f`の限定再検品はPASS、blocker 0件。[証跡](2026-10-17-issue-25-evidence.md)を参照する。最終CI・マージ後照合は未完了。
+状態: Complete。Scope revision 1。[PR #59](https://github.com/KingYoSun/koujou-san/pull/59)を最終head `425e1c3b035125723d31cfa9bfc08258f77fde96`の全CIと独立検品PASS後にマージした。merge `e2d6245d2dc2d1bbe4c1691359e50f54a2a54c4e`とのtreeは`7fa301dfdcd1b3dc6953f7993e72482a459678f3`で一致、差分0。#25をCloseした。型付き評価・発行・連鎖・復旧・HTTP/MCPと共通画面の結果は[証跡](2026-10-17-issue-25-evidence.md)を参照する。
 
-#26〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。LLM操作などは未実装であり、初期リリースの完成とは扱わない。
+## Issue #26の準備
+
+状態: Planned。基準mainは#25マージ後の`e2d6245d2dc2d1bbe4c1691359e50f54a2a54c4e`。[計画](2026-10-18-issue-26-plan.md)へ、初期自動反映、Windows/Webのキー保存、操作ごとの変更可能な上限についてのユーザー回答を反映した。Manifest 6.28.9の所有する合成接続でtool・構造化出力・usageを確認している。製品のHost・共有操作履歴・共通反映はまだ実装していない。
+
+#27〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。
