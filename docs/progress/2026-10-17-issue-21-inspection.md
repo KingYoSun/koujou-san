@@ -50,3 +50,13 @@ E2のコマンドは`apps/server`からroot配下の`.tools/go/bin/go.exe`で実
 - PR CIとマージ後照合はこの固定commitの検品とは別であり、この記録では完了したと判定しない。
 
 固定した条件の判定を終え、blockerがないため、この独立検品を終了する。日本語はyomiyasuで意味・条件・断定の強さを保って推敲した。
+
+## 不正レポート表示の差分検品
+
+- 対象commit: `9d3ab14eeca40e855b77bd5767793c9c95f41cff`。比較元: `2d5253392e05e055b1f181f6738d51cfa404f273`。
+- 初回検品では、保存済みの不正レポートを表示する経路の`criteria_results.map is not a function`を見落としていた。AC-4のこの表示経路について、初回の判定を今回の差分判定で置き換える。
+- 差分は`inspections.tsx`、追加した描画試験、証跡文書の3件だけと確認した。backend、native、CSS、要件は変更されていない。
+- 修正前の失敗ログと、固定コードの`acceptedReport`、`InspectionResult`、`showRun`を照合した。不正形式では条件表の行を生成せず、形式・未判定と原データを表示する。元のraw reportは詳細表示に保持する。正常な条件・証拠の表示構造は維持されている。
+- 人の判断案は同じ`acceptedReport`を使うため、不正形式では条件IDが空配列となり、正常時は元の条件IDを使う。理由・未確認・元結果の参照、判断を明示保存する操作は変わっていない。
+- 独立して`apps/client`から`pnpm exec vitest run src/inspections.test.tsx`を実行し、不正形式と正常表示の2件が成功した（`test-results/issue21-independent-invalid-ui.log`）。実装側の修正前後ログ、最終UI試験13ファイル41件、check・buildの成功ログも照合した。GUI、DB、nativeの試験は再実行していない。
+- 差分判定: **PASS**。修正後のAC-4、正常表示、人の判断案の初期化にblockerはない。他のAC・INVARは変更の影響がないため、既存のPASSを再利用する。`9d3ab14e`で全固定条件PASS・blocker 0件と判定し、差分検品を終了する。

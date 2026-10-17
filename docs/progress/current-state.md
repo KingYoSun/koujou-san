@@ -89,6 +89,6 @@
 
 ## Issue #21の判定
 
-状態: In progress（実装・独立検品完了、CI待ち）。Scope revision 1。固定commit `fec855c62631fa68e14265bf131ef910a637597d`の[独立検品](2026-10-17-issue-21-inspection.md)はAC-1〜8・INVAR-1〜3をPASS、blocker 0件と判定した。[証跡](2026-10-17-issue-21-evidence.md)の専用PG、二登録端末と別保存域の実CLI、実モデル、共通画面、保存/復元、Run/工程/nativeの確認を終えた。[PR #54](https://github.com/KingYoSun/koujou-san/pull/54)の最終headのCIとマージ後照合を残す。物理的に別のPCで試験したとは扱わず、未確認の分離を保証へ格上げしない。
+状態: In progress（実装・独立検品完了、CI待ち）。Scope revision 1。[独立検品](2026-10-17-issue-21-inspection.md)と表示修正commit `9d3ab14eeca40e855b77bd5767793c9c95f41cff`の差分検品は、AC-1〜8・INVAR-1〜3をPASS、blocker 0件と判定した。[証跡](2026-10-17-issue-21-evidence.md)の専用PG、二登録端末と別保存域の実CLI、実モデル、共通画面、保存/復元、Run/工程/nativeの確認を終えた。[PR #54](https://github.com/KingYoSun/koujou-san/pull/54)の最終headのCIとマージ後照合を残す。物理的に別のPCで試験したとは扱わず、未確認の分離を保証へ格上げしない。
 
 #22〜#34は未着手（#33は実スリープ確認の移管を反映済み）。LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
