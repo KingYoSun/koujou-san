@@ -3,10 +3,9 @@ package githubobserve
 
 import (
 	"crypto/rsa"
-	"crypto/x509"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/githubapp"
 	"os"
 	"regexp"
 	"strconv"
@@ -59,24 +58,9 @@ func Environment() (*Config, error) {
 	if err = c.validate(); err != nil {
 		return nil, err
 	}
-	raw, err = os.ReadFile(c.PrivateKeyFile)
+	c.key, err = githubapp.ReadKey(c.PrivateKeyFile)
 	if err != nil {
-		return nil, errors.New("GitHub private key unreadable")
-	}
-	block, _ := pem.Decode(raw)
-	if block == nil {
-		return nil, errors.New("GitHub private key invalid")
-	}
-	if key, e := x509.ParsePKCS1PrivateKey(block.Bytes); e == nil {
-		c.key = key
-	} else {
-		key, e := x509.ParsePKCS8PrivateKey(block.Bytes)
-		if e == nil {
-			c.key, _ = key.(*rsa.PrivateKey)
-		}
-	}
-	if c.key == nil {
-		return nil, errors.New("GitHub RSA private key required")
+		return nil, err
 	}
 	if c.WebhookSecretFile != "" {
 		c.secret, err = os.ReadFile(c.WebhookSecretFile)

@@ -89,6 +89,12 @@
 
 ## Issue #21の判定
 
-状態: In progress（実装・独立検品完了、CI待ち）。Scope revision 1。[独立検品](2026-10-17-issue-21-inspection.md)と表示修正commit `9d3ab14eeca40e855b77bd5767793c9c95f41cff`の差分検品は、AC-1〜8・INVAR-1〜3をPASS、blocker 0件と判定した。[証跡](2026-10-17-issue-21-evidence.md)の専用PG、二登録端末と別保存域の実CLI、実モデル、共通画面、保存/復元、Run/工程/nativeの確認を終えた。[PR #54](https://github.com/KingYoSun/koujou-san/pull/54)の最終headのCIとマージ後照合を残す。物理的に別のPCで試験したとは扱わず、未確認の分離を保証へ格上げしない。
+状態: Complete。Scope revision 1。[PR #54](https://github.com/KingYoSun/koujou-san/pull/54)を最終head `c1a0d23a28ba6a597b7565e5984362cba7d7bef5`の全CI・独立検品後にマージした。main `b8af5a2421c531a3bd83e3ec0818c3789f67b498`と最終headのtreeは`574914bd1720e580d56641c957248d12089de988`で一致、差分0。[証跡](2026-10-17-issue-21-evidence.md)と[独立検品](2026-10-17-issue-21-inspection.md)が揃い、#21をCloseした。二登録端末・別保存域・独立cloneは同じWindowsホストで検証し、未確認の完全分離へ格上げしていない。
 
-#22〜#34は未着手（#33は実スリープ確認の移管を反映済み）。LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #22の準備
+
+状態: In progress。Scope revision 1。本文末尾へ照合用HTMLコメントを自動追加するユーザー判断を[計画](2026-10-17-issue-22-plan.md)へ反映した。共有受付・外部作成・結果不明の照合を、共通Runとサーバー側Connectorへ接続する。観測Appの読取り専用許可は拡大しない。
+
+[PR #55](https://github.com/KingYoSun/koujou-san/pull/55)で固定接続・共通画面・実GitHub接続を検証した。許可を得た一リポジトリ限定の起票Appにより、検証Issue #56の作成・GET確認・外部編集の観測・Closeが成功した。[独立検品](2026-10-17-issue-22-inspection.md)は実接続の追加証拠を含め全AC・INVAR PASS、blocker 0件。head `571bcf2`のCIは全件成功。最終headのCI・マージ後照合が残る。詳細は[証跡](2026-10-17-issue-22-evidence.md)を参照する。
+
+#23〜#34は未着手（#33は実スリープ確認の移管を反映済み）。LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。

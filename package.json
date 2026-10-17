@@ -9,6 +9,8 @@
     "pnpm": "10.16.1"
   },
   "scripts": {
+    "test:publications": "node scripts/dev.mjs test:publications",
+    "test:publications:live": "node scripts/dev.mjs test:publications:live",
     "test:inspections": "node scripts/dev.mjs test:inspections",
     "test:workflows": "node scripts/dev.mjs test:workflows",
     "test:runs": "node scripts/dev.mjs test:runs",

@@ -404,6 +404,12 @@ async function testDatabase(suite = "persistence", testName) {
 }
 
 const tasks = {
+  "test:publications": () =>
+    testDatabase("publications", "TestPublicationsPostgres"),
+  "test:publications:live": () => {
+    env.KOUJOU_TEST_PUBLICATION_LIVE = "1";
+    return testDatabase("publications", "TestPublicationsLive");
+  },
   "test:inspections": () =>
     testDatabase("inspections", "TestInspectionsPostgres"),
   "test:runs": () => testDatabase("runs", "TestRunsPostgres"),

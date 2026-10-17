@@ -33,3 +33,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0020: 固定版の工程定義とRun間の進行](0020-versioned-workflows.md)
 
 - [0021: 固定入力での独立検品と証拠の記録](0021-fixed-inspection-evidence.md)
+
+- [0022: 共有起票要求とGitHub作成確認](0022-issue-publication.md)
