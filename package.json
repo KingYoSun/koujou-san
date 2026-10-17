@@ -12,6 +12,7 @@
     "test:clientops": "node scripts/dev.mjs test:clientops",
     "test:clientops:ui": "node scripts/dev.mjs test:clientops:ui",
     "test:hopper": "node scripts/dev.mjs test:hopper",
+    "test:hopper:live": "node scripts/dev.mjs test:hopper:live",
     "test:hopper:ui": "node scripts/dev.mjs test:hopper:ui",
     "test:workbench": "node scripts/dev.mjs test:workbench",
     "test:workbench:ui": "node scripts/dev.mjs test:workbench:ui",

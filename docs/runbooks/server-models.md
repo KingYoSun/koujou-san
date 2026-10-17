@@ -39,6 +39,8 @@ APIは`KOUJOU_SERVER_LLM_CONFIG`のJSONを要求ごとに読む。`dev:api`はro
 
 Gateway設定JSONは`source_of_truth=config.json`である。管理画面だけで変更した設定を、永続する設定として扱わない。設定・provider環境変数の変更後は、`infra:llm:up`でコンテナを再作成する。providerの認証、モデルへの要求と料金は、利用者が明示した接続だけで確認する。
 
+実接続の受入では、本人が接続・認証・消費を許可した後に限り、`pnpm run test:hopper:live 接続設定JSONのパス`を使う。設定は一つの接続・一つの要求モデルとし、試験用Workspace `one`を明示する。この入口は専用PGと所有Node出力だけを使い、要求は一回・入力4 KiB・出力2048 token・30秒、fallbackなし。実LLMへ障害fixtureや後続CLIの実行を送らない。失敗時も再要求せず停止する。二度目の実行は残る許可枠を確認する。消費と判定のメタデータは`test-results/issue27-live.json`へ保存する。
+
 ## 本文ログと外部通信
 
 共有雛形では本文ログ・object storageへの本文保存・要求単位の本文保存上書き、semantic cache、Maxim、OTEL、Warpを無効にする。Gatewayの稼働・要求状態のメタデータは専用SQLiteへ保存する。Go側の固定入力・原応答・費用履歴は別に保存し、Gatewayのログを判定の正本にしない。

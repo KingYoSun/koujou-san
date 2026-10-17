@@ -485,6 +485,18 @@ const tasks = {
     testDatabase("clientops", "TestClientOperationsPostgres"),
   "test:hopper": () =>
     testDatabase("hopper", "TestHopper(Postgres|SemanticPostgres)"),
+  "test:hopper:live": () => {
+    if (!process.argv[3] || !existsSync(path.resolve(root, process.argv[3])))
+      throw new Error(
+        "Pass the explicitly approved live connection JSON file.",
+      );
+    env.KOUJOU_TEST_HOPPER_LIVE_CONFIG = path.resolve(root, process.argv[3]);
+    env.KOUJOU_TEST_HOPPER_LIVE_REPORT = path.join(
+      root,
+      "test-results/issue27-live.json",
+    );
+    return testDatabase("hopper", "TestHopperSemanticPostgres");
+  },
   "test:hopper:ui": async () => {
     env.KOUJOU_TEST_HOPPER_UI = "1";
     env.KOUJOU_TEST_MCP_UI = "1";

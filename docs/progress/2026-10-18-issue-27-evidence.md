@@ -30,6 +30,10 @@
 
 Chromeで接続取得、時間上限の編集・版保存、有効化、固定証拠からの提案、入力と原応答の明示取得、試行表示、提案からのRun発行、再評価と以前の発行先の保持、連鎖停止・再開、過去二件の評価が発行なしで成立するところまで確認した。`issue27-semantic-published.png / issue27-semantic-replay.png`。固定JSONの横へのはみ出しは、Hopper内で折返しと高さ上限を適用した。Windows実機や本人の初見操作は追加依頼していない。
 
+固定`0413853`の最終検品では、APIの`allowed_actual`と画面・手順の`actual`の不一致を検出した。`f871cff`で統一し、コードの再検品はblocker 0件。所有fixtureのChromeで、意味設定のない定義に「現在の条件に意味判断を追加」し、`allowed_models=["owned-ui-model"]`をDOMで確認して保存成功まで観測した。事前作成した意味定義だけの確認とは分けている。`issue27-ui-create-path.log`。入力欄は既存の工程編集用レイアウトを共用した。
+
+実接続用入口は、明示した一接続・一モデル、入力4 KiB・出力2048 token・30秒・fallbackなしに固定した。一巡の後に終了し、障害fixtureを実接続へ送らない。所有HTTPでこの入口自体を実行し、送信一要求、固定判断、Run作成、原応答の再利用が成功した。`issue27-live-entry-owned.log / issue27-live-entry-owned.json`。これは入口の検証であり、実providerを使った証拠ではない。
+
 ## 任意Gatewayの保存と復旧
 
 [隔離probe](2026-10-18-issue-27-gateway-probe.md)に加え、標準`llm` profileの起動が成功した。管理APIは未認証401、管理ログイン後200。初期providerは未登録なので存在しないモデル要求は400となり、実providerへ要求しない。登録済みproviderのある隔離probeでは、推論APIの未認証401を別に確認している。
@@ -41,3 +45,5 @@ Chromeで接続取得、時間上限の編集・版保存、有効化、固定�
 ## 残る確認
 
 最終固定commitの独立検品・CI、実providerでの意味判断、マージ後照合が残る。実provider試験は未実行で、接続先・認証と消費枠の本人判断が必要である。未実行の条件を成功や達成とは記録しない。
+
+PRは[Draft #61](https://github.com/KingYoSun/koujou-san/pull/61)。先行CI `39079414493`は`infra/README.md`の整形漏れで失敗した。同じ失敗をローカルでも確認し、Prettierを適用した。最新headで再確認する。

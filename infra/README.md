@@ -2,14 +2,14 @@
 
 リポジトリの root から `pnpm run setup`、`pnpm run infra:up` の順に実行する。Compose project は `koujou-san-dev` に固定し、公開するポートはすべて `127.0.0.1` に限定する。
 
-| サービス              | 接続先                                            | 固定 image                    |
-| --------------------- | ------------------------------------------------- | ----------------------------- |
-| PostgreSQL            | `127.0.0.1:15432`                                 | `postgres:17.11-bookworm`     |
-| ArcadeDB              | `http://127.0.0.1:2480`                           | `arcadedata/arcadedb:26.10.1` |
-| Kratos public / admin | `http://127.0.0.1:4433` / `http://127.0.0.1:4434` | `oryd/kratos:v26.2.0`         |
-| Hydra public / admin  | `http://127.0.0.1:4444` / `http://127.0.0.1:4445` | `oryd/hydra:v26.2.0`          |
-| Mailpit               | `http://127.0.0.1:18025`                          | `axllent/mailpit:v1.31.5`     |
-| Bifrost（任意の`llm` profile） | `http://127.0.0.1:18080` | HTTP 2.3.0・digest固定 |
+| サービス                       | 接続先                                            | 固定 image                    |
+| ------------------------------ | ------------------------------------------------- | ----------------------------- |
+| PostgreSQL                     | `127.0.0.1:15432`                                 | `postgres:17.11-bookworm`     |
+| ArcadeDB                       | `http://127.0.0.1:2480`                           | `arcadedata/arcadedb:26.10.1` |
+| Kratos public / admin          | `http://127.0.0.1:4433` / `http://127.0.0.1:4434` | `oryd/kratos:v26.2.0`         |
+| Hydra public / admin           | `http://127.0.0.1:4444` / `http://127.0.0.1:4445` | `oryd/hydra:v26.2.0`          |
+| Mailpit                        | `http://127.0.0.1:18025`                          | `axllent/mailpit:v1.31.5`     |
+| Bifrost（任意の`llm` profile） | `http://127.0.0.1:18080`                          | HTTP 2.3.0・digest固定        |
 
 Bifrostは`pnpm run infra:llm:up`で起動する。標準の`infra:up`では起動しない。専用認証・接続設定・本文ログ・外部通信・backupは[サーバーモデル接続](../docs/runbooks/server-models.md)を参照する。
 

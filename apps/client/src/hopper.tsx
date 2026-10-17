@@ -277,7 +277,7 @@ export function Hopper({
       }),
     );
   return (
-    <details className="workspace-management hopper-editor">
+    <details className="workspace-management workflow-editor hopper-editor">
       <summary>Hopper: 結果から次の仕事を発行</summary>
       <p>
         共有された結果をサーバーが評価します。画面を閉じても動作し、発行・Run作成・実行開始はそれぞれ現在の権限で確認します。

@@ -20,6 +20,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/automation"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/modelreply"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/publications"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
@@ -35,6 +36,7 @@ func TestHopperSemanticPostgres(t *testing.T) {
 		t.Skip("run pnpm run test:hopper")
 	}
 	ctx := context.Background()
+	live := os.Getenv("KOUJOU_TEST_HOPPER_LIVE_CONFIG") != ""
 	schema := "semantic_" + fmt.Sprintf("%x", time.Now().UnixNano())
 	admin, err := pgx.Connect(ctx, dsn)
 	if err != nil {
@@ -96,6 +98,9 @@ func TestHopperSemanticPostgres(t *testing.T) {
 		return r
 	}
 	ctrl := automation.Control{Kind: "hopper", Enabled: true, CanRead: true, CanCommit: true, Slots: 2, MaxAttempts: 2, LeaseSeconds: 30, TimeoutSeconds: 20, RetrySeconds: 0, MaxRequests: 1000, PeriodSeconds: 3600}
+	if live {
+		ctrl.LeaseSeconds, ctrl.TimeoutSeconds = 60, 30
+	}
 	must(auto.Put(ctx, p, "one", "control:hopper", automation.Write{Mutation: m("0"), Value: raw(ctrl)}))
 	template := must(wf.Put(ctx, p, "one", "run-definition:repair", workflows.Write{Mutation: m("0"), Value: raw(workflows.Definition{Schema: "run-definition-v1", Name: "repair", Spec: &runs.Spec{Input: runs.Input{Command: runs.Command{Kind: "cli", Target: "node", Parameters: raw([]string{"--version"}), Binding: map[string]string{"prompt": "stdin-json"}}}}, Selection: &contexts.Selection{Mode: "none"}})}))
 	var calls atomic.Int32
@@ -169,8 +174,38 @@ func TestHopperSemanticPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.Gateway = &serverllm.Gateway{ConfigFile: configFile}
+	if live {
+		s.Gateway.ConfigFile = os.Getenv("KOUJOU_TEST_HOPPER_LIVE_CONFIG")
+		defer func() {
+			page, err := s.Query(ctx, p, "one", Request{Mode: "heads", Kind: "model-attempt", Limit: 10})
+			if err != nil {
+				t.Error(err)
+				return
+			}
+			proof := []any{}
+			for _, item := range page.Items {
+				r, e := record(ctx, store.Database(), "one", item.Ref)
+				if e != nil {
+					t.Error(e)
+					continue
+				}
+				var a modelAttempt
+				_ = json.Unmarshal(r.Value, &a)
+				entry := map[string]any{"attempt": r.Ref, "number": a.Number, "input": a.Input, "outcome": a.Outcome}
+				if a.Response != nil {
+					var reply modelreply.Reply
+					_ = json.Unmarshal(a.Response.Body, &reply)
+					entry["actual_model"], entry["usage"], entry["status"], entry["request_id"] = reply.Model, reply.Usage, a.Response.Status, a.Response.RequestID
+				}
+				proof = append(proof, entry)
+			}
+			if err = os.WriteFile(os.Getenv("KOUJOU_TEST_HOPPER_LIVE_REPORT"), raw(proof), 0600); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
 	connections, err := s.Gateway.Connections("one")
-	if err != nil || len(connections) != 1 {
+	if err != nil || len(connections) != 1 || len(connections[0].Models) != 1 {
 		t.Fatal(connections, err)
 	}
 	d := Template()
@@ -182,13 +217,17 @@ func TestHopperSemanticPostgres(t *testing.T) {
 	d.Action.Start = false
 	d.Action.Mappings = []Mapping{{Path: []string{"semantic", "candidate"}, To: "prompt"}}
 	sem := DefaultSemantic()
-	sem.Connection = "owned"
+	sem.Connection = connections[0].ID
 	sem.Revision = connections[0].Revision
-	sem.Model = "openai/owned-model"
-	sem.Allowed = []string{"owned-model"}
+	sem.Model = connections[0].Models[0].Requested
+	sem.Allowed = connections[0].Models[0].Actual
 	sem.Limits.Seconds = 5
 	price := must(s.Usage.Put(ctx, p, "one", "price:owned-semantic", usage.Write{Mutation: m("0"), Value: raw(usage.Price{Connection: "owned", Model: "owned-model", Currency: "USD", From: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Source: "owned fictional tariff", Scale: 2, Rounding: "half_up", Rates: map[string]usage.Rate{"input": {Amount: "1", Per: "1", Unit: "token"}, "output": {Amount: "1", Per: "1", Unit: "token"}, "cache_read": {Amount: "0", Per: "1", Unit: "token"}, "reasoning": {Amount: "0", Per: "1", Unit: "token"}}})}))
 	sem.Prices = map[string]usage.Ref{"owned-model": {ID: price.ID, Version: price.Version}}
+	if live {
+		sem.Limits = SemanticLimits{InputBytes: 4 << 10, OutputTokens: 2048, Seconds: 30}
+		sem.Prices = nil
+	}
 	d.Semantic = &sem
 	pin := must(s.Put(ctx, p, "one", "hopper:semantic", Write{Mutation: m("0"), Value: raw(d)}))
 	must(s.Put(ctx, p, "one", "hopper-active:semantic", Write{Mutation: m("0"), Value: raw(Activation{Definition: pin, Enabled: true})}))
@@ -271,11 +310,15 @@ func TestHopperSemanticPostgres(t *testing.T) {
 	}
 	var spec runs.Spec
 	_ = json.Unmarshal(inputRecord.Value, &spec)
-	if !strings.Contains(string(spec.Input.Prompt), "needs_reproduction") || strings.Contains(string(spec.Input.Context), "DEFERRED_OWNED_BUG") {
+	if (!strings.Contains(string(spec.Input.Prompt), "needs_reproduction") && !strings.Contains(string(spec.Input.Prompt), "suspected")) || strings.Contains(string(spec.Input.Context), "DEFERRED_OWNED_BUG") {
 		t.Fatal("finding or input separation was lost")
 	}
 	var count int
 	var tokens string
+	if live {
+		t.Log("explicit live server connection: one bounded synthetic request, saved decision and queued Run; no adversarial/retry fixtures sent to live provider")
+		return
+	}
 	if err = store.Database().QueryRow(ctx, `SELECT count(*),max(payload->'quantities'->'input'->>'value') FROM usage_records u JOIN shared_versions h ON h.workspace_id=u.workspace_id AND h.resource_id=u.id AND h.version=u.version WHERE u.workspace_id='one' AND u.kind='usage' AND u.payload->'attribution'->>'kind'='hopper'`).Scan(&count, &tokens); err != nil || count != 1 || tokens != "23" {
 		t.Fatal("usage", count, tokens, err)
 	}
