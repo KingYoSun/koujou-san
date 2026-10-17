@@ -46,7 +46,7 @@
 
 SSEのincomplete応答で、有効なJSON本文があってもlengthをstopへ変えない。変更前は`issue26-rig-partial-before.log`でstopとなる失敗を残し、修正後は既存Goの不完全応答拒否へ渡す。nativeの内部messageをWebのHTTPへ引き継がないことも、`issue26-web-native-envelope-before.log / issue26-web-native-envelope-after.log`で照合した。
 
-WindowsのDPAPI TokenStoreはAPI・利用者・接続で保存先を分け、SDKのFileTokenStoreはlockだけに使う。APIキーとOAuth tokenをWeb、共有記録、Ory/MCP、CLIへ渡さない。モデル呼出し中は非対話の更新だけを許可し、本人の明示ログインを別操作にした。ChatGPTの更新・失効、Copilotのsession交換・再利用・端末からの削除は所有プロトコルで確認した。実契約での本人認証・モデル利用は未確認であり、新しいOAuth接続と最大2回の合成要求の許可をユーザーへ確認中。
+WindowsのDPAPI TokenStoreはAPI・利用者・接続で保存先を分け、SDKのFileTokenStoreはlockだけに使う。APIキーとOAuth tokenをWeb、共有記録、Ory/MCP、CLIへ渡さない。モデル呼出し中は非対話の更新だけを許可し、本人の明示ログインを別操作にした。ChatGPTの更新・失効、Copilotのsession交換・再利用・端末からの削除は所有プロトコルで確認した。組込み時点では実契約での本人認証・モデル利用は未確認だった。後続の許可と実接続結果は次節へ記録する。
 
 | 組込み後の確認 | 結果 |
 | --- | --- |
@@ -58,6 +58,18 @@ WindowsのDPAPI TokenStoreはAPI・利用者・接続で保存先を分け、SDK
 | 追加依存 | 全targetで20件。初期Windowsのnormal/build graphは18件、MIT選択が可能。11の通知を`apps/client/public/third-party-rig.txt`へ同梱。build後のassetの存在を確認。`issue26-rig-added-licenses.json / issue26-rig-windows-dependencies.txt` |
 
 実契約trialは`live_subscription_two_request_trial`へ分離した。新しい接続先を明示し、合成データのみ、最大2回、APIキー課金へのfallbackなし。完了・失敗のいずれでも試験用認証を削除し、確認できた失効結果だけを保存する。通常のテストや起動からは実行しない。
+
+## ChatGPT契約での実接続
+
+本人の許可を得て、新しいbrowser PKCEで認証し、専用のDPAPI保存先だけを使った。既存CLIの秘密ファイルや実Contextは使っていない。
+
+最初はSDK例の`gpt-5.4`を選び、二要求ともモデルの提供終了によるHTTP 400となった。これはSDKの接続障害と区別する。公式の[対応モデル一覧](https://developers.openai.com/codex/models)では、同モデルはChatGPTログインで2026-08-31に提供終了していた。現行の対応一覧を先に確認しなかった試験側の誤りとして記録する。要求数は失敗分も含めて数え、残り一要求の実行には試験用上限を1へ下げた。`issue26-rig-live-first.json / issue26-rig-live-second.json`。
+
+追加最大二要求について改めて許可を得て、`gpt-6.1-sol`を明示した試験は成功した。二要求の間に`context_search`の合成結果を返し、最終応答をJSONとして取得した。両応答の実モデルも`gpt-6.1-sol`。input/outputは順に93/14、94/55 tokenで、二要求目のreasoningは42 tokenだった。要求IDは返らずnullとして残し、推測で補わない。二要求のtool往復・JSON取得を、実Workspaceの選択品質や全モデルの対応確認へ拡張しない。`issue26-rig-live.json`、認証完了画面`issue26-rig-chatgpt-signed-in.png`。
+
+三回の認証それぞれで、試験終了後の端末内削除と提供元の失効が成功した。通常のAPIキー課金へ切り替えていない。Copilotは所有プロトコルでの確認だけであり、実契約の認証・モデル利用は未確認。技術的な接続成功を、提供元による第三者アプリの承認や将来の利用保証と同じ扱いにしない。
+
+実装codeの修正後head `6eadc78`では、CI run `39060993189`の共通UI/サーバー、Windows native、GitGuardianがすべて成功した。後続差分は、所有する実接続fixtureの上限・失敗記録と文書だけ。最終headのCIは別途確認する。
 
 追加の独立検品で、OAuth保存先の計算が利用者別メタデータのファイル名を落とす不備を確認した。既存の試験は利用者ごとに別フォルダを置いていたため、この不備を検出できなかった。製品と同じ同一フォルダ・異なるファイル名へ試験を直すと、別利用者の読取り拒否が失敗した（`issue26-rig-actor-before.log`）。保存先にファイル名も含め、同じ接続IDでも利用者ごとに読取り・更新・削除を分離した。関連native 10件が成功した（`issue26-rig-actor-after.log`）。実契約の資格情報は使っていない。
 
@@ -79,4 +91,4 @@ WindowsのDPAPI TokenStoreはAPI・利用者・接続で保存先を分け、SDK
 
 採用保存中の手動編集は、所有DBのWorkspace streamを30秒だけロックして確認した。保存待ち中に入力をnoneへ変え、保存後にもnoneを保ち、差分確認の通知を表示した（`issue26-adopt-edit-lock.log / issue26-adopt-manual-edit.png`）。この確認に新しい製品用の遅延機構は追加していない。
 
-OAuth保存先の修正差分は`475781a`で独立再検品を終え、blocker 0件となった。残作業は実契約への新規OAuth接続・合成要求の許可確認と試験、最終headのCI、マージ後のtree照合、手動Close。#33へ移管したS3スリープと人の初見操作は未確認のまま維持し、今回の完了へ算入しない。
+OAuth保存先の修正差分は`475781a`で独立再検品を終え、blocker 0件となった。実契約への新規OAuth接続・合成要求の許可確認と試験も終了した。残作業は最終headのCI、マージ後のtree照合、手動Close。#33へ移管したS3スリープと人の初見操作は未確認のまま維持し、今回の完了へ算入しない。

@@ -11,6 +11,11 @@ fn live_subscription_two_request_trial() {
     );
     let provider = std::env::var("KOUJOU_RIG_LIVE_PROVIDER").unwrap();
     let model = std::env::var("KOUJOU_RIG_LIVE_MODEL").unwrap();
+    let limit = std::env::var("KOUJOU_RIG_LIVE_REQUEST_LIMIT")
+        .ok()
+        .map(|v| v.parse::<usize>().unwrap())
+        .unwrap_or(2);
+    assert!((1..=2).contains(&limit));
     let endpoint = match provider.as_str() {
         "chatgpt" => "https://chatgpt.com/backend-api/codex",
         "copilot" => "https://api.githubcopilot.com",
@@ -42,15 +47,19 @@ fn live_subscription_two_request_trial() {
             Ok(())
         });
         let mut calls = 0;
+        let mut failure_response = Value::Null;
         let outcome:Result<Value,String>=async {
             rig_auth::sign_in(&provider,store.clone(),&http,prompt).await?;
             let schema=json!({"type":"object","properties":{"items":{"type":"array","items":{"type":"string"}},"questions":{"type":"array","items":{"type":"string"}},"unknown":{"type":"array","items":{"type":"string"}}},"required":["items","questions","unknown"],"additionalProperties":false});
             let mut body=json!({"model":model,"messages":[{"role":"system","content":"This is a synthetic connection test. Call context_search once, then return the required JSON object. Do not request any other tools."},{"role":"user","content":"Select the synthetic owned-sentence from the owned candidate page."}],"tools":[{"type":"function","function":{"name":"context_search","description":"Read one synthetic owned candidate. No real workspace data.","parameters":{"type":"object","properties":{},"additionalProperties":false}}}],"response_format":{"type":"json_schema","json_schema":{"name":"owned_trial","strict":true,"schema":schema}}});
             let mut observations=vec![];
-            for turn in 0..2 {
+            for turn in 0..limit {
                 calls+=1;
                 let response=rig::request(&stored,body.clone(),180000,store.clone()).await?;
-                if response["status"]!=200 {return Err("provider_model_http_failure".into())}
+                if response["status"]!=200 {
+                    failure_response=json!({"status":response["status"],"error":response["body"]["error"],"detail":response["body"]["detail"]});
+                    return Err("provider_model_http_failure".into())
+                }
                 let reply=&response["body"];
                 observations.push(json!({"actual_model":reply["model"],"usage":reply["usage"],"request_id":reply["rig_request_id"]}));
                 if reply["model"].as_str().is_none_or(str::is_empty) {return Err("actual_model_missing".into())}
@@ -88,7 +97,7 @@ fn live_subscription_two_request_trial() {
         let report = match &outcome {
             Ok(value) => json!({"trial":value,"cleanup":cleanup.ok()}),
             Err(code) => {
-                json!({"provider":provider,"model_calls":calls,"failure":code,"cleanup":cleanup.ok()})
+                json!({"provider":provider,"model_calls":calls,"failure":code,"failure_response":failure_response,"cleanup":cleanup.ok()})
             }
         };
         let destination = Path::new(env!("CARGO_MANIFEST_DIR"))

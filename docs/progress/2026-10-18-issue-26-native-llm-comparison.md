@@ -48,6 +48,8 @@ rigの[ChatGPT認証](https://github.com/0xPlaygrounds/rig/blob/2d1071e0e0c602f9
 
 ## 暗号化保存の差
 
+製品組込み後、本人の許可を得たChatGPT契約試験では、新しいbrowser PKCE、専用DPAPI保存、`gpt-6.1-sol`の二要求・一tool往復・JSON取得、端末内削除・提供元の失効が成功した。[実接続の証跡](2026-10-18-issue-26-evidence.md#chatgpt契約での実接続)を参照する。これは上表の公開版比較とは別の観測であり、Copilotや他のモデルの実契約確認には数えない。
+
 rig 0.44.0のOAuth保存先は、指定ファイルへのJSON保存である。WindowsのDPAPI保存をそのまま満たさない。開発中sourceには`TokenStore`と明示的なbrowser/device sign-in・sign-outがあり、DPAPI実装を接続できるが、これを公開版の機能として数えない。
 
 genaiは`AuthResolver / ServiceTargetResolver`で、取得済みtokenや接続先を渡せる。DPAPI、ログイン画面、更新、失効はkoujou-san側の責務として残る。いずれも、Ory/MCP・Run用CLIの認証と保存先を分離する。CLIの既存tokenを探して流用する方式は採らない。
