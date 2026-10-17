@@ -2,13 +2,13 @@
 
 - 基準main: `b8af5a2421c531a3bd83e3ec0818c3789f67b498`。Scope revision 1、区分C。
 - [計画](2026-10-17-issue-22-plan.md)のAC-1〜7・INVAR-1〜3を扱う。
-- 固定接続・共通画面の検証と独立検品を実施した。実GitHub接続は未確認、PR #55のCIは実行中。実接続部分の再検品・マージ後照合を終えるまでIssueをCloseしない。
+- 固定接続・共通画面・実GitHub接続を検証した。固定commitの独立検品後、実接続部分の再検品を待っている。PR #55のhead `571bcf2f3e95bd9429306c7eda7ad3ceedbd3aa9`のCIは全件成功。最終headのCI・必要な再検品・マージ後照合を終えるまでIssueをCloseしない。
 
 ## 実装と固定接続
 
 端末の下書き、共有下書き、共有受付、送信中、作成確認、確定失敗、結果不明、権限/内容の確認待ちを分けた。起票の固定入力と開始・終了は共通Runに保存し、サーバーConnectorとして記録する。CLIや担当端末が実行したとは記録しない。新規migration 018を追加し、既存001〜017は変更していない。
 
-ユーザー承認済みのHTMLコメントを本文末尾へ追加し、元下書きと外部本文を区別した。Appの鍵読取りとtoken交換を観測/起票で共用し、観測は従来の読取り専用permissionを維持する。起票用の新しい永続アクセスはまだ作成していない。
+ユーザー承認済みのHTMLコメントを本文末尾へ追加し、元下書きと外部本文を区別した。Appの鍵読取りとtoken交換を観測/起票で共用し、観測は従来の読取り専用permissionを維持する。起票用の新しい永続アクセスは、下記の具体的な許可を得て作成した。
 
 専用PGと固定GitHub HTTPで、人と内部自動化主体の同じ受付、共有CASとreceipt、並行処理の一回だけの送信、POST後GETでの内容確認を照合した。作成後の応答喪失と、作成直後のプロセス消失を別々に発生させ、再作成0のまま識別コメントから照合した。検索で見つからない例は結果不明を維持した。
 
@@ -27,11 +27,11 @@
 | 条件 | 固定接続・画面で確認した範囲 | 残る確認 |
 | --- | --- | --- |
 | AC-1 | 二主体の共有受付、端末下書き/共有受付/外部未確認の区別、共通Run | なし |
-| AC-2 | 固定App tokenのrepository/permission、作成後GETによる確認 | 実GitHub Appの作成・再取得、独立照合 |
+| AC-2 | 固定App tokenのrepository/permission、作成後GETによる確認、実Appの作成・再取得 | 実接続部分の独立照合 |
 | AC-3 | receipt再送と並行処理で一つの要求・一回の送信 | なし |
 | AC-4 | 応答喪失とプロセス消失、未発見ではunknown、既存Issue照合でcreated、再作成0 | なし |
 | AC-5 | API停止中の端末下書き、復帰後の復元/明示保存、現在の共有版と既存要求の確認 | なし |
-| AC-6 | 外部の手動編集とHTTP 422を記録し、下書きによる外部上書き0 | 実GitHubの外部編集観測、独立照合 |
+| AC-6 | 外部の手動編集とHTTP 422を記録し、下書きによる外部上書き0。実GitHubの編集観測も確認 | 実接続部分の独立照合 |
 | AC-7 | viewer、実行不許可、別Workspace、許可外接続、取消後の送信0 | なし |
 | INVAR-1〜3 | 共通Run、外部正本の別記録、unknownから再作成しない履歴 | なし |
 
@@ -45,8 +45,17 @@
 - `issue22-check-final.log`、`issue22-unit-final.log`、`issue22-build.log`: 静的検査・全体単体試験・build成功。共通UIは13ファイル41件成功。
 - `.cache/issue22-ui-run.log`: 実Ory/MCPと共通画面fixture、成功（package 371.094秒）。
 
-## 実接続の準備
+## 実GitHub接続
 
-実接続用のApp登録画面へ進んだところ、GitHubがConfirm accessでパスキー等の本人再認証を要求した。本人認証は代行できないためユーザーへ引き継ぎ、独立検品と残りの確認を続ける。新しいApp作成、Issues書込み許可、鍵生成・installationはまだ行っていない。読み取り専用の観測Appも変更していない。
+ユーザーがGitHubの本人再認証を完了した後、登録フォームへ名前・権限・公開範囲を準備した。App作成、秘密鍵のGit管理外保存、一リポジトリへの限定インストール、合成Issue一件の作成・取得・編集・Closeについて、実行直前に明示的な許可を得た。
 
-実接続試験は明示opt-inの`test:publications:live`に用意した。対象は検証用の`KingYoSun/koujou-san`だけとし、合成Issue一件の作成/GET確認、既存CLIからのそのIssueの編集/Closeを行う。許可と設定が揃う前には実行しない。秘密値はチャット・共有記録へ出さない。
+非公開Appは`koujou-san-publisher-kingyosun`、所有者KingYoSun、App ID `5355530`、installation `172329038`。対象は`KingYoSun/koujou-san`（repository ID `1418646340`）一件、権限はIssues read/writeとMetadata readだけ、Webhook無効。秘密鍵と設定は`.cache/github-publisher/`へ保存し、Git管理外であることを確認した。読取り専用の観測Appは変更していない。
+
+`571bcf2`で`pnpm run test:publications:live`を明示実行し、試験専用PGの共有受付からAppで[Issue #56](https://github.com/KingYoSun/koujou-san/issues/56)を作成した。POST後のGETでタイトルと本文・HTMLコメントの完全一致を比較した。同じIssueへ既存の`gh`から確認文を追記し、refreshで外部本文を取得して元の共有下書き本文が変わらないことを比較した。試験成功後、そのIssueだけをCloseした。追加のIssueは作成していない。
+
+- 要求: `publication:live-20261017T081203`。共通Run: `run:publication:live-20261017T081203`。
+- `test-results/issue22-publications-live.log`: 成功、試験6.00秒、package 7.016秒、終了コード0。SHA-256 `fadc0fbfc872c01c047edbaaa91628ba0f2e2ab37ec7bb447a87a1ee0709cd34`。
+- `test-results/issue22-live-external.json`: 作成者`app/koujou-san-publisher-kingyosun`、識別コメントと外部追記、CLOSED（2026-10-17 08:12:08 UTC）を再取得。SHA-256 `c58a1dcfd13d3a271ba79af89ee2211839f5f1d1beddcba974a41a58c65bdd65`。
+- `test-results/issue22-github-publisher-installed.jpg`: Issues read/write、Metadata read、一リポジトリの設定画面。
+
+実接続を補完するまでの差分は検品記録等の文書だけで、固定コード`07a928c`から実装差分はない。実接続を繰り返す代わりに、残るAC-2/6と影響する文書差分だけを再検品する。

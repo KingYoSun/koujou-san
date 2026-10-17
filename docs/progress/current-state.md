@@ -95,6 +95,6 @@
 
 状態: In progress。Scope revision 1。本文末尾へ照合用HTMLコメントを自動追加するユーザー判断を[計画](2026-10-17-issue-22-plan.md)へ反映した。共有受付・外部作成・結果不明の照合を、共通Runとサーバー側Connectorへ接続する。観測Appの読取り専用許可は拡大しない。
 
-[PR #55](https://github.com/KingYoSun/koujou-san/pull/55)はdraft。固定接続・共通画面の検証を終え、[独立検品](2026-10-17-issue-22-inspection.md)では実接続部分のAC-2/6だけが未確認で、ほかの条件はPASSだった。GitHubのConfirm accessで本人再認証を待っており、新しい起票Appと永続アクセスはまだ作成していない。CIは実行中。詳細は[証跡](2026-10-17-issue-22-evidence.md)を参照する。
+[PR #55](https://github.com/KingYoSun/koujou-san/pull/55)はdraft。固定接続・共通画面の検証後、許可を得て一リポジトリ限定の起票Appを作成した。実接続の検証Issue #56で作成・GET確認・外部編集の観測・Closeが成功した。[独立検品](2026-10-17-issue-22-inspection.md)で未確認だったAC-2/6の追加証拠と文書差分を再検品中。head `571bcf2`のCIは全件成功。最終headのCI・再検品・マージ後照合が残る。詳細は[証跡](2026-10-17-issue-22-evidence.md)を参照する。
 
 #23〜#34は未着手（#33は実スリープ確認の移管を反映済み）。LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
