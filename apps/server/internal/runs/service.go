@@ -637,7 +637,9 @@ func (s *Service) Report(ctx context.Context, p access.Principal, w, id string, 
 		default:
 			return r, nil, ErrInvalid
 		}
-		if e.Type != "unknown" && e.Type != "renew" {
+		if !terminal(r.State) && r.Assignment != nil && r.Assignment.SessionUnconfirmed {
+			r.Observation = "unknown"
+		} else if e.Type != "unknown" && e.Type != "renew" {
 			r.Observation = "known"
 		}
 		r.ReportedThrough = e.Sequence

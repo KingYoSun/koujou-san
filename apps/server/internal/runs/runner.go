@@ -15,8 +15,9 @@ import (
 
 type RunnerConnection struct {
 	apicontract.Mutation
-	Generation string `json:"generation"`
-	Unknown    bool   `json:"unknown"`
+	Generation         string `json:"generation"`
+	Unknown            bool   `json:"unknown"`
+	SessionUnconfirmed bool   `json:"session_unconfirmed,omitempty"`
 }
 
 // Transport observation and lease renewal do not consume a CLI event sequence.
@@ -33,7 +34,10 @@ func (s *Service) Connection(ctx context.Context, p access.Principal, w, id stri
 			return r, nil, ErrState
 		}
 		r.Assignment.ExpiresAt = time.Now().UTC().Add(assignmentLifetime)
-		if req.Unknown {
+		if req.SessionUnconfirmed {
+			r.Assignment.SessionUnconfirmed = true
+		}
+		if req.Unknown || r.Assignment.SessionUnconfirmed {
 			r.Observation = "unknown"
 		}
 		return r, old.Refs, nil

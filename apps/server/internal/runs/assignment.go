@@ -56,18 +56,19 @@ type Area struct {
 	Commit string `json:"commit"`
 }
 type Assignment struct {
-	Generation    string      `json:"generation"`
-	DeviceID      string      `json:"device_id"`
-	RunnerID      string      `json:"runner_id"`
-	RunnerVersion string      `json:"runner_version"`
-	RequestedBy   string      `json:"requested_by"`
-	Connection    Connection  `json:"connection"`
-	Required      []string    `json:"required"`
-	Input         Ref         `json:"input"`
-	Repository    *Repository `json:"repository,omitempty"`
-	Area          *Area       `json:"area,omitempty"`
-	PreparedAt    *time.Time  `json:"prepared_at,omitempty"`
-	ExpiresAt     time.Time   `json:"expires_at"`
+	SessionUnconfirmed bool        `json:"session_unconfirmed,omitempty"`
+	Generation         string      `json:"generation"`
+	DeviceID           string      `json:"device_id"`
+	RunnerID           string      `json:"runner_id"`
+	RunnerVersion      string      `json:"runner_version"`
+	RequestedBy        string      `json:"requested_by"`
+	Connection         Connection  `json:"connection"`
+	Required           []string    `json:"required"`
+	Input              Ref         `json:"input"`
+	Repository         *Repository `json:"repository,omitempty"`
+	Area               *Area       `json:"area,omitempty"`
+	PreparedAt         *time.Time  `json:"prepared_at,omitempty"`
+	ExpiresAt          time.Time   `json:"expires_at"`
 }
 type Assign struct {
 	apicontract.Mutation

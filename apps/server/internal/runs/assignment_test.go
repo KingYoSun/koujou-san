@@ -376,6 +376,22 @@ func testAssignments(t *testing.T, s *Service, server *httptest.Server, key []by
 		}
 		outputRef := Ref{ID: "run-output:reconnect-origin:3", Version: origin.Version}
 		origin = accept("assign-one", base+"/executions/reconnect-origin/report", event(origin, "4", "unknown", generation, nil))
+		origin = accept("assign-one", base+"/executions/reconnect-origin/connection", RunnerConnection{Mutation: mutation(origin.Version), Generation: generation, Unknown: true, SessionUnconfirmed: true})
+		// A stored report can commit before its HTTP acknowledgement is lost.
+		// Without a current stdio owner, neither old output nor old known events
+		// can lift Unknown, even if no final connection request ever arrives.
+		for i, kind := range []string{"output", "known"} {
+			stored := event(origin, fmt.Sprint(5+i), kind, generation, nil)
+			stored.Channel, stored.Source, stored.Value = "stdout", "stored-before-owner-loss", raw("stored output")
+			origin = accept("assign-one", base+"/executions/reconnect-origin/report", stored)
+			_, observed := head(origin.ID)
+			if observed.Observation != "unknown" || !observed.Assignment.SessionUnconfirmed || observed.State != "running" {
+				t.Fatal("stored report invented current session continuity", kind, observed.Observation)
+			}
+			if replay := accept("assign-one", base+"/executions/reconnect-origin/report", stored); replay != origin {
+				t.Fatal("unconfirmed session receipt changed")
+			}
+		}
 		prepare := func(id string, source Ref) Ref {
 			return accept("editor", base+"/executions/"+id+"/create", Create{Mutation: mutation("0"), Handoff: true, Spec: Spec{Previous: &source, Sources: []Ref{outputRef}, Artifacts: output.Artifacts, Input: Input{Context: raw("selected artifact only"), Prompt: raw("explicit new input"), Command: Command{Kind: "cli", Target: "fixture", Binding: map[string]string{"context": "stdin", "prompt": "stdin"}}}}})
 		}
@@ -413,10 +429,10 @@ func testAssignments(t *testing.T, s *Service, server *httptest.Server, key []by
 		if h.Decision == nil || h.Decision.Judgment != "duplicate_possible" || h.Decision.By != "admin" || h.Decision.Source != origin {
 			t.Fatal("missing explicit duplicate judgment")
 		}
-		late := event(origin, "5", "output", generation, nil)
+		late := event(origin, "7", "output", generation, nil)
 		late.Channel, late.Source, late.Value = "stdout", "fixed-cli", raw("late original output")
 		origin = accept("assign-one", base+"/executions/reconnect-origin/report", late)
-		finish := event(origin, "6", "finished", generation, nil)
+		finish := event(origin, "8", "finished", generation, nil)
 		finish.ExitCode = &zero
 		origin = accept("assign-one", base+"/executions/reconnect-origin/report", finish)
 		after, _ := head(next.ID)

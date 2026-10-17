@@ -28,6 +28,9 @@ impl Api {
         self.request("runner-state", "GET", Value::Null)
     }
     fn connection(&self, unknown: bool) -> Result<(), String> {
+        self.observe(unknown, false)
+    }
+    fn observe(&self, unknown: bool, session_unconfirmed: bool) -> Result<(), String> {
         let state = self.state()?;
         if matches!(
             state["value"]["state"].as_str(),
@@ -35,7 +38,11 @@ impl Api {
         ) {
             return Ok(());
         }
-        self.request("connection","POST",json!({"operation_id":Uuid::new_v4().to_string(),"expected_version":state["run"]["version"],"generation":self.generation,"unknown":unknown}))?;
+        let mut body = json!({"operation_id":Uuid::new_v4().to_string(),"expected_version":state["run"]["version"],"generation":self.generation,"unknown":unknown});
+        if session_unconfirmed {
+            body["session_unconfirmed"] = json!(true);
+        }
+        self.request("connection", "POST", body)?;
         Ok(())
     }
     fn drain(&self, journal: &Journal, recovering: bool) -> Result<(), String> {
@@ -80,7 +87,7 @@ impl Api {
         self.drain(journal, false)
     }
     fn reconcile(&self, journal: &Journal) -> Result<(), String> {
-        self.connection(true)?;
+        self.observe(true, true)?;
         let identity = journal.identity(&self.id)?;
         journal.annotate(
             &self.id,
