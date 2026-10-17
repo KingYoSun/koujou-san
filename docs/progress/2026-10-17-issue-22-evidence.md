@@ -2,7 +2,7 @@
 
 - 基準main: `b8af5a2421c531a3bd83e3ec0818c3789f67b498`。Scope revision 1、区分C。
 - [計画](2026-10-17-issue-22-plan.md)のAC-1〜7・INVAR-1〜3を扱う。
-- 固定接続・共通画面・実GitHub接続を検証し、独立検品は全AC・INVAR PASS、blocker 0件。PR #55のhead `571bcf2f3e95bd9429306c7eda7ad3ceedbd3aa9`のCIは全件成功。最終headのCI・マージ後照合を終えるまでIssueをCloseしない。
+- Complete。固定接続・共通画面・実GitHub接続を検証し、独立検品は全AC・INVAR PASS、blocker 0件。最終headの全CI・マージ後tree一致を確認し、Issue #22を手動Closeした。
 
 ## 実装と固定接続
 
@@ -58,4 +58,10 @@
 - `test-results/issue22-live-external.json`: 作成者`app/koujou-san-publisher-kingyosun`、識別コメントと外部追記、CLOSED（2026-10-17 08:12:08 UTC）を再取得。SHA-256 `c58a1dcfd13d3a271ba79af89ee2211839f5f1d1beddcba974a41a58c65bdd65`。
 - `test-results/issue22-github-publisher-installed.jpg`: Issues read/write、Metadata read、一リポジトリの設定画面。
 
-実接続を補完するまでの差分は検品記録等の文書だけで、固定コード`07a928c`から実装差分はない。実接続を繰り返す代わりに、残るAC-2/6と影響する文書差分だけを再検品する。
+実接続を補完するまでの差分は検品記録等の文書だけで、固定コード`07a928c`から実装差分はない。実接続を繰り返さず、残るAC-2/6と影響する文書差分だけを再検品した。
+
+## CI・マージ後照合
+
+最終head `3550469edd816cab912af332e4b14e5ae940cb3e`の[CI 39016637625](https://github.com/KingYoSun/koujou-san/actions/runs/39016637625)で、Shared UI and server（5分12秒）、Windows native client、GitGuardianがすべて成功した。PR #55をそのhead指定で2026-10-17 08:21:10 UTCにsquash mergeした。
+
+main `a12eade021e8131ec88f0023203b52aad3b38858`と最終headのtreeは、どちらも`11964d970cc8b4d42a1d8b6a12e13b4655342aec`で一致した。`git diff --exit-code`も0。必要な条件と照合を満たし、08:21:47 UTCにIssue #22を手動Close、親Issue #2を更新した。
