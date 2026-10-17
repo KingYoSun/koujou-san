@@ -1,0 +1,29 @@
+{
+  "gui_pid": 59204,
+  "gui_closed_at": "2026-10-17T00:00:19.279Z",
+  "gui_absent": true,
+  "runner_pid": 84816,
+  "runner_parent_pid": 59204,
+  "cli_pid": 97764,
+  "cli_parent_pid": 84816,
+  "observed_at": "2026-10-17T00:01:09.9624221Z",
+  "same_cli_after_first_answer": true,
+  "after_completion": {
+    "afterCompletion": {
+      "accepting": true,
+      "active": 0,
+      "connected": true,
+      "journal": {
+        "pending_frames": false,
+        "unconfirmed_execution": false
+      },
+      "last_seen": 1792195359,
+      "pid": 84816
+    },
+    "execution": {
+      "phase": "completed",
+      "pid": 97764
+    }
+  },
+  "cli_exited": true
+}

@@ -1,0 +1,340 @@
+{
+  "head": {
+    "id": "run:native-background-dialogue",
+    "version": "N2XBGOZGLAAA3SOLKNHXEGNFQ2",
+    "run_id": "run:native-background-dialogue",
+    "kind": "run",
+    "position": "39",
+    "value": {
+      "name": "画面終了後の独立Runner",
+      "input": {
+        "id": "run-input:native-background-dialogue",
+        "version": "DXKV5TLGOSPTL6ZB2PS7X74BVB"
+      },
+      "state": "succeeded",
+      "execution": {
+        "stop": false,
+        "pause": true,
+        "version": "fixture-v1",
+        "environment": "windows",
+        "version_observed": true
+      },
+      "exit_code": 0,
+      "assignment": {
+        "input": {
+          "id": "run-input:native-background-dialogue",
+          "version": "DXKV5TLGOSPTL6ZB2PS7X74BVB"
+        },
+        "required": [
+          "pause"
+        ],
+        "device_id": "c8e90420-42ca-4321-a37e-50f76d940112",
+        "runner_id": "974b2136-de78-461f-a0b4-db5f9de996c4",
+        "connection": {
+          "kind": "cli",
+          "users": [
+            "WMJPUS6LRWL6DVIHQOKMKU5JHI"
+          ],
+          "target": "fixture-native",
+          "subject": "owned-cli-reference",
+          "version": "fixture-v1",
+          "bindings": [
+            "stdin",
+            "file",
+            "argument"
+          ],
+          "confirmed": true,
+          "environment": "Windows",
+          "capabilities": [
+            "pause"
+          ],
+          "repositories": []
+        },
+        "expires_at": "2026-10-17T00:03:17.4127892Z",
+        "generation": "7IQKCU5RLQYNG3HGNUYXIUEU77",
+        "prepared_at": "2026-10-16T23:59:09.9883866Z",
+        "requested_by": "WMJPUS6LRWL6DVIHQOKMKU5JHI",
+        "runner_version": "WD6QJ5QLV2ANBPC7QI4ZC45H4X"
+      },
+      "created_at": "2026-10-16T23:59:09.7080134Z",
+      "started_at": "2026-10-16T23:59:10.209213Z",
+      "finished_at": "2026-10-17T00:01:17.4519102Z",
+      "observation": "known",
+      "requested_by": "WMJPUS6LRWL6DVIHQOKMKU5JHI",
+      "cancel_requested": false,
+      "reported_through": "17",
+      "execution_requested_at": "2026-10-16T23:59:09.7420197Z"
+    },
+    "refs": [
+      {
+        "id": "run-input:native-background-dialogue",
+        "version": "DXKV5TLGOSPTL6ZB2PS7X74BVB"
+      }
+    ]
+  },
+  "pauses": {
+    "data": {
+      "run": {
+        "id": "run:native-background-dialogue",
+        "version": "N2XBGOZGLAAA3SOLKNHXEGNFQ2"
+      },
+      "items": [
+        {
+          "id": "run-pause:native-background-dialogue:first",
+          "version": "K7MRQCCFLQ2CRZJCI2B2H2NZ57",
+          "run_id": "run:native-background-dialogue",
+          "kind": "pause",
+          "position": "26",
+          "value": {
+            "id": "first",
+            "state": "resolved",
+            "reason": "固定の質問",
+            "request": {
+              "question": "first"
+            },
+            "response": "Windows画面終了後の回答1",
+            "created_at": "2026-10-16T23:59:10.651659Z",
+            "resumed_at": "2026-10-17T00:00:55.2433503Z",
+            "answered_at": "2026-10-17T00:00:54.9522516Z",
+            "answered_by": "WMJPUS6LRWL6DVIHQOKMKU5JHI",
+            "response_id": "TLRDEYZONA4ERHBOIRMECOCBQC",
+            "delivered_at": "2026-10-17T00:00:55.1323099Z",
+            "response_origin": {
+              "id": "WMJPUS6LRWL6DVIHQOKMKU5JHI",
+              "kind": "user"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:native-background-dialogue",
+              "version": "654HM56MDYAGTT4342BJE3SRO2"
+            }
+          ]
+        },
+        {
+          "id": "run-pause:native-background-dialogue:second",
+          "version": "S7FKIFFSNBUV2KVIUSU5UKWNGG",
+          "run_id": "run:native-background-dialogue",
+          "kind": "pause",
+          "position": "35",
+          "value": {
+            "id": "second",
+            "state": "resolved",
+            "reason": "固定の質問",
+            "request": {
+              "question": "second"
+            },
+            "response": "Windows画面終了後の回答2",
+            "created_at": "2026-10-17T00:00:55.3450742Z",
+            "resumed_at": "2026-10-17T00:01:17.0139685Z",
+            "answered_at": "2026-10-17T00:01:16.7364219Z",
+            "answered_by": "WMJPUS6LRWL6DVIHQOKMKU5JHI",
+            "response_id": "56M3R27SUY3ICCETRXB2HER36M",
+            "delivered_at": "2026-10-17T00:01:16.8495425Z",
+            "response_origin": {
+              "id": "WMJPUS6LRWL6DVIHQOKMKU5JHI",
+              "kind": "user"
+            }
+          },
+          "refs": [
+            {
+              "id": "run:native-background-dialogue",
+              "version": "S2U2WPTFNIVIACQDTFOSZBNUYP"
+            }
+          ]
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "runner-ui",
+      "position": null,
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  },
+  "output": {
+    "data": {
+      "run": {
+        "id": "run:native-background-dialogue",
+        "version": "N2XBGOZGLAAA3SOLKNHXEGNFQ2"
+      },
+      "items": [
+        {
+          "id": "run-output:native-background-dialogue:3",
+          "version": "FO6YOCJPQIXK7B73EEE5IIZS5X",
+          "run_id": "run:native-background-dialogue",
+          "kind": "output",
+          "position": "14",
+          "value": {
+            "at": "2026-10-16T23:59:10.5262578Z",
+            "value": "{\"received_input\": {\"context\": {\"order\": [2, 1], \"source\": \"fixed synthetic native input\"}, \"prompt\": \"二Pauseを区別する固定試験\"}}\r\n",
+            "source": "fixture-native",
+            "channel": "stdout",
+            "sequence": "3"
+          },
+          "refs": [
+            {
+              "id": "run:native-background-dialogue",
+              "version": "FO6YOCJPQIXK7B73EEE5IIZS5X"
+            }
+          ]
+        },
+        {
+          "id": "run-output:native-background-dialogue:4",
+          "version": "SOL5RL4HMLYA6MIU5MPIA7DT6R",
+          "run_id": "run:native-background-dialogue",
+          "kind": "output",
+          "position": "15",
+          "value": {
+            "at": "2026-10-16T23:59:10.5876481Z",
+            "value": "{\"koujou_event\": {\"type\": \"pause\", \"pause\": {\"id\": \"first\", \"reason\": \"固定の質問\", \"request\": {\"question\": \"first\"}}}}\r\n",
+            "source": "fixture-native",
+            "channel": "stdout",
+            "sequence": "4"
+          },
+          "refs": [
+            {
+              "id": "run:native-background-dialogue",
+              "version": "SOL5RL4HMLYA6MIU5MPIA7DT6R"
+            }
+          ]
+        },
+        {
+          "id": "run-output:native-background-dialogue:7",
+          "version": "LFTSW7BJ4DRFENEM53UU7B6GC7",
+          "run_id": "run:native-background-dialogue",
+          "kind": "output",
+          "position": "25",
+          "value": {
+            "at": "2026-10-17T00:00:55.1888076Z",
+            "value": "{\"koujou_event\": {\"type\": \"resumed\", \"pause_id\": \"first\", \"response_id\": \"TLRDEYZONA4ERHBOIRMECOCBQC\"}}\r\n",
+            "source": "fixture-native",
+            "channel": "stdout",
+            "sequence": "7"
+          },
+          "refs": [
+            {
+              "id": "run:native-background-dialogue",
+              "version": "LFTSW7BJ4DRFENEM53UU7B6GC7"
+            }
+          ]
+        },
+        {
+          "id": "run-output:native-background-dialogue:9",
+          "version": "7KRY5EWV2KT3BWSTUAOAEHE5TW",
+          "run_id": "run:native-background-dialogue",
+          "kind": "output",
+          "position": "27",
+          "value": {
+            "at": "2026-10-17T00:00:55.2958484Z",
+            "value": "{\"koujou_event\": {\"type\": \"pause\", \"pause\": {\"id\": \"second\", \"reason\": \"固定の質問\", \"request\": {\"question\": \"second\"}}}}\r\n",
+            "source": "fixture-native",
+            "channel": "stdout",
+            "sequence": "9"
+          },
+          "refs": [
+            {
+              "id": "run:native-background-dialogue",
+              "version": "7KRY5EWV2KT3BWSTUAOAEHE5TW"
+            }
+          ]
+        },
+        {
+          "id": "run-output:native-background-dialogue:12",
+          "version": "HF277W3BUVXPYFFTWR24E5SC4Z",
+          "run_id": "run:native-background-dialogue",
+          "kind": "output",
+          "position": "33",
+          "value": {
+            "at": "2026-10-17T00:01:16.9110472Z",
+            "value": "{\"koujou_event\": {\"type\": \"resumed\", \"pause_id\": \"second\", \"response_id\": \"56M3R27SUY3ICCETRXB2HER36M\"}}\r\n",
+            "source": "fixture-native",
+            "channel": "stdout",
+            "sequence": "12"
+          },
+          "refs": [
+            {
+              "id": "run:native-background-dialogue",
+              "version": "HF277W3BUVXPYFFTWR24E5SC4Z"
+            }
+          ]
+        },
+        {
+          "id": "run-output:native-background-dialogue:13",
+          "version": "GP44LWELRNQST2HORKSIQ2KVNG",
+          "run_id": "run:native-background-dialogue",
+          "kind": "output",
+          "position": "34",
+          "value": {
+            "at": "2026-10-17T00:01:16.9653125Z",
+            "value": "DIALOGUE_STDERR_ORIGINAL\r\n",
+            "source": "fixture-native",
+            "channel": "stderr",
+            "sequence": "13"
+          },
+          "refs": [
+            {
+              "id": "run:native-background-dialogue",
+              "version": "GP44LWELRNQST2HORKSIQ2KVNG"
+            }
+          ]
+        },
+        {
+          "id": "run-output:native-background-dialogue:15",
+          "version": "FT7UOPOS6VHPK4PRWSJJPVEH4E",
+          "run_id": "run:native-background-dialogue",
+          "kind": "output",
+          "position": "36",
+          "value": {
+            "at": "2026-10-17T00:01:17.0616498Z",
+            "value": "{\"koujou_event\": {\"type\": \"result\", \"report\": {\"decision\": \"PASS\", \"answers\": [\"Windows画面終了後の回答1\", \"Windows画面終了後の回答2\"]}}}\r\n",
+            "source": "fixture-native",
+            "channel": "stdout",
+            "sequence": "15"
+          },
+          "refs": [
+            {
+              "id": "run:native-background-dialogue",
+              "version": "FT7UOPOS6VHPK4PRWSJJPVEH4E"
+            }
+          ]
+        },
+        {
+          "id": "run-output:native-background-dialogue:16",
+          "version": "V67YHVLTDIX4XAX54IM6LDAWV2",
+          "run_id": "run:native-background-dialogue",
+          "kind": "output",
+          "position": "37",
+          "value": {
+            "at": "2026-10-17T00:01:17.1131478Z",
+            "value": "DIALOGUE_COMPLETED\r\n",
+            "source": "fixture-native",
+            "channel": "stdout",
+            "sequence": "16"
+          },
+          "refs": [
+            {
+              "id": "run:native-background-dialogue",
+              "version": "V67YHVLTDIX4XAX54IM6LDAWV2"
+            }
+          ]
+        }
+      ],
+      "next": ""
+    },
+    "meta": {
+      "workspace_id": "runner-ui",
+      "position": null,
+      "next_cursor": null,
+      "completeness": {
+        "state": "complete"
+      }
+    }
+  },
+  "settingsSavedByNativeUI": true,
+  "runnerStartedByNativeUI": true,
+  "answersSentAfterGUIClose": true
+}

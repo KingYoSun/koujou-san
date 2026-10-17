@@ -1,6 +1,6 @@
 # Issue #18: CLI Runnerの検証
 
-状態: In progress。受入範囲は[計画](2026-10-17-issue-18-plan.md)のScope revision 1。Windows画面終了後の継続と新native設定の実操作は未確認であり、IssueはCloseしない。
+受入範囲は[計画](2026-10-17-issue-18-plan.md)のScope revision 1。初回の実接続に加え、09:02にWindows画面終了後の継続とnative設定の実操作を確認した。最新の判定は[現在状態](current-state.md)を参照する。
 
 ## 実装と実接続
 
@@ -37,7 +37,7 @@ root check/test/build、desktop check/test、専用PGの`test:runs`を実施し�
 
 desktop buildは、稼働中の同じRunner binaryを上書きしようとしてWindowsのfile lockで一度失敗した。所有Runnerの受付を止め、終了後の再実行でdesktopとRunnerの両binaryをbuildできた。共通UIの回答修正後の再buildも成功した。リンク時の既存PDB名の警告は別に記録し、build成功と区別する。
 
-## 画面検証と残作業
+## 初回の画面検証（04:40時点）
 
 Chromeで専用Workspaceと停止非対応Runを表示し、実環境・版・能力、取消要求と自然終了が区別されることを確認した。終了後も「実終了を待つ」と出る文言を、実行中だけの表示へ修正した。
 
@@ -51,6 +51,22 @@ Windows Computer Useのwindow一覧は取得できている。一方、検証用
 
 `state:none`ではcontextを省略するよう修正し、局所テストと[実Runner](assets/issue18-none.json)でpromptだけがCLIへ渡り、終了0となることを確認した。別クライアント条件も追加で確認した。専用fixtureの別利用者BobはCLI・端末登録なし、編集者・実行依頼不許可のまま二Pauseへ回答し、[配送/再開と終了](assets/issue18-bob.json)を確認した。[画面証跡](assets/issue18-bob.png)も保存した。修正固定commit `636dcbb9b675a819d358d98c2e688c6e31aa26f2` の[再検品](2026-10-17-issue-18-inspection.md)でコードblockerが解消し、新たなblockerがないことを確認した。
 
-PRは[#51](https://github.com/KingYoSun/koujou-san/pull/51)。画面終了後の継続・新しいnative設定の実操作が未確認なのでdraftを維持する。
+PRは[#51](https://github.com/KingYoSun/koujou-san/pull/51)。04:40時点では画面終了後の継続・新しいnative設定の実操作が未確認で、draftを維持した。
 
 専用Ory/MCP試験は `PASS 1783.17s` / package `1785.227s` で正常終了した。所有Runnerのactive 0・未送信なしを確認して受付を止め、実終了後に専用環境のサービス・volumeを終了した。今回作成したOAuth/deviceのDPAPIファイルだけを削除し、標準サービスと他の資格情報は変更していない。GUI起動の依頼は一時環境終了により取り下げ、再開時に環境を用意し直す。
+
+## Windows画面の受入（08:48〜09:03 JST）
+
+ユーザーが起動したWindowsアプリをそのまま使った。専用fixture `f6abe538a444` を同じAPI originで作り直し、証明書のSHA-256が変わらないことを照合した。新しい認証主体と端末を使い、前回のDBや権限を再利用していない。
+
+Codex配下のプロセスと通常のWindowsプロセスでは、同じAppData表記が異なる実体を指していた。WSLから双方の実体を確認し、未使用と確認した今回のnamespaceへ、合成fixtureのDPAPIファイルと宣言済み接続だけを用意した。実行接続の`execution.json`は事前に作っていない。
+
+Windows画面でprogram・引数・明示JSONL対話・版確認の引数を入力し、保存ボタンを押した。[保存完了の画面](assets/issue18-native-settings.png)と実ファイルを照合した。保存時点では実行journalがなく、CLIを起動していない。
+
+画面の「独立Runnerを起動」と「状態を更新」を使い、PID 84816がGUIのPID 59204から起動したことを確認した。合成Run `native-background-dialogue`を割り当て、実CLI PID 97764の起動と版確認、最初のPauseをAPIと[Windows画面](assets/issue18-native-before-close.png)で確認した。
+
+09:00:19.279に通常の終了操作でGUIを閉じた。GUIプロセスとウィンドウが消え、同じRunnerとCLIのPIDが残ることを照合した。09:00:54.952と09:01:16.736にWeb画面から二回答を送信した。最初の回答後もCLIのPIDは同じで、両Pauseは配送・再開確認を経てresolvedとなった。09:01:17.451に終了0・Succeededを記録し、CLIプロセスは終了した。Runnerはその後も受付中・active 0・未送信なしで継続していた。
+
+[プロセスの観測](assets/issue18-native-processes.json)、[固定Run・二Pause・原出力](assets/issue18-native-background.json)、[画面終了後の正常終了](assets/issue18-native-after-close.png)を保存した。これにより、初回に未確認としていた二つのWindows操作を確認した。実OSのスリープ・再起動を行った結果へは広げない。
+
+最後に所有Runnerの受付を止め、実終了を確認した。専用Ory/MCP試験は `PASS 745.48s` / package `747.575s` で正常終了し、そのサービス・volumeを終了した。双方の保存先に作った今回のOAuth/device DPAPIファイル4件だけを削除した。表示に残っていた「ネイティブの実行機構は未実装」という旧文言も、合意済みの画面終了後の継続を説明する文言へ訂正した。

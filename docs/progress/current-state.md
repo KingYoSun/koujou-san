@@ -77,6 +77,6 @@
 
 ## Issue #18の判定
 
-状態: In progress。Scope revision 1。ユーザー判断に従い、画面とは独立したRunnerを実装した。[計画](2026-10-17-issue-18-plan.md)と[検証記録](2026-10-17-issue-18-evidence.md)を参照する。Windows/WSLの実CLI、二Pause、停止、専用worktree、Codex/Claudeの同じ入力・判定契約、固定Manifest、Web回答を確認した。Windows画面の起動が自動承認レビューに拒否されたため、ユーザーへ起動だけを依頼した。検証用の一時環境は終了し、先の起動コマンドは実行不要と伝えた。画面検証の再開時に専用環境を用意し直す。[独立検品](2026-10-17-issue-18-inspection.md)のコードblockerは修正・再検品済み。[PR #51](https://github.com/KingYoSun/koujou-san/pull/51)はdraftで、Windows画面終了後の継続と新native設定の実操作が未確認のため#18はCloseしない。最終head CIとマージ後照合も完了条件に含める。
+状態: Inspection pending。Scope revision 1。画面とは独立したRunnerを実装し、[計画](2026-10-17-issue-18-plan.md)の実接続とWindows/Webの受入を確認した。Windows/WSLの実CLI、二Pause、停止、専用worktree、Codex/Claudeの共通入力・判定、Manifestと無注入、二利用者のWeb回答、Windows設定の保存・Runner起動と画面終了後の実CLI完了を確認した。[検証記録](2026-10-17-issue-18-evidence.md)と[独立検品](2026-10-17-issue-18-inspection.md)を参照する。[PR #51](https://github.com/KingYoSun/koujou-san/pull/51)へ追加証跡を固定し、再検品と最終head CI・マージ後照合を行う。#18はその完了後にCloseする。
 
 #19〜#34は未着手。工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
