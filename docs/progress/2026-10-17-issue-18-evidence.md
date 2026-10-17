@@ -70,3 +70,9 @@ Windows画面でprogram・引数・明示JSONL対話・版確認の引数を入�
 [プロセスの観測](assets/issue18-native-processes.json)、[固定Run・二Pause・原出力](assets/issue18-native-background.json)、[画面終了後の正常終了](assets/issue18-native-after-close.png)を保存した。これにより、初回に未確認としていた二つのWindows操作を確認した。実OSのスリープ・再起動を行った結果へは広げない。
 
 最後に所有Runnerの受付を止め、実終了を確認した。専用Ory/MCP試験は `PASS 745.48s` / package `747.575s` で正常終了し、そのサービス・volumeを終了した。双方の保存先に作った今回のOAuth/device DPAPIファイル4件だけを削除した。表示に残っていた「ネイティブの実行機構は未実装」という旧文言も、合意済みの画面終了後の継続を説明する文言へ訂正した。
+
+## マージ後の照合
+
+[PR #51](https://github.com/KingYoSun/koujou-san/pull/51)を最終head `0f7b89cb17a7f9a46ae6d2cc25e52218d33b64c0` の全CI成功後にマージした。CI `38984813350` のattempt 2はLinux 4m59s・Windows 6m44s・GitGuardian 1sで全成功。attempt 1はworkflow全体が成功表示でもWindowsチェックが実行中のまま残ったため、同じheadのWindowsジョブを再実行して完了を確認した。
+
+main `8e067b6552e3a7260dc959fe547c0422b8044ec3` と最終headのtreeは `f2d94bba17326c574321d5daf9ae2f3e29937c05` で一致し、`git diff`は0。AC-1〜8・INVAR-1〜3、独立検品、実CI、マージ後照合を終えて#18をCloseした。
