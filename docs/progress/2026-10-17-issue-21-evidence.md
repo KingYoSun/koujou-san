@@ -55,3 +55,9 @@ Codex CLI 0.162.1とClaude Code 2.1.300は、リポジトリ外の新規一時�
 形式を受入済みのレポートだけ条件別の表示・人の判断案へ使うようにした。不正レポートも形式・未判定と元データを表示し、原レポートを変更しない。修正後は不正形式と正常な条件表の両方の描画が成功（`issue21-invalid-ui-after.log`）。表示の構造・CSSは変えず、正常時の共通GUI証拠を再利用した。最終のUI試験は13ファイル41件成功。check/test/buildも再確認し、影響する表示だけを独立担当へ再検品に渡す。
 
 独立担当は修正commit `9d3ab14eeca40e855b77bd5767793c9c95f41cff`の差分をPASS、blocker 0件と判定した。独立の描画試験も2件成功。不正形式表示・正常表示・人の判断案の初期化を照合し、[検品記録](2026-10-17-issue-21-inspection.md)へ初回の見落としと再判定を追記した。すべての固定条件はPASSとなった。
+
+## マージ後照合
+
+[PR #54](https://github.com/KingYoSun/koujou-san/pull/54)を、最終head `c1a0d23a28ba6a597b7565e5984362cba7d7bef5`の全CI成功後にマージした。[CI 39001629805](https://github.com/KingYoSun/koujou-san/actions/runs/39001629805)の共有UI/server、Windows native、GitGuardianはすべて成功。独立担当は9d3ab14eから最終headまでの文書差分も照合し、全条件PASS・blocker 0件を維持した。
+
+merge/main `b8af5a2421c531a3bd83e3ec0818c3789f67b498`と最終headのtreeは`574914bd1720e580d56641c957248d12089de988`で一致、差分0。AC-1〜8・INVAR-1〜3、必要な独立検品・CI・マージ後照合が揃い、2026-10-17に#21を手動Closeした。親#2の完了欄も更新した。
