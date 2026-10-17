@@ -17,6 +17,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/automation"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/hopper"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
@@ -27,6 +28,7 @@ import (
 )
 
 type Service struct {
+	Hopper     *hopper.Service
 	Auth       *auth.Service
 	Access     *access.Service
 	Contexts   *contexts.Service
@@ -53,6 +55,7 @@ func (s *Service) Register(mux *http.ServeMux) {
 	server := mcp.NewServer(&mcp.Implementation{Name: "koujou-san", Version: "1"}, nil)
 	s.registerUsage(server)
 	s.registerAutomation(server)
+	s.registerHopper(server)
 	s.registerRuns(server)
 	s.registerWorkflows(server)
 	addTool(server, s, "context_search", "Find authorized Context candidates without returning their bodies.", s.search)

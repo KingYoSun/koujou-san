@@ -101,8 +101,12 @@
 
 状態: Complete。Scope revision 2。[PR #57](https://github.com/KingYoSun/koujou-san/pull/57)を最終head `381b2650ffdcd085cbc4a86458362e5731c14321`の全CIと独立検品PASS後にマージした。main `e651f9d8a24574f1a24f23a0da11df7c4a96db40`とのtree一致・差分0を確認してCloseした。[証跡](2026-10-17-issue-23-evidence.md)を参照する。人による初見操作（元AC-5）はユーザー承認により未確認のまま#33 AC-4へ移管した。
 
-## Issue #24の準備
+## Issue #24の判定
 
-状態: In progress。Run別の機械計測・独立した暗号化保留と再送・現在認可・数量/費用表示を実装した。実CLIから認証済みAPI・固定単価へ接続し、終了済みCodexを再実行せず遅着を送ってRun結果の不変を確認した。共通画面・局所試験と取得範囲は[証跡](2026-10-17-issue-24-evidence.md)、固定条件は[計画](2026-10-17-issue-24-plan.md)を参照する。独立検品のB1を修正し、`155c02c`の差分検品は全条件PASS・blocker 0。最終CI・マージ後照合は未完了。
+状態: Complete。Scope revision 1。[PR #58](https://github.com/KingYoSun/koujou-san/pull/58)を最終head `daca90b4754c5b0017b22e6ba7ff1dbb3767b1bf`の全CI・独立検品PASS後にマージした。main `a7c8b56151f51e876844ae2810f59d561b81a631`とのtree一致・差分0を確認してCloseした。実CLI二件・固定個別単価・共通画面・受付応答喪失の修正と取得範囲は[証跡](2026-10-17-issue-24-evidence.md)を参照する。
 
-#25〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。LLM操作などは未実装であり、初期リリースの完成とは扱わない。
+## Issue #25の準備
+
+状態: Inspection pending。基準mainは#24マージ後の`a7c8b56151f51e876844ae2810f59d561b81a631`。[計画](2026-10-17-issue-25-plan.md)の三点への回答を反映し、自動発行・通常の割当と開始、変更可能な起点別上限、未完了Issueへの関連付けと再発提案を実装した。型付き条件、原子的な内部発行、重複・連鎖・明示再開、共有起票、Runner復帰後の割当、共通UI・HTTP・MCPを検証した。検品の3件を修正し、`5ae982f`の限定再検品はPASS、blocker 0件。[証跡](2026-10-17-issue-25-evidence.md)を参照する。最終CI・マージ後照合は未完了。
+
+#26〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。LLM操作などは未実装であり、初期リリースの完成とは扱わない。

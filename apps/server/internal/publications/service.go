@@ -25,6 +25,7 @@ type Backend interface {
 	Observe(context.Context, Connection, string, int64) Outcome
 }
 type Service struct {
+	tx      pgx.Tx
 	Store   *persistence.Store
 	Access  *access.Service
 	Runs    *runs.Service
@@ -32,7 +33,7 @@ type Service struct {
 }
 
 func New(store *persistence.Store, a *access.Service, r *runs.Service, b Backend) *Service {
-	s := &Service{store, a, r, b}
+	s := &Service{Store: store, Access: a, Runs: r, Backend: b}
 	previous := r.BeforeStart
 	r.BeforeStart = func(ctx context.Context, tx pgx.Tx, w, id string) error {
 		if previous != nil {
@@ -43,6 +44,18 @@ func New(store *persistence.Store, a *access.Service, r *runs.Service, b Backend
 		return s.beforeStart(ctx, tx, w, id)
 	}
 	return s
+}
+func (s *Service) InTransaction(tx pgx.Tx) *Service {
+	copy := *s
+	copy.tx = tx
+	copy.Runs = s.Runs.InTransaction(tx)
+	return &copy
+}
+func (s *Service) database() query {
+	if s.tx != nil {
+		return s.tx
+	}
+	return s.Store.Database()
 }
 func decode(b []byte, v any) error {
 	d := json.NewDecoder(bytes.NewReader(b))
@@ -84,14 +97,20 @@ func (s *Service) Read(ctx context.Context, p access.Principal, w string, ref Re
 	if !fixed(ref) && ref.Version != "head" {
 		return Record{}, ErrInvalid
 	}
-	r, err := record(ctx, s.Store.Database(), w, ref)
+	r, err := record(ctx, s.database(), w, ref)
 	if err != nil {
 		return Record{}, access.ErrForbidden
 	}
-	if err = s.Access.Check(ctx, p, w, r.Owner, "get"); err != nil {
+	check := func() error {
+		if s.tx != nil {
+			return s.Access.CheckTx(ctx, s.tx, p, w, r.Owner, "get")
+		}
+		return s.Access.Check(ctx, p, w, r.Owner, "get")
+	}
+	if err = check(); err != nil {
 		return Record{}, err
 	}
-	if err = s.refs(ctx, s.Store.Database(), p, w, append(r.Refs, r.Ref)); err != nil {
+	if err = s.refs(ctx, s.database(), p, w, append(r.Refs, r.Ref)); err != nil {
 		return Record{}, err
 	}
 	return r, nil
@@ -130,7 +149,7 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, owner, 
 		}
 		return s.Access.Check(ctx, p, w, target, action)
 	}
-	if err := check(nil); err != nil {
+	if err := check(s.tx); err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err
 	}
 	scope := persistence.Scope{ActorID: "user:" + p.UserID, Grant: apicontract.Grant{WorkspaceID: w, CanRead: true, CanUpdate: true}, Recheck: func(tx pgx.Tx) *apicontract.Problem {
@@ -142,7 +161,7 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, owner, 
 	return s.Store.Apply(ctx, scope, persistence.Command{WorkspaceID: w, ResourceID: id, Kind: "publication-" + kind, Mutation: m, Payload: raw(payload)}, func(tx pgx.Tx, ref apicontract.Reference) (json.RawMessage, error) {
 		r, err := apply(tx, Ref{ID: ref.ID, Version: ref.Version})
 		return raw(r), err
-	})
+	}, s.tx)
 }
 func (s *Service) Put(ctx context.Context, p access.Principal, w, id string, req Write) (apicontract.Response[apicontract.Reference], error) {
 	value := req.Value
@@ -246,7 +265,7 @@ func (s *Service) SubmitAutomation(ctx context.Context, w, id string, req Submit
 	if !fixed(control) {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
-	r, err := s.Store.Database().Query(ctx, `SELECT payload FROM automation_records WHERE workspace_id=$1 AND id=$2 AND version=$3 AND kind='control'`, w, control.ID, control.Version)
+	r, err := s.database().Query(ctx, `SELECT payload FROM automation_records WHERE workspace_id=$1 AND id=$2 AND version=$3 AND kind='control'`, w, control.ID, control.Version)
 	if err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err
 	}
@@ -275,7 +294,7 @@ func (s *Service) submit(ctx context.Context, p access.Principal, w, id string, 
 		input.Actor.Control = control
 	}
 	input.State = "accepted"
-	if err = s.authority(ctx, s.Store.Database(), w, input, req.Draft.ID, true); err != nil {
+	if err = s.authority(ctx, s.database(), w, input, req.Draft.ID, true); err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err
 	}
 	return s.mutate(ctx, p, w, id, req.Draft.ID, "request", "execute", req.Mutation, struct {

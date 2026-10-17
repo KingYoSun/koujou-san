@@ -16,6 +16,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/githubobserve"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/hopper"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/inspections"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/mcpapi"
@@ -64,7 +65,6 @@ func main() {
 				slog.Error("GitHub observation initialization failed")
 				os.Exit(1)
 			}
-			observer.Start(ctx)
 			routes = append(routes, observer.Register)
 			limits, err := contexts.EnvironmentLimits()
 			if err != nil {
@@ -109,13 +109,18 @@ func main() {
 				os.Exit(1)
 			}
 			publicationService := publications.New(store, accessService, runService, publications.NewRemote(publicationConfig))
+			hopperService := hopper.New(store, accessService, automationService, runService, workflowService, publicationService, graphService)
+			observer.Accepted = hopperService.GitHubAccepted
+			observer.Start(ctx)
+			hopperService.Start(ctx)
+			routes = append(routes, hopperService.Register)
 			publicationService.StartWorker(ctx)
 			routes = append(routes, publicationService.Register)
 			routes = append(routes, workbench.New(store, accessService, runService, workflowService).Register)
 			workflowService.Observer = observer
 			workflowService.StartWorker(ctx)
 			routes = append(routes, workflowService.Register)
-			routes = append(routes, (&mcpapi.Service{Auth: service, Access: accessService, Contexts: contextService, Search: searchService, Graph: graphService, Usage: usageService, Automation: automationService, Runs: runService, Workflows: workflowService}).Register)
+			routes = append(routes, (&mcpapi.Service{Auth: service, Access: accessService, Contexts: contextService, Search: searchService, Graph: graphService, Usage: usageService, Automation: automationService, Runs: runService, Workflows: workflowService, Hopper: hopperService}).Register)
 		}
 	}
 	address := os.Getenv("KOUJOU_API_ADDR")

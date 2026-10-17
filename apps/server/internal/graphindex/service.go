@@ -320,7 +320,7 @@ func (s *Service) rebuild(ctx context.Context, w string) error {
 		}
 		afterRun := ""
 		for {
-			rows, err := tx.Query(ctx, "SELECT resource_id,version FROM shared_versions WHERE workspace_id=$1 AND resource_id LIKE 'run:%' AND NOT deleted AND resource_id>$2 ORDER BY resource_id LIMIT 500", w, afterRun)
+			rows, err := tx.Query(ctx, "SELECT resource_id,version FROM shared_versions WHERE workspace_id=$1 AND (resource_id LIKE 'run:%' OR resource_id LIKE 'hopper-result:%' OR resource_id LIKE 'publication:%' OR resource_id LIKE 'workflow-execution:%') AND NOT deleted AND resource_id>$2 ORDER BY resource_id LIMIT 500", w, afterRun)
 			if err != nil {
 				return err
 			}
@@ -330,7 +330,8 @@ func (s *Service) rebuild(ctx context.Context, w string) error {
 				if err = rows.Scan(&id, &rev); err != nil {
 					break
 				}
-				refs = append(refs, contexts.Ref{Kind: "run", ID: strings.TrimPrefix(id, "run:"), Revision: rev})
+				kind, logical, _ := strings.Cut(id, ":")
+				refs = append(refs, contexts.Ref{Kind: kind, ID: logical, Revision: rev})
 				afterRun = id
 			}
 			rows.Close()
@@ -343,6 +344,9 @@ func (s *Service) rebuild(ctx context.Context, w string) error {
 			out := batch{}
 			for _, ref := range refs {
 				if err = b.node(ctx, &out, ref); err != nil {
+					return err
+				}
+				if err = b.lineage(ctx, &out, resource(ref), ref.Revision); err != nil {
 					return err
 				}
 			}

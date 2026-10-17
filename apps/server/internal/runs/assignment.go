@@ -198,7 +198,7 @@ func CapabilityGap(c Connection, command Command, required []string) string {
 	return ""
 }
 func (s *Service) Assign(ctx context.Context, p access.Principal, w, id string, req Assign) (apicontract.Response[apicontract.Reference], error) {
-	if req.DeviceID == "" || req.Repository != nil && (req.Repository.ID == "" || !commitID.MatchString(req.Repository.Commit)) {
+	if req.DeviceID == "" || !ValidRepository(req.Repository) {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
 	return s.mutate(ctx, p, w, id, "execute", "run-assign", req.Mutation, req, func(tx pgx.Tx, ref apicontract.Reference) (Run, []Ref, error) {

@@ -1,0 +1,24 @@
+{
+  "fixture": "owned synthetic acceptance, no real CLI",
+  "surface": "common Web, Chrome",
+  "evaluation": {
+    "version": "QAC6Y7X2CH2ARX3XBO7BBIZ4HO",
+    "id": "hopper-evaluation:76681a84ac5535ea330ba841fecb4967d04d4aeef11886540ad92e8edbd885bf"
+  },
+  "definition": {
+    "id": "hopper:ui-next-work",
+    "version": "7RXJDAJKMVOJ4A7KEIN2QAGDCG"
+  },
+  "source": {
+    "id": "run:hopper-ui-input",
+    "version": "PL2IDEMAU6DPL4BHCT5YL7XTJ7"
+  },
+  "root": "18370920e88ac217c9dd78e16d7fc3bdd06ad12907278766ea444bb537cad51d",
+  "depth": 0,
+  "state": "published",
+  "reason": "assignment_resumed",
+  "destination": {
+    "id": "run:hopper-346941f7648500f604d7b75de757f0b5a670ecf428894f682239fc841a0df9cb",
+    "version": "Q6L46RTY6VW7UOKBANFMFMX2MY"
+  }
+}

@@ -21,6 +21,7 @@ type Start struct {
 	Inputs       map[string]map[string]json.RawMessage `json:"inputs,omitempty"`
 	InputsUTF8   *string                               `json:"inputs_utf8,omitempty"`
 	Repositories map[string]runs.Repository            `json:"repositories,omitempty"`
+	Sources      []Ref                                 `json:"sources,omitempty"`
 }
 type Decision struct {
 	apicontract.Mutation
@@ -121,6 +122,11 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 		if err != nil {
 			return Record{}, err
 		}
+		origins, err := s.Runs.SourcesTx(ctx, tx, p, w, req.Sources)
+		if err != nil {
+			return Record{}, err
+		}
+		refs = append(refs, origins...)
 		var pin Adoption
 		adoptedRecord, err := record(ctx, tx, w, req.Adoption)
 		if err != nil {

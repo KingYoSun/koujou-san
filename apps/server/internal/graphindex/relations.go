@@ -42,11 +42,11 @@ func (s *Service) validateRef(ctx context.Context, q database, p access.Principa
 		}
 		return nil
 	}
-	if r.Kind != "run" {
+	if !orchestrationKind(r.Kind) && r.Kind != "run" {
 		return errInput
 	}
 	var exists bool
-	if err := q.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2 AND version=$3 AND NOT deleted) OR EXISTS(SELECT 1 FROM graph_relations r WHERE r.workspace_id=$1 AND ((r.payload->'from'->>'kind'='run' AND r.payload->'from'->>'id'=$4 AND r.payload->'from'->>'revision'=$3) OR (r.payload->'to'->>'kind'='run' AND r.payload->'to'->>'id'=$4 AND r.payload->'to'->>'revision'=$3)))", w, resource(r), r.Revision, r.ID).Scan(&exists); err != nil {
+	if err := q.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2 AND version=$3 AND NOT deleted) OR EXISTS(SELECT 1 FROM shared_changes WHERE workspace_id=$1 AND resource_id=$2 AND version=$3 AND NOT deleted) OR EXISTS(SELECT 1 FROM graph_relations r WHERE r.workspace_id=$1 AND ((r.payload->'from'->>'kind'=$5 AND r.payload->'from'->>'id'=$4 AND r.payload->'from'->>'revision'=$3) OR (r.payload->'to'->>'kind'=$5 AND r.payload->'to'->>'id'=$4 AND r.payload->'to'->>'revision'=$3)))", w, resource(r), r.Revision, r.ID, r.Kind).Scan(&exists); err != nil {
 		return err
 	}
 	if !exists {
@@ -54,7 +54,7 @@ func (s *Service) validateRef(ctx context.Context, q database, p access.Principa
 	}
 	return nil
 }
-func (s *Service) PutRelation(ctx context.Context, p access.Principal, w, id string, r RelationWrite) (apicontract.Response[apicontract.Reference], error) {
+func (s *Service) PutRelation(ctx context.Context, p access.Principal, w, id string, r RelationWrite, within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
 	if id == "" || r.Value.Order < 0 || !(r.Value.Kind == "reference" || r.Value.Kind == "uses" || r.Value.Kind == "generated" || r.Value.Kind == "semantic") {
 		return apicontract.Response[apicontract.Reference]{}, errInput
 	}
@@ -95,5 +95,5 @@ func (s *Service) PutRelation(ctx context.Context, p access.Principal, w, id str
 			Ref   contexts.Ref `json:"ref"`
 			Value Relation     `json:"value"`
 		}{contexts.Ref{Kind: "relation", ID: id, Revision: ref.Version}, r.Value}), nil
-	})
+	}, within...)
 }

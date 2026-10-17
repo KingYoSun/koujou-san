@@ -40,7 +40,7 @@ func control(ctx context.Context, q query, w, k string) (Control, error) {
 	}
 	return c, err
 }
-func (s *Service) authority(ctx context.Context, tx pgx.Tx, j Job, commit bool) (Control, error) {
+func (s *Service) controller(ctx context.Context, tx pgx.Tx, j Job, commit bool) (Control, error) {
 	c, err := control(ctx, tx, j.Workspace, j.Kind)
 	if err != nil {
 		return c, access.ErrForbidden
@@ -55,8 +55,15 @@ func (s *Service) authority(ctx context.Context, tx pgx.Tx, j Job, commit bool) 
 	if err = s.checkRefs(ctx, tx, p, j.Workspace, j.Refs); err != nil {
 		return c, err
 	}
-	var current string
-	if err = tx.QueryRow(ctx, "SELECT version FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2", j.Workspace, j.Target.ID).Scan(&current); err != nil || current != j.Target.Version {
+	return c, nil
+}
+func (s *Service) authority(ctx context.Context, tx pgx.Tx, j Job, commit bool) (Control, error) {
+	c, err := s.controller(ctx, tx, j, commit)
+	if err != nil {
+		return c, err
+	}
+	var exists bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2 AND version=$3 UNION ALL SELECT 1 FROM shared_changes WHERE workspace_id=$1 AND resource_id=$2 AND version=$3 AND $4='hopper')`, j.Workspace, j.Target.ID, j.Target.Version, j.Kind).Scan(&exists); err != nil || !exists {
 		return c, ErrInvalid
 	}
 	if j.Kind == "triage" {
@@ -67,12 +74,16 @@ func (s *Service) authority(ctx context.Context, tx pgx.Tx, j Job, commit bool) 
 	}
 	return c, nil
 }
-func (s *Service) budget(ctx context.Context, tx pgx.Tx, j Job, c Control) (string, error) {
+func (s *Service) budget(ctx context.Context, tx pgx.Tx, j Job, c Control, reserved bool) (string, error) {
 	var count int
 	if err := tx.QueryRow(ctx, `SELECT count(*) FROM automation_job_events e JOIN automation_jobs j ON j.workspace_id=e.workspace_id AND j.id=e.job_id WHERE e.workspace_id=$1 AND j.kind=$2 AND e.state='running' AND e.at>now()-make_interval(secs=>$3)`, j.Workspace, j.Kind, c.PeriodSeconds).Scan(&count); err != nil {
 		return "", err
 	}
-	if count >= c.MaxRequests {
+	limit := c.MaxRequests
+	if reserved {
+		limit++
+	}
+	if count >= limit {
 		return "request_budget", nil
 	}
 	if c.Budget == nil {
@@ -156,7 +167,7 @@ func (s *Service) Claim(ctx context.Context, k, worker string) (*Job, error) {
 				reason = "deadline_or_attempts"
 			}
 			if reason == "" {
-				reason, err = s.budget(ctx, tx, j, c)
+				reason, err = s.budget(ctx, tx, j, c, false)
 				if err != nil {
 					return err
 				}

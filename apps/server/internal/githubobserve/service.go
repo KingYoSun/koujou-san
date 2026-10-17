@@ -21,12 +21,13 @@ import (
 )
 
 type Service struct {
-	store  *persistence.Store
-	access *access.Service
-	config *Config
-	remote *Remote
-	wake   chan struct{}
-	mu     sync.Mutex
+	Accepted func(context.Context, pgx.Tx, Target, Snapshot, int64) error
+	store    *persistence.Store
+	access   *access.Service
+	config   *Config
+	remote   *Remote
+	wake     chan struct{}
+	mu       sync.Mutex
 }
 
 func New(ctx context.Context, store *persistence.Store, a *access.Service, c *Config) (*Service, error) {
@@ -129,6 +130,11 @@ func (s *Service) step(ctx context.Context) (bool, error) {
 			version++
 			if _, e := tx.Exec(ctx, `INSERT INTO github_observations VALUES($1,$2,$3,$4)`, t.ID, version, checked, value); e != nil {
 				return e
+			}
+			if s.Accepted != nil {
+				if e := s.Accepted(ctx, tx, t, snapshot, version); e != nil {
+					return e
+				}
 			}
 		}
 		_, e := tx.Exec(ctx, `UPDATE github_targets SET snapshot=$2,version=$3,checked_at=$4,observed_at=$4,reason='',due_at=$5 WHERE id=$1`, t.ID, value, version, checked, next)

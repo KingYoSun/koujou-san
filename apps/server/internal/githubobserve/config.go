@@ -20,6 +20,8 @@ type Target struct {
 	Kind           string `json:"kind"`
 	ExternalID     string `json:"external_id"`
 	Attempt        int    `json:"attempt,omitempty"`
+	WorkflowID     int64  `json:"workflow_id,omitempty"`
+	Event          string `json:"event,omitempty"`
 }
 type Binding struct {
 	WorkspaceID    string   `json:"workspace_id"`
@@ -87,7 +89,11 @@ func (c *Config) validate() error {
 		if !idPattern.MatchString(t.ID) || ids[t.ID] || t.InstallationID <= 0 || t.RepositoryID <= 0 || !repositoryPattern.MatchString(t.Repository) || t.Attempt < 0 {
 			return bad
 		}
-		if t.Kind == "commit" {
+		if t.WorkflowID != 0 || t.Event != "" {
+			if t.Kind != "actions" || t.WorkflowID < 1 || t.ExternalID != "" || t.Attempt != 0 || (t.Event != "" && !idPattern.MatchString(t.Event)) {
+				return bad
+			}
+		} else if t.Kind == "commit" {
 			if !shaPattern.MatchString(t.ExternalID) {
 				return bad
 			}
@@ -103,7 +109,7 @@ func (c *Config) validate() error {
 		if t.Kind != "actions" && t.Attempt != 0 {
 			return bad
 		}
-		tuple := strconv.FormatInt(t.InstallationID, 10) + ":" + strconv.FormatInt(t.RepositoryID, 10) + ":" + t.Kind + ":" + t.ExternalID + ":" + strconv.Itoa(t.Attempt)
+		tuple := strconv.FormatInt(t.InstallationID, 10) + ":" + strconv.FormatInt(t.RepositoryID, 10) + ":" + t.Kind + ":" + t.ExternalID + ":" + strconv.Itoa(t.Attempt) + ":" + strconv.FormatInt(t.WorkflowID, 10) + ":" + t.Event
 		if tuples[tuple] {
 			return errors.New("reuse one GitHub target for identical external references")
 		}

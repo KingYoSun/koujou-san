@@ -82,7 +82,11 @@ func (s *Service) checkRefs(ctx context.Context, tx pgx.Tx, p access.Principal, 
  UNION ALL SELECT 1 FROM shared_changes WHERE workspace_id=$1 AND resource_id=$2 AND version=$3
  UNION ALL SELECT 1 FROM context_records WHERE workspace_id=$1 AND resource_id=$2 AND revision=$3
  UNION ALL SELECT 1 FROM automation_records WHERE workspace_id=$1 AND id=$2 AND version=$3
- UNION ALL SELECT 1 FROM usage_records WHERE workspace_id=$1 AND id=$2 AND version=$3)`, w, r.ID, r.Version).Scan(&exists); err != nil {
+ UNION ALL SELECT 1 FROM usage_records WHERE workspace_id=$1 AND id=$2 AND version=$3
+ UNION ALL SELECT 1 FROM run_records WHERE workspace_id=$1 AND id=$2 AND version=$3
+ UNION ALL SELECT 1 FROM workflow_records WHERE workspace_id=$1 AND id=$2 AND version=$3
+ UNION ALL SELECT 1 FROM publication_records WHERE workspace_id=$1 AND id=$2 AND version=$3
+ UNION ALL SELECT 1 FROM hopper_records WHERE workspace_id=$1 AND id=$2 AND version=$3)`, w, r.ID, r.Version).Scan(&exists); err != nil {
 				return err
 			}
 			if !exists {

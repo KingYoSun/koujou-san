@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { apiRequest } from "./auth";
 import { ContextWorkspace } from "./context-workspace";
 import { Automation } from "./automation";
+import { Hopper } from "./hopper";
 import { Workbench } from "./workbench";
 import { Workflows } from "./workflows";
 import { Inspections } from "./inspections";
@@ -472,6 +473,12 @@ export function Team({ native }: { native: boolean }) {
           )}
           <Automation
             key={`automation/${apiIdentity}/${me.id}/${selected}`}
+            native={native}
+            workspace={selected}
+            role={current.role}
+          />
+          <Hopper
+            key={`hopper/${apiIdentity}/${me.id}/${selected}`}
             native={native}
             workspace={selected}
             role={current.role}
