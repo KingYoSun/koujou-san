@@ -85,6 +85,10 @@
 
 ## Issue #20の判定
 
-状態: In progress（CI待ち）。Scope revision 1。[計画](2026-10-17-issue-20-plan.md)の実装、専用PG・実Ory/MCP・ネイティブの局所試験と共通画面の定義往復を終え、[独立検品](2026-10-17-issue-20-inspection.md)は全条件PASS・blocker 0。[証跡](2026-10-17-issue-20-evidence.md)を固定し、PR CIとマージ後照合へ進める。本人の手動操作は依頼していない。最終CIとマージ後照合までは完了と扱わない。
+状態: Complete。Scope revision 1。[PR #53](https://github.com/KingYoSun/koujou-san/pull/53)を最終head `bb1caeb1b44af9774d12e82e76270d60acd41b67` の全CI・独立検品後にマージした。main `fbb0637ff4f9de825a37a4dc808f7495517f6758`と最終headのtreeは`c70e54891590ae73f00f3738291154ae3bd312db`で一致、差分0。[証跡](2026-10-17-issue-20-evidence.md)と[独立検品](2026-10-17-issue-20-inspection.md)が揃い、#20をCloseした。本人の手動操作は依頼していない。
 
-#21〜#34は未着手（#33は実スリープ確認の移管を反映済み）。工程の詳細画面・LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。
+## Issue #21の判定
+
+状態: In progress（実装・独立検品完了、CI待ち）。Scope revision 1。[独立検品](2026-10-17-issue-21-inspection.md)と表示修正commit `9d3ab14eeca40e855b77bd5767793c9c95f41cff`の差分検品は、AC-1〜8・INVAR-1〜3をPASS、blocker 0件と判定した。[証跡](2026-10-17-issue-21-evidence.md)の専用PG、二登録端末と別保存域の実CLI、実モデル、共通画面、保存/復元、Run/工程/nativeの確認を終えた。[PR #54](https://github.com/KingYoSun/koujou-san/pull/54)の最終headのCIとマージ後照合を残す。物理的に別のPCで試験したとは扱わず、未確認の分離を保証へ格上げしない。
+
+#22〜#34は未着手（#33は実スリープ確認の移管を反映済み）。LLM操作などは未実装であり、段階Aや初期リリースの完成とは扱わない。

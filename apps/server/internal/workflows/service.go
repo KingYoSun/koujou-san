@@ -320,6 +320,7 @@ func (s *Service) validation(ctx context.Context, q query, p access.Principal, w
  SELECT 1 FROM workflow_records WHERE workspace_id=$1 AND id=ref.id AND version=ref.version
  UNION ALL SELECT 1 FROM context_records WHERE workspace_id=$1 AND resource_id=ref.id AND revision=ref.version
  UNION ALL SELECT 1 FROM run_records WHERE workspace_id=$1 AND id=ref.id AND version=ref.version
+ UNION ALL SELECT 1 FROM inspection_records WHERE workspace_id=$1 AND id=ref.id AND version=ref.version
  UNION ALL SELECT 1 FROM shared_versions WHERE workspace_id=$1 AND resource_id=ref.id AND version=ref.version
  UNION ALL SELECT 1 FROM shared_changes WHERE workspace_id=$1 AND resource_id=ref.id AND version=ref.version
  UNION ALL SELECT 1 FROM run_runners WHERE workspace_id=$1 AND device_id=substring(ref.id from 8) AND ref.id LIKE 'runner:%' AND payload->>'version'=ref.version

@@ -27,6 +27,8 @@ type Service struct {
 	Contexts *contexts.Service
 	// Workflow authorization is supplied by its owner, without a reverse import.
 	BeforeStart func(context.Context, pgx.Tx, string, string) error
+	// Derived contracts may narrow a schema-valid result while preserving its bytes.
+	AssessResult func(context.Context, pgx.Tx, string, string, Run, *Assessment) (*Assessment, []Ref, error)
 }
 
 func New(store *persistence.Store, a *access.Service, c *contexts.Service) *Service {
@@ -260,7 +262,8 @@ func (s *Service) sources(ctx context.Context, tx pgx.Tx, p access.Principal, w 
  UNION ALL SELECT 1 FROM shared_changes WHERE workspace_id=$1 AND resource_id=$2 AND version=$3
  UNION ALL SELECT 1 FROM context_records WHERE workspace_id=$1 AND resource_id=$2 AND revision=$3
 	 UNION ALL SELECT 1 FROM run_records WHERE workspace_id=$1 AND id=$2 AND version=$3
-	 UNION ALL SELECT 1 FROM workflow_records WHERE workspace_id=$1 AND id=$2 AND version=$3)`, w, r.ID, r.Version).Scan(&exists); err != nil {
+		 UNION ALL SELECT 1 FROM workflow_records WHERE workspace_id=$1 AND id=$2 AND version=$3
+		 UNION ALL SELECT 1 FROM inspection_records WHERE workspace_id=$1 AND id=$2 AND version=$3)`, w, r.ID, r.Version).Scan(&exists); err != nil {
 			return nil, err
 		}
 		if !exists {
@@ -668,6 +671,15 @@ func (s *Service) Report(ctx context.Context, p access.Principal, w, id string, 
 					return r, nil, err
 				}
 				r.Assessment = assess(spec.Derivation, e.Report)
+				if s.AssessResult != nil {
+					var resultRefs []Ref
+					r.Assessment, resultRefs, err = s.AssessResult(ctx, tx, w, ref.ID, r, r.Assessment)
+					if err != nil {
+						return r, nil, err
+					}
+					refs = unique(append(refs, resultRefs...))
+					old.Refs = unique(append(old.Refs, resultRefs...))
+				}
 			} else {
 				r.State = "cancelled"
 			}

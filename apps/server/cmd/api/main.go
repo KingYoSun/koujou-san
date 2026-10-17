@@ -17,6 +17,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/githubobserve"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/inspections"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/mcpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
@@ -98,6 +99,8 @@ func main() {
 			runService := runs.New(store, accessService, contextService)
 			routes = append(routes, runService.Register)
 			workflowService := workflows.New(store, accessService, contextService, runService)
+			inspectionService := inspections.New(store, accessService, contextService, runService, workflowService)
+			routes = append(routes, inspectionService.Register)
 			workflowService.Observer = observer
 			workflowService.StartWorker(ctx)
 			routes = append(routes, workflowService.Register)
