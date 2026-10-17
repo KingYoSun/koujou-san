@@ -42,3 +42,9 @@ root check/test/buildとdesktop check/test/buildを実行した。rootの共通U
 画面証跡は[オフライン保存](assets/issue19-offline-answer.png)、[古い案と次のPause](assets/issue19-stale-answer.png)、[固定出力の引継ぎ](assets/issue19-fixed-handoff.png)、[Unknownの重複了承](assets/issue19-unknown-handoff.png)。構造化した実測は[実行記録](assets/issue19-reconnect.json)にまとめる。資格情報と端末内pathは含めない。
 
 AGENTS.mdから参照された`DESIGN.md`と`docs/adr/0014-uiux-dev-flow.md`は、このcheckoutには存在しなかった。既存のRun画面と操作構造を使い、別のビジュアル仕様を作って代用していない。
+
+## マージ後の照合
+
+PR #52の最終head `ff3e61efd113a281ef81de27ac335a3ea5d2bfcd`でCI `38992176485`が成功した。共有UI/サーバーは5分1秒、Windows nativeは6分55秒で完了し、GitGuardianも成功。独立担当は同じheadのScope revision 2をblocker 0で検品終了した。
+
+main `7c6b43eaaa273dacbd62de432bf716a74c178ed0`へマージし、最終headとmainのtreeが`7d79405800b16ef9d0d06f87dd323c5ee6a3a5a3`で一致、差分0を確認して#19をCloseした。試験専用環境は停止・撤去し、所有する検証用DPAPIファイルだけを削除した。実スリープは未確認のまま#33 AC-11へ引き継いだ。

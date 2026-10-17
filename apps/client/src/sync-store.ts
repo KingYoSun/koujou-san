@@ -49,35 +49,37 @@ export function allowAnswerScope(
   closedAnswerScopes.delete(legacyKey(n));
   return true;
 }
-const answerKey = (n: SyncNamespace, key: string) =>
-  JSON.stringify([...namespace(n), "pause-answer", key]);
-export async function readAnswerDraft(
+const answerKey = (n: SyncNamespace, key: string, kind: string) =>
+  JSON.stringify([...namespace(n), kind, key]);
+export async function readLocalDraft<T = AnswerDraft>(
   native: boolean,
   n: SyncNamespace,
   key: string,
-): Promise<AnswerDraft | undefined> {
+  kind = "pause-answer",
+): Promise<T | undefined> {
   await answerWrites.get(n.user)?.catch(() => {});
   if (closedAnswerActors.has(n.user) || closedAnswerScopes.has(legacyKey(n)))
     return;
   if (native)
     return (
-      (await invoke<AnswerDraft | null>("run_answer_draft", {
+      (await invoke<T | null>("run_answer_draft", {
         ...n,
-        key,
+        key: kind === "pause-answer" ? key : `${kind}:${key}`,
         action: "read",
         value: null,
       })) ?? undefined
     );
-  return transaction<AnswerDraft | undefined>(["states"], false, (tx, done) => {
-    const request = tx.objectStore("states").get(answerKey(n, key));
-    request.onsuccess = () => done(request.result as AnswerDraft | undefined);
+  return transaction<T | undefined>(["states"], false, (tx, done) => {
+    const request = tx.objectStore("states").get(answerKey(n, key, kind));
+    request.onsuccess = () => done(request.result as T | undefined);
   });
 }
-export function saveAnswerDraft(
+export function saveLocalDraft<T extends object = AnswerDraft>(
   native: boolean,
   n: SyncNamespace,
   key: string,
-  value?: AnswerDraft,
+  value?: T,
+  kind = "pause-answer",
 ): Promise<void> {
   const work = (answerWrites.get(n.user) ?? Promise.resolve())
     .catch(() => {})
@@ -90,7 +92,7 @@ export function saveAnswerDraft(
       if (native) {
         await invoke("run_answer_draft", {
           ...n,
-          key,
+          key: kind === "pause-answer" ? key : `${kind}:${key}`,
           action: value ? "save" : "remove",
           value: value ?? null,
         });
@@ -98,14 +100,16 @@ export function saveAnswerDraft(
       }
       await transaction<void>(["states"], true, (tx, done) => {
         const store = tx.objectStore("states");
-        if (value) store.put(value, answerKey(n, key));
-        else store.delete(answerKey(n, key));
+        if (value) store.put(value, answerKey(n, key, kind));
+        else store.delete(answerKey(n, key, kind));
         done();
       });
     });
   answerWrites.set(n.user, work);
   return work;
 }
+export const readAnswerDraft = readLocalDraft;
+export const saveAnswerDraft = saveLocalDraft;
 export function localEntry(value: SavedSync, key: string): LocalEntry {
   return {
     key,

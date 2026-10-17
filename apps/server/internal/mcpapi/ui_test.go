@@ -256,7 +256,7 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 			traceLock.Lock()
 			trace = append(trace, entry)
 			traceLock.Unlock()
-			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/usage/", "/automation/", "/runs/", "/healthz", "/readyz"} {
+			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/usage/", "/automation/", "/runs/", "/workflows/", "/healthz", "/readyz"} {
 				if strings.HasPrefix(r.URL.Path, prefix) {
 					token, err := bearer()
 					if err != nil {

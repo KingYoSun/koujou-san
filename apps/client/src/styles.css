@@ -476,3 +476,31 @@ button:disabled {
   max-height: 65vh;
   overflow: auto;
 }
+
+.workflow-editor fieldset {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+.workflow-editor label {
+  display: grid;
+  gap: 6px;
+  max-width: 100%;
+}
+.workflow-editor fieldset input,
+.workflow-editor textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.workflow-editor textarea {
+  min-height: 96px;
+  border: 1px solid var(--input);
+  border-radius: 6px;
+  padding: 10px;
+  font-family: ui-monospace, monospace;
+}
+.workflow-editor pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

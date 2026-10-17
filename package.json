@@ -9,6 +9,7 @@
     "pnpm": "10.16.1"
   },
   "scripts": {
+    "test:workflows": "node scripts/dev.mjs test:workflows",
     "test:runs": "node scripts/dev.mjs test:runs",
     "test:automation": "node scripts/dev.mjs test:automation",
     "test:usage": "node scripts/dev.mjs test:usage",

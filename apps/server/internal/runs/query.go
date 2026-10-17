@@ -39,6 +39,11 @@ type linkSnapshot struct {
 func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Request) (apicontract.Response[Page], error) {
 	return s.page(ctx, p, w, r, false)
 }
+
+// ExportPage rejects unreadable records rather than silently omitting them.
+func (s *Service) ExportPage(ctx context.Context, p access.Principal, w string, r Request) (apicontract.Response[Page], error) {
+	return s.page(ctx, p, w, r, true)
+}
 func (s *Service) page(ctx context.Context, p access.Principal, w string, r Request, strict bool) (apicontract.Response[Page], error) {
 	empty := apicontract.Response[Page]{}
 	if err := s.Access.Check(ctx, p, w, "", "read"); err != nil {

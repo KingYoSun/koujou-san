@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { syncRequest } from "./auth";
+import { syncRequest, workspaceAccessLost } from "./auth";
 import { SyncHTTPError } from "./sync-error";
 import { RunnerSettings } from "./runner-settings";
 import { ExecutionSettings } from "./execution-settings";
@@ -320,21 +320,8 @@ export function RunRecords({
         setInput(null);
         setContextText(undefined);
         // A denied execution action alone does not revoke Workspace reading.
-        let revoked = error instanceof SyncHTTPError && error.status === 401;
-        if (!revoked) {
-          try {
-            await syncRequest(
-              `/access/workspaces/${encodeURIComponent(workspace)}/members`,
-              native,
-              { method: "GET" },
-            );
-          } catch (probe) {
-            revoked =
-              probe instanceof SyncHTTPError &&
-              (probe.status === 401 || probe.status === 403);
-          }
-        }
-        if (revoked) await syncStorage(native).remove(namespace);
+        if (await workspaceAccessLost(native, workspace, error))
+          await syncStorage(native).remove(namespace);
         pending.current = null;
         setNotice("現在の閲覧・編集・実行依頼の権限を確認してください。");
       } else

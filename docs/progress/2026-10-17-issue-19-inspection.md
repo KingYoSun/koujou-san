@@ -44,4 +44,4 @@
 
 head `c927025c521e5cc1a632b1478d340eea41f932ea`では、期限切れRunner接続を現在の端末認可で更新してから照合する差分を検品した。現在の割当世代・依頼者権限・入力参照権限を維持し、CLI起動経路が増えていない。直接試験の共有Run版不変と、`command_started=false`・`continuation_verified=false`の証拠も一致した。GUIの追加クリックは行わず、入口の対応と同じネイティブ処理の直接試験で確認した。
 
-残る実スリープはユーザー承認で#33へ移し、Scope revision 2とする。最終文書差分を照合した後に検品を終了し、実際のCIとmerge後の照合は別に確認する。
+残る実スリープはユーザー承認で#33へ移し、Scope revision 2とする。最終head `ff3e61efd113a281ef81de27ac335a3ea5d2bfcd`の文書差分と改定条件を独立担当が照合し、blocker 0で検品を終了した。CIとmerge後の照合も[検証記録](2026-10-17-issue-19-evidence.md)に記録した。

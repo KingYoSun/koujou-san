@@ -25,10 +25,12 @@ type Service struct {
 	Store    *persistence.Store
 	Access   *access.Service
 	Contexts *contexts.Service
+	// Workflow authorization is supplied by its owner, without a reverse import.
+	BeforeStart func(context.Context, pgx.Tx, string, string) error
 }
 
 func New(store *persistence.Store, a *access.Service, c *contexts.Service) *Service {
-	return &Service{store, a, c}
+	return &Service{Store: store, Access: a, Contexts: c}
 }
 func runID(id string) string { return "run:" + strings.TrimPrefix(id, "run:") }
 func contextRef(r contexts.Ref) Ref {
@@ -159,26 +161,43 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, action,
 	root := runID(id)
 	check := func(tx pgx.Tx) error {
 		target := root
-		if action == "register" {
+		permission := action
+		if action == "register" || action == "workflow-create" {
 			target = ""
+		}
+		if action == "workflow-create" {
+			permission = "execute"
+			if req, ok := payload.(workflowCreation); ok {
+				for _, source := range req.Create.Spec.Sources {
+					if strings.HasPrefix(source.ID, "workflow-task:") {
+						target = source.ID
+						break
+					}
+				}
+			}
 		}
 		var q query = s.Store.Database()
 		var err error
 		if tx == nil {
-			err = s.Access.Check(ctx, p, w, target, action)
+			err = s.Access.Check(ctx, p, w, target, permission)
 		} else {
 			q = tx
-			err = s.Access.CheckTx(ctx, tx, p, w, target, action)
+			err = s.Access.CheckTx(ctx, tx, p, w, target, permission)
 		}
 		if err != nil {
 			return err
+		}
+		if action == "workflow-create" {
+			if err = s.BeforeStart(ctx, tx, w, root); err != nil {
+				return err
+			}
 		}
 		for _, guard := range guards {
 			if err = guard(q); err != nil {
 				return err
 			}
 		}
-		if action == "register" || p.DeviceID != "" {
+		if action == "register" || action == "workflow-create" || p.DeviceID != "" {
 			return nil
 		}
 		r, _, err := loadRun(ctx, q, w, root)
@@ -240,7 +259,8 @@ func (s *Service) sources(ctx context.Context, tx pgx.Tx, p access.Principal, w 
 		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2 AND version=$3
  UNION ALL SELECT 1 FROM shared_changes WHERE workspace_id=$1 AND resource_id=$2 AND version=$3
  UNION ALL SELECT 1 FROM context_records WHERE workspace_id=$1 AND resource_id=$2 AND revision=$3
- UNION ALL SELECT 1 FROM run_records WHERE workspace_id=$1 AND id=$2 AND version=$3)`, w, r.ID, r.Version).Scan(&exists); err != nil {
+	 UNION ALL SELECT 1 FROM run_records WHERE workspace_id=$1 AND id=$2 AND version=$3
+	 UNION ALL SELECT 1 FROM workflow_records WHERE workspace_id=$1 AND id=$2 AND version=$3)`, w, r.ID, r.Version).Scan(&exists); err != nil {
 			return nil, err
 		}
 		if !exists {
@@ -302,10 +322,35 @@ func artifactsValid(items []contexts.Fixed) bool {
 	return true
 }
 func (s *Service) Create(ctx context.Context, p access.Principal, w, id string, req Create) (apicontract.Response[apicontract.Reference], error) {
+	return s.create(ctx, p, w, id, req, "register", nil)
+}
+
+// These methods are server-side orchestration only; no user/device route accepts
+// fabricated observer events. Their input and results use the common Run records.
+type Observation struct {
+	Report  json.RawMessage
+	Verdict string
+}
+type workflowCreation struct {
+	Create      Create
+	Observation *Observation
+}
+
+func (s *Service) CreateForWorkflow(ctx context.Context, p access.Principal, w, id string, req Create, observation *Observation) (apicontract.Response[apicontract.Reference], error) {
+	if s.BeforeStart == nil {
+		return apicontract.Response[apicontract.Reference]{}, access.ErrForbidden
+	}
+	return s.create(ctx, p, w, id, req, "workflow-create", observation)
+}
+func (s *Service) create(ctx context.Context, p access.Principal, w, id string, req Create, action string, observation *Observation) (apicontract.Response[apicontract.Reference], error) {
 	if id == "" || strings.TrimPrefix(id, "run:") == "" || req.ExpectedVersion != "0" || validate(req.Spec) != nil || !artifactsValid(req.Spec.Artifacts) || req.Handoff && req.Spec.Previous == nil {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
-	return s.mutate(ctx, p, w, id, "register", "run-create", req.Mutation, req, func(tx pgx.Tx, ref apicontract.Reference) (Run, []Ref, error) {
+	var payload any = req
+	if action == "workflow-create" {
+		payload = workflowCreation{req, observation}
+	}
+	return s.mutate(ctx, p, w, id, action, "run-create", req.Mutation, payload, func(tx pgx.Tx, ref apicontract.Reference) (Run, []Ref, error) {
 		spec := req.Spec
 		refs, err := s.sources(ctx, tx, p, w, spec.Sources)
 		if err != nil {
@@ -358,6 +403,18 @@ func (s *Service) Create(ctx context.Context, p access.Principal, w, id string, 
 			}
 		}
 		r := Run{Name: spec.Name, Input: input, Previous: spec.Previous, RequestedBy: p.UserID, CreatedAt: time.Now().UTC(), State: "queued", Observation: "known", ReportedThrough: "0"}
+		if observation != nil {
+			zero := 0
+			r.State = "succeeded"
+			r.StartedAt = &r.CreatedAt
+			r.FinishedAt = &r.CreatedAt
+			r.ExitCode = &zero
+			r.ExecutionRequestedAt = &r.CreatedAt
+			r.Assessment = &Assessment{State: "valid", Verdict: observation.Verdict, Report: observation.Report}
+			if err = s.save(ctx, tx, w, ref.ID, "run-result:"+strings.TrimPrefix(ref.ID, "run:"), "result", ref.Version, r.Assessment, refs); err != nil {
+				return Run{}, nil, err
+			}
+		}
 		if req.Handoff {
 			r.Handoff = &Handoff{Source: *spec.Previous, PreparedBy: p.UserID, PreparedAt: r.CreatedAt}
 		}

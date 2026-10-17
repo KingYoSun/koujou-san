@@ -40,6 +40,7 @@ export default defineConfig({
       "/usage/": apiProxy,
       "/automation/": apiProxy,
       "/runs/": apiProxy,
+      "/workflows/": apiProxy,
       "/mcp": apiProxy,
       "/.well-known/oauth-protected-resource/": apiProxy,
     },

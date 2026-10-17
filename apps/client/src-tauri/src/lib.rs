@@ -20,6 +20,8 @@ pub fn run() {
             sync_store::run_answer_draft,
             sync_store::sync_request,
             run_export::export_run,
+            run_export::export_definition,
+            run_export::export_workflow,
             runner::runner_configure,
             runner::runner_contact,
             runner::prepare_run,

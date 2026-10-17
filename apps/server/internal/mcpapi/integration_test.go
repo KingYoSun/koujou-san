@@ -32,6 +32,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/sharedsync"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/workflows"
 	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
@@ -95,9 +96,11 @@ func TestMCPIntegration(t *testing.T) {
 	graph := graphindex.New(store, a, c, remote, graphindex.DefaultLimits(), cfg.Key)
 	defer graph.Close()
 	s := &Service{Auth: identity, Access: a, Contexts: c, Search: search, Graph: graph, Usage: usage.New(store, a), Automation: automation.New(store, a), Runs: runs.New(store, a, c)}
+	s.Workflows = workflows.New(store, a, c, s.Runs)
+	s.Workflows.StartWorker(ctx)
 	githubMux := http.NewServeMux()
 	handler := func(runService *runs.Service) http.Handler {
-		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
+		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
 	}
 	faults := &reconnectFixture{}
 	server := httptest.NewUnstartedServer(faults.handler(handler(s.Runs)))
@@ -340,7 +343,7 @@ func TestMCPIntegration(t *testing.T) {
 		return []byte(text.Text)
 	}
 	listed, err := session.ListTools(ctx, nil)
-	if err != nil || len(listed.Tools) != 15 {
+	if err != nil || len(listed.Tools) != 19 {
 		t.Fatal("tool catalogue", err)
 	}
 	call(session, "context_get", public, false)
@@ -403,6 +406,7 @@ func TestMCPIntegration(t *testing.T) {
 	checkUsageMCP(t, s, p, ordinary.Access, session, editor, none, func(handle string) (*mcp.ClientSession, error) { return connect(tokens.Access, "mcp-one", handle) }, call, request, cfg.Site)
 	checkAutomationMCP(t, s, p, ordinary.Access, session, editor, none, func(handle string) (*mcp.ClientSession, error) { return connect(tokens.Access, "mcp-one", handle) }, call, request, cfg.Site)
 	checkRunsMCP(t, s, p, session, none, call, request, cfg.Site, ordinary.Access)
+	checkWorkflowsMCP(t, s, p, session, none, fixed, call, request, cfg.Site, ordinary.Access)
 	write := contexts.Write{Mutation: mutation(public.Revision), Value: json.RawMessage(`{"kind":"sentence","text":"edited from ordinary HTTP"}`)}
 	resp, raw = request("POST", cfg.Site+"/contexts/workspaces/mcp-one/sentence/public", write, map[string]string{"Authorization": "Bearer " + ordinary.Access})
 	var saved apicontract.Response[apicontract.Reference]
@@ -616,6 +620,19 @@ func TestMCPIntegration(t *testing.T) {
 		}
 	}
 	t.Logf("10,000 Contexts x three versions: one prohibition rule, first 100 permitted candidates in %s, opaque continuation present=%v", time.Since(started), bulk.Meta.NextCursor != nil)
+	workflowBefore, err := s.Workflows.Read(ctx, p, "mcp-one", workflows.Ref{ID: "run-definition:ui-command", Version: "head"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflowAfter, err := s.Workflows.Put(ctx, p, "mcp-one", workflowBefore.ID, workflows.Write{Mutation: mutation(workflowBefore.Version), Value: workflowBefore.Value})
+	if err != nil || workflowAfter.Data == nil {
+		t.Fatal("workflow update after Context bulk", workflowAfter, err)
+	}
+	workflowHead, err := s.Workflows.Read(ctx, p, "mcp-one", workflows.Ref{ID: workflowBefore.ID, Version: "head"})
+	if err != nil || workflowHead.Version != workflowAfter.Data.Version {
+		t.Fatal("workflow head sorted history positions as strings", workflowHead.Ref, err)
+	}
+	t.Log("workflow head after 30,000 Context versions selects the numeric latest position")
 	if os.Getenv("KOUJOU_TEST_MCP_UI") == "1" {
 		webTokens := issue("", "koujou offline_access")
 		originalJar := client.Jar
