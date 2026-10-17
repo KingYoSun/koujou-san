@@ -247,7 +247,7 @@ func (s *Service) Assign(ctx context.Context, p access.Principal, w, id string, 
 			if req.HandoffSource == nil || *req.HandoffSource != head.Ref {
 				return r, nil, ErrState
 			}
-			if _, err = s.sources(ctx, tx, p, w, []Ref{head.Ref}); err != nil {
+			if _, err = s.SourcesTx(ctx, tx, p, w, []Ref{head.Ref}); err != nil {
 				return r, nil, err
 			}
 			judgment := "confirmed_end"

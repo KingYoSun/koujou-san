@@ -76,6 +76,9 @@ jobs:
       - name: Test fixed inspection inputs, verdicts and evidence
         run: pnpm run test:inspections
 
+      - name: Test shared issue requests and external confirmation
+        run: pnpm run test:publications
+
       - name: Test durable automation and triage state
         run: pnpm run test:automation
 

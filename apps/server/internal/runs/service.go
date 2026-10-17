@@ -167,6 +167,17 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, action,
 		if action == "register" || action == "workflow-create" {
 			target = ""
 		}
+		if action == "connector-create" {
+			permission = "execute"
+			if req, ok := payload.(Create); ok {
+				for _, source := range req.Spec.Sources {
+					if strings.HasPrefix(source.ID, "publication-draft:") {
+						target = source.ID
+						break
+					}
+				}
+			}
+		}
 		if action == "workflow-create" {
 			permission = "execute"
 			if req, ok := payload.(workflowCreation); ok {
@@ -189,7 +200,7 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, action,
 		if err != nil {
 			return err
 		}
-		if action == "workflow-create" {
+		if action == "workflow-create" || action == "connector-create" {
 			if err = s.BeforeStart(ctx, tx, w, root); err != nil {
 				return err
 			}
@@ -199,7 +210,7 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, action,
 				return err
 			}
 		}
-		if action == "register" || action == "workflow-create" || p.DeviceID != "" {
+		if action == "register" || action == "workflow-create" || action == "connector-create" || p.DeviceID != "" {
 			return nil
 		}
 		r, _, err := loadRun(ctx, q, w, root)
@@ -245,7 +256,7 @@ func loadRun(ctx context.Context, q query, w, id string) (Run, Record, error) {
 	}
 	return v, r, err
 }
-func (s *Service) sources(ctx context.Context, tx pgx.Tx, p access.Principal, w string, refs []Ref) ([]Ref, error) {
+func (s *Service) SourcesTx(ctx context.Context, tx pgx.Tx, p access.Principal, w string, refs []Ref) ([]Ref, error) {
 	out := []Ref{}
 	for _, r := range refs {
 		if !fixed(r) {
@@ -263,7 +274,8 @@ func (s *Service) sources(ctx context.Context, tx pgx.Tx, p access.Principal, w 
  UNION ALL SELECT 1 FROM context_records WHERE workspace_id=$1 AND resource_id=$2 AND revision=$3
 	 UNION ALL SELECT 1 FROM run_records WHERE workspace_id=$1 AND id=$2 AND version=$3
 		 UNION ALL SELECT 1 FROM workflow_records WHERE workspace_id=$1 AND id=$2 AND version=$3
-		 UNION ALL SELECT 1 FROM inspection_records WHERE workspace_id=$1 AND id=$2 AND version=$3)`, w, r.ID, r.Version).Scan(&exists); err != nil {
+		 UNION ALL SELECT 1 FROM inspection_records WHERE workspace_id=$1 AND id=$2 AND version=$3
+		 UNION ALL SELECT 1 FROM publication_records WHERE workspace_id=$1 AND id=$2 AND version=$3)`, w, r.ID, r.Version).Scan(&exists); err != nil {
 			return nil, err
 		}
 		if !exists {
@@ -355,7 +367,7 @@ func (s *Service) create(ctx context.Context, p access.Principal, w, id string, 
 	}
 	return s.mutate(ctx, p, w, id, action, "run-create", req.Mutation, payload, func(tx pgx.Tx, ref apicontract.Reference) (Run, []Ref, error) {
 		spec := req.Spec
-		refs, err := s.sources(ctx, tx, p, w, spec.Sources)
+		refs, err := s.SourcesTx(ctx, tx, p, w, spec.Sources)
 		if err != nil {
 			return Run{}, nil, err
 		}
@@ -364,7 +376,7 @@ func (s *Service) create(ctx context.Context, p access.Principal, w, id string, 
 			if err != nil || prev.Kind != "run" {
 				return Run{}, nil, ErrInvalid
 			}
-			deps, err := s.sources(ctx, tx, p, w, []Ref{*spec.Previous})
+			deps, err := s.SourcesTx(ctx, tx, p, w, []Ref{*spec.Previous})
 			if err != nil {
 				return Run{}, nil, err
 			}
@@ -474,7 +486,7 @@ func (s *Service) Answer(ctx context.Context, p access.Principal, w, id string, 
 		if err = s.refs(ctx, tx, p, w, deps); err != nil {
 			return r, nil, err
 		}
-		added, err := s.sources(ctx, tx, p, w, req.Sources)
+		added, err := s.SourcesTx(ctx, tx, p, w, req.Sources)
 		if err != nil {
 			return r, nil, err
 		}
@@ -549,7 +561,7 @@ func (s *Service) Report(ctx context.Context, p access.Principal, w, id string, 
 		if err = tx.QueryRow(ctx, `SELECT registered_by FROM access_devices WHERE workspace_id=$1 AND id=$2`, w, p.DeviceID).Scan(&owner); err != nil {
 			return r, nil, err
 		}
-		deps, err := s.sources(ctx, tx, access.Principal{UserID: owner}, w, e.Sources)
+		deps, err := s.SourcesTx(ctx, tx, access.Principal{UserID: owner}, w, e.Sources)
 		if err != nil {
 			return r, nil, err
 		}

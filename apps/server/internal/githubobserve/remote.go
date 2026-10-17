@@ -2,15 +2,12 @@ package githubobserve
 
 import (
 	"context"
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/githubapp"
 	"io"
 	"net/http"
 	"strconv"
@@ -67,11 +64,7 @@ type cachedResponse struct {
 	ETag string
 	Body []byte
 }
-type appToken struct {
-	Value      string
-	Expires    time.Time
-	Repository string
-}
+type appToken = githubapp.Token
 
 // Remote is owned by the single observation worker. HTTP calls are serialized,
 // including token exchange, page retrieval and webhook-triggered reconciliations.
@@ -113,47 +106,18 @@ func (r *Remote) token(ctx context.Context, t Target) (string, error) {
 		}
 		return tok.Value, nil
 	}
-	enc := base64.RawURLEncoding.EncodeToString
-	claims, _ := json.Marshal(map[string]any{"iat": time.Now().Add(-time.Minute).Unix(), "exp": time.Now().Add(8 * time.Minute).Unix(), "iss": r.config.AppID})
-	unsigned := enc([]byte(`{"alg":"RS256","typ":"JWT"}`)) + "." + enc(claims)
-	digest := sha256.Sum256([]byte(unsigned))
-	sig, err := rsa.SignPKCS1v15(rand.Reader, r.config.key, crypto.SHA256, digest[:])
-	if err != nil {
-		return "", errors.New("authentication_failed")
-	}
-	payload, _ := json.Marshal(map[string]any{"repository_ids": []int64{t.RepositoryID}, "permissions": map[string]string{"metadata": "read", "issues": "read", "pull_requests": "read", "contents": "read", "actions": "read"}})
-	resp, err := r.request(ctx, "POST", fmt.Sprintf("/app/installations/%d/access_tokens", t.InstallationID), unsigned+"."+enc(sig), strings.NewReader(string(payload)))
-	if err != nil {
-		return "", errors.New("connection_failed")
-	}
-	defer resp.Body.Close()
-	r.limit(resp)
-	if resp.StatusCode != 201 {
-		return "", errors.New("authentication_failed")
-	}
-	var tok struct {
-		Token        string            `json:"token"`
-		Expires      time.Time         `json:"expires_at"`
-		Permissions  map[string]string `json:"permissions"`
-		Repositories []struct {
-			ID       int64  `json:"id"`
-			FullName string `json:"full_name"`
-		} `json:"repositories"`
-	}
-	if json.NewDecoder(resp.Body).Decode(&tok) != nil || tok.Token == "" || !tok.Expires.After(time.Now()) {
-		return "", errors.New("authentication_failed")
-	}
-	// The exchange explicitly requests just this repository and read permissions.
-	for _, v := range tok.Permissions {
-		if v != "read" {
-			return "", errors.New("unexpected_permissions")
+	tok, err := githubapp.Exchange(ctx, r.config.AppID, r.config.key, githubapp.Repository{InstallationID: t.InstallationID, ID: t.RepositoryID, Name: t.Repository}, map[string]string{"metadata": "read", "issues": "read", "pull_requests": "read", "contents": "read", "actions": "read"}, func(ctx context.Context, method, path, token string, body io.Reader) (*http.Response, error) {
+		resp, err := r.request(ctx, method, path, token, body)
+		if err == nil {
+			r.limit(resp)
 		}
+		return resp, err
+	})
+	if err != nil {
+		return "", err
 	}
-	if len(tok.Repositories) != 1 || tok.Repositories[0].ID != t.RepositoryID || !strings.EqualFold(tok.Repositories[0].FullName, t.Repository) {
-		return "", errors.New("repository_not_allowed")
-	}
-	r.tokens[key] = appToken{tok.Token, tok.Expires, tok.Repositories[0].FullName}
-	return tok.Token, nil
+	r.tokens[key] = tok
+	return tok.Value, nil
 }
 func (r *Remote) limit(resp *http.Response) {
 	now := time.Now()

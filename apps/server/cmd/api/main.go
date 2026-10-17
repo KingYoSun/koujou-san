@@ -20,6 +20,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/inspections"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/mcpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/publications"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/sharedsync"
@@ -101,6 +102,14 @@ func main() {
 			workflowService := workflows.New(store, accessService, contextService, runService)
 			inspectionService := inspections.New(store, accessService, contextService, runService, workflowService)
 			routes = append(routes, inspectionService.Register)
+			publicationConfig, err := publications.Environment()
+			if err != nil {
+				slog.Error("issue publication configuration invalid")
+				os.Exit(1)
+			}
+			publicationService := publications.New(store, accessService, runService, publications.NewRemote(publicationConfig))
+			publicationService.StartWorker(ctx)
+			routes = append(routes, publicationService.Register)
 			workflowService.Observer = observer
 			workflowService.StartWorker(ctx)
 			routes = append(routes, workflowService.Register)

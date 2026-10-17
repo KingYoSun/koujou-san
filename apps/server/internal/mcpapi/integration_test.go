@@ -29,6 +29,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/httpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/inspections"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/publications"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/sharedsync"
@@ -99,10 +100,16 @@ func TestMCPIntegration(t *testing.T) {
 	s := &Service{Auth: identity, Access: a, Contexts: c, Search: search, Graph: graph, Usage: usage.New(store, a), Automation: automation.New(store, a), Runs: runs.New(store, a, c)}
 	s.Workflows = workflows.New(store, a, c, s.Runs)
 	inspectionService := inspections.New(store, a, c, s.Runs, s.Workflows)
+	publicationService := publications.New(store, a, s.Runs, &publicationUIBackend{})
+	publicationService.StartWorker(ctx)
 	s.Workflows.StartWorker(ctx)
 	githubMux := http.NewServeMux()
 	handler := func(runService *runs.Service) http.Handler {
-		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, inspectionService.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
+		if runService != s.Runs {
+			runService.BeforeStart = s.Runs.BeforeStart
+			runService.AssessResult = s.Runs.AssessResult
+		}
+		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, inspectionService.Register, publicationService.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
 	}
 	faults := &reconnectFixture{}
 	server := httptest.NewUnstartedServer(faults.handler(handler(s.Runs)))

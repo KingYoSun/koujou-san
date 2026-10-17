@@ -6,6 +6,7 @@ import { Automation } from "./automation";
 import { RunRecords } from "./runs";
 import { Workflows } from "./workflows";
 import { Inspections } from "./inspections";
+import { Publications } from "./publications";
 import { UsagePricing } from "./usage-pricing";
 import { GithubObservations } from "./github-observations";
 import { DeliveryPolicy } from "./delivery-policy";
@@ -448,6 +449,17 @@ export function Team({ native }: { native: boolean }) {
           {apiIdentity && (
             <Inspections
               key={`inspections/${apiIdentity}/${me.id}/${selected}`}
+              native={native}
+              api={apiIdentity}
+              workspace={selected}
+              user={me.id}
+              role={current.role}
+              canExecute={current.can_execute}
+            />
+          )}
+          {apiIdentity && (
+            <Publications
+              key={`publications/${apiIdentity}/${me.id}/${selected}`}
               native={native}
               api={apiIdentity}
               workspace={selected}
