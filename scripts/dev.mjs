@@ -404,6 +404,13 @@ async function testDatabase(suite = "persistence", testName) {
 }
 
 const tasks = {
+  "test:workbench": () => testDatabase("workbench", "TestWorkbenchPostgres"),
+  "test:workbench:ui": async () => {
+    env.KOUJOU_TEST_WORKBENCH_UI = "1";
+    env.KOUJOU_TEST_MCP_UI = "1";
+    await client("build");
+    await testDatabase("mcpapi");
+  },
   "test:publications": () =>
     testDatabase("publications", "TestPublicationsPostgres"),
   "test:publications:live": () => {

@@ -4,14 +4,9 @@ import { syncRequest, workspaceAccessLost } from "./auth";
 import { SyncHTTPError } from "./sync-error";
 import { RunnerSettings } from "./runner-settings";
 import { ExecutionSettings } from "./execution-settings";
-import {
-  allowAnswerScope,
-  answerScopeEpoch,
-  readAnswerDraft,
-  saveAnswerDraft,
-  syncStorage,
-} from "./sync-store";
-import type { AnswerDraft, SyncNamespace } from "./sync-store";
+import { allowAnswerScope, answerScopeEpoch, syncStorage } from "./sync-store";
+import { PauseAnswer, PauseResponse, QuestionView } from "./run-pause";
+import type { Pause } from "./run-pause";
 
 type Ref = { id: string; version: string };
 type RecordVersion = Ref & { run_id: string; kind: string; value: unknown };
@@ -73,19 +68,6 @@ type InputSpec = {
   sources?: Ref[];
   artifacts?: unknown[];
 };
-type Pause = {
-  response_kind?: string;
-  response_origin?: { kind: string; id: string; source?: string };
-  id: string;
-  reason: string;
-  request: unknown;
-  state: string;
-  response?: unknown;
-  answered_by?: string;
-  answered_at?: string;
-  delivered_at?: string;
-  resumed_at?: string;
-};
 const stateNames: Record<string, string> = {
   queued: "起動前",
   running: "実行中",
@@ -99,105 +81,6 @@ const stateNames: Record<string, string> = {
   resolved: "再開確認済み",
 };
 const show = (value: unknown) => JSON.stringify(value, null, 2);
-
-function PauseAnswer({
-  native,
-  namespace,
-  record,
-  busy,
-  send,
-}: {
-  native: boolean;
-  namespace: SyncNamespace;
-  record: RecordVersion;
-  busy: boolean;
-  send: (draft: AnswerDraft) => Promise<void>;
-}) {
-  const [draft, setDraft] = useState<AnswerDraft>();
-  const [notice, setNotice] = useState("");
-  const { api, user, workspace } = namespace;
-  useEffect(() => {
-    let active = true;
-    const scope = { api, user, workspace };
-    readAnswerDraft(native, scope, record.id)
-      .then((saved) => {
-        if (active)
-          setDraft(
-            saved ?? { pauseVersion: record.version, value: "", json: false },
-          );
-      })
-      .catch(() => {
-        if (active) setNotice("端末内の回答案を読み戻せません。");
-      });
-    return () => {
-      active = false;
-    };
-  }, [native, api, user, workspace, record.id, record.version]);
-  if (!draft)
-    return <p role="status">{notice || "端末内の回答案を確認しています…"}</p>;
-  const stale =
-    (record.value as Pause).state !== "waiting" ||
-    draft.pauseVersion !== record.version;
-  if (stale && !draft.value) return null;
-  const change = (value: AnswerDraft) => {
-    setDraft(value);
-    setNotice("端末へ保存しています…");
-    void saveAnswerDraft(native, namespace, record.id, value)
-      .then(() =>
-        setNotice("この端末に回答案を保存しました。自動送信しません。"),
-      )
-      .catch(() => setNotice("回答案の保存を確認できません。"));
-  };
-  return (
-    <fieldset disabled={busy}>
-      {stale && (
-        <p>質問の状態が変わりました。保存済みの回答案は送信できません。</p>
-      )}
-      <label>
-        質問への回答
-        <textarea
-          rows={3}
-          readOnly={stale}
-          value={draft.value}
-          onChange={(e) => change({ ...draft, value: e.target.value })}
-        />
-      </label>
-      <label>
-        <input
-          type="checkbox"
-          disabled={stale}
-          checked={draft.json}
-          onChange={(e) => change({ ...draft, json: e.target.checked })}
-        />
-        構造化JSONで回答
-      </label>
-      {notice && <p role="status">{notice}</p>}
-      {!stale && (
-        <button disabled={!draft.value} onClick={() => void send(draft)}>
-          回答を送信
-        </button>
-      )}
-      {draft.value && (
-        <button
-          onClick={() => {
-            void saveAnswerDraft(native, namespace, record.id)
-              .then(() => {
-                setDraft({
-                  pauseVersion: record.version,
-                  value: "",
-                  json: false,
-                });
-                setNotice("回答案を削除しました。");
-              })
-              .catch(() => setNotice("回答案の削除を確認できません。"));
-          }}
-        >
-          この回答案を削除
-        </button>
-      )}
-    </fieldset>
-  );
-}
 
 export function RunStatus({ value }: { value: Run }) {
   return (
@@ -251,6 +134,7 @@ export function RunRecords({
   user,
   role,
   canExecute,
+  selected,
 }: {
   native: boolean;
   api: string;
@@ -258,6 +142,7 @@ export function RunRecords({
   user: string;
   role: string;
   canExecute: boolean;
+  selected?: Ref;
 }) {
   const [deviceID, setDeviceID] = useState(""),
     [repoID, setRepoID] = useState("");
@@ -480,6 +365,15 @@ export function RunRecords({
     setPrevious(null);
     setNotice("Runを作成しました。開始は依頼していません。");
   };
+  useEffect(() => {
+    if (selected) void run(() => load(selected.id));
+    else {
+      setCurrent(null);
+      setPage(null);
+      setInput(null);
+      setContextText(undefined);
+    }
+  }, [selected?.id, selected?.version]);
   return (
     <details className="team-details">
       <summary>Run・入力・Pause・出力</summary>
@@ -950,7 +844,7 @@ export function RunRecords({
                               ? "外部イベント待ち"
                               : (stateNames[pause.state] ?? pause.state)}
                           </p>
-                          <pre>{show(pause.request)}</pre>
+                          <QuestionView value={pause.request} />
                           {pause.response !== undefined && (
                             <>
                               {pause.response_origin?.kind === "event" && (
@@ -963,7 +857,10 @@ export function RunRecords({
                                 回答者: {pause.answered_by} /{" "}
                                 {pause.answered_at}
                               </p>
-                              <pre>{show(pause.response)}</pre>
+                              <PauseResponse
+                                value={pause.response}
+                                request={pause.request}
+                              />
                               <p>
                                 配送確認: {pause.delivered_at ?? "未確認"} /
                                 再開確認: {pause.resumed_at ?? "未確認"}
@@ -979,41 +876,18 @@ export function RunRecords({
                                 namespace={namespace}
                                 record={record}
                                 busy={busy}
-                                send={(draft) =>
+                                runID={current.id}
+                                onAccepted={() =>
                                   run(async () => {
-                                    const latest = await read({
-                                      id: current.id,
-                                      version: "head",
-                                    });
-                                    const latestRun = latest.value as Run;
-                                    if (
-                                      latestRun.state !== "paused" ||
-                                      latestRun.active_pause?.id !==
-                                        record.id ||
-                                      latestRun.active_pause.version !==
-                                        draft.pauseVersion
-                                    )
-                                      throw Error("pause_changed");
-                                    await mutate(
-                                      current.id,
-                                      "answer",
-                                      latest.version,
-                                      {
-                                        pause_id: pause.id,
-                                        value: draft.json
-                                          ? JSON.parse(draft.value)
-                                          : draft.value,
-                                      },
-                                    );
-                                    await saveAnswerDraft(
-                                      native,
-                                      namespace,
-                                      record.id,
-                                    );
                                     await load(current.id);
                                     setNotice(
                                       "回答を受領しました。配送と実行再開はまだ確認していません。",
                                     );
+                                  })
+                                }
+                                onDenied={(error) =>
+                                  run(async () => {
+                                    throw error;
                                   })
                                 }
                               />

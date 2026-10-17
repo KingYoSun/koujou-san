@@ -52,6 +52,16 @@ elif mode == "orphan":
         Path("heartbeat.json").write_text(json.dumps({"pid": os.getpid(), "tick": tick}), encoding="utf-8")
         tick += 1
         time.sleep(0.2)
+elif mode == "workbench":
+    initial = json.loads(sys.stdin.readline())
+    print("WORKBENCH_BUILD_PROGRESS: 固定ビルドの準備を完了", flush=True)
+    event({"type": "pause", "pause": {"id": "review", "reason": "利用者の判断待ち", "request": initial["request"]}})
+    answer = json.loads(sys.stdin.readline())
+    assert answer["type"] == "answer" and answer["pause_id"] == "review"
+    event({"type": "resumed", "pause_id": "review", "response_id": answer["response_id"]})
+    result = answer["value"] if isinstance(answer["value"], dict) else {"verdict": "INCONCLUSIVE", "answer": answer["value"]}
+    event({"type": "result", "report": result})
+    print("WORKBENCH_REVIEW_COMPLETED", flush=True)
 elif mode == "dialogue":
     initial = json.loads(sys.stdin.readline())
     print(json.dumps({"received_input": initial["input"]}, ensure_ascii=False), flush=True)

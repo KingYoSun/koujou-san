@@ -34,6 +34,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/sharedsync"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/workbench"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/workflows"
 	mcpauth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -101,6 +102,7 @@ func TestMCPIntegration(t *testing.T) {
 	s.Workflows = workflows.New(store, a, c, s.Runs)
 	inspectionService := inspections.New(store, a, c, s.Runs, s.Workflows)
 	publicationService := publications.New(store, a, s.Runs, &publicationUIBackend{})
+	workbenchService := workbench.New(store, a, s.Runs, s.Workflows)
 	publicationService.StartWorker(ctx)
 	s.Workflows.StartWorker(ctx)
 	githubMux := http.NewServeMux()
@@ -109,7 +111,7 @@ func TestMCPIntegration(t *testing.T) {
 			runService.BeforeStart = s.Runs.BeforeStart
 			runService.AssessResult = s.Runs.AssessResult
 		}
-		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, inspectionService.Register, publicationService.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
+		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, inspectionService.Register, publicationService.Register, workbenchService.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) { mux.Handle("/github/", githubMux) })
 	}
 	faults := &reconnectFixture{}
 	server := httptest.NewUnstartedServer(faults.handler(handler(s.Runs)))

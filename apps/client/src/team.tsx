@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { apiRequest } from "./auth";
 import { ContextWorkspace } from "./context-workspace";
 import { Automation } from "./automation";
-import { RunRecords } from "./runs";
+import { Workbench } from "./workbench";
 import { Workflows } from "./workflows";
 import { Inspections } from "./inspections";
 import { Publications } from "./publications";
@@ -395,6 +395,17 @@ export function Team({ native }: { native: boolean }) {
             あなたの役割: {roles[current.role]} / 実行依頼:{" "}
             {current.can_execute ? "許可" : "不許可"}
           </p>
+          <Workbench
+            key={`runs/${apiIdentity}/${me.id}/${selected}`}
+            native={native}
+            api={apiIdentity}
+            workspace={selected}
+            user={me?.id ?? ""}
+            role={current.role}
+            canExecute={current.can_execute}
+            members={members.items}
+            membersNext={members.next_cursor}
+          />
           {apiIdentity && me && (
             <ContextWorkspace
               key={selected}
@@ -425,15 +436,6 @@ export function Team({ native }: { native: boolean }) {
             native={native}
             workspace={selected}
             role={current.role}
-          />
-          <RunRecords
-            key={`runs/${apiIdentity}/${me.id}/${selected}`}
-            native={native}
-            api={apiIdentity}
-            workspace={selected}
-            user={me?.id ?? ""}
-            role={current.role}
-            canExecute={current.can_execute}
           />
           {apiIdentity && (
             <Workflows

@@ -135,6 +135,7 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 		raw, _ := json.MarshalIndent(trace, "", "  ")
 		_ = os.WriteFile("../../../../.cache/issue12-ui-requests.json", raw, 0600)
 	}()
+	var workbenchFixture func(http.ResponseWriter, *http.Request) bool
 	gateway := func(current auth.Tokens) *httptest.Server {
 		var tokenLock sync.Mutex
 		expires := time.Now().Add(-time.Second) // Exercise a real refresh before the first UI request.
@@ -171,6 +172,9 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 		}
 		files := http.FileServer(http.Dir("../../../client/dist"))
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if workbenchFixture != nil && workbenchFixture(w, r) {
+				return
+			}
 			if r.URL.Path == "/__fixture/finish" && r.Method == "POST" {
 				select {
 				case done <- struct{}{}:
@@ -258,7 +262,7 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 			traceLock.Lock()
 			trace = append(trace, entry)
 			traceLock.Unlock()
-			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/usage/", "/automation/", "/runs/", "/workflows/", "/inspections/", "/publications/", "/healthz", "/readyz"} {
+			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/usage/", "/automation/", "/runs/", "/workflows/", "/inspections/", "/publications/", "/workbench/", "/healthz", "/readyz"} {
 				if strings.HasPrefix(r.URL.Path, prefix) {
 					token, err := bearer()
 					if err != nil {
@@ -281,6 +285,11 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 	defer fixture.Close()
 	second := gateway(bob)
 	defer second.Close()
+	if os.Getenv("KOUJOU_TEST_WORKBENCH_UI") == "1" {
+		var stopWorkbench func()
+		workbenchFixture, stopWorkbench = prepareWorkbenchUI(t, service, principal, otherUser.ID, cfg.Key, fixture.URL)
+		defer stopWorkbench()
+	}
 	root := filepath.Clean("../../../../.cache")
 	caFile := filepath.Join(root, "issue12-ui-ca.pem")
 	if err := os.WriteFile(caFile, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certificate}), 0600); err != nil {

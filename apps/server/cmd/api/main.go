@@ -25,6 +25,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/sharedsync"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/workbench"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/workflows"
 )
 
@@ -110,6 +111,7 @@ func main() {
 			publicationService := publications.New(store, accessService, runService, publications.NewRemote(publicationConfig))
 			publicationService.StartWorker(ctx)
 			routes = append(routes, publicationService.Register)
+			routes = append(routes, workbench.New(store, accessService, runService, workflowService).Register)
 			workflowService.Observer = observer
 			workflowService.StartWorker(ctx)
 			routes = append(routes, workflowService.Register)

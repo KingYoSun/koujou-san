@@ -79,6 +79,9 @@ jobs:
       - name: Test shared issue requests and external confirmation
         run: pnpm run test:publications
 
+      - name: Test work summaries and decision routing
+        run: pnpm run test:workbench
+
       - name: Test durable automation and triage state
         run: pnpm run test:automation
 
