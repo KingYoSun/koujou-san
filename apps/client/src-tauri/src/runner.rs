@@ -348,9 +348,11 @@ pub async fn runner_execution_save(
 }
 
 mod journal;
+mod model_capture;
 mod observation;
 mod protocol;
 mod runtime;
+mod usage;
 pub(crate) fn background_entry() {
     runtime::main_entry();
 }

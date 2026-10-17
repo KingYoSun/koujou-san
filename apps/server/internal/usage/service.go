@@ -80,6 +80,28 @@ func (s *Service) authorizeWrite(ctx context.Context, tx pgx.Tx, p access.Princi
 	return err
 }
 func (s *Service) Put(ctx context.Context, p access.Principal, w, id string, req Write) (apicontract.Response[apicontract.Reference], error) {
+	return s.put(ctx, p, w, id, req, nil)
+}
+
+// RunWrite adds the execution owner's current authorization and fixed input
+// dependencies to the same transaction as the ordinary usage mutation.
+type RunWrite struct {
+	Actor        string
+	Dependencies []Ref
+	Check        func(context.Context, pgx.Tx) error
+}
+
+func (s *Service) PutFromRun(ctx context.Context, p access.Principal, w, id string, req Write, guard RunWrite) (apicontract.Response[apicontract.Reference], error) {
+	if kindOf(id) != "usage" || guard.Check == nil || guard.Actor == "" {
+		return apicontract.Response[apicontract.Reference]{}, access.ErrForbidden
+	}
+	if err := guard.Check(ctx, nil); err != nil {
+		return apicontract.Response[apicontract.Reference]{}, err
+	}
+	return s.put(ctx, p, w, id, req, &guard)
+}
+
+func (s *Service) put(ctx context.Context, p access.Principal, w, id string, req Write, guard *RunWrite) (apicontract.Response[apicontract.Reference], error) {
 	empty := apicontract.Response[apicontract.Reference]{}
 	if id == "" || strings.TrimPrefix(id, kindOf(id)+":") == "" {
 		return empty, ErrInvalid
@@ -112,7 +134,16 @@ func (s *Service) Put(ctx context.Context, p access.Principal, w, id string, req
 		return empty, ErrInvalid
 	}
 	raw, _ := json.Marshal(value)
-	scope := persistence.Scope{ActorID: "user:" + p.UserID, Grant: apicontract.Grant{WorkspaceID: w, CanRead: true, CanUpdate: true}, Recheck: func(tx pgx.Tx) *apicontract.Problem {
+	actor := "user:" + p.UserID
+	if guard != nil {
+		actor = guard.Actor
+	}
+	scope := persistence.Scope{ActorID: actor, Grant: apicontract.Grant{WorkspaceID: w, CanRead: true, CanUpdate: true}, Recheck: func(tx pgx.Tx) *apicontract.Problem {
+		if guard != nil {
+			if err := guard.Check(ctx, tx); err != nil {
+				return &apicontract.Problem{Code: "forbidden"}
+			}
+		}
 		if err := s.authorizeWrite(ctx, tx, p, w, id); err != nil {
 			return &apicontract.Problem{Code: "forbidden"}
 		}
@@ -127,6 +158,9 @@ func (s *Service) Put(ctx context.Context, p access.Principal, w, id string, req
 			return nil, err
 		}
 		deps := []Ref{}
+		if guard != nil {
+			deps = append(deps, guard.Dependencies...)
+		}
 		group := ""
 		switch v := value.(type) {
 		case Observation:
@@ -137,6 +171,9 @@ func (s *Service) Put(ctx context.Context, p access.Principal, w, id string, req
 			if err == nil {
 				if json.Unmarshal(previous, &old) != nil || old.Group != v.Group || old.Source != v.Source || old.Series != v.Series || old.Mode != v.Mode || (v.Mode == "cumulative" && (v.Sequence < old.Sequence || (v.Sequence == old.Sequence && v.Event != old.Event))) {
 					return nil, ErrInvalid
+				}
+				if guard != nil && (old.Attribution.Kind != v.Attribution.Kind || old.Attribution.ID != v.Attribution.ID || old.Attribution.Resource != v.Attribution.Resource || old.Measurement == nil || old.Measurement.Generation != v.Measurement.Generation) {
+					return nil, access.ErrForbidden
 				}
 			} else if !errors.Is(err, pgx.ErrNoRows) {
 				return nil, err

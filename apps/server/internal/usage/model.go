@@ -45,6 +45,23 @@ type Observation struct {
 	At             time.Time           `json:"at"`
 	Attribution    Attribution         `json:"attribution"`
 	Quantities     map[string]Quantity `json:"quantities"`
+	Measurement    *Measurement        `json:"measurement,omitempty"`
+}
+
+// Measurement describes the machine source and its limits, never a transcript.
+type Measurement struct {
+	State        string  `json:"state"`
+	Protocol     string  `json:"protocol"`
+	CLIVersion   string  `json:"cli_version"`
+	Session      string  `json:"session"`
+	ProcessID    string  `json:"process_id,omitempty"`
+	Generation   string  `json:"generation"`
+	Billing      string  `json:"billing"`
+	Scope        string  `json:"scope"`
+	Reason       string  `json:"reason,omitempty"`
+	SourceRef    string  `json:"source_ref"`
+	SourceDigest string  `json:"source_digest"`
+	EstimateUSD  *string `json:"estimate_usd,omitempty"`
 }
 type Rate struct {
 	Amount string `json:"amount"`
@@ -133,6 +150,16 @@ func validQuantity(q Quantity) bool {
 	return err == nil
 }
 func (o Observation) validate() error {
+	if m := o.Measurement; m != nil {
+		if (m.State != "provisional" && m.State != "final" && m.State != "partial" && m.State != "unavailable" && m.State != "not_applicable") || (m.Billing != "unknown" && m.Billing != "api" && m.Billing != "subscription" && m.Billing != "local") || m.Protocol == "" || m.Scope == "" || m.Generation == "" {
+			return ErrInvalid
+		}
+		if m.EstimateUSD != nil {
+			if _, err := number(*m.EstimateUSD); err != nil {
+				return err
+			}
+		}
+	}
 	if o.Source == "" || o.Transform == "" || o.Event == "" || o.Series == "" || o.Sequence < 0 || o.Group == "" || o.Connection == "" || o.At.IsZero() || (o.Mode != "delta" && o.Mode != "cumulative") || (o.Coverage != "confirmed" && o.Coverage != "unknown") {
 		return ErrInvalid
 	}

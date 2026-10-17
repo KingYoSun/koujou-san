@@ -122,6 +122,18 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, req R
 	var args []any
 	base := []any{w, p.UserID, p.OperationID, c.Through, req.Kind}
 	switch req.Mode {
+	case "run":
+		if req.AttributionID == "" || (req.Kind != "usage" && req.Kind != "reported" && req.Kind != "estimated" && req.Kind != "api_equivalent" && req.Kind != "allocated") {
+			return empty, ErrInvalid
+		}
+		// Select this Run's indexed keys first; never compute every Workspace
+		// head before filtering. The second attribution check excludes corrections
+		// that moved an old key to a different Run.
+		sql = `WITH candidates AS (SELECT DISTINCT projection_key FROM usage_entries WHERE workspace_id=$1 AND kind=$5 AND attribution_kind='run' AND attribution_id=$6 AND position<=$4 AND projection_key>$7), latest AS (
+ SELECT e.* FROM candidates c CROSS JOIN LATERAL (SELECT * FROM usage_entries u WHERE u.workspace_id=$1 AND u.projection_key=c.projection_key AND u.position<=$4 ORDER BY u.position DESC LIMIT 1) e)
+ SELECT jsonb_build_object('key',e.projection_key,'group',e.coverage_group,'position',e.position,'at',e.at,'kind',e.kind,'currency',e.currency,'model',NULLIF(e.model,''),'amount',CASE WHEN e.state='rated' AND NOT EXISTS(SELECT 1 FROM usage_group_updates g WHERE g.workspace_id=$1 AND g.coverage_group=e.coverage_group AND g.position>e.position AND g.position<=$4) THEN e.amount::text END,'state',CASE WHEN e.kind<>'usage' AND EXISTS(SELECT 1 FROM usage_group_updates g WHERE g.workspace_id=$1 AND g.coverage_group=e.coverage_group AND g.position>e.position AND g.position<=$4) THEN 'pending' ELSE e.state END,'refs',(SELECT COALESCE(jsonb_agg(r),'[]'::jsonb) FROM jsonb_array_elements(e.refs) r WHERE r->>'id' LIKE 'usage:%' OR r->>'id' LIKE 'price:%' OR r->>'id' LIKE 'evaluation:%'),'quantities',e.quantities,'value',e.payload),e.projection_key
+ FROM latest e WHERE e.attribution_kind='run' AND e.attribution_id=$6 AND ` + access.ReadFilterSQL("e.refs") + ` ORDER BY e.projection_key LIMIT $8`
+		args = append(base, req.AttributionID, c.After, req.Limit+1)
 	case "records":
 		if req.Kind != "usage" && req.Kind != "price" && req.Kind != "evaluation" {
 			return empty, ErrInvalid
