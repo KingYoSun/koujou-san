@@ -2,7 +2,7 @@
 
 - 基準main: `a12eade021e8131ec88f0023203b52aad3b38858`。Scope revision 1、区分C。
 - [計画](2026-10-17-issue-23-plan.md)のAC-1〜7・INVAR-1〜3。現在の判定は[current-state](current-state.md)を参照する。
-- 実装・局所試験と共通画面の確認中。AC-5の本人観測、独立検品、最終head CI、マージ後照合は未完了。
+- 実装・局所試験と共通画面の確認中。[独立検品](2026-10-17-issue-23-inspection.md)ではAC-5以外をPASSとし、実装上のblockerは0件。AC-5の本人観測、最終head CI、マージ後照合は未完了。
 
 ## 実装と局所確認
 
@@ -39,4 +39,6 @@ FAILの検品から当時の条件・Stale・期限切れ証拠を取得し、�
 
 AC-5の依頼は「受入: 固定ビルドの画面を確認」。対象は所有する静的HTMLの`build-v1`、質問に目的・確認操作・対象版・条件・選択肢の影響を表示する。背景を説明せず、画面内の情報から成果物を開き、判断・理由・証拠URLを返す操作を本人へ依頼した。準備画像は`test-results/issue23-human-review-ready.jpg`。AIが本人の代わりに判断したとは記録せず、観測結果が揃うまでAC-5を成功にしない。
 
-本人の回答、初期fixtureの終了結果、差分の最終検証、固定成果物の独立検品、PR CIとマージ後照合を補完してから完了を判定する。
+実装成果物は`4487a0c4c717ee075964a875a35fea5ce23c47d2`、PRは[#57](https://github.com/KingYoSun/koujou-san/pull/57)。独立検品者は同commitと基準mainの差分を固定し、専用PG試験を一回実行して成功した（試験1.01秒、package 2.148秒）。ログは`test-results/issue23-independent-workbench.log`。AC-1〜4・6〜7とINVAR-1〜3はPASS、AC-5は本人観測待ちINCONCLUSIVEであり、全条件達成とは扱わない。
+
+本人の回答、再実行中fixtureの終了結果、最終head CIとマージ後照合を補完してから完了を判定する。初回fixtureのFAILは上記の失敗記録として残す。
