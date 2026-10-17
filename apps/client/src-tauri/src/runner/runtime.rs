@@ -4,7 +4,7 @@ use journal::Journal;
 use std::{
     collections::HashMap,
     io::{BufRead, BufReader, Read, Write},
-    sync::Arc,
+    sync::{Arc, Mutex},
     thread,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
@@ -153,6 +153,7 @@ fn reader(
     source: String,
     channel: &'static str,
     structured: bool,
+    meter: Arc<Mutex<usage::Meter>>,
 ) -> thread::JoinHandle<Result<(), String>> {
     thread::spawn(move || {
         let mut input = BufReader::new(stream);
@@ -167,6 +168,9 @@ fn reader(
             }
             let position = journal.log(&id, channel, &bytes)?;
             if channel == "stdout" {
+                if let Ok(mut meter) = meter.lock() {
+                    let _ = meter.observe(&journal, position, &bytes);
+                }
                 if let Some(session) = protocol::session(&protocol, &bytes) {
                     journal.annotate(&id, "provider_session", json!(session))?;
                 }
@@ -220,7 +224,20 @@ fn run_one(
             return Ok(());
         }
     };
-    let mut prepared = match execution::prepare(root, &assigned, adapter, area.as_deref()) {
+    let capture = usage::capture(
+        adapter,
+        assigned["assignment"]["connection"]["version"]
+            .as_str()
+            .unwrap_or(""),
+    );
+    let capture_config = capture.as_ref().map(|value| value.config());
+    let mut prepared = match execution::prepare(
+        root,
+        &assigned,
+        adapter,
+        area.as_deref(),
+        capture_config.as_deref(),
+    ) {
         Ok(v) => v,
         Err(e) => {
             let reason = if e == "input_binding_unsupported" {
@@ -257,6 +274,14 @@ fn run_one(
             return Ok(());
         }
     };
+    let meter = Arc::new(Mutex::new(usage::Meter::new(
+        &assigned,
+        adapter,
+        observed_version,
+    )));
+    if let Ok(mut meter) = meter.lock() {
+        meter.attach_capture(capture);
+    }
     // Resolve current authorization after all Git/file preparation, immediately
     // before the actual task process. No program is inferred from a shared target.
     let current = api.request("assigned-input", "GET", Value::Null)?;
@@ -300,6 +325,9 @@ fn run_one(
         std::process::exit(77);
     }
     journal.started(&api.id, child.id(), &json!({"process":process,"protocol":prepared.protocol,"environment":assigned["assignment"]["connection"]["environment"],"session_kind":"anonymous_stdio","transfer_verified":false}))?;
+    if let Ok(mut meter) = meter.lock() {
+        meter.process(child.id());
+    }
     journal.enqueue(&api.id,&json!({"type":"started","execution":{"environment":if adapter.wsl.is_empty(){"windows".to_owned()}else{format!("wsl:{}",adapter.wsl)},"version":assigned["assignment"]["connection"]["version"],"version_observed":observed_version,"pause":prepared.protocol=="jsonl-v1","stop":prepared.stop_supported&&adapter.wsl.is_empty()}}))?;
     let device = assigned["assignment"]["device_id"]
         .as_str()
@@ -318,6 +346,7 @@ fn run_one(
         source.clone(),
         "stdout",
         !assigned["spec"]["derivation"]["result_schema"].is_null(),
+        meter.clone(),
     );
     let stderr = reader(
         child.stderr.take().ok_or("cli_output_unavailable")?,
@@ -328,6 +357,7 @@ fn run_one(
         source,
         "stderr",
         false,
+        meter.clone(),
     );
     let mut online = api.drain(&journal, false).is_ok();
     let mut disconnected = !online;
@@ -351,6 +381,9 @@ fn run_one(
         if let Some(status) = child.try_wait().map_err(|_| "cli_status_unavailable")? {
             stdout.join().map_err(|_| "cli_output_unavailable")??;
             stderr.join().map_err(|_| "cli_output_unavailable")??;
+            if let Ok(mut meter) = meter.lock() {
+                let _ = meter.finish(&journal);
+            }
             journal.enqueue(&api.id,&json!({"type":if stopped{"cancelled"}else{"finished"},"exit_code":status.code().unwrap_or(-1),"report":journal.final_result(&api.id)?}))?;
             // The source process has ended; unsent facts remain durable until accepted.
             loop {
@@ -461,6 +494,7 @@ fn serve(binding: RuntimeBinding) -> Result<(), String> {
             }
         }
         if connected {
+            let _ = usage::drain(&client, &journal);
             let recovered = journal.recovery_page(&recovery_after)?;
             recovery_after = if recovered.len() == 50 {
                 recovered.last().unwrap().0.clone()
@@ -668,6 +702,10 @@ pub(super) fn reconcile(auth: &Auth, workspace: &str, id: &str) -> Result<Value,
         json!({"run":state["run"],"local_phase":phase,"observation":observation,"queued_reconciliation":queued,"command_started":false}),
     )
 }
+
+#[cfg(all(test, windows))]
+#[path = "runtime_usage_test.rs"]
+mod usage_tests;
 
 #[cfg(all(test, windows))]
 mod tests {

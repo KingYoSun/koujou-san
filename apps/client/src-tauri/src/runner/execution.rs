@@ -10,6 +10,8 @@ pub(super) struct ExecutionSettings {
 }
 #[derive(Clone, Default, Deserialize, Serialize)]
 pub(super) struct Adapter {
+    #[serde(default)]
+    pub usage: super::usage::Settings,
     pub kind: String,
     pub target: String,
     pub program: String,
@@ -244,6 +246,7 @@ pub(super) fn prepare(
     assigned: &Value,
     adapter: &Adapter,
     area: Option<&Path>,
+    model_capture: Option<&str>,
 ) -> Result<Prepared, String> {
     if adapter.program.is_empty()
         || !matches!(
@@ -273,7 +276,16 @@ pub(super) fn prepare(
             inputs.insert(name.to_owned(), value);
         }
     }
-    let mut args = adapter.arguments.clone();
+    let mut args = Vec::new();
+    if let Some(exporter) = model_capture {
+        args.extend([
+            "-c".to_owned(),
+            exporter.to_owned(),
+            "-c".to_owned(),
+            "otel.log_user_prompt=false".to_owned(),
+        ]);
+    }
+    args.extend(adapter.arguments.clone());
     if let Some(params) = command.get("parameters") {
         if let Some(items) = params.as_array() {
             for item in items {
@@ -542,7 +554,8 @@ mod tests {
             };
             assert_eq!(area.commit, commit);
             let worktree = prepare_area(&repo, &storage.join("areas"), &area).unwrap();
-            let mut prepared = prepare(&storage, assigned, &adapter, Some(&worktree)).unwrap();
+            let mut prepared =
+                prepare(&storage, assigned, &adapter, Some(&worktree), None).unwrap();
             let mut child = prepared.command.spawn().unwrap();
             child
                 .stdin
@@ -590,7 +603,7 @@ mod tests {
             stdin_json: true,
             ..Default::default()
         };
-        let prepared = prepare(&root, &base, &adapter, None).unwrap();
+        let prepared = prepare(&root, &base, &adapter, None, None).unwrap();
         let value: Value = serde_json::from_slice(&prepared.input).unwrap();
         assert_eq!(
             value,
@@ -599,7 +612,9 @@ mod tests {
         let mut precise = base.clone();
         precise["spec"]["input"]["context"] =
             serde_json::from_str("123456789012345678901234567890").unwrap();
-        let precise_input = prepare(&root, &precise, &adapter, None).unwrap().input;
+        let precise_input = prepare(&root, &precise, &adapter, None, None)
+            .unwrap()
+            .input;
         assert!(
             String::from_utf8(precise_input)
                 .unwrap()
@@ -612,20 +627,24 @@ mod tests {
             .unwrap()
             .remove("context");
         manifest["manifest"] = json!({"value":{"input_utf8":original}});
-        let manifest_input = prepare(&root, &manifest, &adapter, None).unwrap().input;
+        let manifest_input = prepare(&root, &manifest, &adapter, None, None)
+            .unwrap()
+            .input;
         let manifest_input: Value = serde_json::from_slice(&manifest_input).unwrap();
         assert_eq!(manifest_input["context"], original);
         manifest["manifest"]["value"] = json!({"state":"none"});
-        let none_input = prepare(&root, &manifest, &adapter, None).unwrap().input;
+        let none_input = prepare(&root, &manifest, &adapter, None, None)
+            .unwrap()
+            .input;
         let none_input: Value = serde_json::from_slice(&none_input).unwrap();
         assert_eq!(none_input, json!({"prompt":"value {context} 日本語"}));
         adapter.stdin_json = false;
-        assert!(prepare(&root, &base, &adapter, None).is_err());
+        assert!(prepare(&root, &base, &adapter, None, None).is_err());
         let mut args = base.clone();
         args["spec"]["input"]["command"]["binding"] = json!({"context":"file","prompt":"argument"});
         adapter.context_args = vec!["--context".into(), "{context_file}".into()];
         adapter.prompt_args = vec!["--prompt".into(), "{prompt}".into()];
-        let p = prepare(&root, &args, &adapter, None).unwrap();
+        let p = prepare(&root, &args, &adapter, None, None).unwrap();
         let argv: Vec<_> = p
             .command
             .get_args()
@@ -640,7 +659,7 @@ mod tests {
         let mut omitted = base.clone();
         omitted["spec"]["input"] = json!({"command":{}});
         assert!(
-            prepare(&root, &omitted, &adapter, None)
+            prepare(&root, &omitted, &adapter, None, None)
                 .unwrap()
                 .input
                 .is_empty()

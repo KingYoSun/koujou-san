@@ -470,5 +470,6 @@ func TestRunsPostgres(t *testing.T) {
 		t.Fatal("revoked device reported", status)
 	}
 	testAssignments(t, s, server, key)
+	testRunUsage(t, s, server, key)
 	t.Log("command-only, immutable input, two pauses/concurrent answers, separate delivery/resume, raw output, verdict/state, new-Run lineage, paged export, current policy and restart passed")
 }

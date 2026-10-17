@@ -19,6 +19,11 @@ export function ExecutionSettings({ workspace }: { workspace: string }) {
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
   const [status, setStatus] = useState<unknown>();
+  const [billing, setBilling] = useState("unknown");
+  const [contract, setContract] = useState("");
+  const [usageMode, setUsageMode] = useState("end");
+  const [modelCapture, setModelCapture] = useState(false);
+  const [nonLLM, setNonLLM] = useState(false);
   async function work(action: () => Promise<void>) {
     setBusy(true);
     setNotice("");
@@ -34,6 +39,8 @@ export function ExecutionSettings({ workspace }: { workspace: string }) {
   }
   function preset(value: string) {
     setProtocol(value);
+    setUsageMode("end");
+    setModelCapture(false);
     if (value === "codex-jsonl") {
       setArguments('["exec","--json","--ephemeral","-"]');
       setVersionArgs('["--version"]');
@@ -171,6 +178,66 @@ export function ExecutionSettings({ workspace }: { workspace: string }) {
             秘密値は入力せず、既存の環境変数名だけを参照します。CLI自身が持つ権限を自動で狭める保証はありません。
           </p>
         </details>
+        <details>
+          <summary>利用量の取得と契約</summary>
+          <label>
+            課金・契約方式
+            <select
+              value={billing}
+              onChange={(e) => setBilling(e.target.value)}
+            >
+              <option value="unknown">未確認</option>
+              <option value="api">API課金</option>
+              <option value="subscription">定額契約</option>
+              <option value="local">ローカル実行</option>
+            </select>
+          </label>
+          <label>
+            個別契約の識別名（秘密値は入力しない）
+            <input
+              value={contract}
+              onChange={(e) => setContract(e.target.value)}
+            />
+          </label>
+          <label>
+            取得タイミング
+            <select
+              value={usageMode}
+              onChange={(e) => setUsageMode(e.target.value)}
+            >
+              <option value="end">終了時に取得</option>
+              <option value="live" disabled={protocol !== "claude-jsonl"}>
+                途中更新と終了時（Claude Code）
+              </option>
+            </select>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={nonLLM}
+              onChange={(e) => setNonLLM(e.target.checked)}
+            />
+            この接続はLLMを使わない
+          </label>
+          {protocol === "codex-jsonl" && (
+            <>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={modelCapture}
+                  onChange={(e) => setModelCapture(e.target.checked)}
+                />
+                Codexのモデルを端末内で計測する
+              </label>
+              <p>
+                この接続で起動するCodexのOTel出力先を、実行ごとの一時的な端末内受信先へ指定します。既存の外部OTel出力先があれば、この実行では置き換わります。会話履歴の保存と認証の設定は維持します。無効時はモデル名を未取得として表示します。
+              </p>
+            </>
+          )}
+          <p>
+            計測に未対応のCLIも実行できます。定額契約・ローカル実行を0支払とは扱いません。個別単価はWorkspaceの料金設定で管理します。
+          </p>
+        </details>
         <button
           disabled={!target || !program}
           onClick={() =>
@@ -193,6 +260,13 @@ export function ExecutionSettings({ workspace }: { workspace: string }) {
                   wsl,
                   repositories: JSON.parse(repositories),
                   env_refs: JSON.parse(envRefs),
+                  usage: {
+                    billing,
+                    contract,
+                    mode: usageMode,
+                    model_capture: modelCapture,
+                    non_llm: nonLLM,
+                  },
                 },
               });
               setNotice(

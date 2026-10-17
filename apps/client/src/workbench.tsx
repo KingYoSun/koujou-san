@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { RunUsage } from "./run-usage";
 import { syncRequest, workspaceAccessLost } from "./auth";
 import {
   answerScopeEpoch,
@@ -565,6 +566,19 @@ export function Workbench({
                 </button>
               )}
             </section>
+          )}
+          {selected.kind === "run" && (
+            <RunUsage
+              key={workspace + selected.id}
+              native={native}
+              workspace={workspace}
+              runID={selected.id}
+              onDenied={(e) => {
+                void act(async () => {
+                  throw e;
+                });
+              }}
+            />
           )}
           {selected.kind === "execution" && (
             <WorkflowExecution

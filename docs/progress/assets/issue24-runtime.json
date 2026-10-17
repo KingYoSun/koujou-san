@@ -1,0 +1,150 @@
+{
+  "schema": "owned-native-usage-evidence/v1",
+  "environment": "Windows, disposable Ory/API/PostgreSQL, registered native Runner",
+  "amounts": "synthetic individual tariff; not actual bills",
+  "runs": [
+    {
+      "id": "run:usage-live-0-24100f34-0962-4dc1-b092-5c9af85d7aa4",
+      "head": "ZFHMMQPE7TQMUR6LBCWQM2OK2M",
+      "state": "succeeded",
+      "run_unchanged_by_usage": true,
+      "usage": [
+        {
+          "model": "gpt-6.1-sol",
+          "state": "confirmed",
+          "quantities": {
+            "cache_read": {
+              "state": "reported",
+              "unit": "token",
+              "value": "13440"
+            },
+            "cache_write": {
+              "state": "reported",
+              "unit": "token",
+              "value": "0"
+            },
+            "input": {
+              "includes": [
+                "cache_read",
+                "cache_write"
+              ],
+              "state": "reported",
+              "unit": "token",
+              "value": "25034"
+            },
+            "output": {
+              "includes": [
+                "reasoning"
+              ],
+              "state": "reported",
+              "unit": "token",
+              "value": "5"
+            },
+            "reasoning": {
+              "state": "reported",
+              "unit": "token",
+              "value": "0"
+            }
+          },
+          "measurement": {
+            "billing": "unknown",
+            "cli_version": "0.162.1",
+            "generation": "UNYWXFHPSEE5RE3MFIAN6RDDAI",
+            "process_id": "95028",
+            "protocol": "codex-jsonl",
+            "reason": "provider_scope_only",
+            "scope": "main-session; child sessions unavailable",
+            "session": "01a1495d-6304-72d0-9b8e-667cf7bfd259",
+            "source_digest": "46aeb7f8a445c3c10e24c5853855c34ea8c282740235f42eb2163e054520e590",
+            "source_ref": "runner-log://a3fad061-f8bc-41b9-8865-e0ce2f0c9411/123b5677988b52e2d427190ef8f56bbd56d48e23d283a0ea371277e465125629/19",
+            "state": "final"
+          }
+        }
+      ],
+      "fees": [
+        {
+          "model": "gpt-6.1-sol",
+          "kind": "estimated",
+          "state": "rated",
+          "amount": "0.025039",
+          "currency": "USD",
+          "source": "fixture://individual-contract",
+          "price": {
+            "id": "price:usage-live-0-0",
+            "version": "IIVLF5TRW3B7EVFKY47SGS45AJ"
+          }
+        }
+      ]
+    },
+    {
+      "id": "run:usage-live-1-aad57b10-6e38-4b18-a1bb-c0a473d1719b",
+      "head": "BDUVVJ4NDWFYDT6YXSZIBGMQDT",
+      "state": "succeeded",
+      "run_unchanged_by_usage": true,
+      "usage": [
+        {
+          "model": "claude-opus-5-5",
+          "state": "confirmed",
+          "quantities": {
+            "cache_read": {
+              "state": "reported",
+              "unit": "token",
+              "value": "6890"
+            },
+            "cache_write": {
+              "state": "reported",
+              "unit": "token",
+              "value": "4291"
+            },
+            "input": {
+              "state": "reported",
+              "unit": "token",
+              "value": "2"
+            },
+            "output": {
+              "includes": [
+                "reasoning"
+              ],
+              "state": "reported",
+              "unit": "token",
+              "value": "4"
+            },
+            "reasoning": {
+              "state": "reported",
+              "unit": "token",
+              "value": "0"
+            }
+          },
+          "measurement": {
+            "billing": "unknown",
+            "cli_version": "2.1.300",
+            "estimate_usd": "0.035794",
+            "generation": "4EZ73BOOREEGTJ7D2B7QBGKFCS",
+            "process_id": "107052",
+            "protocol": "claude-jsonl",
+            "reason": "provider_scope_only",
+            "scope": "cli-pipeline; outside helpers unavailable",
+            "session": "1ef5e1ff-e64e-4c02-9d19-23fbb554aa9b",
+            "source_digest": "310015917acc995e34d995f34194db16855c5cea010ab048e1a897509f7ae5b3",
+            "source_ref": "runner-log://a3fad061-f8bc-41b9-8865-e0ce2f0c9411/97061b698f59c0ab60e6e551fc9b4c6c94aed57f23bad53004e3282c638a5b16/23",
+            "state": "final"
+          }
+        }
+      ],
+      "fees": [
+        {
+          "model": "claude-opus-5-5",
+          "kind": "estimated",
+          "state": "rated",
+          "amount": "0.011187",
+          "currency": "USD",
+          "source": "fixture://individual-contract",
+          "price": {
+            "id": "price:usage-live-1-0",
+            "version": "HPGYFICS2BDSKMFOGP3DS5ZPEI"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -322,6 +322,7 @@ func body(r *http.Request, v any) bool {
 func (s *Service) Register(mux *http.ServeMux) {
 	s.registerAssignment(mux)
 	s.registerRunner(mux)
+	s.registerUsage(mux)
 	base := "/runs/workspaces/{workspace}"
 	mux.HandleFunc("GET "+base+"/executions/{id}/export", s.exportHTTP)
 	mux.HandleFunc("GET "+base+"/records/{id}", func(w http.ResponseWriter, r *http.Request) {

@@ -37,3 +37,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0022: 共有起票要求とGitHub作成確認](0022-issue-publication.md)
 
 - [0023: 作業と判断の共通画面](0023-work-and-decisions.md)
+
+- [0024: CLIの機械記録からRun別の利用量を取得する](0024-run-usage.md)

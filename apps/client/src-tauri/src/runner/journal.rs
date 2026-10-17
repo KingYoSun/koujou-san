@@ -1,16 +1,19 @@
 use super::*;
 use crate::auth::{protect, unprotect};
 use rusqlite::{Connection, OptionalExtension, params};
+use std::sync::{Arc, atomic::AtomicI64};
 
 #[derive(Clone)]
 pub(super) struct Journal {
     file: PathBuf,
+    pub(super) usage_cursor: Arc<AtomicI64>,
 }
 impl Journal {
     pub fn open(root: &Path) -> Result<Self, String> {
         fs::create_dir_all(root).map_err(|_| "journal_unavailable")?;
         let value = Self {
             file: root.join("executions.sqlite"),
+            usage_cursor: Arc::new(AtomicI64::new(0)),
         };
         value.db()?.execute_batch("PRAGMA journal_mode=WAL;
    CREATE TABLE IF NOT EXISTS executions(id TEXT PRIMARY KEY,generation TEXT NOT NULL,phase TEXT NOT NULL,config TEXT NOT NULL,pid INTEGER);
@@ -25,10 +28,13 @@ CREATE INDEX IF NOT EXISTS execution_recovery_page ON executions(id) WHERE phase
 CREATE INDEX IF NOT EXISTS execution_uncertain ON executions(phase) WHERE phase IN ('unknown','unconfirmed','unlocated');
 CREATE TABLE IF NOT EXISTS execution_identity(run_id TEXT PRIMARY KEY,payload BLOB NOT NULL);
    CREATE TABLE IF NOT EXISTS execution_results(run_id TEXT PRIMARY KEY,payload BLOB NOT NULL);
-CREATE TABLE IF NOT EXISTS execution_responses(run_id TEXT NOT NULL,response_id TEXT NOT NULL,PRIMARY KEY(run_id,response_id));").map_err(|_|"journal_unavailable")?;
+CREATE TABLE IF NOT EXISTS execution_responses(run_id TEXT NOT NULL,response_id TEXT NOT NULL,PRIMARY KEY(run_id,response_id));
+CREATE TABLE IF NOT EXISTS execution_usage(event_id TEXT PRIMARY KEY,run_id TEXT NOT NULL,resource_id TEXT NOT NULL,payload BLOB NOT NULL,sent INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS execution_usage_pending ON execution_usage(sent);
+CREATE TABLE IF NOT EXISTS execution_usage_versions(resource_id TEXT PRIMARY KEY,version TEXT NOT NULL);").map_err(|_|"journal_unavailable")?;
         Ok(value)
     }
-    fn db(&self) -> Result<Connection, String> {
+    pub(super) fn db(&self) -> Result<Connection, String> {
         let db = Connection::open(&self.file).map_err(|_| "journal_unavailable")?;
         db.busy_timeout(std::time::Duration::from_secs(5))
             .map_err(|_| "journal_unavailable")?;
@@ -245,7 +251,14 @@ CREATE TABLE IF NOT EXISTS execution_responses(run_id TEXT NOT NULL,response_id 
                 |r| r.get(0),
             )
             .map_err(|_| "journal_unavailable")?;
-        Ok(json!({"pending_frames":pending,"unconfirmed_execution":unknown}))
+        let usage: bool = db
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM execution_usage WHERE sent=0)",
+                [],
+                |r| r.get(0),
+            )
+            .map_err(|_| "journal_unavailable")?;
+        Ok(json!({"pending_frames":pending,"pending_usage":usage,"unconfirmed_execution":unknown}))
     }
 }
 
