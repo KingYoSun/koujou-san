@@ -79,4 +79,4 @@ WindowsのDPAPI TokenStoreはAPI・利用者・接続で保存先を分け、SDK
 
 採用保存中の手動編集は、所有DBのWorkspace streamを30秒だけロックして確認した。保存待ち中に入力をnoneへ変え、保存後にもnoneを保ち、差分確認の通知を表示した（`issue26-adopt-edit-lock.log / issue26-adopt-manual-edit.png`）。この確認に新しい製品用の遅延機構は追加していない。
 
-残作業はOAuth保存先の修正差分の独立再検品、実契約への新規OAuth接続・合成要求の許可確認と試験、最終headのCI、マージ後のtree照合、手動Close。#33へ移管したS3スリープと人の初見操作は未確認のまま維持し、今回の完了へ算入しない。
+OAuth保存先の修正差分は`475781a`で独立再検品を終え、blocker 0件となった。残作業は実契約への新規OAuth接続・合成要求の許可確認と試験、最終headのCI、マージ後のtree照合、手動Close。#33へ移管したS3スリープと人の初見操作は未確認のまま維持し、今回の完了へ算入しない。
