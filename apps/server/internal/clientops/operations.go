@@ -288,7 +288,7 @@ func (s *Service) Begin(ctx context.Context, p access.Principal, w, id string, r
 		if err != nil {
 			return Record{}, err
 		}
-		req.Sources = unique(append(req.Sources, observed...))
+		req.Sources = unique(append(append(req.Sources, observed...), refs(contexts.Selection{Include: policy.Fixed.Include})...))
 		if err = s.checkRefs(ctx, tx, reader, w, req.Sources); err != nil {
 			return Record{}, err
 		}

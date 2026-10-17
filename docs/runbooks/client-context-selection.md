@@ -28,4 +28,4 @@ Webのキーは画面を開いている間だけ保持し、再読込後は再�
 - UI試験の終了は、同じ検証サーバーの`/__fixture/finish`へPOSTする。専用Docker projectは終了時に片付ける。
 - Windows側の変更は`pnpm run check:desktop`と`pnpm run test:desktop`で確認する。所有するOry fixtureでのネイティブ認証試験は`auth::mcp::tests::owned_native_mcp_pkce_refresh_and_logout`に限定して実行する。`KOUJOU_CLIENTOPS_NATIVE_API`にそのfixtureのURL、`KOUJOU_DEV_CA_FILE`に検証用CAを指定する。通常の開発アカウントや既存の秘密ファイルを使わない。
 
-Gatewayの提供方式と初期ログ設定は判断待ちである。候補の調査コマンドを、標準の開発起動や製品への同梱と混同しない。固定版と検証範囲は[評価記録](../progress/2026-10-18-issue-26-gateway-probe.md)を参照する。
+Gateway/組込みSDKの採用方針は判断待ちである。本文ログは初期無効とする。候補の調査コマンドを、標準の開発起動や製品への同梱と混同しない。固定版と検証範囲は[評価記録](../progress/2026-10-18-issue-26-gateway-probe.md)を参照する。

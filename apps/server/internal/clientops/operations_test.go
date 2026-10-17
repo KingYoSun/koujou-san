@@ -53,6 +53,23 @@ func checkOperations(t *testing.T, s *Service) {
 		t.Helper()
 		return must(s.Begin(ctx, p, "one", ref.ID, Begin{Mutation: m(ref.Version), Client: client, InputDigest: strings.Repeat("a", 64), PromptVersion: "fixture-v1"}))
 	}
+	t.Run("forbidden_required_reference_is_not_reserved_for_model_delivery", func(t *testing.T) {
+		text := "ordinary manual-only Context"
+		saved := must(s.Contexts.Put(ctx, p, "one", contexts.Identity{Kind: "sentence", ID: "required-no-export"}, contexts.Write{Mutation: m("0"), Value: raw(contexts.Unit{Kind: "sentence", Text: &text, Tags: []string{"no-export"}})}))
+		input := contexts.Selection{Mode: "select", Include: []contexts.Ref{{Kind: "sentence", ID: "required-no-export", Revision: saved.Version}}}
+		must(s.PutSelection(ctx, p, "one", "client-selection:manual-no-export", SelectionWrite{Mutation: m("0"), Input: input}))
+		policy := DefaultPolicy()
+		policy.Fixed = input
+		policyRef := must(s.PutPolicy(ctx, p, "one", "selection-policy:required-no-export", Write{Mutation: m("0"), Value: raw(policy)}))
+		created := start("required-no-export", policyRef)
+		if _, err := s.Begin(ctx, p, "one", created.ID, Begin{Mutation: m(created.Version), Client: "alpha", InputDigest: strings.Repeat("a", 64), PromptVersion: "fixture-v1"}); err == nil {
+			t.Fatal("forbidden required ID/version can enter the initial model request")
+		}
+		var count int
+		if err := s.Store.Database().QueryRow(ctx, `SELECT models FROM client_operation_heads WHERE workspace_id='one' AND id=$1`, created.ID).Scan(&count); err != nil || count != 0 {
+			t.Fatal("forbidden initial input reserved a model request", count, err)
+		}
+	})
 	reply := func(proposal Proposal) json.RawMessage {
 		return raw(map[string]any{"id": fmt.Sprint("owned-", serial), "model": "owned-model", "choices": []any{map[string]any{"message": map[string]any{"content": string(raw(proposal))}, "finish_reason": "stop"}}, "usage": map[string]any{"prompt_tokens": 10, "completion_tokens": 4, "prompt_tokens_details": map[string]any{"cached_tokens": 0}, "completion_tokens_details": map[string]any{"reasoning_tokens": 0}}})
 	}

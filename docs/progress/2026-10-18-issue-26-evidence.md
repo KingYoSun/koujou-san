@@ -7,13 +7,13 @@
 | 条件 | 観測・証拠 |
 | --- | --- |
 | AC-1 | 専用PGの操作、送信意図、原応答、質問、案、採用を固定参照で照合。Run/command/Pause/工程の増加なし。`issue26-clientops-final-local.log` |
-| AC-2 | 1万Context×3版から、検索のページ継続と段階取得で四粒度の固定版を選択。所有する二モデルのHTTPと共通UIで保存を確認。`issue26-ui-3.log`、`issue26-client-ui.json`、`issue26-selection-applied.png`。別OriginのHTTPS接続と最終Manifestの対照は追記予定 |
+| AC-2 | 1万Context×3版から、検索のページ継続と段階取得で四粒度の固定版を選択。別OriginのHTTPS二接続で20要求。保存版のroots/placementsは4/10、4/10、手動3/8、none 0/0で、Run IDは空。`issue26-ui-cross-origin-2.log`、`issue26-client-ui-cross-origin.json`、`issue26-cross-origin-applied.png` |
 | AC-3 | none、必須・除外、容量不足、投影未反映、不完全候補、元版の拒否をPG/MCPで確認。通常のページ継続は別扱い。`issue26-page-after.log`、`issue26-pagination-regression-3.log` |
-| AC-4 | 実装対話・自己評価の合成マーカーをHostから除外。禁止分類、別Workspace、除外された子をMCPで拒否。所有モデルHTTPへOry/MCP token・cookie・操作handleが届かないことを受信側で検査 |
+| AC-4 | 実装対話・自己評価の合成マーカーをHostから除外。禁止分類、別Workspace、除外された子をMCPで拒否。独立検品で見つかった初回の禁止固定IDの漏出は、送信予約前の分類検証を追加。失敗/成功は`issue26-inspection-b1-before.log / issue26-inspection-b1-after.log`。所有モデルHTTPへOry/MCP token・cookie・操作handleが届かないことを受信側で検査 |
 | AC-5 | 共通保存のHTTP/MCP receipt、元版競合、手動必須をPGで確認。ブラウザでAlphaの自動反映、Betaの採用待ちと明示採用、一項目を外した三項目の手動保存、キー未入力でのnone保存を確認。`issue26-selection-manual.png / issue26-selection-none.png` |
 | AC-6 | 送信意図と原応答のACK喪失、同一要求の再送、別クライアントの送信意図、遅い応答、依頼者以外の回答・引継ぎ拒否を確認。再接続だけでは要求を再送しない。`issue26-host-protocol-after.log`、PGの操作試験 |
 | AC-7 | `owned-alpha / owned-beta`で同じ四粒度の選択を保存。実モデルの不一致、tool不正、障害、要求・時間・費用上限、手動への復帰を確認。実LLMの意味判断品質を確認したとは扱わない |
-| AC-8 | 固定Gatewayのtool・構造化出力・明示モデル・許可fallback・本文記録切替・試行・相関・復旧・fetch送信先を観測。依存と配布の調査を[Gateway評価](2026-10-18-issue-26-gateway-probe.md)へ記録。初期提供方式と本文ログはユーザー判断待ち |
+| AC-8 | 固定Gatewayのtool・構造化出力・明示モデル・許可fallback・本文記録切替・試行・相関・復旧・fetch送信先を観測。その後の指示によりManifest採用を保留し、[Tauri直接組込み](2026-10-18-issue-26-native-llm-comparison.md)を比較。採用方針は判断待ち、本文ログの初期無効は確定 |
 | AC-9 | Windowsの実Oryを使うPKCE・DPAPI・再起動更新・専用resource・ログアウトが成功。登録モデルの実HTTPと暗号化保存、リダイレクト拒否が成功。Webは実ブラウザで専用MCP OAuth、二接続、再読込後のキー消去、保存・採用を確認。費用は操作へ帰属しRunへ加算しない |
 | INVAR-1〜3 | クライアントがモデルを呼び、サーバーに代行処理なし。保存・採用からRunは始まらず、モデル・MCPがなくても手動保存できる |
 
@@ -35,6 +35,8 @@
 | `pnpm run test:desktop` | Windows上で23件成功・10件ignore。当該モデルHTTP・暗号化保存の3件は実行済み。`issue26-model-native-current.log` |
 | 所有Oryによる追加のnative MCP試験 | 1件成功、1.14秒。`issue26-native-mcp-ory.log`。通常の開発アカウント・既存の秘密ファイル・実GUI起動は使わない |
 | 所有Gatewayの追加probe | 成功。`issue26-manifest-probe-recording.log`、`issue26-manifest-probe-final.json` |
+| 別Origin HTTPSの共通画面 | 成功、313.66秒（画面操作の待機を含む）。`issue26-ui-cross-origin-2.log`。Webとモデルは別port、二モデルの20要求でcookie・MCP header受信0 |
+| Windows上の組込みSDK候補 | rig-core/rig-agent 0.44.0とgenai 0.7.0-rc.8で、それぞれ2モデル要求・1tool往復が成功。`issue26-sdk-probes.log`。製品への組込みや実OAuthの成功には数えない |
 
 ## 失敗と修正の区別
 
@@ -48,4 +50,10 @@
 
 ## 残作業
 
-Gatewayのユーザー判断、別OriginのHTTPS画面試験の記録、固定成果物の独立検品、最終headのCI、マージ後のtree照合、手動Close。#33へ移管したS3スリープと人の初見操作は未確認のまま維持し、今回の完了へ算入しない。
+固定commit `2e1f36618b6095e37c3f7653bc6b46b04e24edc1`の独立検品で二件のblockerを確認した。禁止された手動必須ContextのID/版が初回モデル入力へ入る経路と、提案の明示採用が共通入力へ反映されない経路である。
+
+前者は送信意図の確定前に固定includeも操作の送信分類で検証し、手動保存は可能なまま、禁止参照のモデル要求数が0であることをPGで確認した。後者は明示採用でも共通の反映処理を呼ぶよう修正した。二項目の案を空の入力へ採用すると、修正前は0項目のまま、修正後は2項目へ変わった（`issue26-adopt-before.png / issue26-adopt-after.png`）。
+
+採用保存中の手動編集は、所有DBのWorkspace streamを30秒だけロックして確認した。保存待ち中に入力をnoneへ変え、保存後にもnoneを保ち、差分確認の通知を表示した（`issue26-adopt-edit-lock.log / issue26-adopt-manual-edit.png`）。この確認に新しい製品用の遅延機構は追加していない。
+
+残作業は修正差分の独立再検品、組込みSDK/接続方式のユーザー判断、その判断に必要な実装・検証、最終headのCI、マージ後のtree照合、手動Close。#33へ移管したS3スリープと人の初見操作は未確認のまま維持し、今回の完了へ算入しない。

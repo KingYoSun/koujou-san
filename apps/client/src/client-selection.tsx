@@ -117,6 +117,10 @@ export function ClientSelection({ ui }: { ui: UI }) {
     call<Saved<T>>(
       `/records/${encodeURIComponent(ref.id)}?version=${encodeURIComponent(ref.version)}`,
     );
+  const inputSignature = () => {
+    const { include, exclude, mode } = ui.store.getState();
+    return JSON.stringify([include, exclude, mode]);
+  };
   const mutate = async (
     path: string,
     version: string,
@@ -138,15 +142,7 @@ export function ClientSelection({ ui }: { ui: UI }) {
   async function apply(ref: VersionRef, expected?: string) {
     const saved = await read<Selection>(ref);
     setSelection(pin(saved));
-    if (
-      expected !== undefined &&
-      expected !==
-        JSON.stringify([
-          ui.store.getState().include,
-          ui.store.getState().exclude,
-          ui.store.getState().mode,
-        ])
-    ) {
+    if (expected !== undefined && expected !== inputSignature()) {
       setNotice(
         "選択を保存しました。画面の選択は変更されているため、差分を確認してから反映してください。",
       );
@@ -211,11 +207,7 @@ export function ClientSelection({ ui }: { ui: UI }) {
     if (!profile || !modelReady(ui.native, actor, profile))
       throw new Error("model_key_required");
     const mine = ++epoch.current;
-    const signature = JSON.stringify([
-      ui.store.getState().include,
-      ui.store.getState().exclude,
-      ui.store.getState().mode,
-    ]);
+    const signature = inputSignature();
     const port: HostPort = {
       read,
       query: async (root, kind) => {
@@ -318,6 +310,7 @@ export function ClientSelection({ ui }: { ui: UI }) {
   }
   async function act(action: string) {
     if (!operation) return;
+    const signature = inputSignature();
     const value: Record<string, unknown> = { kind: action, client: clientID };
     if (action === "answer") value.answer = answer;
     if (action === "takeover" && profile)
@@ -328,6 +321,8 @@ export function ClientSelection({ ui }: { ui: UI }) {
       value,
     );
     const current = await refresh(ref);
+    if (action === "adopt" && current?.value.applied)
+      await apply(current.value.applied, signature);
     if ((action === "resume" || action === "answer") && current) {
       const policy = await read<SelectionPolicy>(current.value.policy);
       await run(current, policy.value);

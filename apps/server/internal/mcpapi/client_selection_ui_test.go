@@ -308,7 +308,11 @@ func (f *clientSelectionUI) model(w http.ResponseWriter, r *http.Request, s *Ser
 			tool(fmt.Sprintf("get-%d", missing), "context_get", f.expected[missing])
 		} else {
 			items := []any{}
-			for _, ref := range f.expected {
+			selected := f.expected
+			if body.Model == "owned-beta" {
+				selected = selected[:2]
+			}
+			for _, ref := range selected {
 				items = append(items, map[string]any{"ref": ref, "reason": "所有する受入規約の固定版"})
 			}
 			b, _ := json.Marshal(map[string]any{"items": items, "questions": []string{}, "unknown": []string{}})

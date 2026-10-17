@@ -1,6 +1,6 @@
 # Issue #26: Manifestの予備接続検証
 
-2026-10-18時点。Context選択Hostは実装・接続検証済み。Manifestの初期提供方式と本文ログ設定はユーザー判断待ちであり、標準構成へは追加していない。
+2026-10-18時点。Context選択Hostは実装・接続検証済み。Manifestの採用は保留し、Tauriに直接組み込むSDKを比較した。本文ログの初期無効は確定しており、Gatewayを標準構成へ追加していない。
 
 ## 固定した候補
 
@@ -32,7 +32,7 @@ Manifest `manifest@6.28.9`、source `f36dfa739af2a993d1dfaca10f59ddc2df58d60b`�
 
 固定imageをネットワークなしで読み、実行時のNodeパッケージ354件を列挙した。licenseメタデータはMIT 277、Apache-2.0 35、ISC 20、BSD-2-Clause 7、BSD-3-Clause 3、BlueOak-1.0.0 4、0BSD 1、MPL-2.0またはApache-2.0の選択1、MITとBSD-3-Clauseの併用1、未記載5だった。未記載はManifestのprivate package三件と`busboy / streamsearch`であり、後二件には当該image内でLICENSEファイルも見つからなかった。記録は`test-results/issue26-manifest-runtime-licenses.json`。rootのMIT表示だけで、imageやOSを含む全配布物の通知義務を確認済みとは扱わない。再配布する構成を選ぶ場合は配布物の通知・ライセンス同梱を確定する必要がある。
 
-候補の必要機能と導入負担の有限な調査は終えた。残る判断は、任意の外部Gatewayとして対応するか標準構成へ組み込むか、本文ログを初期無効にするかである。モデル二件のプロトコル合成試験を、実LLMによる意味判断の品質の成功へ読み替えない。候補のsource改造や新しいGateway製品の探索へ広げない。
+候補の必要機能と導入負担の有限な調査は終えた。その後のユーザー指示により、Manifestの採用を保留して[Tauri組込みSDK](2026-10-18-issue-26-native-llm-comparison.md)を比較した。採用方針は判断待ちであり、本文ログは初期無効とする。モデル二件のプロトコル合成試験を、実LLMによる意味判断の品質の成功へ読み替えない。候補のsource改造や新しいGateway製品の探索へ広げない。
 
 固定した所有試験のSHA-256は次のとおり。どちらにも生成キーは含めない。
 
