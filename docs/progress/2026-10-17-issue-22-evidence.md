@@ -2,7 +2,7 @@
 
 - 基準main: `b8af5a2421c531a3bd83e3ec0818c3789f67b498`。Scope revision 1、区分C。
 - [計画](2026-10-17-issue-22-plan.md)のAC-1〜7・INVAR-1〜3を扱う。
-- 固定接続・共通画面・実GitHub接続を検証した。固定commitの独立検品後、実接続部分の再検品を待っている。PR #55のhead `571bcf2f3e95bd9429306c7eda7ad3ceedbd3aa9`のCIは全件成功。最終headのCI・必要な再検品・マージ後照合を終えるまでIssueをCloseしない。
+- 固定接続・共通画面・実GitHub接続を検証し、独立検品は全AC・INVAR PASS、blocker 0件。PR #55のhead `571bcf2f3e95bd9429306c7eda7ad3ceedbd3aa9`のCIは全件成功。最終headのCI・マージ後照合を終えるまでIssueをCloseしない。
 
 ## 実装と固定接続
 
@@ -27,15 +27,15 @@
 | 条件 | 固定接続・画面で確認した範囲 | 残る確認 |
 | --- | --- | --- |
 | AC-1 | 二主体の共有受付、端末下書き/共有受付/外部未確認の区別、共通Run | なし |
-| AC-2 | 固定App tokenのrepository/permission、作成後GETによる確認、実Appの作成・再取得 | 実接続部分の独立照合 |
+| AC-2 | 固定App tokenのrepository/permission、作成後GETによる確認、実Appの作成・再取得 | なし |
 | AC-3 | receipt再送と並行処理で一つの要求・一回の送信 | なし |
 | AC-4 | 応答喪失とプロセス消失、未発見ではunknown、既存Issue照合でcreated、再作成0 | なし |
 | AC-5 | API停止中の端末下書き、復帰後の復元/明示保存、現在の共有版と既存要求の確認 | なし |
-| AC-6 | 外部の手動編集とHTTP 422を記録し、下書きによる外部上書き0。実GitHubの編集観測も確認 | 実接続部分の独立照合 |
+| AC-6 | 外部の手動編集とHTTP 422を記録し、下書きによる外部上書き0。実GitHubの編集観測も確認 | なし |
 | AC-7 | viewer、実行不許可、別Workspace、許可外接続、取消後の送信0 | なし |
 | INVAR-1〜3 | 共通Run、外部正本の別記録、unknownから再作成しない履歴 | なし |
 
-固定commit `07a928cc62b2397430274e05a8e2f38d704dcc56`の[独立検品](2026-10-17-issue-22-inspection.md)では、AC-1/3/4/5/7・INVAR-1〜3がPASS、AC-2/6は実接続部分が未確認でINCONCLUSIVEだった。具体的なblockerは0件。検品担当による`test:publications`の再実行も成功した。実接続後は残る二条件と影響する差分だけを再検品する。
+固定commit `07a928cc62b2397430274e05a8e2f38d704dcc56`の[独立検品](2026-10-17-issue-22-inspection.md)では、AC-1/3/4/5/7・INVAR-1〜3がPASS、AC-2/6は実接続部分が未確認でINCONCLUSIVEだった。検品担当による`test:publications`の再実行も成功した。実接続後、`64eb719`の文書差分と追加証拠を同じ検品担当が照合した。実Issueの読取り再取得でも作成者・本文・Closeを確認し、AC-2/6もPASS、全条件の総合PASS、blocker 0件となった。実接続やGUIを再実行していない。
 
 ## 検証ログ
 
