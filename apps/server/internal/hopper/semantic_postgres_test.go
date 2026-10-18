@@ -358,7 +358,7 @@ process.stdout.write([
 			}
 			job, err := auto.Claim(ctx, "hopper", root)
 			if err != nil || job == nil {
-					t.Fatal(job, err)
+				t.Fatal(job, err)
 			}
 			before := calls.Load()
 			value, err := s.Execute(ctx, *job)

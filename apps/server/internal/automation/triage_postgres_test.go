@@ -418,6 +418,43 @@ func TestTriagePostgres(t *testing.T) {
 	if remote.writes != 4 || !slices.Contains(remote.labels, "priority:high") || slices.Contains(remote.labels, "priority:urgent") || calls.Load() != before {
 		t.Fatal("unapplied label failure did not reconcile/retry", remote, calls.Load()-before)
 	}
+	t.Run("historical-own-write-conflict-explicit-resolution-and-import", func(t *testing.T) {
+		issue, infoRef, info := create("resume-history", "human")
+		info.External = &ExternalPriority{Connection: "owned", Number: 7, Labels: map[string]string{"P1": "priority:high", "P2": "priority:normal"}}
+		put(infoRef.ID, infoRef.Version, info)
+		oldBackend := s.PriorityBackend
+		defer func() { s.PriorityBackend = oldBackend }()
+		remote := &ownedPriorityBackend{labels: []string{"unrelated"}, events: []LabelEvent{{ID: 1, Action: "labeled", Label: "priority:high", Own: true}}}
+		s.PriorityBackend = remote
+		rec := put("priority:"+issue.ID, "0", PriorityEdit{Target: issue, Policy: pol, Value: ptr("P1"), Reason: "new fixture has no prior write intent"})
+		observe := func() {
+			t.Helper()
+			sql(`UPDATE triage_sync SET due_at=CASE WHEN scope_id=$1 THEN now() ELSE now()+interval '1 day' END`, issue.ID)
+			if worked, err := s.SyncPriority(ctx); err != nil || !worked {
+				t.Fatal(worked, err)
+			}
+		}
+		before := calls.Load()
+		observe()
+		saved, err := record(ctx, store.Database(), "one", Ref{ID: "priority-sync:" + issue.ID, Version: "head"})
+		var state PrioritySync
+		_ = json.Unmarshal(saved.Value, &state)
+		if err != nil || state.State != "conflict" || remote.writes != 0 {
+			t.Fatal("historical conflict not protected", state, err)
+		}
+		put(rec.ID, rec.Version, PriorityEdit{Target: issue, Policy: pol, Value: ptr("P1"), Reason: "explicit synthetic continuation after preserved historical conflict"})
+		observe()
+		observe()
+		if remote.writes != 1 || !slices.Contains(remote.labels, "priority:high") {
+			t.Fatal("explicit resolution did not export", remote)
+		}
+		remote.human("priority:high", "priority:normal")
+		observe()
+		_, value := priority(issue)
+		if !value.Fixed || value.Origin != "external" || value.Adopted == nil || *value.Adopted != "P2" || calls.Load() != before {
+			t.Fatal("historical continuation/import", value)
+		}
+	})
 	t.Run("bounded-batch-and-indexed-priority-list", func(t *testing.T) {
 		sql(`UPDATE automation_jobs SET state='stopped' WHERE state IN ('waiting','retry','blocked')`)
 		request := Write{Mutation: m("0"), Value: encode(BatchEdit{Policy: pol, Scopes: []string{"scope:project"}, From: time.Now().Add(-time.Hour), Until: time.Now().Add(time.Hour), Count: 2, PageSize: 1, Cost: &usage.CostBudget{Amount: "10000", Currency: "USD", Valuation: "estimated"}})}
@@ -612,6 +649,17 @@ func TestTriagePostgres(t *testing.T) {
 		if !strings.Contains(string(input.Request), textA) || strings.Contains(string(input.Request), textB) {
 			t.Fatal("selection/exclusion delivery", string(input.Request))
 		}
+		beforeLoadLimit := calls.Load()
+		limits := s.Contexts.Limits
+		s.Contexts.Limits.Loaded = 1
+		info.Body = "outage context load limit"
+		infoRef = put(infoRef.ID, infoRef.Version, info)
+		run()
+		_, held := priority(issue)
+		if calls.Load() != beforeLoadLimit || held.State != "input_waiting" || held.Reason != "context_load_limit" || held.Adopted == nil || *held.Adopted != "P1" {
+			t.Fatal("load limit sent or changed adopted priority", held, calls.Load()-beforeLoadLimit)
+		}
+		s.Contexts.Limits = limits
 		before := calls.Load()
 		textA = "PERMITTED_CONTEXT_UPDATED"
 		aRef = contextPut("sentence", "triage-context-a", aRef.Version, contexts.Unit{Kind: "sentence", Text: &textA})

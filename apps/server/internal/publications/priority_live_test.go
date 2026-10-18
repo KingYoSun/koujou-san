@@ -41,6 +41,14 @@ func (b priorityAllowance) use(kind string) error {
 		return err
 	}
 	var counts map[string]int
+	if kind == "label_creates" || kind == "label_deletes" {
+		// A continuation restores only the two labels on an already-created Issue.
+		// The extra two creations/deletions require a separate, explicit allowance.
+		var approved map[string]int
+		if json.Unmarshal(data, &approved) == nil && approved["resume_issue"] > 0 && approved["extra_label_pairs"] > 0 && approved["extra_label_pairs"] <= 2 {
+			max += 2 * approved["extra_label_pairs"]
+		}
+	}
 	if json.Unmarshal(data, &counts) != nil || counts["approved"] != 1 || counts[kind] < 0 || counts[kind] >= max {
 		return errors.New("priority trial allowance exhausted")
 	}
@@ -68,6 +76,22 @@ func TestPriorityAllowanceDoesNotExpand(t *testing.T) {
 		if err := allowance.use(kind); err == nil {
 			t.Fatal("expanded trial", kind)
 		}
+	}
+	if err := os.WriteFile(path, raw(map[string]int{"approved": 1, "resume_issue": 63, "extra_label_pairs": 1, "issue_creates": 1, "label_creates": 2, "label_deletes": 2}), 0600); err != nil {
+		t.Fatal(err)
+	}
+	for _, kind := range []string{"label_creates", "label_deletes"} {
+		for i := 0; i < 2; i++ {
+			if err := allowance.use(kind); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := allowance.use(kind); err == nil {
+			t.Fatal("continuation exceeded two restored labels", kind)
+		}
+	}
+	if err := allowance.use("issue_creates"); err == nil {
+		t.Fatal("continuation permitted a second Issue")
 	}
 }
 
@@ -138,6 +162,25 @@ func TestPriorityLive(t *testing.T) {
 	labels := []string{tag + "-high", tag + "-normal"}
 	created := []string{}
 	var issue *Issue
+	if path := os.Getenv("KOUJOU_TEST_PRIORITY_RESUME_REPORT"); path != "" {
+		var previous struct {
+			Repository string
+			Number     int64 `json:"issue_number"`
+			Labels     []string
+			Closed     bool `json:"issue_closed"`
+		}
+		var allowance map[string]int
+		data, readErr := os.ReadFile(path)
+		approved, approvalErr := os.ReadFile(budget.Path)
+		if readErr != nil || approvalErr != nil || json.Unmarshal(data, &previous) != nil || json.Unmarshal(approved, &allowance) != nil || previous.Repository != connection.Repository || len(previous.Labels) != 2 || !previous.Closed || previous.Number <= 0 || int64(allowance["resume_issue"]) != previous.Number {
+			t.Fatal("explicit continuation allowance and original closed Issue report required")
+		}
+		observed := remote.Observe(ctx, connection, "", previous.Number)
+		if observed.Issue == nil || observed.Issue.State != "closed" {
+			t.Fatal("original Issue must remain closed")
+		}
+		issue, labels = observed.Issue, previous.Labels
+	}
 	report := map[string]any{"repository": connection.Repository, "labels": labels, "llm_requests": 0, "issue_closed": false, "labels_deleted": []string{}}
 	defer func() {
 		if path := os.Getenv("KOUJOU_TEST_PRIORITY_LIVE_REPORT"); path != "" {
@@ -165,7 +208,7 @@ func TestPriorityLive(t *testing.T) {
 		cleanup, stop := context.WithTimeout(context.Background(), 30*time.Second)
 		defer stop()
 		ctx = cleanup
-		if issue != nil {
+		if issue != nil && issue.State != "closed" {
 			if err := budget.use("issue_closes"); err != nil {
 				t.Error(err)
 			} else if err = request("PATCH", "/repos/"+connection.Repository+"/issues/"+fmt.Sprint(issue.Number), map[string]string{"state": "closed"}); err != nil {
@@ -173,6 +216,8 @@ func TestPriorityLive(t *testing.T) {
 			} else {
 				report["issue_closed"] = true
 			}
+		} else if issue != nil {
+			report["issue_closed"] = true
 		}
 		deleted := []string{}
 		for _, label := range created {
@@ -197,12 +242,14 @@ func TestPriorityLive(t *testing.T) {
 		}
 		created = append(created, label)
 	}
-	if err = budget.use("issue_creates"); err != nil {
-		t.Fatal(err)
-	}
 	body := "koujou-san #28の合成接続試験です。優先度ラベルだけを同期します。実データや秘密値は含みません。"
-	outcome := remote.Create(ctx, connection, Draft{Title: "[koujou-san #28 接続試験] " + tag}, body+"\n\n"+marker(w, tag))
-	issue = outcome.Issue
+	if issue == nil {
+		if err = budget.use("issue_creates"); err != nil {
+			t.Fatal(err)
+		}
+		outcome := remote.Create(ctx, connection, Draft{Title: "[koujou-san #28 接続試験] " + tag}, body+"\n\n"+marker(w, tag))
+		issue = outcome.Issue
+	}
 	if issue == nil {
 		t.Fatal("synthetic creation remains unconfirmed; do not create again")
 	}
@@ -230,6 +277,7 @@ func TestPriorityLive(t *testing.T) {
 	put("issue:priority-live", automation.Issue{Scope: scope, Origin: "github", Title: issue.Title, Body: body, State: "open", Dependencies: []automation.Ref{}, External: &automation.ExternalPriority{Connection: connection.ID, Number: issue.Number}})
 	p1 := "P1"
 	put("priority:"+scope.ID, automation.PriorityEdit{Target: scope, Policy: policy, Value: &p1, Reason: "synthetic already exported manual priority"})
+	resolvedHistory := false
 	reconcile := func() {
 		t.Helper()
 		for i := 0; i < 8; i++ {
@@ -245,6 +293,17 @@ func TestPriorityLive(t *testing.T) {
 			}
 			var state automation.PrioritySync
 			_ = json.Unmarshal(rec.Value, &state)
+			report["last_sync"] = state
+			if os.Getenv("KOUJOU_TEST_PRIORITY_RESUME_REPORT") != "" && !resolvedHistory && state.State == "conflict" && state.Reason == "concurrent_manual_priority" {
+				previous, err := auto.Read(ctx, actor, w, automation.Ref{ID: "priority:" + scope.ID, Version: "head"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				must(auto.Put(ctx, actor, w, previous.ID, automation.Write{Mutation: mutation(previous.Version), Value: raw(automation.PriorityEdit{Target: scope, Policy: policy, Value: &p1, Reason: "explicit synthetic continuation after preserved historical conflict"})}))
+				resolvedHistory = true
+				report["historical_conflict_resolved"] = true
+				continue
+			}
 			if state.State == "synced" {
 				return
 			}
@@ -287,7 +346,7 @@ func TestPriorityLive(t *testing.T) {
 		t.Fatal("external human priority not fixed")
 	}
 	observed, err = remote.ReadPriority(ctx, w, connection.ID, issue.Number, 1)
-	if err != nil || observed.Body != issue.Body || observed.State != "open" {
+	if err != nil || observed.Body != issue.Body || observed.State != issue.State {
 		t.Fatal("label synchronization changed body/state", err)
 	}
 	var attempts int

@@ -26,7 +26,7 @@ noneと未指定は無注入。selectはinclude順、型付きの子参照順で
 
 外部情報をsnapshotで渡す場合は、固定したURI・版・範囲とcanonical JSONのdigestを照合する。referenceで渡す場合は参照自体を実入力へ含め、本文を取得済みとは表示しない。構造化前の文書をSentenceへ自動登録しない。evidenceはBleve/ArcadeDB担当の取得境界を示すfixtureであり、投影の正本確認や候補取得本体の代用にはしない。
 
-初期値は`KOUJOU_CONTEXT_MAX_BYTES=16777216`、`KOUJOU_CONTEXT_MAX_PLACEMENTS=100000`。サーバー起動時に設定し、不正な値では起動しない。上限を超えた内容を省略・自動要約して確定することはない。
+初期値は`KOUJOU_CONTEXT_MAX_BYTES=16777216`、`KOUJOU_CONTEXT_MAX_PLACEMENTS=100000`、`KOUJOU_CONTEXT_MAX_LOADED=100000`。最後の設定は、入力組立ての解決1回で選択・除外から読み込む固定版の合計で、同じ版の再利用は1件と数える。上限に達すると次の版を取得せず`load_limit`を返す。除外後の入力が小さくても対象になる。Workspace全体の件数や保存できるContextの数は制限しない。サーバー起動時に設定し、不正な値では起動しない。上限を超えた内容を省略・自動要約して確定することはない。
 
 ## 検証
 

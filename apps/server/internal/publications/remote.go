@@ -66,6 +66,7 @@ type Remote struct {
 	mu       sync.Mutex
 	tokens   map[string]githubapp.Token
 	resumeAt time.Time
+	botID    int64
 }
 
 func NewRemote(c *Config) *Remote {

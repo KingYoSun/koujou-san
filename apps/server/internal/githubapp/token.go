@@ -28,17 +28,25 @@ type Repository struct {
 }
 type Request func(context.Context, string, string, string, io.Reader) (*http.Response, error)
 
-func Exchange(ctx context.Context, appID string, key *rsa.PrivateKey, repo Repository, permissions map[string]string, request Request) (Token, error) {
+func jwt(appID string, key *rsa.PrivateKey) (string, error) {
 	enc := base64.RawURLEncoding.EncodeToString
 	claims, _ := json.Marshal(map[string]any{"iat": time.Now().Add(-time.Minute).Unix(), "exp": time.Now().Add(8 * time.Minute).Unix(), "iss": appID})
 	unsigned := enc([]byte(`{"alg":"RS256","typ":"JWT"}`)) + "." + enc(claims)
 	digest := sha256.Sum256([]byte(unsigned))
 	sig, err := rsa.SignPKCS1v15(rand.Reader, key, crypto.SHA256, digest[:])
 	if err != nil {
-		return Token{}, errors.New("authentication_failed")
+		return "", errors.New("authentication_failed")
+	}
+	return unsigned + "." + enc(sig), nil
+}
+
+func Exchange(ctx context.Context, appID string, key *rsa.PrivateKey, repo Repository, permissions map[string]string, request Request) (Token, error) {
+	identity, err := jwt(appID, key)
+	if err != nil {
+		return Token{}, err
 	}
 	payload, _ := json.Marshal(map[string]any{"repository_ids": []int64{repo.ID}, "permissions": permissions})
-	resp, err := request(ctx, "POST", fmt.Sprintf("/app/installations/%d/access_tokens", repo.InstallationID), unsigned+"."+enc(sig), strings.NewReader(string(payload)))
+	resp, err := request(ctx, "POST", fmt.Sprintf("/app/installations/%d/access_tokens", repo.InstallationID), identity, strings.NewReader(string(payload)))
 	if err != nil {
 		return Token{}, errors.New("connection_failed")
 	}

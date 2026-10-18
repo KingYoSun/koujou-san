@@ -263,6 +263,9 @@ func (s *Service) prepareTriageInput(ctx context.Context, j Job, p Policy) (Reco
 			if !result.Ready || result.Manifest == nil {
 				input.State = "input_waiting"
 				input.Reason = "evaluation_context_unavailable"
+				if len(result.Missing) > 0 && result.Missing[0].Code == "load_limit" {
+					input.Reason = "context_load_limit"
+				}
 				return nil
 			}
 			for _, placement := range result.Manifest.Placements {

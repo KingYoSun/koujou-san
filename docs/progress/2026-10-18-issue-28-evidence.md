@@ -1,6 +1,6 @@
 # Issue #28の検証記録
 
-状態: In progress。Scope revision 1。基準は`17def2aa914e0c31cf8a03360521e57864d060d0`。PR #62でCIと独立検品を進めている。実接続とマージは未実施。
+状態: In progress。Scope revision 2。基準は`17def2aa914e0c31cf8a03360521e57864d060d0`。PR #62でCIと独立検品を進めている。実OpenAI二要求は成功し、実GitHubの継続試験とマージが残っている。
 
 ## 確定した判断
 
@@ -56,3 +56,27 @@ Chromeの所有環境で、手動P2を固定したまま推奨P1を保持、本�
 初回commit `ea4f2eb`のCI（run `39087728605`）はShared UI and server・Windows native client・GitGuardianがすべて成功した。独立検品の修正後のHEADについては、別途CIを確認する。`issue28-review-check.log`の静的検査もPASS。
 
 本人へ、Context取得固定版の初期上限、最大二要求の実モデル試験、一件のIssueと二つの一時ラベルのGitHub同期試験を質問済み。回答前には依存する実装・実接続を行わない。修正後CIはrun `39088269171`で進行中。
+
+## Scope revision 2の確認
+
+本人の承認後、入力組立てで選択・除外から読む固定版を初期10万件に制限した。同じ版は再利用し、次の取得前に検査する。`KOUJOU_CONTEXT_MAX_LOADED`で変更可能。API起動時の同じContext serviceをTriageへ接続し、配置数・byteとは別に適用する。Context保存の制限は追加していない。
+
+`issue28-load-bound-before.log`は上限3の設定で6版を取得して成功してしまう変更前の失敗。`issue28-load-bound-after.log`では選択・除外とも3版までで停止し、同じ版の再利用は1取得となった。`issue28-load-bound-triage.log`では超過時のモデル要求ゼロ・入力待ち・採用済みP1の保持を含めPASS。`issue28-historical-continuation-owned.log`は旧書込み意図のない履歴の競合保護、明示解消、App反映、外部手動固定の順を含めPASS。
+
+`issue28-approved-check.log`、`issue28-approved-test.log`で静的検査、Go全パッケージ、共通UI 18ファイル64テストがPASS。CI run `39088352381`は、前回の診断削除時に残したGoの空白で失敗した。対象をgofmtで修正した。ContextとJWTを共有する既存経路も対象を絞って再確認する。
+
+## 実OpenAIの二要求
+
+承認済みの専用APIキー・Bifrost・`gpt-6.1-sol`で通常の合成Issueと非信頼の優先度変更指示を各一回送信した。両方HTTP 200・P1採用、固定引用あり、工数・費用・影響人数は不明のまま。入力は2507/2630 byte、input tokenは475/505、output tokenは199/232。各入力4 KiB・出力2048 token・30秒、retry/fallbackなしの枠内である。
+
+記録は`issue28-live.log`、`issue28-live.json`と二つの原応答JSON。reasoning tokenと単価は欠測で、費用を0としていない。消費の許可記録は二要求とも使用済みで、追加要求を行っていない。Gatewayは通常停止し、標準の接続一覧は空のまま。
+
+## 実GitHubの観測と途中失敗
+
+既存App・対象repo限定で合成Issue [#63](https://github.com/KingYoSun/koujou-san/issues/63)と二ラベルを作成した。最初はAppの書込みはできたが、イベントの`performed_via_github_app`がnullで由来判定に失敗した（`issue28-github-live.log`）。IssueのCloseと二ラベル削除を確認済み。App ID `5355530`、actorはbotの数値ID `343876039`だった。
+
+App自身をJWTで照合し、そのslugから取得したbotの数値IDとイベントactorを照合するよう修正した。人・別App・App ID不一致の所有試験は`issue28-app-provenance-before.log`の失敗から`issue28-app-provenance-after.log`の成功へ変わった。`issue28-github-existing-event.log`で#63の既存イベント`33554004876`を読み取るだけでOwnと判定した。読み取りprobeのソースはGit管理外の`.cache/issue28-live/existing-event-proof.go.txt`へ保全した。
+
+本人は同じClose済み#63の二ラベルを一度復元する追加枠を承認した。再開も収束せず失敗し、二ラベルを削除した（`issue28-github-resumed.log`）。書込み意図を持たない新しい検証DBと以前のイベントの組合せから、所有環境で`concurrent_manual_priority`を再現した。実試験時の最後の同期理由は未保存であり、コード経路と所有再現による原因判定である。競合保護を弱めず、通常の明示操作でこの競合を解消する手順をfixtureへ組み込み、最後の同期状態も記録するようにした。
+
+現在の累積消費はIssue作成1・Close1、ラベル作成4・削除4、Appのラベル作用1、人の外部変更0、モデル0。承認枠の追加なしにラベルを再作成しない。既存のカウンタをリセットせず、継続する場合も同じIssue・同じ二ラベルだけを使う。実GitHubの外部手動変更・固定の最終判定は未確認。

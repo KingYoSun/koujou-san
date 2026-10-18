@@ -9,9 +9,10 @@ import (
 type Limits struct {
 	Bytes      int
 	Placements int
+	Loaded     int
 }
 
-func DefaultLimits() Limits { return Limits{16 * 1024 * 1024, 100000} }
+func DefaultLimits() Limits { return Limits{16 * 1024 * 1024, 100000, 100000} }
 
 type Loader func(context.Context, Ref) (Unit, error)
 type inputNode struct {
@@ -32,6 +33,7 @@ type graph struct {
 	loader   Loader
 	units    map[string]Unit
 	visiting map[string]bool
+	limit    int
 }
 
 func (g *graph) load(r Ref) error {
@@ -43,6 +45,9 @@ func (g *graph) load(r Ref) error {
 	}
 	if _, ok := g.units[r.key()]; ok {
 		return nil
+	}
+	if g.limit > 0 && len(g.units)+len(g.visiting) >= g.limit {
+		return invalid("load_limit", &r)
 	}
 	g.visiting[r.key()] = true
 	defer delete(g.visiting, r.key())
@@ -92,7 +97,7 @@ func unresolved(err error) Resolution {
 func Resolve(ctx context.Context, load Loader, w string, request ResolveRequest, limits Limits) Resolution {
 	s := request.Selection
 	m := &Manifest{Schema: "context-manifest-v1", Assembler: "structured-json-v1", WorkspaceID: w, RunID: request.RunID, Baseline: request.Baseline, Selection: s, State: "ready", ReadStatus: "unobserved", Placements: []Placement{}, Excluded: []Ref{}, Duplicates: []Ref{}}
-	if limits.Bytes <= 0 || limits.Placements <= 0 {
+	if limits.Bytes <= 0 || limits.Placements <= 0 || limits.Loaded <= 0 {
 		return unresolved(invalid("invalid_limits", nil))
 	}
 	hasInput := len(s.Include)+len(s.Exclude)+len(s.Direct)+len(s.External) > 0
@@ -115,7 +120,7 @@ func Resolve(ctx context.Context, load Loader, w string, request ResolveRequest,
 			return Resolution{Missing: []Gap{{Code: "incomplete_candidates", Source: e.Engine + ":" + e.Reason}}}
 		}
 	}
-	g := graph{ctx, load, map[string]Unit{}, map[string]bool{}}
+	g := graph{ctx, load, map[string]Unit{}, map[string]bool{}, limits.Loaded}
 	for _, r := range append(append([]Ref{}, s.Include...), s.Exclude...) {
 		if err := g.load(r); err != nil {
 			return unresolved(err)

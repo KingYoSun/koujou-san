@@ -305,7 +305,7 @@ func TestContextsPostgres(t *testing.T) {
 	if partial.Ready || partial.Manifest != nil {
 		t.Fatal("incomplete candidates became complete")
 	}
-	s.Limits = Limits{64, 100000}
+	s.Limits = Limits{64, 100000, 100000}
 	limitFailure := request("alice", "POST", path("one", "manifest", "too-large"), Write{mutation("0"), canonical(initialRequest)}, 400)
 	if !bytes.Contains(limitFailure, []byte("byte_limit")) {
 		t.Fatal("capacity reason missing")

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/automation"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/githubapp"
 )
 
 // ReadPriority shares the existing limited installation credential. Each call
@@ -46,12 +47,26 @@ func (r *Remote) ReadPriority(ctx context.Context, w, id string, number int64, p
 		App *struct {
 			ID int64 `json:"id"`
 		} `json:"performed_via_github_app"`
+		Actor struct {
+			ID   int64
+			Type string
+		} `json:"actor"`
 	}
 	if json.NewDecoder(io.LimitReader(events.Body, 2<<20)).Decode(&rows) != nil {
 		return out, ErrState
 	}
 	for _, row := range rows {
-		out.Events = append(out.Events, automation.LabelEvent{ID: row.ID, Action: row.Event, Label: row.Label.Name, Own: row.App != nil && strconv.FormatInt(row.App.ID, 10) == r.config.AppID})
+		own := row.App != nil && strconv.FormatInt(row.App.ID, 10) == r.config.AppID
+		if row.App == nil && row.Actor.Type == "Bot" {
+			if r.botID == 0 {
+				r.botID, err = githubapp.Bot(ctx, r.config.AppID, r.config.key, token, r.request)
+				if err != nil {
+					return out, err
+				}
+			}
+			own = row.Actor.ID == r.botID
+		}
+		out.Events = append(out.Events, automation.LabelEvent{ID: row.ID, Action: row.Event, Label: row.Label.Name, Own: own})
 	}
 	out.More = len(rows) == 100
 	response, err := r.request(ctx, "GET", path, token, nil)
