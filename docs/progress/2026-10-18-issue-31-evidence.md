@@ -45,3 +45,9 @@
 ## 独立検品
 
 実装commit `b4ecf61170e8113c6b9a5346d1038e13a9d6b7de` を別コンテキストで検品し、全AC・INVARがPASS、blockerなし。[検品記録](2026-10-18-issue-31-inspection.md)を参照する。その後の差分は、ADRの固定値の説明の正確化と検品・状態の文書だけで、コードは不変。PR #66の最終headでCIと配布更新・復元を確認する。
+
+## CI・マージ後の完了照合
+
+最終head `1c8fd239038a90ec5711485c74a537cb364cb27c` の[CI 39126400726](https://github.com/KingYoSun/koujou-san/actions/runs/39126400726)は全成功。共有UI・サーバー10分26秒、Windows15分51秒、GitGuardian1秒。共有ログ `test-results/issue31-ci-shared.log` で配布物のbackup/restoreとschema 22→24の実migration、失敗時の元release/三DB/sessionの復元と再試行成功を確認した。検品記録追加前のrun 39126137803は、最終headのCIへ枠を渡すため途中停止した。
+
+[PR #66](https://github.com/KingYoSun/koujou-san/pull/66)をマージした。merge `cfca32923449ce6f24347088c12ea0ad1834b204` と最終headのtreeは `c27c07810e107d3bd226bd6cb6d35a409734db6d` で一致し、差分0。全条件・独立検品・最終CI・merge後照合を満たし、#31を手動Close、親#2の進捗を更新した。現在の判定は[current-state](current-state.md)へ集約する。
