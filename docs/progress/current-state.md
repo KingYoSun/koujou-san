@@ -145,4 +145,4 @@
 
 ## Issue #47の判定
 
-状態: In progress。本人の指定で#33・#34を保留したまま着手した。DESIGN.mdと関連文書、原本、三つの参照見本を追加し、局所検証を終えた。本番UIの変更は含めない。[表示・操作・コントラスト・拡大・印刷の確認範囲](2026-10-19-issue-47-evidence.md)を記録し、PR CIとマージ後照合を残している。
+状態: Complete。[PR #68](https://github.com/KingYoSun/koujou-san/pull/68)を最終head `81372688549d5a7b95a87e637b9750ab0bbfedd9` の全CI成功後にマージした。merge `35995f473e58ee0d27399acaa60d1ebf9ae3cd79` と最終headのtreeは `3a5d6f9a8629cc6fa38b14cf30699b78691d2c69` で一致、差分0。AC-1〜7・INVAR-1〜4を照合し、#47をCloseした。DESIGN.mdと関連文書、原本、三つの参照見本を追加した。本番UIの変更は含めない。[検証記録](2026-10-19-issue-47-evidence.md)に初回CIのポート競合と再実行成功、表示・操作・拡大・印刷の確認範囲を保持する。#33・#34は保留を維持する。
