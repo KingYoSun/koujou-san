@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
@@ -56,7 +57,14 @@ func (s *Service) CheckMCPPolicy(ctx context.Context, p access.Principal, w stri
 	if err != nil || !found {
 		return err
 	}
-	_, err = s.currentPolicy(ctx, s.Store.Database(), access.Principal{UserID: p.UserID}, w, op)
+	policy, err := s.currentPolicy(ctx, s.Store.Database(), access.Principal{UserID: p.UserID}, w, op)
+	if err == nil && policy.Generation != nil {
+		_, deps, sourceErr := s.generationSource(ctx, access.Principal{UserID: p.UserID}, w, policy.Generation)
+		if sourceErr != nil {
+			return sourceErr
+		}
+		err = s.checkRefs(ctx, s.Store.Database(), access.Principal{UserID: p.UserID, OperationID: op.CandidateOperation}, w, append(deps, generationRefs(policy.Generation)...))
+	}
 	return err
 }
 func (s *Service) CandidatePrincipal(ctx context.Context, p access.Principal, w string) (access.Principal, []contexts.Identity, bool, error) {
@@ -140,8 +148,9 @@ type ModelResolution struct {
 	Missing    []string             `json:"missing"`
 }
 
-func (s *Service) mcpSources(ctx context.Context, q query, w, operation string, since *time.Time, complete bool) ([]Ref, error) {
-	rows, err := q.Query(ctx, `SELECT DISTINCT r.id,r.version FROM access_operation_events e CROSS JOIN LATERAL jsonb_to_recordset(CASE WHEN jsonb_typeof(e.result->'refs')='array' THEN e.result->'refs' ELSE '[]'::jsonb END) r(id text,version text) WHERE e.workspace_id=$1 AND e.operation_id=$2 AND e.result->>'outcome'='returned' AND ($3::timestamptz IS NULL OR e.created_at>=$3) AND (NOT $4 OR (e.result#>>'{meta,completeness,state}'='complete' OR (e.result#>>'{meta,completeness,state}'='partial' AND e.result#>>'{meta,completeness,reason}'='limit_reached' AND COALESCE(e.result#>>'{meta,next_cursor}','')<>'')))`, w, operation, since, complete)
+func (s *Service) mcpSources(ctx context.Context, q query, w, operation string, since *time.Time, complete bool, contextOnly ...bool) ([]Ref, error) {
+	onlyContext := len(contextOnly) > 0 && contextOnly[0]
+	rows, err := q.Query(ctx, `SELECT DISTINCT r.id,r.version FROM access_operation_events e CROSS JOIN LATERAL jsonb_to_recordset(CASE WHEN jsonb_typeof(e.result->'refs')='array' THEN e.result->'refs' ELSE '[]'::jsonb END) r(id text,version text) WHERE e.workspace_id=$1 AND e.operation_id=$2 AND e.result->>'outcome'='returned' AND ($3::timestamptz IS NULL OR e.created_at>=$3) AND (NOT $5 OR e.method IN ('context_search','context_graph','context_get','context_resolve')) AND (NOT $4 OR (e.result#>>'{meta,completeness,state}'='complete' OR (e.result#>>'{meta,completeness,state}'='partial' AND e.result#>>'{meta,completeness,reason}'='limit_reached' AND COALESCE(e.result#>>'{meta,next_cursor}','')<>'')))`, w, operation, since, complete, onlyContext)
 	if err != nil {
 		return nil, err
 	}
@@ -227,4 +236,22 @@ func (s *Service) PreviewForModel(ctx context.Context, p access.Principal, w str
 		return nil
 	})
 	return out, refs, found, err
+}
+
+func (s *Service) CheckReadTool(ctx context.Context, p access.Principal, w, name string) error {
+	op, found, err := s.MCPBinding(ctx, s.Store.Database(), p, w)
+	if err != nil || !found {
+		return err
+	}
+	if !ReadTool(name, op.Purpose) {
+		return access.ErrForbidden
+	}
+	policy, err := s.currentPolicy(ctx, s.Store.Database(), access.Principal{UserID: p.UserID}, w, op)
+	if err != nil {
+		return err
+	}
+	if policy.Fixed.Mode == "none" && strings.HasPrefix(name, "context_") {
+		return access.ErrForbidden
+	}
+	return nil
 }

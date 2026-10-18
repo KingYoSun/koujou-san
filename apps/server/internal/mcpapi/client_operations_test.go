@@ -29,7 +29,7 @@ func (t selectionTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	r.Header.Set("X-Koujou-Client", t.client)
 	return t.base.RoundTrip(r)
 }
-func checkClientSelectionMCP(t *testing.T, s *Service, p access.Principal, apiToken, mcpToken string, transport http.RoundTripper, reader, contextEditor, none *mcp.ClientSession, public, secret contexts.Ref, call func(*mcp.ClientSession, string, any, bool) []byte, request func(string, string, any, map[string]string) (*http.Response, []byte), site string) {
+func checkClientSelectionMCP(t *testing.T, s *Service, p access.Principal, apiToken, mcpToken string, transport http.RoundTripper, reader, contextEditor, none *mcp.ClientSession, public, secret contexts.Ref, call func(*mcp.ClientSession, string, any, bool) []byte, request func(string, string, any, map[string]string) (*http.Response, []byte), site string, generationKey []byte) {
 	t.Helper()
 	ctx := context.Background()
 	// Client bookkeeping must not turn unchanged search pages into pending data
@@ -222,6 +222,7 @@ func checkClientSelectionMCP(t *testing.T, s *Service, p access.Principal, apiTo
 		call(peer, "workflow_get", template.Ref, false)
 		peer.Close()
 	}
+	checkContextGenerationMCP(t, s, p, generationKey, connect, call)
 	t.Log("client selection: HTTP/MCP fixed versions/replay, purpose separation, owned-client transport and no excluded metadata passed")
 }
 func mustJSON(v any) string { b, _ := json.Marshal(v); return string(b) }

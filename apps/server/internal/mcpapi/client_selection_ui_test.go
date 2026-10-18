@@ -20,32 +20,60 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/auth"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/clientops"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 )
 
 type clientSelectionUI struct {
-	Handler   http.Handler
-	done      chan struct{}
-	mu        sync.Mutex
-	observed  []map[string]any
-	violation bool
-	site      string
-	modelSite string
-	expected  []contexts.Ref
+	Handler        http.Handler
+	generationEmit chan chan clientops.GenerationSource
+	emitGeneration func() clientops.GenerationSource
+	done           chan struct{}
+	mu             sync.Mutex
+	observed       []map[string]any
+	violation      bool
+	site           string
+	modelSite      string
+	expected       []contexts.Ref
 }
 
 func (f *clientSelectionUI) Wait(t *testing.T, s *Service, ctx context.Context) {
 	t.Helper()
 	t.Logf("Client selection UI: %s/__fixture/browser-login ; cross-Origin HTTPS owned provider: %s/v1 ; model names owned-alpha / owned-beta; inert key owned-model-key", f.site, f.modelSite)
-	select {
-	case <-f.done:
-	case <-time.After(30 * time.Minute):
-		t.Fatal("client selection UI fixture timed out")
+	if os.Getenv("KOUJOU_TEST_OUTPUT_CONTEXT_UI") == "1" {
+		emitted := false
+	waiting:
+		for {
+			select {
+			case <-f.done:
+				break waiting
+			case response := <-f.generationEmit:
+				if emitted {
+					response <- clientops.GenerationSource{}
+				} else {
+					response <- f.emitGeneration()
+					emitted = true
+				}
+			case <-time.After(30 * time.Minute):
+				t.Fatal("context generation UI fixture timed out")
+			}
+		}
+	} else {
+		select {
+		case <-f.done:
+		case <-time.After(30 * time.Minute):
+			t.Fatal("client selection UI fixture timed out")
+		}
 	}
+
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.violation {
 		t.Fatal("owned model receiver detected prohibited credentials or data")
+	}
+	if os.Getenv("KOUJOU_TEST_OUTPUT_CONTEXT_UI") == "1" {
+		contextGenerationUIEvidence(t, s, ctx, f.site, f.observed)
+		return
 	}
 	if os.Getenv("KOUJOU_TEST_DEFINITION_UI") == "1" {
 		definitionUIEvidence(t, s, ctx, f.site, f.observed)
@@ -97,6 +125,9 @@ func newClientSelectionUI(t *testing.T, ctx context.Context, s *Service, client 
 	modelServer.StartTLS()
 	t.Cleanup(modelServer.Close)
 	f.modelSite = strings.Replace(modelServer.URL, "127.0.0.1", "localhost", 1)
+	if os.Getenv("KOUJOU_TEST_OUTPUT_CONTEXT_UI") == "1" {
+		seedContextGenerationUI(t, ctx, s, p, cfg, f)
+	}
 	serial := 0
 	put := func(kind, id string, children []contexts.Ref) contexts.Ref {
 		t.Helper()
@@ -157,6 +188,15 @@ func newClientSelectionUI(t *testing.T, ctx context.Context, s *Service, client 
 			default:
 			}
 			w.WriteHeader(204)
+			return
+		case "/__fixture/generation-source":
+			if r.Method != "POST" || f.generationEmit == nil {
+				http.Error(w, "owned source unavailable", 400)
+				return
+			}
+			response := make(chan clientops.GenerationSource, 1)
+			f.generationEmit <- response
+			json.NewEncoder(w).Encode(<-response)
 			return
 		case "/__fixture/native-authorize":
 			var v struct {
@@ -254,13 +294,19 @@ func (f *clientSelectionUI) model(w http.ResponseWriter, r *http.Request, s *Ser
 		http.Error(w, "invalid owned model request", 400)
 		return
 	}
-	bad := r.Header.Get("Authorization") != "Bearer owned-model-key" || r.Header.Get("Cookie") != "" || r.Header.Get("X-Koujou-Operation") != "" || bytes.Contains(raw, []byte("FORBIDDEN_IMPL_DIALOGUE")) || bytes.Contains(raw, []byte("FORBIDDEN_SELF_EVALUATION"))
+	bad := r.Header.Get("Authorization") != "Bearer owned-model-key" || r.Header.Get("Cookie") != "" || r.Header.Get("X-Koujou-Operation") != "" || bytes.Contains(raw, []byte("FORBIDDEN_IMPL_DIALOGUE")) || bytes.Contains(raw, []byte("FORBIDDEN_SELF_EVALUATION")) || bytes.Contains(raw, []byte("FORBIDDEN_OTHER_INPUT")) || bytes.Contains(raw, []byte("FORBIDDEN_OTHER_CHANNEL_DATA"))
 	f.mu.Lock()
 	f.violation = f.violation || bad
 	f.observed = append(f.observed, map[string]any{"model": body.Model, "messages": len(body.Messages), "cookie_absent": r.Header.Get("Cookie") == "", "mcp_header_absent": r.Header.Get("X-Koujou-Operation") == ""})
 	f.mu.Unlock()
 	if bad {
 		http.Error(w, "owned receiver boundary failed", 400)
+		return
+	}
+	if body.Format.Schema.Name == "output_context" {
+		_ = s.Search.Sync(ctx)
+		_ = s.Graph.Sync(ctx)
+		contextGenerationUIModel(w, raw)
 		return
 	}
 	if body.Format.Schema.Name == "run_definition" {

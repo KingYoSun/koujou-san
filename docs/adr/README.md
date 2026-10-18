@@ -51,3 +51,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0029: 標準構成の配布と復旧](0029-standard-distribution.md)
 
 - [0030: 自由入力からのRun定義と共通の検証・採用](0030-run-definition-generation.md)
+
+- [0031: 固定出力からのContext生成と版付き反映](0031-output-context-generation.md)

@@ -696,7 +696,7 @@ func TestMCPIntegration(t *testing.T) {
 		t.Fatal("workflow head sorted history positions as strings", workflowHead.Ref, err)
 	}
 	t.Log("workflow head after 30,000 Context versions selects the numeric latest position")
-	checkClientSelectionMCP(t, s, p, ordinary.Access, tokens.Access, client.Transport, session, editor, none, public, secret, call, request, cfg.Site)
+	checkClientSelectionMCP(t, s, p, ordinary.Access, tokens.Access, client.Transport, session, editor, none, public, secret, call, request, cfg.Site, cfg.Key)
 	if selectionUI {
 		fixture := newClientSelectionUI(t, ctx, s, client, cfg, p)
 		selectionBrowser = fixture.Handler

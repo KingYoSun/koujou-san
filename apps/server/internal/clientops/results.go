@@ -16,7 +16,7 @@ import (
 type Reply = modelreply.Reply
 
 func ReadTool(name string, purpose ...string) bool {
-	return name == "context_search" || name == "context_graph" || name == "context_get" || name == "context_resolve" || (len(purpose) > 0 && purpose[0] == "definition" && (name == "workflow_get" || name == "workflow_query" || name == "workflow_capabilities"))
+	return (len(purpose) > 0 && purpose[0] == "context-generation" && name == "run_get") || name == "context_search" || name == "context_graph" || name == "context_get" || name == "context_resolve" || (len(purpose) > 0 && purpose[0] == "definition" && (name == "workflow_get" || name == "workflow_query" || name == "workflow_capabilities"))
 }
 func parseReply(b json.RawMessage, m Model, purpose ...string) (Reply, string) {
 	r, reason := modelreply.Parse(b, m.Allowed)

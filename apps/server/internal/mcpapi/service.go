@@ -47,6 +47,7 @@ type boundary struct {
 	Workspace, Subject string
 }
 type outcome struct {
+	Range      string
 	Value      any
 	Refs       []contexts.Ref
 	Meta       apicontract.Meta
@@ -148,8 +149,7 @@ func addTool[In any](server *mcp.Server, s *Service, name, description string, r
 	mcp.AddTool[In, any](server, &mcp.Tool{Name: name, Description: description, InputSchema: schema}, func(ctx context.Context, _ *mcp.CallToolRequest, args In) (*mcp.CallToolResult, any, error) {
 		if s.ClientOps != nil {
 			b := ctx.Value(operationKey{}).(boundary)
-			op, found, err := s.ClientOps.MCPBinding(ctx, s.ClientOps.Store.Database(), b.Principal, b.Workspace)
-			if err != nil || (found && !clientops.ReadTool(name, op.Purpose)) {
+			if err := s.ClientOps.CheckReadTool(ctx, b.Principal, b.Workspace, name); err != nil {
 				return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "forbidden"}}}, nil, nil
 			}
 		}
@@ -213,6 +213,9 @@ func (s *Service) finish(ctx context.Context, method string, value outcome) erro
 		rangeKind = "whole_run_record"
 	case "run_query":
 		rangeKind = "run_record_page"
+	}
+	if value.Range != "" {
+		rangeKind = value.Range
 	}
 	return s.Access.RecordOperation(ctx, b.Principal, b.Workspace, method, b.Subject, access.OperationEvent{Refs: refs, Range: rangeKind, Meta: value.Meta, MutationID: value.MutationID, QueryKey: value.QueryKey, Outcome: "returned"})
 }

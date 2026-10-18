@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { apiRequest } from "./auth";
+import type { OutputContextSource } from "./context-generation";
 import { ContextWorkspace } from "./context-workspace";
 import { Automation } from "./automation";
 import { Hopper } from "./hopper";
@@ -81,6 +82,8 @@ export function Team({ native }: { native: boolean }) {
   const [status, setStatus] = useState("checking");
   const [workspaces, setWorkspaces] = useState<Page<Workspace>>(empty);
   const [selected, setSelected] = useState("");
+  const [contextSource, setContextSource] = useState<OutputContextSource>();
+  useEffect(() => setContextSource(undefined), [selected]);
   const [members, setMembers] = useState<Page<Member>>(empty);
   const [invites, setInvites] = useState<Page<Invite>>(empty);
   const [devices, setDevices] = useState<Page<Device>>(empty);
@@ -406,9 +409,11 @@ export function Team({ native }: { native: boolean }) {
             canExecute={current.can_execute}
             members={members.items}
             membersNext={members.next_cursor}
+            onGenerate={setContextSource}
           />
           {apiIdentity && me && (
             <ContextWorkspace
+              source={contextSource}
               key={selected}
               role={current.role}
               native={native}

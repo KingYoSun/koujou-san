@@ -157,6 +157,64 @@ function fixture(
   };
 }
 describe("client selection Host", () => {
+  it("uses one shared source-only Host under none without leaking fixed text", async () => {
+    const f = fixture(true, true, false, "context-generation");
+    f.rpc.mockImplementation(async (wire: { method: string }) => ({
+      status: 200,
+      body: {
+        result:
+          wire.method === "tools/list"
+            ? {
+                tools: [
+                  "run_get",
+                  "run_query",
+                  "context_get",
+                  "context_edit",
+                ].map((name) => ({ name, inputSchema: { type: "object" } })),
+              }
+            : {},
+      },
+    }));
+    const p: SelectionPolicy = {
+      ...policy,
+      generation: {
+        source: {
+          run: { id: "run:source", version: "finished" },
+          output: { id: "run-output:source:2", version: "fixed" },
+          path: ["checks", "invalid"],
+        },
+        fixed: [
+          {
+            ref: { kind: "sentence", id: "locked", revision: "v1" },
+            fields: { text: '"PRIVATE_UNSENT_TEXT"' },
+          },
+        ],
+        group_scopes: [],
+      },
+    };
+    await runSelection(f.start, p, profile, "client", f.port, () => {});
+    const input = (
+      f.model.mock.calls as unknown as [Record<string, unknown>][]
+    )[0][0];
+    expect(
+      (input.tools as { function: { name: string } }[]).map(
+        (t) => t.function.name,
+      ),
+    ).toEqual(["run_get"]);
+    expect(input.response_format).toMatchObject({
+      json_schema: {
+        name: "output_context",
+        schema: {
+          required: ["changes_utf8", "reason", "questions", "unknown"],
+        },
+      },
+    });
+    expect(JSON.stringify(input.messages)).toContain("run-output:source:2");
+    expect(JSON.stringify(input.messages)).not.toContain("PRIVATE_UNSENT_TEXT");
+    expect(JSON.stringify(input.messages)).not.toContain('"locked"');
+    expect(f.model).toHaveBeenCalledTimes(1);
+  });
+
   it("uses the shared Host for definition generation while none exposes only metadata tools", async () => {
     const f = fixture(false, false, false, "definition");
     const names = ["workflow_get", "workflow_query", "workflow_capabilities"];

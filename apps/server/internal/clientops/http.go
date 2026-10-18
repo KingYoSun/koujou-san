@@ -40,6 +40,15 @@ func response(w http.ResponseWriter, v any, err error) {
 }
 func (s *Service) Register(mux *http.ServeMux) {
 	root := "/client-operations/workspaces/{workspace}"
+	s.registerGeneration(mux)
+	mux.HandleFunc("GET "+root+"/origins/{id}", func(w http.ResponseWriter, r *http.Request) {
+		p, ok := s.user(w, r)
+		if !ok {
+			return
+		}
+		v, err := s.GenerationOrigin(r.Context(), p, r.PathValue("workspace"), r.PathValue("id"), r.URL.Query().Get("version"), r.URL.Query().Get("operation"))
+		response(w, v, err)
+	})
 	mux.HandleFunc("GET "+root+"/template", func(w http.ResponseWriter, r *http.Request) {
 		p, ok := s.user(w, r)
 		if !ok {

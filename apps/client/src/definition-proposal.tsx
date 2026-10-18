@@ -76,3 +76,33 @@ export function DefinitionProposal({
     </section>
   );
 }
+
+export function DefinitionFixedFields({
+  paths,
+  onPaths,
+}: {
+  paths: string[];
+  onPaths: (paths: string[]) => void;
+}) {
+  return (
+    <details>
+      <summary>変更させない定義の項目</summary>
+      {definitionFields.map(([path, label]) => (
+        <label key={path}>
+          <input
+            type="checkbox"
+            checked={paths.includes(path)}
+            onChange={(e) =>
+              onPaths(
+                e.target.checked
+                  ? [...paths, path]
+                  : paths.filter((p) => p !== path),
+              )
+            }
+          />
+          {label}を固定
+        </label>
+      ))}
+    </details>
+  );
+}

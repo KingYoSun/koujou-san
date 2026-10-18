@@ -9,6 +9,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/workflows"
 	"github.com/jackc/pgx/v5"
@@ -19,6 +20,7 @@ type query interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Service struct {
+	Runs        *runs.Service
 	Definitions *workflows.Service
 	Store       *persistence.Store
 	Access      *access.Service
@@ -27,7 +29,17 @@ type Service struct {
 }
 
 func New(s *persistence.Store, a *access.Service, c *contexts.Service, u *usage.Service) *Service {
-	return &Service{Store: s, Access: a, Contexts: c, Usage: u}
+	service := &Service{Store: s, Access: a, Contexts: c, Usage: u, Runs: runs.New(s, a, c)}
+	previous := s.Accepted
+	s.Accepted = func(ctx context.Context, tx pgx.Tx, command persistence.Command, ref apicontract.Reference, value json.RawMessage) error {
+		if previous != nil {
+			if err := previous(ctx, tx, command, ref, value); err != nil {
+				return err
+			}
+		}
+		return service.observeGenerationSource(ctx, tx, command, ref, value)
+	}
+	return service
 }
 func raw(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
 func pinned(r Ref) bool {
@@ -134,7 +146,7 @@ type Write struct {
 	Value json.RawMessage `json:"value"`
 }
 
-func (s *Service) PutPolicy(ctx context.Context, p access.Principal, w, id string, req Write) (apicontract.Response[apicontract.Reference], error) {
+func (s *Service) PutPolicy(ctx context.Context, p access.Principal, w, id string, req Write, within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
 	var v Policy
 	if decode(req.Value, &v) != nil || !validPolicyKind(id, v) || (v.Mode != "manual" && v.Mode != "proposal" && v.Mode != "auto") || (v.Fixed.Mode != "none" && v.Fixed.Mode != "select") || v.Limits.Models < 1 || v.Limits.MCP < 1 || v.Limits.Seconds < 1 {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
@@ -147,6 +159,14 @@ func (s *Service) PutPolicy(ctx context.Context, p access.Principal, w, id strin
 			return Record{}, ErrInvalid
 		}
 		rs := refs(v.Fixed)
+		if v.Generation != nil {
+			_, deps, err := s.generationSource(ctx, p, w, v.Generation)
+			if err != nil {
+				return Record{}, err
+			}
+			rs = append(rs, deps...)
+			rs = append(rs, generationRefs(v.Generation)...)
+		}
 		if v.Definition != nil {
 			rs = append(rs, v.Definition.Sources...)
 			if err := s.checkRefs(ctx, tx, p, w, v.Definition.Sources); err != nil {
@@ -160,7 +180,7 @@ func (s *Service) PutPolicy(ctx context.Context, p access.Principal, w, id strin
 			rs = append(rs, Ref{ID: "scope:" + scope})
 		}
 		return s.save(ctx, tx, w, p, r, "policy", v, rs)
-	})
+	}, within...)
 }
 
 type SelectionWrite struct {
