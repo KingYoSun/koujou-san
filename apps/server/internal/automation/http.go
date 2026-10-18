@@ -249,7 +249,7 @@ func (s *Service) ApplyPast(ctx context.Context, p access.Principal, w string, r
 			if s.checkRefs(ctx, tx, p, w, refs) != nil {
 				continue
 			}
-			if err = s.enqueue(ctx, tx, w, "triage", Source{Event: "explicit:" + target.ID + "@" + target.Version, Target: target}, r.Policy, "", refs); err != nil {
+			if err = s.queueTriage(ctx, tx, w, target, "explicit:"+r.OperationID+":"+target.ID+"@"+target.Version); err != nil {
 				return nil, err
 			}
 			dependencies = append(dependencies, refs...)

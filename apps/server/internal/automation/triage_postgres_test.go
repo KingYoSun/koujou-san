@@ -473,6 +473,66 @@ func TestTriagePostgres(t *testing.T) {
 			t.Fatal("priority cursor", next, err)
 		}
 	})
+	t.Run("batch-stop-worker-poll-continue", func(t *testing.T) {
+		sql(`UPDATE automation_jobs SET state='stopped' WHERE state IN ('waiting','retry','blocked')`)
+		scope, _, _ := create("batch-resume", "human")
+		batch := put("batch:resume", "0", BatchEdit{Policy: pol, Scopes: []string{scope.ID}, From: time.Now().Add(-time.Hour), Until: time.Now().Add(time.Hour), Count: 1, PageSize: 1})
+		batch = put(batch.ID, batch.Version, BatchEdit{Stop: true})
+		before := calls.Load()
+		if j, err := s.Claim(ctx, "triage", "stopped-batch-poll"); err != nil || j != nil {
+			t.Fatal("stopped batch claimed", j, err)
+		}
+		var state, reason string
+		var attempts int
+		if err := store.Database().QueryRow(ctx, `SELECT j.state,j.reason,j.attempts FROM triage_batch_jobs b JOIN automation_jobs j ON j.id=b.job_id AND j.workspace_id=b.workspace_id WHERE b.batch_id=$1`, batch.ID).Scan(&state, &reason, &attempts); err != nil || state != "waiting" || reason != "batch_stopped" || attempts != 0 {
+			t.Fatal("stopped batch lost resumable job", state, reason, attempts, err)
+		}
+		put(batch.ID, batch.Version, BatchEdit{Continue: true})
+		sql(`UPDATE automation_jobs SET due_at=now() WHERE reason='batch_stopped'`)
+		run()
+		_, value := priority(scope)
+		if calls.Load() != before+1 || value.Adopted == nil || *value.Adopted != "P1" {
+			t.Fatal("continued batch not adopted exactly once", value, calls.Load()-before)
+		}
+	})
+	t.Run("batch-stop-after-response-reuses-saved-result", func(t *testing.T) {
+		sql(`UPDATE automation_jobs SET state='stopped' WHERE state IN ('waiting','retry','blocked')`)
+		scope, _, _ := create("batch-response-resume", "human")
+		batch := put("batch:response-resume", "0", BatchEdit{Policy: pol, Scopes: []string{scope.ID}, From: time.Now().Add(-time.Hour), Until: time.Now().Add(time.Hour), Count: 1, PageSize: 1})
+		stop := func() { batch = put(batch.ID, batch.Version, BatchEdit{Stop: true}) }
+		action.Store(&stop)
+		before := calls.Load()
+		run()
+		_, value := priority(scope)
+		if value.Adopted != nil || calls.Load() != before+1 {
+			t.Fatal("stopped response adopted", value)
+		}
+		put(batch.ID, batch.Version, BatchEdit{Continue: true})
+		// A saved result needs neither another model attempt nor its old deadline.
+		sql(`UPDATE automation_jobs SET due_at=now(),deadline=now()-interval '1 hour',attempts=$2 WHERE target_id=$1 AND state='waiting'`, scope.ID, control.MaxAttempts)
+		run()
+		_, value = priority(scope)
+		var attempts int
+		if err := store.Database().QueryRow(ctx, `SELECT attempts FROM automation_jobs WHERE id=$1`, value.Job).Scan(&attempts); err != nil || attempts != control.MaxAttempts || calls.Load() != before+1 || value.Adopted == nil || *value.Adopted != "P1" {
+			t.Fatal("saved result was not resumed without another request", value, attempts, err)
+		}
+	})
+	t.Run("legacy-apply-past-model-evaluation", func(t *testing.T) {
+		sql(`UPDATE automation_jobs SET state='stopped' WHERE state IN ('waiting','retry','blocked')`)
+		scope, _, _ := create("zzzz-legacy-target", "human")
+		sql(`UPDATE automation_jobs SET state='stopped' WHERE target_id=$1`, scope.ID)
+		request := ApplyPast{Mutation: m("0"), Policy: pol, After: "scope:zzzz-legacy-", Limit: 1}
+		applied, err := s.ApplyPast(ctx, p, "one", request)
+		if err != nil || applied.Data == nil || applied.Data.Requested != 1 {
+			t.Fatal("legacy application", applied, err)
+		}
+		before := calls.Load()
+		run()
+		_, value := priority(scope)
+		if calls.Load() != before+1 || value.Adopted == nil || *value.Adopted != "P1" {
+			t.Fatal("legacy apply did not evaluate latest input", value, calls.Load()-before)
+		}
+	})
 	t.Run("issue-assignment-gate-and-dependencies", func(t *testing.T) {
 		sql(`UPDATE automation_jobs SET state='stopped' WHERE state IN ('waiting','retry','blocked')`)
 		rs := runs.New(store, a, c)

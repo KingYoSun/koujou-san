@@ -100,7 +100,6 @@ func main() {
 			clientOperations := clientops.New(store, accessService, contextService, usageService)
 			routes = append(routes, clientOperations.Register)
 			automationService := automation.New(store, accessService)
-			automationService.Start(ctx)
 			routes = append(routes, automationService.Register)
 			runService := runs.New(store, accessService, contextService)
 			routes = append(routes, runService.Register)

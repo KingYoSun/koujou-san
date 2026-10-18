@@ -289,8 +289,8 @@ func (s *Service) triageBudget(ctx context.Context, tx pgx.Tx, j Job, c Control)
 	return "", nil
 }
 
-// Waiting for another request's consumption is not a model attempt. Keep the
-// accepted request pending and retry only after observation can be checked.
+// A stopped batch or unknown consumption keeps its accepted request pending.
+// An unsent reservation is not a model attempt; a saved result keeps its count.
 func (s *Service) deferTriage(ctx context.Context, j Job, reason string) error {
 	return pgx.BeginFunc(ctx, s.Store.Database(), func(tx pgx.Tx) error {
 		if err := sameLease(ctx, tx, j); err != nil {
@@ -300,10 +300,7 @@ func (s *Service) deferTriage(ctx context.Context, j Job, reason string) error {
 		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM triage_model_attempts WHERE workspace_id=$1 AND job_id=$2 AND number=$3)`, j.Workspace, j.ID, j.Attempts).Scan(&sent); err != nil {
 			return err
 		}
-		if sent {
-			return ErrInvalid
-		}
-		_, err := tx.Exec(ctx, `UPDATE automation_jobs SET state='waiting',reason=$3,due_at=now()+interval '5 seconds',lease_until=NULL,attempts=attempts-1,deadline=CASE WHEN attempts=1 THEN NULL ELSE deadline END,updated_at=now() WHERE workspace_id=$1 AND id=$2`, j.Workspace, j.ID, reason)
+		_, err := tx.Exec(ctx, `UPDATE automation_jobs SET state='waiting',reason=$3,due_at=now()+interval '5 seconds',lease_until=NULL,attempts=attempts-CASE WHEN $4 THEN 0 ELSE 1 END,deadline=CASE WHEN NOT $4 AND attempts=1 THEN NULL ELSE deadline END,updated_at=now() WHERE workspace_id=$1 AND id=$2`, j.Workspace, j.ID, reason, sent)
 		if err != nil {
 			return err
 		}

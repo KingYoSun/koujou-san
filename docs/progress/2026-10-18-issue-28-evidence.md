@@ -1,6 +1,6 @@
 # Issue #28の検証記録
 
-状態: In progress。Scope revision 1。基準は`17def2aa914e0c31cf8a03360521e57864d060d0`。最終検品・CI・マージは未実施。
+状態: In progress。Scope revision 1。基準は`17def2aa914e0c31cf8a03360521e57864d060d0`。PR #62でCIと独立検品を進めている。実接続とマージは未実施。
 
 ## 確定した判断
 
@@ -13,6 +13,10 @@
 - migrationの途中でContext履歴の列名を誤って`position`とし、所有DBで失敗した。実際の`stream_sequence`に修正し、同じ新規migrationを通した。診断用の一時コードは削除済み。
 - 確認済みの手動値から外部だけが変わる場合まで競合にしていた。`issue28-external-manual-before.log`で再現し、最後に同期した判断との比較へ修正した。同じ条件の`issue28-external-manual-after.log`はPASS。
 - 同時取得した一括要求が、先行要求の消費未確定を完了扱いにしていた。`issue28-batch-concurrency-before.log`で再現し、送信前の待機と試行回数の保護へ修正した。`issue28-batch-concurrency-after.log`はPASS。
+- 独立検品で、一括停止後のWorker巡回が要求を復帰不能にすることと、旧`apply-past`が現在要求の索引を更新しないことを検出した。`issue28-review-legacy-before.log`で両方を再現した。停止は再開できる待機とし、旧APIも共通の受付処理へ接続した。応答後の停止では保存済み結果と試行数を維持し、再開時に再送しない。
+- この修正の途中でSQLのNULLとJSONのnullの区別を誤り、試行数が増えない失敗を`issue28-review-fixes-after.log`で検出した。両方を未完了として扱い、`issue28-review-fixes-after2.log`で既存条件と追加した三条件がPASSした。29要求と29利用量を照合した。
+- API起動時にTriageのStartが二度呼ばれていた。独立検品の指摘を受け、依存先の設定後に一度だけ起動するよう修正した。
+- 選択Contextの全子孫取得後にしか配置上限が効かない点も検出した。読み込み上限を追加すると、除外後の入力が小さい既存選択も保留になり得る。既存の「入力配置数」から「取得する固定版数」へ意味を広げる変更は未承認のため、実装せず本人の判断を確認する。
 
 ## 取得済みの証拠
 
@@ -29,8 +33,11 @@
 | `test-results/issue28-check-final.log`、`issue28-test-final.log` | 静的検査、Go全パッケージ、共通UI 18ファイル64テストがPASS |
 | `test-results/issue28-runs-final.log`、`issue28-publications-final.log` | 既存Runと外部起票のPG回帰がPASS |
 | `test-results/issue28-hopper-final.log`、`issue28-hopper-diagnostic.log` | 最初は途中のClaimがnilとなり後続も失敗した。取得失敗の診断を追加した再実行は全Hopper条件がPASS。最初の失敗を削除せず、検品で原因と再現性を確認する |
+| `test-results/issue28-independent-hopper.log`、`issue28-independent-hopper-repeat.log` | 独立した全Hopper回帰と診断付きSemanticの有限6回がPASS。最初のClaim失敗は再現せず、原因未確定。追加診断は別のClaimにあったため、元の失敗原因を説明した証拠として扱わない |
+| `test-results/issue28-independent-migration-upgrade.log` | 001〜022の旧Scope・Grouping・固定/採用値・Hopper設定・jobを投入して023へ移行。既存3テーブルの双方向EXCEPT一致、新規jobゼロ、旧受付日時維持がPASS |
+| `test-results/issue28-review-fixes-after2.log`、`issue28-review-fixes-final.log` | 一括停止→Worker巡回→再開、応答後停止→期限/試行上限後の保存結果の採用、旧API経由の実評価がPASS。修正差分は再検品の対象 |
 
-これらの合格は記録を取得した時点の範囲であり、最新差分の全条件合格を意味しない。実provider・実GitHub・独立検品・必須CI・マージ後照合は未確認。
+これらの合格は記録を取得した時点の範囲であり、最新差分の全条件合格を意味しない。[独立検品](2026-10-18-issue-28-inspection.md)の初回結果はblocker三件。修正差分の再確認、Context取得上限の判断、実provider・実GitHub・必須CI・マージ後照合が残っている。
 
 ## 共通画面の観測
 
@@ -42,6 +49,8 @@ Chromeの所有環境で、手動P2を固定したまま推奨P1を保持、本�
 
 ## 実接続と画面の境界
 
-実providerへの追加要求とGitHubへの新たな変更はまだ行っていない。#27で許可された三要求は使い切っており、#28へ流用しない。実行前に合成入力・上限・対象を具体化して確認する。専用キーや秘密鍵を文書・ログ・Gitへ記録しない。
+実providerへの追加要求とGitHubへの新たな変更はまだ行っていない。#27で許可された三要求は使い切っており、#28へ流用しない。実行前に合成入力・上限・対象を具体化して確認する。二要求のモデル試験と、一件の合成Issue・二つの一時ラベルの同期試験の入口・メタデータ設定を準備済み。承認済みの消費台帳はまだ作っていない。専用キーや秘密鍵を文書・ログ・Gitへ記録しない。
 
 共通UIではブラウザで一巡し、新しいOS境界を変更しない限りTauriで同じ操作を重ねない。ユーザーが提示した入口から参照される`DESIGN.md`と`docs/adr/0014-uiux-dev-flow.md`は、このcheckoutには存在しなかった。既存のフォーム・履歴・権限表示を使い、指示書やデザイン文書を推測して新設しない。
+
+初回commit `ea4f2eb`のCI（run `39087728605`）はShared UI and server・Windows native client・GitGuardianがすべて成功した。独立検品の修正後のHEADについては、別途CIを確認する。`issue28-review-check.log`の静的検査もPASS。

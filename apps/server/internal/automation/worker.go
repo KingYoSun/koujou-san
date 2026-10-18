@@ -162,15 +162,11 @@ func (s *Service) Claim(ctx context.Context, k, worker string) (*Job, error) {
 				continue
 			}
 			c, authErr := s.authority(ctx, tx, j, false)
-			reason := ""
-			if authErr != nil {
-				reason = "authority_revoked"
-				if errors.Is(authErr, ErrInvalid) {
-					reason = "basis_changed"
+			if j.Kind == "triage" {
+				err := authErr
+				if err == nil {
+					err = s.checkBatch(ctx, tx, j, access.Principal{UserID: c.Controller}, j.Result == nil)
 				}
-			}
-			if reason == "" && j.Kind == "triage" {
-				err := s.checkBatch(ctx, tx, j, access.Principal{UserID: c.Controller}, true)
 				var wait triageWait
 				if errors.As(err, &wait) {
 					if _, err = tx.Exec(ctx, `UPDATE automation_jobs SET state='waiting',reason=$3,due_at=now()+interval '5 seconds',lease_until=NULL WHERE workspace_id=$1 AND id=$2`, j.Workspace, j.ID, string(wait)); err != nil {
@@ -183,14 +179,21 @@ func (s *Service) Claim(ctx context.Context, k, worker string) (*Job, error) {
 					}
 					continue
 				}
-				if err != nil {
+				if authErr == nil && err != nil {
 					return err
 				}
 			}
-			if reason == "" && (j.Attempts >= c.MaxAttempts || (j.Deadline != nil && !time.Now().Before(*j.Deadline))) {
+			reason := ""
+			if authErr != nil {
+				reason = "authority_revoked"
+				if errors.Is(authErr, ErrInvalid) {
+					reason = "basis_changed"
+				}
+			}
+			if reason == "" && (j.Kind != "triage" || j.Result == nil) && (j.Attempts >= c.MaxAttempts || (j.Deadline != nil && !time.Now().Before(*j.Deadline))) {
 				reason = "deadline_or_attempts"
 			}
-			if reason == "" {
+			if reason == "" && (j.Kind != "triage" || j.Result == nil) {
 				reason, err = s.budget(ctx, tx, j, c, false)
 				if err != nil {
 					return err
@@ -212,7 +215,7 @@ func (s *Service) Claim(ctx context.Context, k, worker string) (*Job, error) {
 			if active >= c.Slots {
 				continue
 			}
-			j, err = scanJob(tx.QueryRow(ctx, `UPDATE automation_jobs SET state='running',reason='',worker=$3,lease=$4,lease_until=now()+make_interval(secs=>$5),attempts=attempts+1,deadline=COALESCE(deadline,now()+make_interval(secs=>$6)),updated_at=now() WHERE workspace_id=$1 AND id=$2 RETURNING `+jobColumns, j.Workspace, j.ID, worker, rand.Text(), c.LeaseSeconds, c.MaxAttempts*c.LeaseSeconds+(c.MaxAttempts-1)*c.RetrySeconds))
+			j, err = scanJob(tx.QueryRow(ctx, `UPDATE automation_jobs SET state='running',reason='',worker=$3,lease=$4,lease_until=now()+make_interval(secs=>$5),attempts=attempts+CASE WHEN kind='triage' AND result IS NOT NULL AND result<>'null'::jsonb THEN 0 ELSE 1 END,deadline=COALESCE(deadline,now()+make_interval(secs=>$6)),updated_at=now() WHERE workspace_id=$1 AND id=$2 RETURNING `+jobColumns, j.Workspace, j.ID, worker, rand.Text(), c.LeaseSeconds, c.MaxAttempts*c.LeaseSeconds+(c.MaxAttempts-1)*c.RetrySeconds))
 			if err != nil {
 				return err
 			}
@@ -447,6 +450,11 @@ func (s *Service) Finish(ctx context.Context, j Job, result Result) error {
 	}
 	if response.Error != nil {
 		if response.Error.Code == "forbidden" {
+			var wait triageWait
+			checkErr := pgx.BeginFunc(ctx, s.Store.Database(), func(tx pgx.Tx) error { return s.checkBatch(ctx, tx, j, access.Principal{UserID: c.Controller}, false) })
+			if errors.As(checkErr, &wait) {
+				return s.deferTriage(ctx, j, string(wait))
+			}
 			return s.block(ctx, j, "authority_revoked")
 		}
 		return ErrLease

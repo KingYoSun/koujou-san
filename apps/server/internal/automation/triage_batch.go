@@ -241,7 +241,7 @@ func (s *Service) checkBatch(ctx context.Context, tx pgx.Tx, j Job, p access.Pri
 			return ErrInvalid
 		}
 		if b.State == "stopped" {
-			return access.ErrForbidden
+			return triageWait("batch_stopped")
 		}
 		if spending && b.Cost != nil {
 			state, err := s.batchCost(ctx, tx, p, j.Workspace, e.id, *b.Cost)
