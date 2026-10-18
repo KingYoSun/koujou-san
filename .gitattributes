@@ -3,3 +3,6 @@
 *.bat text eol=crlf
 *.png binary
 *.ico binary
+
+# Preserve verbatim upstream license and notice bytes.
+legal/third-party/** -text

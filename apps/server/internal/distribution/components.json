@@ -1,0 +1,32 @@
+{
+  "postgres": {
+    "image": "postgres:17.11-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826",
+    "license": "PostgreSQL",
+    "source": "https://github.com/postgres/postgres/tree/REL_17_11",
+    "license_url": "https://raw.githubusercontent.com/postgres/postgres/REL_17_11/COPYRIGHT"
+  },
+  "kratos": {
+    "image": "oryd/kratos:v26.2.0@sha256:2a13bb8d362c7a7ae33bd7c0f5168aee46921f15c916a06346db91c06dc76643",
+    "license": "Apache-2.0",
+    "source": "https://github.com/ory/kratos/tree/v26.2.0",
+    "license_url": "https://raw.githubusercontent.com/ory/kratos/v26.2.0/LICENSE"
+  },
+  "hydra": {
+    "image": "oryd/hydra:v26.2.0@sha256:ff67c7fb5f95074fa53374d41151713554960504b340cd3f95b09e65deaea2a9",
+    "license": "Apache-2.0",
+    "source": "https://github.com/ory/hydra/tree/v26.2.0",
+    "license_url": "https://raw.githubusercontent.com/ory/hydra/v26.2.0/LICENSE"
+  },
+  "arcadedb": {
+    "image": "arcadedata/arcadedb:26.10.1@sha256:01506549bcb4a6d16af678ee43718850eba605430a3720a6b0398cb0470c710d",
+    "license": "Apache-2.0",
+    "source": "https://github.com/ArcadeData/arcadedb/tree/26.10.1",
+    "license_url": "https://raw.githubusercontent.com/ArcadeData/arcadedb/26.10.1/LICENSE"
+  },
+  "bifrost": {
+    "image": "maximhq/bifrost:v2.3.0@sha256:8f37e33a8caa85faf59a875605c61d1d934738e517d8fe96e2d9fcf6f0ef9098",
+    "license": "Apache-2.0",
+    "source": "https://github.com/maximhq/bifrost/tree/9237ec06672406e437b3cb33fc793ffd0403b3ae",
+    "license_url": "https://raw.githubusercontent.com/maximhq/bifrost/9237ec06672406e437b3cb33fc793ffd0403b3ae/LICENSE"
+  }
+}

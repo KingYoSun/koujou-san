@@ -123,6 +123,6 @@
 
 ## Issue #29の準備
 
-状態: Planned。Scope revision 1。基準mainは`fb336a0df3ac10f4d6b03c7e9ecfc3db6994c399`。共有サーバーの配布先、Windows配布の署名・初期操作、自身のOSSライセンス、外部投稿の方針の四点を本人へ質問済み。[計画](2026-10-18-issue-29-plan.md)に五条件の判定方法と調査範囲を記録し、判断に依存する配布・UI・ライセンス変更は未着手。既存の配布設定と依存ライセンス情報の下見を行った。
+状態: In progress。Scope revision 1。基準mainは`fb336a0df3ac10f4d6b03c7e9ecfc3db6994c399`。本人がApache-2.0・DCO 1.1・Linux x86_64 Compose・接続先設定を持つ未署名Windowsプレビューと手動更新を承認した。[計画](2026-10-18-issue-29-plan.md)に五条件の判定方法と調査範囲を記録し、初期接続、privateな設定生成、起動・backup/restore・更新と配布buildを実装している。局所試験の後、固定配布物で五条件を検証する。
 
 #30〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。

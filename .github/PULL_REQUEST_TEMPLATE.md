@@ -50,3 +50,7 @@ AGENTS.md と docs/runbooks/issue-lifecycle.md を適用し、固定した末端
 - 監査者 / 記録 / 対象 commit / Scope revision:
 - AC / INVAR と証拠の照合、blocker、PASS / FAIL / INCONCLUSIVE:
 - 監査後の差分確認:
+
+## 新しい外部投稿の提出権限
+
+<!-- 採用後の新しい外部投稿に限る。本人がCONTRIBUTING.mdとDCO 1.1を確認し、各投稿コミットへSigned-off-byを付ける。AIは本人の表明を代行しない。既存履歴へ遡って付与しない。 -->

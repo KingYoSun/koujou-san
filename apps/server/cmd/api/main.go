@@ -34,6 +34,11 @@ import (
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	migrationOnly := len(os.Args) == 2 && os.Args[1] == "migrate"
+	if migrationOnly && os.Getenv("KOUJOU_DATABASE_URL") == "" {
+		slog.Error("migration requires a database")
+		os.Exit(1)
+	}
 	var ready func(context.Context) error
 	var routes []func(*http.ServeMux)
 	if databaseURL := os.Getenv("KOUJOU_DATABASE_URL"); databaseURL != "" {
@@ -43,6 +48,9 @@ func main() {
 			os.Exit(1)
 		}
 		defer store.Close()
+		if migrationOnly {
+			return
+		}
 		ready = store.Ready
 		if os.Getenv("KOUJOU_AUTH_ENABLED") == "1" {
 			service, err := auth.New(ctx, auth.Environment(), store.Database())

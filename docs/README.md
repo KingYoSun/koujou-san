@@ -44,3 +44,5 @@ IssueとPRは作業の追跡に使う。ユーザーから承認された変更�
 | `.github/` | Issue・PRの雛形とCI |
 
 この配置は開発の入口を用意するもの。Run、Context、認証、検索・関係探索などの製品機能は、Issueや依頼ごとの条件で順に実装する。
+
+標準配布の導入・backup・更新は[配布手順](runbooks/distribution.md)、採用した責務と初期対応環境は[ADR 0029](adr/0029-standard-distribution.md)を参照する。受入検証中の結果は[進捗記録](progress/current-state.md)で確認する。
