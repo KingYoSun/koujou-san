@@ -37,7 +37,7 @@
 | `test-results/issue28-independent-migration-upgrade.log` | 001〜022の旧Scope・Grouping・固定/採用値・Hopper設定・jobを投入して023へ移行。既存3テーブルの双方向EXCEPT一致、新規jobゼロ、旧受付日時維持がPASS |
 | `test-results/issue28-review-fixes-after2.log`、`issue28-review-fixes-final.log` | 一括停止→Worker巡回→再開、応答後停止→期限/試行上限後の保存結果の採用、旧API経由の実評価がPASS。修正差分は再検品の対象 |
 
-これらの合格は記録を取得した時点の範囲であり、最新差分の全条件合格を意味しない。[独立検品](2026-10-18-issue-28-inspection.md)の初回結果はblocker三件。修正差分の再確認、Context取得上限の判断、実provider・実GitHub・必須CI・マージ後照合が残っている。
+これらの合格は記録を取得した時点の範囲であり、最新差分の全条件合格を意味しない。[独立検品](2026-10-18-issue-28-inspection.md)の初回結果はblocker三件。二修正の差分再検品は`c0daf08`でPASS。Context取得上限の判断、実provider・実GitHub・必須CI・マージ後照合が残っている。
 
 ## 共通画面の観測
 
@@ -54,3 +54,5 @@ Chromeの所有環境で、手動P2を固定したまま推奨P1を保持、本�
 共通UIではブラウザで一巡し、新しいOS境界を変更しない限りTauriで同じ操作を重ねない。ユーザーが提示した入口から参照される`DESIGN.md`と`docs/adr/0014-uiux-dev-flow.md`は、このcheckoutには存在しなかった。既存のフォーム・履歴・権限表示を使い、指示書やデザイン文書を推測して新設しない。
 
 初回commit `ea4f2eb`のCI（run `39087728605`）はShared UI and server・Windows native client・GitGuardianがすべて成功した。独立検品の修正後のHEADについては、別途CIを確認する。`issue28-review-check.log`の静的検査もPASS。
+
+本人へ、Context取得固定版の初期上限、最大二要求の実モデル試験、一件のIssueと二つの一時ラベルのGitHub同期試験を質問済み。回答前には依存する実装・実接続を行わない。修正後CIはrun `39088269171`で進行中。
