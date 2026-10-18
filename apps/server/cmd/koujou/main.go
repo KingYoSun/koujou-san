@@ -48,39 +48,42 @@ func main() {
 		case "restore":
 			err = distribution.Restore(ctx, release, root, *backup)
 		default:
-			var d *distribution.Deployment
-			d, err = distribution.Open(root)
-			if err == nil {
-				var unlock func()
-				unlock, err = d.Lock()
-				if err == nil {
-					defer unlock()
-					switch command {
-					case "up":
-						if *llm {
-							err = d.EnableGateway()
-						}
-						if err == nil {
-							err = d.Up(ctx)
-						}
-					case "stop":
-						err = d.Stop(ctx)
-					case "status":
-						err = distribution.PrintStatus(os.Stdout, d.Settings)
-						if err == nil {
-							err = d.Status(ctx, os.Stdout)
-						}
-					case "bootstrap":
-						err = d.Bootstrap(ctx, *email, *password)
-					case "backup":
-						err = d.Backup(ctx, *backup)
-					case "update":
-						err = d.Update(ctx, release)
-					default:
-						err = fmt.Errorf("unknown operation")
-					}
+			err = func() error {
+				d, e := distribution.Open(root)
+				if e != nil {
+					return e
 				}
-			}
+				if command == "status" {
+					if e = distribution.PrintStatus(os.Stdout, d.Settings); e != nil {
+						return e
+					}
+					return d.Status(ctx, os.Stdout)
+				}
+				unlock, e := d.Lock()
+				if e != nil {
+					return e
+				}
+				defer unlock()
+				switch command {
+				case "up":
+					if *llm {
+						if e = d.EnableGateway(); e != nil {
+							return e
+						}
+					}
+					return d.Up(ctx)
+				case "stop":
+					return d.Stop(ctx)
+				case "bootstrap":
+					return d.Bootstrap(ctx, *email, *password)
+				case "backup":
+					return d.Backup(ctx, *backup)
+				case "update":
+					return d.Update(ctx, release)
+				default:
+					return fmt.Errorf("unknown operation")
+				}
+			}()
 		}
 	}
 	if err != nil {

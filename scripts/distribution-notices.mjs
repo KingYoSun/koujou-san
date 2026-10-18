@@ -73,19 +73,24 @@ function identify(text) {
 
 export async function notices(root, stage, target) {
   const records = [];
+  const overrides = JSON.parse(
+    await readFile(
+      path.join(root, "legal/third-party/crate-licenses.json"),
+      "utf8",
+    ),
+  );
   await mkdir(path.join(stage, "licenses"), { recursive: true });
   await mkdir(path.join(stage, "source", "dependencies"), { recursive: true });
   async function add(kind, name, version, dir, declared) {
     let files = readdirSync(dir).filter(
       (n) => names.test(n) && statSync(path.join(dir, n)).isFile(),
     );
-    if (
-      kind === "rust" &&
-      ["webview2-com", "webview2-com-sys"].includes(name) &&
-      version === "0.39.1"
-    ) {
+    const sourceDir = dir;
+    const override =
+      kind === "rust" ? overrides[`${name}@${version}`] : undefined;
+    if (override) {
       dir = path.join(root, "legal/third-party");
-      files = ["webview2-rs-LICENSE"];
+      files = [override.file];
     }
     if (files.length === 0 && kind === "rust") {
       let parent = path.dirname(dir);
@@ -115,7 +120,7 @@ export async function notices(root, stage, target) {
     let source;
     if (license.includes("MPL-2.0")) {
       source = `source/dependencies/${key}`;
-      await cp(dir, path.join(stage, source), {
+      await cp(sourceDir, path.join(stage, source), {
         recursive: true,
         dereference: true,
         filter: (f) =>

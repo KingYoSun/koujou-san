@@ -207,9 +207,16 @@ func Render(root string, s Settings) error {
 		if e != nil {
 			return e
 		}
-		if e = os.WriteFile(filepath.Join(config, name), b, 0600); e != nil {
+		mode := os.FileMode(0600)
+		if name == "postgres-init.sh" {
+			mode = 0644
+		}
+		if e = os.WriteFile(filepath.Join(config, name), b, mode); e != nil {
 			return e
 		}
+	}
+	if err = os.Chmod(filepath.Join(config, "postgres-init.sh"), 0644); err != nil {
+		return err
 	}
 	flows := object{}
 	for _, kind := range []string{"login", "registration", "settings", "recovery", "verification", "error"} {

@@ -394,9 +394,6 @@ func Restore(ctx context.Context, bundle, root, backup string) error {
 	if e = d.restoreDatabases(ctx, root); e != nil {
 		return e
 	}
-	if e = d.Up(ctx); e != nil {
-		return e
-	}
 	// Restore dumps have served their purpose; remove only these own copies.
 	return os.RemoveAll(filepath.Join(root, "databases"))
 }

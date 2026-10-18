@@ -26,3 +26,9 @@ Windowsの初期設定はHTTPS originと認証設定を確認した後にURLだ�
 `issue29-native-unit.log`は32件PASS・12件ignore（既存の実接続用）。最初の全体試験では既存sync-storeの1件が5秒でtimeoutし、Goと残りUI63件は成功した。内容を変えない`issue29-ui-retest.log`はUI18ファイル64件すべてPASS。原因は未確定で、並行compileとの時刻関係だけから環境起因と断定しない。
 
 WindowsのWebView2 static loaderは公式NuGet 1.0.3800.47とhash一致を確認した。ラッパーのMITとloaderのBSD-3-Clause、原SDKのnoticeを分け、原文をlegalへ保持した。NSIS 3.11のzipはTauri CLIの固定SHA-1と照合し、原licenseを保全した。これは配布物全体のAC-5判定の代替ではない。
+
+最初のserver配布物のbuildは`issue29-server-build1.log`でPASSし、固定imageとbundleを生成した。新規導入ではPostgreSQL init scriptのmodeが0600で内部postgresユーザーが読めず、rolesが一つも作られない状態を確認した。privateな診断記録にPermission deniedがあり、秘密値を含まないscriptだけ0644へ修正した。既存fileや復旧後にも適用するようchmodを明示した。
+
+失敗時にmainのos.Exitがdeferを飛ばして操作lockを残す点も修正し、lockの取得・解放を終了コード設定より内側の関数へ移した。statusは読取りとしてlockの外で取得する。最初のsmoke環境は所有projectだけを停止し、失敗の証拠を保持した。新しい空の保存先で再試験する。
+
+最初のdesktop buildは原文licenseを含まないcrateで停止した。metadataとVCS commitを照合して六つの不足を特定し、対応する原文を追加した。selectorsはsource headerが指すMPL-2.0の原文と、実際のcrate sourceを配布する。原文のある場所と対象sourceの場所を分離し、license補完で対象sourceを置き換えない。
