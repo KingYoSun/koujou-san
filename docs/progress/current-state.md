@@ -121,8 +121,8 @@
 
 状態: Complete。Scope revision 2。[PR #62](https://github.com/KingYoSun/koujou-san/pull/62)を最終head `fd620c07a5711246f0038d488d201d207c33b102`の全CI・全AC/INVARの独立検品PASS後にマージした。merge `fb336a0df3ac10f4d6b03c7e9ecfc3db6994c399`とのtreeは`d2647b333315069f2680a6487a0513056228993d`で一致、差分0。実OpenAI二要求、同じ合成Issue #63でのGitHub双方向同期・外部手動固定・後片付けまで確認し、#28を手動Closeした。失敗履歴・承認枠・未確認の実機条件は[検証記録](2026-10-18-issue-28-evidence.md)へ保持する。
 
-## Issue #29の準備
+## Issue #29の判定
 
-状態: In progress。Scope revision 1。基準mainは`fb336a0df3ac10f4d6b03c7e9ecfc3db6994c399`。本人がApache-2.0・DCO 1.1・Linux x86_64 Compose・接続先設定を持つ未署名Windowsプレビューと手動更新を承認した。[計画](2026-10-18-issue-29-plan.md)に五条件の判定方法と調査範囲を記録し、初期接続、privateな設定生成、起動・backup/restore・更新と配布buildを実装している。局所試験の後、固定配布物で五条件を検証する。
+状態: Inspection pending。Scope revision 1。[PR #64](https://github.com/KingYoSun/koujou-san/pull/64)。初期方針の四判断を反映し、Linux配布物の導入・二人の参加・backup/restore・投影再構築・schema 22→23の成功/失敗復旧、Windowsの初回URL保存・再起動・NSIS導入・Runner保護と再導入を確認した。固定候補`6189df56`は[独立検品](2026-10-18-issue-29-inspection.md)でAC-1〜5・INVAR-1〜3がPASS、blocker 0件。[検証記録](2026-10-18-issue-29-evidence.md)に失敗と修正、対象版とhashを保持する。実際の最終CIとマージ後照合は未完了。
 
 #30〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。

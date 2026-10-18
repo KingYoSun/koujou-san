@@ -38,3 +38,22 @@ WindowsのWebView2 static loaderは公式NuGet 1.0.3800.47とhash一致を確認
 実際の新規起動ではKratosとHydraのTLS設定形式、ログレベルとhealthcheckの違いも確認した。固定版のKratos schemaと既存の動作済みhealthcheckを照合して修正した。`issue29-server-up4.log`は修正CLIと`ed2c0bea`のimageを組み合わせた途中fixtureで起動成功した結果であり、最終配布物の新規導入の代替にはしない。`issue29-distribution-smoke7.log`は外部配送しないMailpitを使い、管理者初期化・自己登録・メール確認・二人のBFF認証・招待・版履歴・所属・参照関係とBleve/ArcadeDBの結果・反映位置を確認した。
 
 公開proxyでConnection headerが信頼する転送headerを取り除く経路は、`issue29-proxy-before.log`でFAILした。Go ReverseProxyのRewriteへ切り替え、転送headerの除去後に設定する形で同じ試験が成功した。外部からの転送headerを認証接続へ引き継がない。
+
+## 固定配布物での受入結果
+
+Linuxは`server-0.1.0-preview.1-050ae4df`、Windowsは`desktop-0.1.0-preview.1-6189df56`を対象にした。両候補間の`apps/server`差分は0。最終候補`6189df56f6c54eebe7c5916d6d41889ee7c72626`には、初回展開先を作る手順、実archiveを展開するCI、Windowsの埋込み修正を含む。ローカル成果物は公開リリースではなく、CIと独立検品の判定も別に確認する。
+
+| 条件 | 観測した結果と証拠 |
+| --- | --- |
+| AC-1 | 空のLinux保存先で配布CLI・固定imageを起動。管理者初期化、別利用者の自己登録・メール確認、二人のBFFログイン、Workspace作成と招待受諾を実通信で確認。`issue29-distribution-cycle3.log`。Windows初回画面で所有HTTPS接続先を保存し、再起動後もURL再入力なしでログイン・Workspace入口を表示。`issue29-native-setup-ui.json`。既存Web/Tauriのブラウザ復帰・ログアウトは[#5の証拠](2026-10-15-issue-5-evidence.md)を再利用した |
+| AC-2 | API/管理proxyのloopbackと公開入口だけのportを照合。公開から管理API・鍵へ到達しない局所HTTP試験がPASS。固定image、DB/role、issuer、SMTP、鍵の責務は[運用手順](../runbooks/distribution.md)と[ADR](../adr/0029-standard-distribution.md)に記録 |
+| AC-3 | Context二版、Scopeと所属、参照関係、未開始Run、二人の認証セッションを含むprivate backupを取得。新規保存先へrestore後、起動サービスはPostgreSQLのみで、検索領域は空。明示起動後、固定記録・履歴・二セッションと、再構築したBleve/ArcadeDBの結果・正本の反映位置が一致。任意Bifrostもprovider未設定・モデル要求0で起動し、backup前後を照合。`issue29-distribution-cycle3.log` |
+| AC-4 | #27 API `17def2aa914e0c31cf8a03360521e57864d060d0`とschema 22の保存処理、現行入口とstdin対応の管理コマンドを組み合わせた所有fixtureで確認。過去に配布済みの製品とは扱わない。新規`triage_targets`作成だけを失敗させ、更新コマンドが失敗を返し、旧版・三DB・二セッション・記録と投影が復旧。失敗条件を外した更新では実migration 23が適用され、同じ記録を照合。`issue29-distribution-update3.log` |
+| AC-5 | 本人の四判断と原文・固定依存・配布物を照合。最新NSISの新規導入でRunner・LICENSE・NOTICE・依存表示・source archiveの同梱とhashを確認。動作中の所有Runnerを終了させずinstallerがexit 2、終了後の手動再導入と所有installの削除が成功。`issue29-desktop-install4.log` |
+| INVAR-1〜3 | DB正本と再構築、既存CLI/repoの移行不要、認証SaaS契約不要、秘密値・backupのprivate保存と非公開経路を上記試験と独立検品で照合。外部LLM・GitHub・実メールへの要求は0 |
+
+Windowsの画面確認で、初期配布候補がファイル一覧を表示する失敗を観測した。Tauriの`custom-protocol`と、絶対Windows pathをURLとして解釈させない相対`frontendDist`を適用し、`http://tauri.localhost/`から埋込みUIが表示されることを確認した。実画面の対象binary SHA-256は`CD5C40969E764C9404AE459DF6B768848E37E2D44C0A7F8B410A75203565AD21`。新規のURL-only profileは検証後に削除し、既存のDPAPI認証情報は読取り・変更していない。
+
+旧Windows候補ではRunnerが二重に同梱され、installed hashが先にbuildしたコピーと異なる失敗も確認した。Tauri標準の追加binary同梱へ一本化し、最終build後のRunnerを照合対象にして解消した。更新fixtureの途中失敗は、現行bootstrapが旧DBを先にschema 23へ更新した点と、失敗triggerが旧版起動の`CREATE TABLE IF NOT EXISTS`まで拒否した点だった。schema 22の保存処理へ揃え、拒否対象を新規tableへ限定してから上記の成功を確認した。WSLの空portがWindows側の予約portに重なった失敗は、所有試験のportを明示して解消した。製品の公開URL設定や失敗保護を緩めていない。
+
+新しいWindows配布境界だけを実画面で確認した。実S3スリープと人による初見操作は、本人承認どおり未確認のまま#33に保持する。本Issueの結果で代替しない。
