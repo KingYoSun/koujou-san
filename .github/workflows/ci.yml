@@ -127,7 +127,9 @@ jobs:
           cp apps/server/cmd/auth-bootstrap/main.go .cache/distribution-previous/apps/server/cmd/auth-bootstrap/main.go
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 GOWORK=off "$PWD/.tools/go/bin/go" -C "$PWD/.cache/distribution-previous/apps/server" build -trimpath -o "$PWD/.cache/distribution-schema22-auth-bootstrap" ./cmd/auth-bootstrap
           .tools/go/bin/go -C apps/server run ./cmd/devcert "$PWD/.cache/distribution-tls"
-          bundle=$(find "$PWD/artifacts" -maxdepth 1 -type d -name 'server-*' -print -quit)
+          mkdir -p .cache/distribution-extracted
+          tar -xzf artifacts/koujou-san-server-linux-amd64-0.1.0-preview.1.tar.gz -C .cache/distribution-extracted
+          bundle="$PWD/.cache/distribution-extracted"
           python3 scripts/test-distribution-cycle.py "$bundle" "$PWD/.cache/distribution-schema22-api" "$PWD/.cache/distribution-tls" | tee test-results/distribution-cycle.log
 
       - name: Keep verification evidence

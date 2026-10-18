@@ -5,6 +5,7 @@ All Docker projects and files are newly created for this fixture and retained.
 """
 import hashlib
 import json
+import os
 from pathlib import Path
 import shutil
 import socket
@@ -40,7 +41,7 @@ def sql(state, statement):
 
 def initialize(state, release):
     with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
+        listener.bind(("127.0.0.1", int(os.environ.get("KOUJOU_TEST_DISTRIBUTION_PORT", "51429"))))
         port = listener.getsockname()[1]
     run([cli, "init", "--state", state, "--bundle", release, "--url", "https://127.0.0.1:" + str(port),
          "--smtp-file", root / "smtp", "--cert", tls / "cert.pem", "--key", tls / "key.pem", "--ca", tls / "cert.pem"])

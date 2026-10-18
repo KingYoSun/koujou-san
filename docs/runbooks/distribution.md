@@ -10,6 +10,7 @@ Linux x86_64、Docker EngineとCompose pluginを用意する。公開HTTPS origi
 
 ```sh
 umask 077
+mkdir -p ./bundle
 tar -xzf koujou-san-server-linux-amd64-0.1.0-preview.1.tar.gz -C ./bundle
 cd ./bundle
 chmod +x ./koujou
