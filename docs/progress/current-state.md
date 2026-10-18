@@ -131,4 +131,8 @@
 
 ## Issue #31の判定
 
-状態: In progress（独立検品PASS、CI確認中）。本人の判断に従い、検証済み変更の自動反映と、明示有効化後の新しい確定出力からの処理を実装した。[計画](2026-10-18-issue-31-plan.md)のAC-1〜7・INVAR-1〜3に対応する実PG・実Ory/MCP・二つの所有モデルと共通Web画面の結果は[証跡](2026-10-18-issue-31-evidence.md)を参照。[固定commitの独立検品](2026-10-18-issue-31-inspection.md)は全条件PASS。必須CI、マージ後照合が残る。#33へ移した実S3スリープと初見操作は未確認のまま保持する。
+状態: Complete。Scope revision 1。[PR #66](https://github.com/KingYoSun/koujou-san/pull/66)を最終head `1c8fd239038a90ec5711485c74a537cb364cb27c` の全CI成功後にマージした。全AC・INVARの[独立検品](2026-10-18-issue-31-inspection.md)はPASS、blockerなし。merge `cfca32923449ce6f24347088c12ea0ad1834b204`と最終headのtreeは`c27c07810e107d3bd226bd6cb6d35a409734db6d`で一致、差分0。Linux配布物のschema 22→24更新と復元、Windows配布物もCIで成功し、#31を手動Closeした。[証跡](2026-10-18-issue-31-evidence.md)を参照する。
+
+## Issue #32の判定
+
+状態: In progress（独立検品PASS、CI確認中）。本人が承認した条件による二群比較、料金根拠と明示再評価、通常編集への導線を実装した。[計画](2026-10-19-issue-32-plan.md)の六条件と維持条件に対応する実PG・実Ory/MCP・共有Chrome操作と回帰試験は[証跡](2026-10-19-issue-32-evidence.md)を参照。[固定commitの独立検品](2026-10-19-issue-32-inspection.md)は全条件PASS。最終CIとmerge後照合が残る。#33へ移した実S3スリープと初見操作は未確認のまま保持する。

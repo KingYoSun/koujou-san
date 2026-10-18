@@ -53,3 +53,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0030: 自由入力からのRun定義と共通の検証・採用](0030-run-definition-generation.md)
 
 - [0031: 固定出力からのContext生成と版付き反映](0031-output-context-generation.md)
+
+- [0032: 費用・品質・時間の二群比較](0032-cost-quality-comparison.md)

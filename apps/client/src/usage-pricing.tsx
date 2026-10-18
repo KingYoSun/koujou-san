@@ -1,3 +1,6 @@
+import { UsageRecordDetails } from "./usage-record-details";
+import { allowAnswerScope, answerScopeEpoch } from "./sync-store";
+import { UsageComparison } from "./usage-comparison";
 import { useRef, useState } from "react";
 import { syncRequest } from "./auth";
 import { SyncHTTPError } from "./sync-error";
@@ -49,10 +52,14 @@ export function UsagePricing({
   native,
   workspace,
   role,
+  api,
+  user,
 }: {
   native: boolean;
   workspace: string;
   role: string;
+  api: string;
+  user: string;
 }) {
   const [mode, setMode] = useState("aggregate");
   const [kind, setKind] = useState("usage");
@@ -125,17 +132,19 @@ export function UsagePricing({
       setBusy(false);
     }
   };
-  const read = async (r: RecordView) => {
+  const read = async (r: { id: string; version: string }) => {
     setBusy(true);
     setMessage("");
     try {
+      const epoch = answerScopeEpoch({ api, user, workspace });
       const response = (await syncRequest(
         `${base}/records/${encodeURIComponent(r.id)}?version=${encodeURIComponent(r.version)}`,
         native,
         { method: "GET" },
       )) as RecordView;
+      if (!allowAnswerScope({ api, user, workspace }, epoch)) return;
       setDetail(response);
-      if (r.kind === "price") {
+      if (response.kind === "price") {
         setPrice(response.value as Price);
         setPriceID(r.id);
         setVersion(r.version);
@@ -167,7 +176,15 @@ export function UsagePricing({
       )) as { data: { id: string; version: string } };
       setPriceID(response.data.id);
       setVersion(response.data.version);
-      setMessage("料金版を保存しました。過去の費用評価は変更されません。");
+      setDetail({
+        id: response.data.id,
+        version: response.data.version,
+        kind: "price",
+        value: price,
+      });
+      setMessage(
+        `料金版 ${response.data.id} @ ${response.data.version} を保存しました。過去の費用評価は変更されません。`,
+      );
     } catch (e) {
       fail(e);
     } finally {
@@ -180,6 +197,14 @@ export function UsagePricing({
       <p>
         個別契約単価を含め、既定ではWorkspace内で共有します。接続先・契約は識別名で登録し、APIキーは入力しないでください。履歴は無期限に保持します。
       </p>
+      <UsageComparison
+        native={native}
+        workspace={workspace}
+        role={role}
+        api={api}
+        user={user}
+        onInspect={read}
+      />
       <div className="team-controls">
         <label>
           表示
@@ -313,10 +338,7 @@ export function UsagePricing({
         </>
       )}
       {detail && (
-        <details open>
-          <summary>選択した固定版</summary>
-          <pre>{show(detail)}</pre>
-        </details>
+        <UsageRecordDetails record={detail} onRead={(r) => void read(r)} />
       )}
       {role !== "viewer" && (
         <fieldset disabled={busy}>

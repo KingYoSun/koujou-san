@@ -124,7 +124,12 @@ export function ContextWorkspace({
     },
   };
   return (
-    <section className="context-workspace" aria-label="コンテキスト管理">
+    <section
+      id="cost-context-editor"
+      tabIndex={-1}
+      className="context-workspace"
+      aria-label="コンテキスト管理"
+    >
       <header className="context-heading">
         <div>
           <p className="eyebrow">CONTEXT LIBRARY</p>
@@ -169,7 +174,9 @@ export function ContextWorkspace({
         <ContextEditor ui={ui} />
         <ContextPreview ui={ui} />
       </div>
-      <ClientSelection key={`${api}/${user}/${workspace}`} ui={ui} />
+      <div id="cost-model-editor" tabIndex={-1}>
+        <ClientSelection key={`${api}/${user}/${workspace}`} ui={ui} />
+      </div>
       <ContextGeneration
         key={`generation:${api}/${user}/${workspace}`}
         ui={ui}

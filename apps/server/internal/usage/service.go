@@ -142,6 +142,12 @@ func (s *Service) put(ctx context.Context, p access.Principal, w, id string, req
 			return empty, ErrInvalid
 		}
 		value = v
+	case "comparison":
+		var v Comparison
+		if decode(req.Value, &v) != nil || v.validate() != nil {
+			return empty, ErrInvalid
+		}
+		value = v
 	case "evaluation":
 		var v Evaluation
 		if decode(req.Value, &v) != nil || req.ExpectedVersion != "0" {
@@ -240,6 +246,27 @@ func (s *Service) put(ctx context.Context, p access.Principal, w, id string, req
 			}
 			if _, err = tx.Exec(ctx, `INSERT INTO usage_group_updates VALUES($1,$2,$3,$4,$5,$6,$7)`, w, group, seq, from, until, id, ref.Version); err != nil {
 				return nil, err
+			}
+		case Comparison:
+			for _, condition := range []Request{v.Left, v.Right} {
+				deps = append(deps, condition.Basis...)
+				for _, scope := range condition.Scopes {
+					deps = append(deps, Ref{ID: "scope:" + scope})
+				}
+				if condition.Workflow != "" {
+					deps = append(deps, Ref{ID: condition.Workflow})
+				}
+				if condition.AttributionID != "" {
+					deps = append(deps, Ref{ID: condition.AttributionID})
+				}
+			}
+			for _, dep := range uniqueRefs(deps) {
+				if err := s.Access.CheckTx(ctx, tx, p, w, dep.ID, "get"); err != nil {
+					return nil, err
+				}
+				if err := s.Access.CheckVersion(ctx, tx, p, w, dep.ID, dep.Version); err != nil {
+					return nil, err
+				}
 			}
 		case Evaluation:
 			group = v.Group

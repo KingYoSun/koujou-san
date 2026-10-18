@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -76,6 +77,8 @@ func checkUsageMCP(t *testing.T, s *Service, p access.Principal, ordinary string
 		t.Fatal("cost fixture", evaluated, e)
 	}
 	for _, query := range []usage.Request{
+		{Mode: "compare", Kind: "estimated", From: price.From, Until: price.From.AddDate(1, 0, 0), Limit: 50},
+		{Mode: "compare_details", Kind: "estimated", From: price.From, Until: price.From.AddDate(1, 0, 0), Limit: 50},
 		{Mode: "records", Kind: "usage", Limit: 50}, {Mode: "records", Kind: "evaluation", Limit: 50},
 		{Mode: "aggregate", Kind: "estimated", From: price.From, Until: price.From.AddDate(1, 0, 0), Limit: 50},
 		{Mode: "export", Kind: "estimated", From: price.From, Until: price.From.AddDate(1, 0, 0), Limit: 50},
@@ -100,11 +103,18 @@ func checkUsageMCP(t *testing.T, s *Service, p access.Principal, ordinary string
 	setPricePolicy(true)
 	call(session, "usage_get", ref, true)
 	call(session, "usage_get", usage.Ref{ID: evaluated.Data.ID, Version: evaluated.Data.Version}, true)
-	for _, mode := range []string{"aggregate", "export"} {
+	for _, mode := range []string{"aggregate", "export", "compare", "compare_details"} {
 		body := call(session, "usage_query", usage.Request{Mode: mode, Kind: "estimated", From: price.From, Until: price.From.AddDate(1, 0, 0), Limit: 50}, false)
 		var page apicontract.Response[usage.Page]
 		_ = json.Unmarshal(body, &page)
-		if page.Data == nil || len(page.Data.Items) != 0 {
+		if page.Data == nil {
+			t.Fatal("private query unavailable", mode, string(body))
+		}
+		if mode == "compare" || mode == "compare_details" {
+			if strings.Contains(string(body), "price:personal") || strings.Contains(string(body), `"amount":"0.100000"`) {
+				t.Fatal("private price leaked through comparison", mode, string(body))
+			}
+		} else if len(page.Data.Items) != 0 {
 			t.Fatal("private price basis leaked via MCP", mode, string(body))
 		}
 	}

@@ -348,7 +348,11 @@ export function Workflows({
     /* The raw editor retains invalid input until corrected. */
   }
   return (
-    <details className="team-details workflow-editor">
+    <details
+      id="cost-definition-editor"
+      tabIndex={-1}
+      className="team-details workflow-editor"
+    >
       <summary>工程定義・検証・採用と実行</summary>
       <p>
         定義の保存・検証・採用と、実行開始を分けます。必要な固定入力と接続だけを指定します。
