@@ -1,0 +1,296 @@
+import { useEffect, useRef, useState } from "react";
+import { syncRequest } from "./auth";
+import { editorStore, identityKey, contextPath, type UI } from "./context-ui";
+import { ClientSelection } from "./client-selection";
+import type { GenerationPolicy } from "./client-selection-host";
+import type { ModelProfile, VersionRef } from "./model-connections";
+import { allowAnswerScope, answerScopeEpoch } from "./sync-store";
+import { ContextGenerationResults } from "./context-generation-results";
+import { ContextGenerationAutomation } from "./context-generation-automation";
+import { useContextGenerationWorker } from "./context-generation-worker";
+
+export type OutputContextSource = {
+  workspace: string;
+  run: VersionRef;
+  output: VersionRef;
+  channel: string;
+};
+type Preview = {
+  run: VersionRef;
+  output: {
+    ref: VersionRef;
+    path: string[];
+    digest: string;
+    selected_utf8: string;
+  };
+  extras: unknown[];
+};
+export function ContextGeneration({
+  ui,
+  source: request,
+}: {
+  ui: UI;
+  source?: OutputContextSource;
+}) {
+  const [store] = useState(() => editorStore());
+  const [runID, setRunID] = useState(""),
+    [outputID, setOutputID] = useState(""),
+    [outputVersion, setOutputVersion] = useState(""),
+    [pointer, setPointer] = useState(""),
+    [channel, setChannel] = useState("report");
+  const [source, setSource] = useState<GenerationPolicy["source"]>(),
+    [preview, setPreview] = useState<Preview>(),
+    [notice, setNotice] = useState(""),
+    [busy, setBusy] = useState(false);
+  const [fixed, setFixed] = useState<GenerationPolicy["fixed"]>([]),
+    [groupScopes, setGroupScopes] = useState<GenerationPolicy["group_scopes"]>(
+      [],
+    ),
+    [scopeID, setScopeID] = useState("");
+  const [profile, setProfile] = useState<ModelProfile>(),
+    [result, setResult] = useState<VersionRef>(),
+    [initial, setInitial] = useState<VersionRef>();
+  const target = useRef<VersionRef>({
+    id: `context-result:${crypto.randomUUID()}`,
+    version: "0",
+  });
+  const namespace = { api: ui.api, user: ui.user, workspace: ui.workspace };
+  const base = `/client-operations/workspaces/${encodeURIComponent(ui.workspace)}`;
+  const workerNotice = useContextGenerationWorker(ui, setResult);
+  const path = () =>
+    pointer === ""
+      ? []
+      : pointer
+          .replace(/^\//, "")
+          .split("/")
+          .map((p) => p.replace(/~1/g, "/").replace(/~0/g, "~"));
+  async function prepare(input?: OutputContextSource) {
+    setBusy(true);
+    setNotice("");
+    const epoch = answerScopeEpoch(namespace);
+    try {
+      const run =
+        input?.run ??
+        ((await syncRequest(
+          `/runs/workspaces/${encodeURIComponent(ui.workspace)}/records/${encodeURIComponent(runID)}?version=head`,
+          ui.native,
+          { method: "GET" },
+        )) as VersionRef);
+      const output = input?.output ?? { id: outputID, version: outputVersion };
+      const selected = {
+        run: { id: run.id, version: run.version },
+        output,
+        path: path(),
+      };
+      const data = (await syncRequest(base + "/generation/preview", ui.native, {
+        method: "POST",
+        body: selected,
+      })) as Preview;
+      if (!allowAnswerScope(namespace, epoch)) return;
+      setSource(selected);
+      setPreview(data);
+      setInitial(undefined);
+      target.current = {
+        id: `context-result:${crypto.randomUUID()}`,
+        version: "0",
+      };
+      if (input) {
+        setRunID(input.run.id);
+        setOutputID(input.output.id);
+        setOutputVersion(input.output.version);
+        setChannel(input.channel);
+      }
+    } catch {
+      setNotice("固定した出力・対象箇所・現在の閲覧権限を確認してください。");
+    } finally {
+      setBusy(false);
+    }
+  }
+  useEffect(() => {
+    if (request?.workspace === ui.workspace) void prepare(request);
+  }, [
+    request?.run.id,
+    request?.run.version,
+    request?.output.id,
+    request?.output.version,
+    request?.workspace,
+  ]);
+  async function group() {
+    try {
+      const data = await ui.request<{
+        ref: { kind: "scope"; id: string; revision: string };
+        value: { kind: string; name: string };
+      }>(
+        `${contextPath(ui.workspace, { kind: "scope", id: scopeID })}?revision=head`,
+      );
+      if (data.data)
+        setGroupScopes((current) => [
+          ...current.filter((r) => r.id !== scopeID),
+          data.data!.ref,
+        ]);
+    } catch {
+      setNotice("所属先のScopeを取得できません。");
+    }
+  }
+  function lockSelected() {
+    const selected = ui.store.getState().selected;
+    if (
+      !selected ||
+      !["sentence", "paragraph", "section", "document"].includes(selected.kind)
+    )
+      return;
+    const key = identityKey(selected),
+      draft = ui.engine.state.drafts[key],
+      body = draft?.value ?? ui.engine.state.items[key]?.record.value;
+    const ref =
+      draft?.base.record.ref ?? ui.engine.state.items[key]?.record.ref;
+    if (!body || !ref || ref.revision === "0") return;
+    const fields = Object.fromEntries(
+      ["name", selected.kind === "sentence" ? "text" : "title"]
+        .filter((k) => k in body)
+        .map((k) => [k, JSON.stringify(body[k])]),
+    );
+    setFixed((current) => [
+      ...current.filter((v) => identityKey(v.ref) !== key),
+      { ref, fields },
+    ]);
+  }
+  async function openOperation(ref: VersionRef) {
+    try {
+      const op = (await syncRequest(
+        `${base}/records/${encodeURIComponent(ref.id)}?version=head`,
+        ui.native,
+        { method: "GET" },
+      )) as {
+        value: { policy: VersionRef; target: VersionRef; applied?: VersionRef };
+      };
+      const policy = (await syncRequest(
+        `${base}/records/${encodeURIComponent(op.value.policy.id)}?version=${encodeURIComponent(op.value.policy.version)}`,
+        ui.native,
+        { method: "GET" },
+      )) as { value: { generation: GenerationPolicy } };
+      target.current = op.value.applied ?? op.value.target;
+      setSource(policy.value.generation.source);
+      setFixed(policy.value.generation.fixed);
+      setGroupScopes(policy.value.generation.group_scopes);
+      setInitial(ref);
+    } catch {
+      setNotice("操作を取得できません。現在の権限を確認してください。");
+    }
+  }
+  return (
+    <details
+      className="team"
+      open={!!request}
+      aria-label="出力からのContext生成"
+    >
+      <summary>出力からContextを作成・更新</summary>
+      <p>
+        作業と判断で選んだ出力を使います。原出力・検品判定・過去の入力を置き換えません。
+      </p>
+      <details>
+        <summary>元の出力をIDで指定</summary>
+        <label>
+          元Run ID
+          <input value={runID} onChange={(e) => setRunID(e.target.value)} />
+        </label>
+        <label>
+          出力ID
+          <input
+            value={outputID}
+            onChange={(e) => setOutputID(e.target.value)}
+          />
+        </label>
+        <label>
+          出力の固定版
+          <input
+            value={outputVersion}
+            onChange={(e) => setOutputVersion(e.target.value)}
+          />
+        </label>
+      </details>
+      <label>
+        対象箇所（JSON pointer・空欄はこの出力全体）
+        <input value={pointer} onChange={(e) => setPointer(e.target.value)} />
+      </label>
+      <button
+        disabled={busy || !runID || !outputID || !outputVersion}
+        onClick={() => void prepare()}
+      >
+        固定した出力と対象箇所を確認
+      </button>
+      {preview && (
+        <details>
+          <summary>固定した元出力の箇所</summary>
+          <pre>{preview.output.selected_utf8}</pre>
+          <small>digest: {preview.output.digest}</small>
+        </details>
+      )}
+      <button disabled={!ui.canCreate} onClick={lockSelected}>
+        選択中Contextの本文・名称を固定
+      </button>
+      {fixed.map((lock) => (
+        <p key={lock.ref.id}>
+          {lock.ref.kind}:{lock.ref.id} · 固定:{" "}
+          {Object.keys(lock.fields).join("、")}
+          <button onClick={() => setFixed(fixed.filter((v) => v !== lock))}>
+            固定を外す
+          </button>
+        </p>
+      ))}
+      <label>
+        所属先Scope ID（文書構成と別）
+        <input value={scopeID} onChange={(e) => setScopeID(e.target.value)} />
+      </label>
+      <button disabled={!scopeID} onClick={() => void group()}>
+        所属先を取得
+      </button>
+      {groupScopes.map((ref) => (
+        <p key={ref.id}>
+          {ref.id}
+          <button
+            onClick={() =>
+              setGroupScopes(groupScopes.filter((r) => r.id !== ref.id))
+            }
+          >
+            所属先から外す
+          </button>
+        </p>
+      ))}
+      {source && (
+        <ClientSelection
+          ui={{ ...ui, store }}
+          generation={{
+            target: target.current,
+            policy: { source, fixed, group_scopes: groupScopes },
+            initial,
+            onProfile: setProfile,
+            onApplied: async (ref) => {
+              target.current = { id: ref.id, version: ref.version };
+              setResult(ref);
+              await ui.engine.refresh();
+            },
+          }}
+        />
+      )}
+      <ContextGenerationAutomation
+        ui={ui}
+        source={source}
+        fixed={fixed}
+        groupScopes={groupScopes}
+        profile={profile}
+        channel={channel}
+        onOpen={(ref) => void openOperation(ref)}
+      />
+      {result && (
+        <ContextGenerationResults
+          ui={ui}
+          result={result}
+          onOpen={(ref) => ui.store.getState().choose(ref)}
+        />
+      )}
+      <p role="status">{notice}</p>
+      <p role="status">{workerNotice}</p>
+    </details>
+  );
+}

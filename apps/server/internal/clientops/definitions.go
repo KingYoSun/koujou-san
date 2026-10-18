@@ -47,6 +47,9 @@ func definitionPath(path string) bool {
 	return false
 }
 func validPolicyKind(id string, p Policy) bool {
+	if p.Generation != nil {
+		return p.Definition == nil && strings.HasPrefix(id, "context-policy:") && generationFields(p.Generation)
+	}
 	if p.Definition == nil {
 		return strings.HasPrefix(id, "selection-policy:")
 	}
@@ -85,6 +88,24 @@ func (s *Service) target(ctx context.Context, tx pgx.Tx, p access.Principal, w s
 	return Record{Ref: r.Ref, Kind: r.Kind, Value: r.Value, Refs: r.Refs}, err
 }
 func decodeOperationProposal(b []byte, purpose string, p *Proposal) error {
+	if purpose == "context-generation" {
+		var v struct {
+			ChangesUTF8 string   `json:"changes_utf8"`
+			Reason      string   `json:"reason"`
+			Questions   []string `json:"questions"`
+			Unknown     []string `json:"unknown"`
+		}
+		if decode(b, &v) != nil || v.Questions == nil || v.Unknown == nil || v.Reason == "" || !json.Valid([]byte(v.ChangesUTF8)) {
+			return ErrInvalid
+		}
+		var changes GenerationProposal
+		if decode([]byte(v.ChangesUTF8), &changes) != nil || changes.Changes == nil || changes.Grouping == nil || changes.Candidates == nil {
+			return ErrInvalid
+		}
+		*p = Proposal{Items: []Item{}, ChangesUTF8: v.ChangesUTF8, Reason: v.Reason, Questions: v.Questions, Unknown: v.Unknown}
+		return nil
+	}
+
 	if purpose != "definition" {
 		return decodeProposal(b, p)
 	}

@@ -127,4 +127,5 @@ func TestClientOperationsPostgres(t *testing.T) {
 	})
 	t.Run("client_operation_ownership_replay_pause_limits_and_usage", func(t *testing.T) { checkOperations(t, s) })
 	t.Run("generated_definitions_use_normal_validation_and_never_start", func(t *testing.T) { checkDefinitions(t, s) })
+	t.Run("fixed_output_to_Context_keeps_records_and_authority", func(t *testing.T) { checkContextGeneration(t, s) })
 }

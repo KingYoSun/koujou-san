@@ -1,6 +1,7 @@
 package clientops
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -64,12 +65,15 @@ type Start struct {
 	Client  string `json:"client"`
 }
 
-func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, req Start) (apicontract.Response[apicontract.Reference], error) {
+func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, req Start, within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
 	targetPrefix := "client-selection:"
 	if req.Purpose == "definition" {
 		targetPrefix = "run-definition:"
 	}
-	if !strings.HasPrefix(id, "client-operation:") || !strings.HasPrefix(req.Target.ID, targetPrefix) || req.Target.Version == "" || req.Target.Version == "head" || req.Goal == "" || !validModel(req.Model) || (req.Purpose != "selection" && req.Purpose != "inspection" && req.Purpose != "definition") || p.OperationID != "" {
+	if req.Purpose == "context-generation" {
+		targetPrefix = "context-result:"
+	}
+	if !strings.HasPrefix(id, "client-operation:") || !strings.HasPrefix(req.Target.ID, targetPrefix) || req.Target.Version == "" || req.Target.Version == "head" || req.Goal == "" || (!validModel(req.Model) && !(req.Purpose == "context-generation" && bytes.Equal(raw(req.Model), raw(Model{})))) || (req.Purpose != "selection" && req.Purpose != "inspection" && req.Purpose != "definition" && req.Purpose != "context-generation") || p.OperationID != "" {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
 	return s.mutate(ctx, p, w, id, req.Mutation, req, func(tx pgx.Tx, r Ref) (Record, error) {
@@ -77,10 +81,13 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 		if err != nil {
 			return Record{}, err
 		}
-		if policy.Mode == "manual" {
+		if policy.Mode == "manual" && req.Purpose != "context-generation" {
 			return Record{}, ErrState
 		}
-		if (policy.Definition != nil) != (req.Purpose == "definition") {
+		if !(policy.Mode == "manual" && req.Purpose == "context-generation") && !validModel(req.Model) {
+			return Record{}, ErrInvalid
+		}
+		if (policy.Definition != nil) != (req.Purpose == "definition") || (policy.Generation != nil) != (req.Purpose == "context-generation") {
 			return Record{}, ErrInvalid
 		}
 		if req.Target.Version != "0" {
@@ -89,6 +96,13 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 				return Record{}, err
 			}
 			if err = s.checkRefs(ctx, tx, p, w, append(append([]Ref{}, v.Refs...), v.Ref)); err != nil {
+				return Record{}, err
+			}
+		}
+		var generationDependencies []Ref
+		if policy.Generation != nil {
+			_, generationDependencies, err = s.generationSource(ctx, p, w, policy.Generation)
+			if err != nil {
 				return Record{}, err
 			}
 		}
@@ -105,7 +119,15 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 			id      string
 			bounded bool
 		}{{op.ReadOperation, policy.Fixed.Mode == "none" || len(policy.Scopes) > 0}, {op.CandidateOperation, policy.Fixed.Mode == "none"}} {
-			allowed := refs(policy.Fixed)
+			allowed := append([]Ref{}, refs(policy.Fixed)...)
+			for _, dependency := range generationDependencies {
+				// Source dependencies authorize the selected output; they do not grant the
+				// model direct access to unrelated library content outside its Scope.
+				if o.id == op.CandidateOperation || !strings.HasPrefix(dependency.ID, "context:") {
+					allowed = append(allowed, dependency)
+				}
+			}
+			allowed = append(allowed, generationRefs(policy.Generation)...)
 			if policy.Definition != nil {
 				allowed = append(allowed, policy.Definition.Sources...)
 				if req.Target.Version != "0" {
@@ -137,6 +159,8 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 			}
 		}
 		dependencies := append([]Ref{req.Policy}, refs(policy.Fixed)...)
+		dependencies = append(dependencies, generationDependencies...)
+		dependencies = append(dependencies, generationRefs(policy.Generation)...)
 		if policy.Definition != nil {
 			dependencies = append(dependencies, policy.Definition.Sources...)
 		}
@@ -150,10 +174,11 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 			dependencies = append(dependencies, req.Target)
 		}
 		return s.save(ctx, tx, w, p, r, "operation", op, dependencies)
-	})
+	}, within...)
 }
 
 type Action struct {
+	ChangesUTF8       string   `json:"changes_utf8,omitempty"`
 	DefinitionSources []Ref    `json:"definition_sources,omitempty"`
 	Paths             []string `json:"paths,omitempty"`
 	apicontract.Mutation
@@ -183,7 +208,11 @@ func (s *Service) currentPolicy(ctx context.Context, tx query, p access.Principa
 	if version != op.Policy.Version {
 		return Policy{}, ErrState
 	}
-	return s.policy(ctx, tx, p, w, op.Policy)
+	policy, err := s.policy(ctx, tx, p, w, op.Policy)
+	if err == nil && policy.Generation != nil {
+		err = s.generationControl(ctx, tx, p, w, policy.Generation.Activation)
+	}
+	return policy, err
 }
 func (s *Service) Act(ctx context.Context, p access.Principal, w, id string, req Action) (apicontract.Response[apicontract.Reference], error) {
 	return s.mutate(ctx, p, w, id, req.Mutation, req, func(tx pgx.Tx, r Ref) (Record, error) {
@@ -192,6 +221,22 @@ func (s *Service) Act(ctx context.Context, p access.Principal, w, id string, req
 			return Record{}, err
 		}
 		switch req.Kind {
+		case "revise":
+			if op.Purpose != "context-generation" || op.Client != req.Client || op.State == "applied" || op.State == "cancelled" {
+				return Record{}, ErrState
+			}
+			var changes GenerationProposal
+			if decode([]byte(req.ChangesUTF8), &changes) != nil || changes.Changes == nil || changes.Grouping == nil || changes.Candidates == nil {
+				return Record{}, ErrInvalid
+			}
+			proposal := Proposal{Items: []Item{}, ChangesUTF8: req.ChangesUTF8, Reason: "Edited explicitly by the requester", Questions: []string{}, Unknown: []string{}, Manual: true}
+			proposalRef, err := s.writeRelated(ctx, tx, p, w, "client-proposal:manual:"+r.Version, "proposal", proposal, append(old.Refs, old.Ref), id)
+			if err != nil {
+				return Record{}, err
+			}
+			op.Proposal = &proposalRef
+			op.State = "proposal"
+			op.Reason = ""
 		case "takeover":
 			if req.Client == "" || op.State == "applied" || op.State == "cancelled" {
 				return Record{}, ErrState
@@ -328,7 +373,20 @@ func (s *Service) Begin(ctx context.Context, p access.Principal, w, id string, r
 		if err != nil {
 			return Record{}, err
 		}
+		if policy.Mode == "manual" {
+			return Record{}, ErrState
+		}
 		reader := access.Principal{UserID: p.UserID, OperationID: op.ReadOperation}
+		if policy.Generation != nil {
+			_, deps, err := s.generationSource(ctx, p, w, policy.Generation)
+			if err != nil {
+				return Record{}, err
+			}
+			if err = s.checkRefs(ctx, tx, access.Principal{UserID: p.UserID, OperationID: op.CandidateOperation}, w, append(deps, generationRefs(policy.Generation)...)); err != nil {
+				return Record{}, err
+			}
+		}
+
 		observed, err := s.mcpSources(ctx, tx, w, op.ReadOperation, nil, false)
 		if err != nil {
 			return Record{}, err
@@ -399,6 +457,9 @@ func (s *Service) Begin(ctx context.Context, p access.Principal, w, id string, r
 func (s *Service) adopt(ctx context.Context, tx pgx.Tx, p access.Principal, w string, operation Ref, op *Operation) error {
 	if op.Purpose == "definition" {
 		return s.adoptDefinition(ctx, tx, p, w, operation, op)
+	}
+	if op.Purpose == "context-generation" {
+		return s.adoptGeneration(ctx, tx, p, w, operation, op)
 	}
 	policy, err := s.currentPolicy(ctx, tx, p, w, *op)
 	if err != nil {

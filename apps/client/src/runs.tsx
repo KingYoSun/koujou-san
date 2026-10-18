@@ -6,6 +6,8 @@ import { RunnerSettings } from "./runner-settings";
 import { ExecutionSettings } from "./execution-settings";
 import { allowAnswerScope, answerScopeEpoch, syncStorage } from "./sync-store";
 import { PauseAnswer, PauseResponse, QuestionView } from "./run-pause";
+import { RunOutputRecord, handoffOutput } from "./run-output-record";
+import type { OutputContextSource } from "./context-generation";
 import type { Pause } from "./run-pause";
 
 type Ref = { id: string; version: string };
@@ -135,6 +137,7 @@ export function RunRecords({
   role,
   canExecute,
   selected,
+  onGenerate,
 }: {
   native: boolean;
   api: string;
@@ -143,6 +146,7 @@ export function RunRecords({
   role: string;
   canExecute: boolean;
   selected?: Ref;
+  onGenerate?: (source: OutputContextSource) => void;
 }) {
   const [deviceID, setDeviceID] = useState(""),
     [repoID, setRepoID] = useState("");
@@ -894,41 +898,29 @@ export function RunRecords({
                             )}
                         </>
                       ) : (
-                        <details>
-                          <summary>
-                            {record.kind} · {record.id} · {record.version}
-                          </summary>
-                          <pre>{show(record.value)}</pre>
-                          {canEdit && record.kind === "output" && (
-                            <button
-                              disabled={busy}
-                              onClick={() => {
-                                const same =
-                                  handoff && previous?.id === current.id;
-                                setPrevious({
-                                  id: current.id,
-                                  version: current.version,
-                                });
-                                setHandoff(true);
-                                setOutputs((old) => [
-                                  ...(same
-                                    ? old.filter(
-                                        (r) =>
-                                          r.id !== record.id ||
-                                          r.version !== record.version,
-                                      )
-                                    : []),
-                                  record,
-                                ]);
-                                setNotice(
-                                  "この固定出力を引継ぎ入力へ追加しました。新Runの入力欄で確認してください。",
-                                );
-                              }}
-                            >
-                              この固定出力を新Runへ引き継ぐ
-                            </button>
-                          )}
-                        </details>
+                        <RunOutputRecord
+                          record={record}
+                          current={current}
+                          workspace={workspace}
+                          editable={canEdit}
+                          busy={busy}
+                          onGenerate={onGenerate}
+                          onHandoff={() => {
+                            const next = handoffOutput(
+                              current,
+                              record,
+                              previous,
+                              handoff,
+                              outputs,
+                            );
+                            setPrevious(next.previous);
+                            setHandoff(true);
+                            setOutputs(next.outputs);
+                            setNotice(
+                              "この固定出力を引継ぎ入力へ追加しました。新Runの入力欄で確認してください。",
+                            );
+                          }}
+                        />
                       )}
                     </li>
                   );

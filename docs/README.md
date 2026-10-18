@@ -9,6 +9,8 @@ koujou-sanの製品仕様、開発手順、現在の状態をここから参照�
 3. [開発手順](runbooks/dev.md)と[Issueから実装する手順](runbooks/issue-lifecycle.md)。Context画面は[編集・Scope整理・プレビュー](runbooks/context-ui.md)、GitHub接続は[観測手順](runbooks/github-observation.md)、利用量・単価は[料金と集計](runbooks/usage-pricing.md)、Triage・Workerは[自動化の手順](runbooks/automation.md)、Runは[入力・質問・出力](runbooks/runs.md)、工程は[定義・検証・実行](runbooks/workflows.md)も参照する。
 4. 作業と判断は[一覧・回答・回付・差し戻し](runbooks/work-and-decisions.md)、Runの利用量は[モデル・数量・費用](runbooks/run-usage.md)、Hopperは[定義・発行・連鎖](runbooks/hopper.md)、独立検品は[固定入力と証拠の手順](runbooks/inspections.md)、外部起票は[共有要求と作成確認](runbooks/issue-publication.md)、そのほかは関連する[ADR](adr/README.md)、[進捗記録](progress/README.md)、実装とテスト。
 
+固定出力からのContext生成は[生成・採用・自動方針](runbooks/output-context-generation.md)、契約は[ADR 0031](adr/0031-output-context-generation.md)を参照する。
+
 Contextの自動選択とモデル接続は[選択・保存・中断再開](runbooks/client-context-selection.md)、契約は[ADR 0026](adr/0026-client-context-selection.md)を参照する。
 
 サーバーLLMによるHopperの意味判断と任意Bifrostは[サーバーモデル接続](runbooks/server-models.md)、契約は[ADR 0027](adr/0027-server-hopper-semantics.md)を参照する。

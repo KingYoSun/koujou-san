@@ -96,6 +96,7 @@ try:
     # Current stdin command entry against the same schema-22 persistence source.
     shutil.copy(previous_api.with_name(previous_api.name.replace("-api", "-auth-bootstrap")), old_bundle / "auth-bootstrap")
     release = json.loads((bundle / "release.json").read_text())
+    current_schema = release["schema"]
     old_image = "koujou-owned-update:" + root.name
     (old_bundle / "Dockerfile").write_text("FROM " + release["image"] + "\nCOPY api auth-bootstrap /app/\n")
     run(["docker", "build", "--platform", "linux/amd64", "-t", old_image, old_bundle])
@@ -121,9 +122,9 @@ try:
     verify(old, old)
     sql(old, "DROP EVENT TRIGGER owned_reject_migration; DROP FUNCTION owned_reject_migration();")
     run([cli, "update", "--state", old, "--bundle", bundle])
-    assert sql(old, "SELECT max(version) FROM shared_migrations") == "23"
+    assert sql(old, "SELECT max(version) FROM shared_migrations") == str(current_schema)
     verify(old, old)
-    print("PASS: schema 22→23 real migration; failed migration restores original release/three databases/sessions; retry succeeds", flush=True)
+    print(f"PASS: schema 22→{current_schema} real migration; failed migration restores original release/three databases/sessions; retry succeeds", flush=True)
 finally:
     for deployment in deployments:
         if (deployment / "compose.json").exists():

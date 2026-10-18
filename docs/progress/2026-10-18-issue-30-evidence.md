@@ -1,6 +1,6 @@
 # Issue #30: Run定義生成の検証
 
-状態: In progress。条件は[計画](2026-10-18-issue-30-plan.md)のAC-1〜6・INVAR-1〜3。全体の現在判定は[現在状態](current-state.md)へ集約する。
+状態: Complete。条件は[計画](2026-10-18-issue-30-plan.md)のAC-1〜6・INVAR-1〜3。全体の現在判定は[現在状態](current-state.md)へ集約する。
 
 ## 実装と検証範囲
 
@@ -41,3 +41,9 @@ Chrome、日本語、通常のviewport・既存theme、`https://localhost:54724`
 [独立検品](2026-10-18-issue-30-inspection.md)は最終コード `6d3156e532be8dd63b1fccb3faec438d2a69e99d` のAC-1〜6・INVAR-1〜3を全てPASSとした。必須Context・空配列固定も別コンテキストの実PG再実行で確認した。最終の共通checkは `issue30-check-final2.log` でPASS。
 
 PR #65の途中のCI `39118697484` は、MCP fixture起動時にDockerの127.0.0.1:38503が割当済みとなり、試験開始前に共有jobが失敗した。ログは `issue30-ci9b-shared.log`。製品の試験失敗としては扱わず、最終headの新しい試験環境でCIを確認する。必須CIとmerge後の内容照合は継続中。
+
+## 完了
+
+最終head `c3487443e74416a4b211045d42c00bac090c3cb3` のCI [39119336486](https://github.com/KingYoSun/koujou-san/actions/runs/39119336486)は全てPASS。共有UI/サーバー9分57秒（job 117651772591）、Windows13分44秒（job 117651772747）、GitGuardian13秒。途中のポート競合は最終の新しい試験環境で発生しなかった。
+
+[PR #65](https://github.com/KingYoSun/koujou-san/pull/65)をマージし、main `3804bab8a8c4f769a4fb64ce844a7a6185c5c1fe` と最終headのtree `65dc10b6fb4d9612006d5309dea84491509a0d46` が一致、差分0を確認した。全AC/INVAR・独立検品・必須CI・merge後照合が揃い、#30をCloseした。

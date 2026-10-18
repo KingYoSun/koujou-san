@@ -9,6 +9,10 @@ import type { UI } from "./context-ui";
 import { ContextExplorer } from "./context-explorer";
 import { ContextEditor } from "./context-editor";
 import { ContextPreview } from "./context-preview";
+import {
+  ContextGeneration,
+  type OutputContextSource,
+} from "./context-generation";
 import { ClientSelection } from "./client-selection";
 export function ContextWorkspace({
   native,
@@ -17,6 +21,7 @@ export function ContextWorkspace({
   user,
   role,
   onRevoked,
+  source,
 }: {
   native: boolean;
   api: string;
@@ -24,6 +29,7 @@ export function ContextWorkspace({
   user: string;
   role: string;
   onRevoked: () => void;
+  source?: OutputContextSource;
 }) {
   const [, render] = useReducer((n) => n + 1, 0);
   const [engine, setEngine] = useState<SyncEngine>();
@@ -164,6 +170,11 @@ export function ContextWorkspace({
         <ContextPreview ui={ui} />
       </div>
       <ClientSelection key={`${api}/${user}/${workspace}`} ui={ui} />
+      <ContextGeneration
+        key={`generation:${api}/${user}/${workspace}`}
+        ui={ui}
+        source={source}
+      />
     </section>
   );
 }

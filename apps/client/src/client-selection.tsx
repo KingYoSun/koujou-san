@@ -1,15 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
-import { mcpRequest, syncRequest } from "./auth";
+import { syncRequest } from "./auth";
 import { refKey, refLabel, type UI, type Ref } from "./context-ui";
 import { ModelConnectionSettings } from "./model-connection-settings";
-import { DefinitionProposal, definitionFields } from "./definition-proposal";
-import { allowAnswerScope, answerScopeEpoch } from "./sync-store";
+import {
+  DefinitionProposal,
+  DefinitionFixedFields,
+  definitionFields,
+} from "./definition-proposal";
+import {
+  operationClientID as clientID,
+  operationPort,
+} from "./client-operation-port";
+import {
+  ContextGenerationProposal,
+  emptyContextChanges,
+} from "./context-generation-proposal";
 import { fieldSources } from "./workflow-json";
 import {
   modelReady,
-  modelRequest,
   modelSnapshot,
   type ModelProfile,
   type VersionRef,
@@ -21,11 +31,12 @@ import {
   type Saved,
   type SelectionInput,
   type SelectionPolicy,
-  type HostPort,
+  type GenerationPolicy,
 } from "./client-selection-host";
-const clientID = crypto.randomUUID();
 const pin = (v: VersionRef): VersionRef => ({ id: v.id, version: v.version });
 type Proposal = {
+  changes_utf8?: string;
+  manual?: boolean;
   definition_utf8?: string;
   reason?: string;
   items: { ref: Ref; reason: string }[];
@@ -66,13 +77,25 @@ export type DefinitionTarget = {
   ) => Promise<boolean>;
   onDraft: (text: string) => void;
 };
+export type GenerationTarget = {
+  target: VersionRef;
+  policy: GenerationPolicy;
+  initial?: VersionRef;
+  onApplied: (ref: VersionRef) => Promise<void>;
+  onProfile?: (profile: ModelProfile | undefined) => void;
+};
 export function ClientSelection({
   ui,
   definition,
+  generation,
 }: {
   ui: OperationUI;
   definition?: DefinitionTarget;
+  generation?: GenerationTarget;
 }) {
+  const generationCurrent = useRef(generation);
+  generationCurrent.current = generation;
+  const [changePaths, setChangePaths] = useState<string[]>([]);
   const definitionCurrent = useRef(definition);
   definitionCurrent.current = definition;
   const [definitionLocks, setDefinitionLocks] = useState<string[]>([]);
@@ -159,6 +182,8 @@ export function ClientSelection({
       `/records/${encodeURIComponent(ref.id)}?version=${encodeURIComponent(ref.version)}`,
     );
   const inputSignature = () => {
+    if (generationCurrent.current)
+      return JSON.stringify(generationCurrent.current.policy);
     if (definitionCurrent.current)
       return JSON.stringify({
         text: definitionCurrent.current.text,
@@ -187,6 +212,19 @@ export function ClientSelection({
     return pin(result.data);
   };
   async function apply(ref: VersionRef, expected?: string) {
+    if (generationCurrent.current) {
+      if (expected !== undefined && expected !== inputSignature()) {
+        setNotice(
+          "Contextの変更を保存しました。表示中の出力や設定は変わっているため、履歴で結果を確認してください。",
+        );
+        return;
+      }
+      await generationCurrent.current.onApplied(ref);
+      setNotice(
+        "検証したContextの版と所属を保存しました。原出力・過去の入力は変更していません。",
+      );
+      return;
+    }
     if (definitionCurrent.current) {
       if (expected !== undefined && expected !== inputSignature()) {
         setNotice(
@@ -240,7 +278,10 @@ export function ClientSelection({
       id: selected.id,
       version: "head",
     });
-    if ((current.value.purpose === "definition") !== !!definition)
+    if (
+      (current.value.purpose === "definition") !== !!definition ||
+      (current.value.purpose === "context-generation") !== !!generation
+    )
       throw new Error("different_operation_kind");
     setOperation(current);
     setSelection(pin(current.value.applied ?? current.value.target));
@@ -285,45 +326,12 @@ export function ClientSelection({
     if (!profile || !modelReady(ui.native, actor, profile))
       throw new Error("model_key_required");
     const mine = ++epoch.current;
-    const namespace = { api: ui.api, user: ui.user, workspace: ui.workspace };
-    const permission = answerScopeEpoch(namespace);
-    const port: HostPort = {
-      read,
-      query: async (root, kind) => {
-        const rows: Saved[] = [];
-        let cursor = { after: 0, after_id: "" };
-        for (;;) {
-          const page = await call<{
-            items: Saved[];
-            after: number;
-            after_id: string;
-          }>("/query", { root, kind, limit: 100, ...cursor });
-          rows.push(...page.items);
-          if (page.items.length < 100) break;
-          cursor = { after: page.after, after_id: page.after_id };
-        }
-        return rows;
-      },
-      write: (id, action, version, value, mutation) =>
-        mutate(
-          `/operations/${encodeURIComponent(id)}/${action}`,
-          version,
-          value,
-          mutation,
-        ),
-      rpc: (body) =>
-        mcpRequest(ui.native, ui.workspace, transport.current!, body, clientID),
-      model: (body, timeout) =>
-        modelRequest(ui.native, actor, profile, body, timeout),
-      active: () =>
-        epoch.current === mine && allowAnswerScope(namespace, permission),
-    };
-    if (policy.fixed.mode !== "none" || policy.definition) {
-      const info = await call<{ handle: string }>(
-        `/operations/${encodeURIComponent(current.id)}/transport`,
-      );
-      transport.current = info.handle;
-    }
+    const port = operationPort(
+      ui,
+      profile,
+      current,
+      () => epoch.current === mine,
+    );
     const result = await runSelection(
       current,
       policy,
@@ -354,10 +362,9 @@ export function ClientSelection({
     setHistoryItem(undefined);
     setHistoryCursor({ after: page.after, after_id: page.after_id });
   }
-  const transport = useRef<string | undefined>(undefined);
-  async function start() {
+  async function start(manual = false) {
     const signature = inputSignature();
-    if (!profile) throw new Error("model_required");
+    if (!manual && !profile) throw new Error("model_required");
     const values = definition
       ? fieldSources(
           definition.text,
@@ -365,7 +372,8 @@ export function ClientSelection({
         )
       : [];
     const policy: SelectionPolicy = {
-      mode,
+      mode: manual ? "manual" : mode,
+      ...(generation ? { generation: generation.policy } : {}),
       fixed: selectionInput(state.mode, fixed, state.exclude),
       scopes: scopes.split(/[,\s]+/).filter(Boolean),
       limits: { model_requests: models, mcp_requests: mcp, seconds },
@@ -382,7 +390,7 @@ export function ClientSelection({
         : {}),
     };
     const policyRef = await mutate(
-      `/policies/${definition ? "definition" : "selection"}-policy:${crypto.randomUUID()}`,
+      `/policies/${generation ? "context" : definition ? "definition" : "selection"}-policy:${crypto.randomUUID()}`,
       "0",
       { value: policy },
     );
@@ -391,21 +399,26 @@ export function ClientSelection({
       "0",
       {
         policy: policyRef,
-        target: definition?.target ??
+        target: generation?.target ??
+          definition?.target ??
           selection ?? {
             id: `client-selection:${crypto.randomUUID()}`,
             version: "0",
           },
         goal: definition?.request ? goal + "\n" + definition.request : goal,
-        purpose: definition ? "definition" : purpose,
-        model: modelSnapshot(profile, ui.workspace),
+        purpose: generation
+          ? "context-generation"
+          : definition
+            ? "definition"
+            : purpose,
+        model: manual ? {} : modelSnapshot(profile!, ui.workspace),
         client: clientID,
       },
     );
     const current = await read<ClientOperation>(ref);
     setOperation(current);
     setProposal(undefined);
-    await run(current, policy, signature);
+    if (!manual) await run(current, policy, signature);
   }
   async function act(action: string) {
     if (!operation) return;
@@ -416,6 +429,10 @@ export function ClientSelection({
         ? answer + "\n" + definition.request
         : answer;
       if (definition) value.definition_sources = definition.sources;
+    }
+    if (action === "adopt" && generation) {
+      if (!changePaths.length) throw Error("choose_changes");
+      value.paths = changePaths;
     }
     if (action === "adopt" && definition) {
       if (!definitionPaths.length) throw new Error("choose_fields");
@@ -436,6 +453,13 @@ export function ClientSelection({
       await run(current, policy.value, signature);
     }
   }
+  useEffect(() => {
+    if (generation?.initial)
+      void work(async () => {
+        const current = await refresh(generation.initial);
+        if (current?.value.applied) await apply(current.value.applied);
+      });
+  }, [generation?.initial?.id, generation?.initial?.version]);
   async function manual() {
     const ref = await mutate(
       `/selections/${encodeURIComponent(selection?.id ?? `client-selection:${crypto.randomUUID()}`)}`,
@@ -467,11 +491,19 @@ export function ClientSelection({
     <section
       className="context-preview"
       aria-label={
-        definition ? "自由入力からRun定義を生成" : "Contextの自動選択と保存"
+        generation
+          ? "出力からContextを生成"
+          : definition
+            ? "自由入力からRun定義を生成"
+            : "Contextの自動選択と保存"
       }
     >
       <h3>
-        {definition ? "自由入力からRun定義を作る" : "Contextの選択と保存"}
+        {generation
+          ? "出力からContextを生成"
+          : definition
+            ? "自由入力からRun定義を作る"
+            : "Contextの選択と保存"}
       </h3>
       <p>
         手動の必須・除外を保ち、許された候補から選びます。取得範囲・未確認事項・固定版は履歴で確認できます。
@@ -481,16 +513,27 @@ export function ClientSelection({
         actor={actor}
         workspace={ui.workspace}
         selected={profile}
-        onSelected={setProfile}
+        onSelected={(p) => {
+          setProfile(p);
+          generation?.onProfile?.(p);
+        }}
       />
       <fieldset disabled={!ui.canCreate || busy}>
         <legend>
-          {definition ? "生成する目的と方針" : "選択する目的と方針"}
+          {definition || generation
+            ? "生成する目的と方針"
+            : "選択する目的と方針"}
         </legend>
         <label>
           作業の目的
           <textarea
-            aria-label={definition ? "Run定義を作る依頼" : "Contextを選ぶ目的"}
+            aria-label={
+              generation
+                ? "Contextを作る依頼"
+                : definition
+                  ? "Run定義を作る依頼"
+                  : "Contextを選ぶ目的"
+            }
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
           />
@@ -502,17 +545,23 @@ export function ClientSelection({
             onChange={(e) => setMode(e.target.value as SelectionPolicy["mode"])}
           >
             <option value="auto">
-              {definition
-                ? "検証済みの定義を自動反映"
-                : "検証済みの選択を自動反映"}
+              {generation
+                ? "検証済みのContext変更を自動反映"
+                : definition
+                  ? "検証済みの定義を自動反映"
+                  : "検証済みの選択を自動反映"}
             </option>
             <option value="proposal">案を確認して採用</option>
             <option value="manual">
-              {definition ? "手動で定義を編集" : "手動で選択"}
+              {generation
+                ? "手動でContextを編集"
+                : definition
+                  ? "手動で定義を編集"
+                  : "手動で選択"}
             </option>
           </select>
         </label>
-        {!definition && (
+        {!definition && !generation && (
           <label>
             用途
             <select
@@ -524,11 +573,13 @@ export function ClientSelection({
             </select>
           </label>
         )}
-        {definition && (
+        {(definition || generation) && (
           <>
-            <p>
-              作業場所は接続設定とRun専用worktreeを使い、リポジトリ・commitはRun割当時に指定します。
-            </p>
+            {definition && (
+              <p>
+                作業場所は接続設定とRun専用worktreeを使い、リポジトリ・commitはRun割当時に指定します。
+              </p>
+            )}
             <label>
               Contextの取得
               <select
@@ -540,28 +591,19 @@ export function ClientSelection({
                 }
               >
                 <option value="select">許可範囲を検索して選ぶ</option>
-                <option value="none">Contextを参照・追加しない</option>
+                <option value="none">
+                  {generation
+                    ? "既存Contextを参照しない"
+                    : "Contextを参照・追加しない"}
+                </option>
               </select>
             </label>
-            <details>
-              <summary>変更させない定義の項目</summary>
-              {definitionFields.map(([path, label]) => (
-                <label key={path}>
-                  <input
-                    type="checkbox"
-                    checked={definitionLocks.includes(path)}
-                    onChange={(e) =>
-                      setDefinitionLocks(
-                        e.target.checked
-                          ? [...definitionLocks, path]
-                          : definitionLocks.filter((p) => p !== path),
-                      )
-                    }
-                  />
-                  {label}を固定
-                </label>
-              ))}
-            </details>
+            {definition && (
+              <DefinitionFixedFields
+                paths={definitionLocks}
+                onPaths={setDefinitionLocks}
+              />
+            )}
           </>
         )}
         <details>
@@ -634,7 +676,7 @@ export function ClientSelection({
             </>
           )}
         </details>
-        {!definition && (
+        {!definition && !generation && (
           <button onClick={() => void work(manual)}>
             現在の選択を手動で保存
           </button>
@@ -646,10 +688,19 @@ export function ClientSelection({
             !profile ||
             !modelReady(ui.native, actor, profile)
           }
-          onClick={() => void work(start)}
+          onClick={() => void work(() => start())}
         >
-          {definition ? "Run定義の生成を依頼" : "Contextの選択を依頼"}
+          {generation
+            ? "出力からContextの生成を依頼"
+            : definition
+              ? "Run定義の生成を依頼"
+              : "Contextの選択を依頼"}
         </button>
+        {generation && (
+          <button disabled={!goal} onClick={() => void work(() => start(true))}>
+            出力から手動でContext案を編集
+          </button>
+        )}
       </fieldset>
       <button
         disabled={busy}
@@ -670,8 +721,10 @@ export function ClientSelection({
       {operation && (
         <section aria-label={definition ? "定義生成の状態" : "選択操作の状態"}>
           <h4>
-            {definition && operation.value.state === "applied"
-              ? "定義を保存・採用済み"
+            {(definition || generation) && operation.value.state === "applied"
+              ? generation
+                ? "Contextを保存・採用済み"
+                : "定義を保存・採用済み"
               : (labels[operation.value.state] ?? operation.value.state)}
           </h4>
           <p>{operation.value.goal}</p>
@@ -689,7 +742,7 @@ export function ClientSelection({
                   disabled={busy || !profile}
                   onClick={() => void work(() => act("resume"))}
                 >
-                  {definition
+                  {definition || generation
                     ? "接続・条件を確認して生成を再開"
                     : "接続・条件を確認して選択を再開"}
                 </button>
@@ -707,7 +760,7 @@ export function ClientSelection({
                     })
                   }
                 >
-                  {definition
+                  {definition || generation
                     ? "このクライアントで生成を続ける"
                     : "このクライアントで選択を続ける"}
                 </button>
@@ -725,9 +778,11 @@ export function ClientSelection({
                     disabled={busy || !answer}
                     onClick={() => void work(() => act("answer"))}
                   >
-                    {definition
-                      ? "回答して定義生成を再開"
-                      : "回答して選択を再開"}
+                    {generation
+                      ? "回答してContext生成を再開"
+                      : definition
+                        ? "回答して定義生成を再開"
+                        : "回答して選択を再開"}
                   </button>
                 </>
               )}
@@ -745,7 +800,11 @@ export function ClientSelection({
                   void work(() => act("cancel"));
                 }}
               >
-                {definition ? "この定義生成を終了" : "この選択操作を終了"}
+                {generation
+                  ? "このContext生成を終了"
+                  : definition
+                    ? "この定義生成を終了"
+                    : "この選択操作を終了"}
               </button>
             </>
           )}
@@ -761,10 +820,36 @@ export function ClientSelection({
           <button onClick={() => void work(() => loadHistory())}>
             この操作の履歴を50件取得
           </button>
+          {generation && (
+            <ContextGenerationProposal
+              value={proposal?.value.changes_utf8 ?? emptyContextChanges}
+              goal={operation.value.goal}
+              onPaths={setChangePaths}
+              editable={
+                ui.canCreate &&
+                operation.value.state !== "applied" &&
+                operation.value.state !== "cancelled"
+              }
+              onRevise={(text) =>
+                void work(async () => {
+                  const ref = await mutate(
+                    `/operations/${encodeURIComponent(operation.id)}/actions`,
+                    operation.version,
+                    { kind: "revise", client: clientID, changes_utf8: text },
+                  );
+                  await refresh(ref);
+                })
+              }
+            />
+          )}
           {proposal && (
             <>
               <h4>
-                {definition ? "定義案・未確認事項" : "選択案・未確認事項"}
+                {generation
+                  ? "Context案・未確認事項"
+                  : definition
+                    ? "定義案・未確認事項"
+                    : "選択案・未確認事項"}
               </h4>
               {definition && proposal.value.definition_utf8 && (
                 <>
@@ -796,7 +881,7 @@ export function ClientSelection({
               {proposal.value.unknown.map((q, i) => (
                 <p key={i}>{q}</p>
               ))}
-              {!definition && (
+              {!definition && !generation && (
                 <>
                   <ul>
                     {proposal.value.items

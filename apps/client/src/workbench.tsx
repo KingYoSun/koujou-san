@@ -16,6 +16,7 @@ import {
   question,
 } from "./run-pause";
 import type { Pause } from "./run-pause";
+import type { OutputContextSource } from "./context-generation";
 import { RunRecords } from "./runs";
 import { WorkflowExecution } from "./workflow-execution";
 import { InspectionResult } from "./inspections";
@@ -139,6 +140,7 @@ export function Workbench({
   canExecute,
   members,
   membersNext,
+  onGenerate,
 }: {
   native: boolean;
   api: string;
@@ -148,6 +150,7 @@ export function Workbench({
   canExecute: boolean;
   members: Member[];
   membersNext?: string;
+  onGenerate?: (source: OutputContextSource) => void;
 }) {
   const namespace = { api, user, workspace };
   const base = `/workbench/workspaces/${encodeURIComponent(workspace)}`;
@@ -904,6 +907,7 @@ export function Workbench({
         </article>
       )}
       <RunRecords
+        onGenerate={onGenerate}
         native={native}
         api={api}
         workspace={workspace}

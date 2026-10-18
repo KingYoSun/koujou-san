@@ -125,10 +125,10 @@
 
 状態: Complete。Scope revision 1。[PR #64](https://github.com/KingYoSun/koujou-san/pull/64)を最終head `d36ca8624a5228e255d7b2a3afcc051070fa66d3`の全CI（39113715998）と[独立検品](2026-10-18-issue-29-inspection.md)PASS後にマージした。merge `c7ac1c40c3d8d45a8d1731c0e3931a0c9ba3c3f8`とのtreeは`9badcda20bc4de06d9525c39efd0672504787892`で一致、差分0。五ACと三維持条件を確認して#29を手動Closeした。配布物・復旧/更新・Windows・OSS表示と失敗履歴は[証跡](2026-10-18-issue-29-evidence.md)を参照する。
 
-## Issue #30の準備
-
-状態: In progress。Scope revision 1。本人は検証済みの定義案を自動反映する初期値を承認した。[計画](2026-10-18-issue-30-plan.md)に六条件と維持条件、共通操作・定義保存・モデル接続の再利用、検証を記録した。#31〜#34は未着手。#33へ移管した実S3スリープと初見操作は未確認のまま保持する。
-
 ## Issue #30の判定
 
-状態: In progress。本人が検証済み定義の自動反映と、接続設定・Run専用worktreeによる作業場所を承認した。[計画](2026-10-18-issue-30-plan.md)のAC-1〜6・INVAR-1〜3は実PG・実Ory/MCP・二モデルHTTPの共通画面と[独立検品](2026-10-18-issue-30-inspection.md)でPASS。必須CIとmerge後照合を継続中。[検証記録](2026-10-18-issue-30-evidence.md)を参照する。
+状態: Complete。[PR #65](https://github.com/KingYoSun/koujou-san/pull/65)を全CI成功後にマージした。main `3804bab8a8c4f769a4fb64ce844a7a6185c5c1fe` と最終headのtree `65dc10b6fb4d9612006d5309dea84491509a0d46` は一致し、差分0。全AC/INVAR、[独立検品](2026-10-18-issue-30-inspection.md)、[検証と完了の記録](2026-10-18-issue-30-evidence.md)が揃い、#30をCloseした。
+
+## Issue #31の判定
+
+状態: In progress（独立検品PASS、CI確認中）。本人の判断に従い、検証済み変更の自動反映と、明示有効化後の新しい確定出力からの処理を実装した。[計画](2026-10-18-issue-31-plan.md)のAC-1〜7・INVAR-1〜3に対応する実PG・実Ory/MCP・二つの所有モデルと共通Web画面の結果は[証跡](2026-10-18-issue-31-evidence.md)を参照。[固定commitの独立検品](2026-10-18-issue-31-inspection.md)は全条件PASS。必須CI、マージ後照合が残る。#33へ移した実S3スリープと初見操作は未確認のまま保持する。

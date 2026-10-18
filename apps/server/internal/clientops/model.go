@@ -74,6 +74,7 @@ type Limits struct {
 	Cost    *usage.CostBudget `json:"cost,omitempty"`
 }
 type Policy struct {
+	Generation *GenerationPolicy  `json:"generation,omitempty"`
 	Definition *DefinitionPolicy  `json:"definition,omitempty"`
 	Mode       string             `json:"mode"`
 	Limits     Limits             `json:"limits"`
@@ -90,6 +91,8 @@ type Item struct {
 	Reason string       `json:"reason"`
 }
 type Proposal struct {
+	Manual         bool     `json:"manual,omitempty"`
+	ChangesUTF8    string   `json:"changes_utf8,omitempty"`
 	DefinitionUTF8 string   `json:"definition_utf8,omitempty"`
 	Reason         string   `json:"reason,omitempty"`
 	Items          []Item   `json:"items"`

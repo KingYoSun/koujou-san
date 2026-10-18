@@ -19,6 +19,14 @@ func (s *Service) registerRuns(server *mcp.Server) {
 			return outcome{}, access.ErrForbidden
 		}
 		b := ctx.Value(operationKey{}).(boundary)
+		if s.ClientOps != nil {
+			v, refs, found, err := s.ClientOps.GenerationRead(ctx, b.Principal, b.Workspace, r)
+			if found || err != nil {
+				out := definitionOutcome(b.Workspace, v, refs, "")
+				out.Range = "fixed_output_excerpt"
+				return out, err
+			}
+		}
 		v, err := s.Runs.Read(ctx, b.Principal, b.Workspace, r)
 		kind, id, _ := strings.Cut(r.ID, ":")
 		return outcome{Value: v, Refs: []contexts.Ref{{Kind: kind, ID: id, Revision: r.Version}}}, err

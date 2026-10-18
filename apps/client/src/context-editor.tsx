@@ -12,6 +12,7 @@ import {
   kinds,
   scopeKinds,
 } from "./context-ui";
+import { ContextGenerationOrigin } from "./context-generation-origin";
 import { EnvelopeStatus } from "./context-status";
 export function ContextEditor({ ui }: { ui: UI }) {
   const state = useStore(ui.store);
@@ -338,6 +339,19 @@ export function ContextEditor({ ui }: { ui: UI }) {
               )}
             </>
           )}
+          {ref &&
+            ref.revision !== "0" &&
+            (value.origin as { kind?: string })?.kind === "run-output" &&
+            typeof (value.origin as { operation_id?: unknown })
+              ?.operation_id === "string" && (
+              <ContextGenerationOrigin
+                ui={ui}
+                refValue={ref}
+                operation={
+                  (value.origin as { operation_id: string }).operation_id
+                }
+              />
+            )}
           {(value.origin || value.external || value.attachments) && (
             <details open>
               <summary>由来・固定参照・添付・取得状態</summary>
