@@ -24,7 +24,7 @@ impl Auth {
 }
 
 pub(super) fn setup(
-    app: &tauri::App,
+    app: &tauri::AppHandle,
     api: &str,
     file: &std::path::Path,
 ) -> Result<(), Box<dyn std::error::Error>> {

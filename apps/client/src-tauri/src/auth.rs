@@ -82,6 +82,7 @@ impl Auth {
             || api.query().is_some()
             || api.fragment().is_some()
             || !api.username().is_empty()
+            || api.password().is_some()
         {
             return Err("HTTPS API root required".into());
         }
@@ -95,6 +96,9 @@ impl Auth {
             login_lock: Mutex::new(()),
             device_lock: Mutex::new(()),
         })
+    }
+    pub(crate) fn verify_connection(&self) -> Result<(), String> {
+        self.config().map(|_| ())
     }
     fn config(&self) -> Result<Config, String> {
         let config: Config = self
@@ -743,18 +747,17 @@ pub async fn open_account(app: tauri::AppHandle, path: String) -> Result<(), Str
     .map_err(|_| "account_task_failed")?
 }
 
-pub fn setup(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-    let api =
-        std::env::var("KOUJOU_PUBLIC_API_URL").unwrap_or_else(|_| "https://localhost:8080/".into());
-    let key = hex_name(&api);
+pub(crate) fn initialize(app: &tauri::AppHandle, api: &str) -> Result<(), String> {
     let file = app
         .path()
-        .app_local_data_dir()?
-        .join(format!("auth-{key}.dpapi"));
-    mcp::setup(app, &api, &file)?;
-    app.manage(Auth::new(&api, file).map_err(std::io::Error::other)?);
+        .app_local_data_dir()
+        .map_err(|_| "app_data_unavailable")?
+        .join(format!("auth-{}.dpapi", hex_name(api)));
+    mcp::setup(app, api, &file).map_err(|_| "mcp_configuration_failed")?;
+    app.manage(Auth::new(api, file)?);
     Ok(())
 }
+
 pub(crate) fn hex_name(value: &str) -> String {
     Sha256::digest(value.as_bytes())
         .iter()

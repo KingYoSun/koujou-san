@@ -1,6 +1,6 @@
 # Issue #28の検証記録
 
-状態: In progress。Scope revision 2。基準は`17def2aa914e0c31cf8a03360521e57864d060d0`。実OpenAI二要求・実GitHub・独立検品はPASS。PR #62の最終文書を含むHEADのCIとマージ後照合が残っている。
+状態: Complete。Scope revision 2。基準は`17def2aa914e0c31cf8a03360521e57864d060d0`。全受入・実接続・独立検品・最終CI・マージ後tree照合を完了し、#28を手動Closeした。
 
 ## 確定した判断
 
@@ -92,3 +92,7 @@ App自身をJWTで照合し、そのslugから取得したbotの数値IDとイ�
 別コンテキストの検品者が最終のログ・結果JSON・累積カウンタと検品済みコードの一致を照合し、AC-1〜13・INVAR-1〜4すべてPASS、blocker 0件として検品を終了した。過去の失敗と原因未確定のHopper観測は消さない。#33へ移した本人の初見操作・S3スリープは未確認のまま維持する。
 
 HEAD `82781f9d2d4dce9f65c512d3841613be23588b8d`のCI run `39095730596`はShared UI and server・Windows native client・GitGuardianすべてPASS。現在の残作業は、この最終文書を含むHEADのCI確認、マージ、tree照合と手動Closeである。
+
+## マージ後の照合
+
+最終head `fd620c07a5711246f0038d488d201d207c33b102`のCI run [39103625988](https://github.com/KingYoSun/koujou-san/actions/runs/39103625988)はShared UI and server・Windows native client・GitGuardianすべてPASS。[PR #62](https://github.com/KingYoSun/koujou-san/pull/62)をsquash mergeし、merge `fb336a0df3ac10f4d6b03c7e9ecfc3db6994c399`と最終headのtreeが`d2647b333315069f2680a6487a0513056228993d`で一致、`git diff --exit-code`は差分0。確認後に#28を手動Closeした。過去の試験失敗を受入条件の緩和で処理していない。#29の計画と未決判断へ進む。

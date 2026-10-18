@@ -1,0 +1,37 @@
+{
+  "webview2-rs": {
+    "version": "0.39.1",
+    "license": "MIT",
+    "source": "https://github.com/wravery/webview2-rs/tree/edc2caf886175ccaebe86078c9cfe1ae2a187328",
+    "files": ["webview2-rs-LICENSE"]
+  },
+  "webview2-sdk-loader": {
+    "version": "1.0.3800.47",
+    "license": "BSD-3-Clause",
+    "source": "https://api.nuget.org/v3-flatcontainer/microsoft.web.webview2/1.0.3800.47/microsoft.web.webview2.1.0.3800.47.nupkg",
+    "files": ["webview2-sdk-LICENSE.txt", "webview2-sdk-NOTICE.txt"],
+    "loader_sha256": "89c6b872783b8f6c3cedbff618adb42082d455c615453ae10cfc753f1e8f25d8"
+  },
+  "nsis": {
+    "version": "3.11",
+    "license": "Zlib AND bzip2-1.0.6 AND LicenseRef-Public-Domain",
+    "source": "https://github.com/tauri-apps/binary-releases/releases/download/nsis-3.11/nsis-3.11.zip",
+    "archive_sha1": "ef7ff767e5cbd9edd22add3a32c9b8f4500bb10d",
+    "files": ["nsis-3.11"]
+  },
+  "sqlite3": {
+    "version": "3.53.2",
+    "license": "LicenseRef-Public-Domain",
+    "source": "https://sqlite.org/copyright.html",
+    "files": ["sqlite3-NOTICE"]
+  },
+  "nsis-tauri-utils": {
+    "version": "0.5.3",
+    "license": "Apache-2.0 OR MIT",
+    "source": "https://github.com/tauri-apps/nsis-tauri-utils/tree/nsis_tauri_utils-v0.5.3",
+    "files": [
+      "nsis-tauri-utils-LICENSE_MIT",
+      "nsis-tauri-utils-LICENSE_APACHE-2.0"
+    ]
+  }
+}

@@ -1,6 +1,6 @@
 {
   "name": "koujou-san",
-  "version": "0.0.0",
+  "version": "0.1.0-preview.1",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@10.16.1",
@@ -59,9 +59,12 @@
     "infra:llm:up": "node scripts/dev.mjs infra:llm:up",
     "infra:llm:stop": "node scripts/dev.mjs infra:llm:stop",
     "format": "prettier --write package.json pnpm-workspace.yaml contracts scripts .github infra apps/client",
-    "format:check": "prettier --check package.json pnpm-workspace.yaml contracts scripts .github infra apps/client"
+    "format:check": "prettier --check package.json pnpm-workspace.yaml contracts scripts .github infra apps/client",
+    "dist:server": "node scripts/distribution.mjs server",
+    "dist:desktop": "node scripts/distribution.mjs desktop"
   },
   "devDependencies": {
     "prettier": "3.9.10"
-  }
+  },
+  "license": "Apache-2.0"
 }

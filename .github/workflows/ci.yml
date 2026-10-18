@@ -24,6 +24,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -112,6 +114,24 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Build standard Linux distribution
+        run: pnpm run dist:server
+
+      - name: Test packaged installation, recovery and schema 22 update
+        shell: bash
+        run: |
+          set -eu
+          mkdir -p .cache/distribution-previous
+          git archive 17def2aa914e0c31cf8a03360521e57864d060d0 apps/server | tar -x -C .cache/distribution-previous
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 GOWORK=off "$PWD/.tools/go/bin/go" -C "$PWD/.cache/distribution-previous/apps/server" build -trimpath -o "$PWD/.cache/distribution-schema22-api" ./cmd/api
+          cp apps/server/cmd/auth-bootstrap/main.go .cache/distribution-previous/apps/server/cmd/auth-bootstrap/main.go
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 GOWORK=off "$PWD/.tools/go/bin/go" -C "$PWD/.cache/distribution-previous/apps/server" build -trimpath -o "$PWD/.cache/distribution-schema22-auth-bootstrap" ./cmd/auth-bootstrap
+          .tools/go/bin/go -C apps/server run ./cmd/devcert "$PWD/.cache/distribution-tls"
+          mkdir -p .cache/distribution-extracted
+          tar -xzf artifacts/koujou-san-server-linux-amd64-0.1.0-preview.1.tar.gz -C .cache/distribution-extracted
+          bundle="$PWD/.cache/distribution-extracted"
+          python3 scripts/test-distribution-cycle.py "$bundle" "$PWD/.cache/distribution-schema22-api" "$PWD/.cache/distribution-tls" | tee test-results/distribution-cycle.log
+
       - name: Keep verification evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -124,7 +144,7 @@ jobs:
   windows-native:
     name: Windows native client
     runs-on: windows-2022
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -164,6 +184,15 @@ jobs:
 
       - name: Test native client
         run: pnpm run test:desktop
+
+      - name: Build unsigned preview installer
+        run: pnpm run dist:desktop
+
+      - name: Test installed resources, Runner guard and manual reinstall
+        shell: pwsh
+        run: |
+          $bundle = Get-ChildItem artifacts -Directory -Filter 'desktop-*' | Select-Object -First 1
+          ./scripts/test-distribution-desktop.ps1 -Bundle $bundle.FullName | Tee-Object test-results/distribution-desktop.log
 
       - name: Keep verification evidence
         if: always()

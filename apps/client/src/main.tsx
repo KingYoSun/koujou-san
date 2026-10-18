@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { DesktopConnection } from "./desktop-connection";
 import { clientCapabilities } from "./capabilities";
 import "./styles.css";
 
@@ -16,7 +17,13 @@ const native =
 createRoot(root).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App apiBaseUrl={apiBaseUrl} native={native} />
+      {native ? (
+        <DesktopConnection>
+          <App apiBaseUrl={apiBaseUrl} native={native} />
+        </DesktopConnection>
+      ) : (
+        <App apiBaseUrl={apiBaseUrl} native={native} />
+      )}
     </QueryClientProvider>
   </StrictMode>,
 );

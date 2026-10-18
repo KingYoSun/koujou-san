@@ -38,7 +38,7 @@
 
 ## 現在の判定
 
-初回の三指摘はすべて解消した。Scope revision 2の最終判定はPASS、AC-1〜13・INVAR-1〜4すべてPASS、blocker 0件。最終GitHub証跡も検品者が照合して検品を終了した。残るリリース操作は最終文書を含むHEADのCI、マージ後tree照合、手動Close。試験のログは[検証記録](2026-10-18-issue-28-evidence.md)へ集約する。
+初回の三指摘はすべて解消した。Scope revision 2の最終判定はPASS、AC-1〜13・INVAR-1〜4すべてPASS、blocker 0件。最終GitHub証跡も検品者が照合して検品を終了した。最終head `fd620c0`の全CI・merge `fb336a0`とのtree一致・差分0・手動Closeまで確認済み。試験のログは[検証記録](2026-10-18-issue-28-evidence.md)へ集約する。
 
 ## 追加差分の検品
 

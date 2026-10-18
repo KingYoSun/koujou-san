@@ -1,6 +1,6 @@
 {
   "name": "@koujou-san/client",
-  "version": "0.0.0",
+  "version": "0.1.0-preview.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -37,5 +37,6 @@
     "typescript": "6.0.3",
     "vite": "8.3.4",
     "vitest": "5.0.4"
-  }
+  },
+  "license": "Apache-2.0"
 }

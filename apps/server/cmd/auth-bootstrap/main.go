@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/auth"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -14,16 +15,21 @@ import (
 func main() {
 	email := flag.String("admin-email", "", "explicit initial administrator email")
 	passwordFile := flag.String("password-file", "", "path to a private password file")
+	passwordStdin := flag.Bool("password-stdin", false, "read the initial password from standard input")
 	clientsOnly := flag.Bool("clients-only", false, "register bundled OAuth clients without changing identities")
 	flag.Parse()
-	if !*clientsOnly && (*email == "" || *passwordFile == "") {
+	if !*clientsOnly && (*email == "" || (*passwordFile == "") == !*passwordStdin) {
 		fmt.Fprintln(os.Stderr, "--admin-email and --password-file are required")
 		os.Exit(2)
 	}
 	var password []byte
 	var err error
 	if !*clientsOnly {
-		password, err = os.ReadFile(*passwordFile)
+		if *passwordStdin {
+			password, err = io.ReadAll(os.Stdin)
+		} else {
+			password, err = os.ReadFile(*passwordFile)
+		}
 	}
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "password file unavailable")
