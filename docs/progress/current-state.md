@@ -131,4 +131,8 @@
 
 ## Issue #30の判定
 
-状態: In progress。本人が検証済み定義の自動反映と、接続設定・Run専用worktreeによる作業場所を承認した。[計画](2026-10-18-issue-30-plan.md)のAC-1〜6・INVAR-1〜3は実PG・実Ory/MCP・二モデルHTTPの共通画面と[独立検品](2026-10-18-issue-30-inspection.md)でPASS。必須CIとmerge後照合を継続中。[検証記録](2026-10-18-issue-30-evidence.md)を参照する。
+状態: Complete。[PR #65](https://github.com/KingYoSun/koujou-san/pull/65)を全CI成功後にマージした。main `3804bab8a8c4f769a4fb64ce844a7a6185c5c1fe` と最終headのtree `65dc10b6fb4d9612006d5309dea84491509a0d46` は一致し、差分0。全AC/INVAR、[独立検品](2026-10-18-issue-30-inspection.md)、[検証と完了の記録](2026-10-18-issue-30-evidence.md)が揃い、#30をCloseした。
+
+## Issue #31の判定
+
+状態: In progress。本人が検証済み変更の自動反映と、生成方針の明示有効化後の新しい確定出力からの処理を承認した。[計画](2026-10-18-issue-31-plan.md)のAC-1〜7・INVAR-1〜3を実装・検証する。
