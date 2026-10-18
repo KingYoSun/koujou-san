@@ -32,3 +32,9 @@ WindowsのWebView2 static loaderは公式NuGet 1.0.3800.47とhash一致を確認
 失敗時にmainのos.Exitがdeferを飛ばして操作lockを残す点も修正し、lockの取得・解放を終了コード設定より内側の関数へ移した。statusは読取りとしてlockの外で取得する。最初のsmoke環境は所有projectだけを停止し、失敗の証拠を保持した。新しい空の保存先で再試験する。
 
 最初のdesktop buildは原文licenseを含まないcrateで停止した。metadataとVCS commitを照合して六つの不足を特定し、対応する原文を追加した。selectorsはsource headerが指すMPL-2.0の原文と、実際のcrate sourceを配布する。原文のある場所と対象sourceの場所を分離し、license補完で対象sourceを置き換えない。
+
+独立検品で認証用内部proxyの接続先と四つのAPI prefix不足を検出した。`issue29-review-before.log`で失敗し、loopbackへの統一と公開経路の修正後、同じ試験が成功した。Windowsインストーラーの生成は`9f41b311`で成功したが、MPLソースの取得先不足が検品で見つかり、source archiveをインストーラーにも同梱するよう修正した。修正後の再生成と導入確認は未完了。
+
+実際の新規起動ではKratosとHydraのTLS設定形式、ログレベルとhealthcheckの違いも確認した。固定版のKratos schemaと既存の動作済みhealthcheckを照合して修正した。`issue29-server-up4.log`は修正CLIと`ed2c0bea`のimageを組み合わせた途中fixtureで起動成功した結果であり、最終配布物の新規導入の代替にはしない。`issue29-distribution-smoke7.log`は外部配送しないMailpitを使い、管理者初期化・自己登録・メール確認・二人のBFF認証・招待・版履歴・所属・参照関係とBleve/ArcadeDBの結果・反映位置を確認した。
+
+公開proxyでConnection headerが信頼する転送headerを取り除く経路は、`issue29-proxy-before.log`でFAILした。Go ReverseProxyのRewriteへ切り替え、転送headerの除去後に設定する形で同じ試験が成功した。外部からの転送headerを認証接続へ引き継がない。
