@@ -13,7 +13,7 @@ koujou-sanは、初期リリースから膨大な数のContextを管理する製
 - `docs/runbooks/dev.md`
 - `docs/runbooks/issue-lifecycle.md`（Issueの起票・計画・実装・監査・Close・Reopenを行う場合）
 - `PLANS.md` (プランモード・プラン作成時)
-- `DESIGN.md`（UI/UX 作業時のビジュアル仕様。フロー/ガードレールは `docs/adr/0014-uiux-dev-flow.md`）
+- [DESIGN.md](DESIGN.md)（UI/UX作業時の視覚仕様。作業と確認は [Issueから実装する手順](docs/runbooks/issue-lifecycle.md)）
 - `REFACTORING.md`（リファクタリング・構造整理・大きめの移動/抽出を行う場合）
 
 ## 作業原則
