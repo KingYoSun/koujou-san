@@ -16,4 +16,16 @@
 - `test-results/issue30-mcp1.log`: 実Ory・公式MCP SDK・PG・Bleve・ArcadeDB。新目的のmetadata読取り、未許可toolと分類の拒否、none、再接続、本人の別クライアントへの引継ぎを確認。10,000 Context×3版でも同じ境界を確認。PASS。
 - `test-results/issue30-check.log`: Go vet・型・formatの共通検査はPASS。
 
-最初の共通画面では、MCPへ未接続の要求を同じ操作で再開し、端末/CLI不足の質問を保持した。その後、能力toolの応答に完了状態の情報がなくHostが `incomplete_candidates` で保留する不具合を確認した。metadataの共通応答形式へ修正し、認証付き試験にも完了状態の照合を追加した。最終画面、独立検品、必須CI、merge後照合は継続中。
+最初の共通画面では、MCPへ未接続の要求を同じ操作で再開し、端末/CLI不足の質問を保持した。その後、能力toolの応答に完了状態の情報がなくHostが `incomplete_candidates` で保留する不具合を確認した。metadataの共通応答形式へ修正し、認証付き試験にも完了状態の照合を追加した。修正後の実Ory/MCP試験もPASS（`test-results/issue30-ui2.log`）。
+
+## 最終の共通画面
+
+Chrome、日本語、通常のviewport・既存theme、`https://localhost:54724`。`test-results/issue30-definition-ui.json` は所有モデルHTTPの受信記録とDB状態、`issue30-ui-domain.json` は各操作と定義版、`issue30-ui-created-run.json` と `issue30-ui-fixed-input.json` は作成したRunと固定入力。
+
+1. 端末を未指定にした依頼から質問を表示。端末とCodex接続を回答すると、固定能力をMCPで読んで同じ操作を再開し、確認操作を挟まず保存・採用した。
+2. 同じ定義でモデルαからβへ切り替え、Claude接続へ変更した。手動の名称を保持して自動採用した。通常の明示作成で `run:c8e48372-0da5-4b21-9858-34ca56b950f6` が一件でき、状態queued、割当・開始要求なし。
+3. 提案方式で名称と接続先の元値・生成案を開き、名称の採用checkboxを外して採用した。名称は維持され、同じ定義の新しい版となった。
+4. 部分案を下書きへ戻す経路は、独立検品C30-1で省略値の消失を指摘された。原文fragmentを使う部分マージへ修正し、元の名称・prompt・巨大整数を保持する同条件の試験をFAIL→PASSで確認（`issue30-partial-draft-before.log` / `after.log`）。
+5. 生成開始直後の画面編集でも、送信準備後に比較基準を取ってしまう時間差を検出した。比較基準を依頼操作の最初で固定し、定義取得後にも照合する修正を行った。同じ画面操作で修正前は名称が戻ったが、修正後は「受入: 生成中に編集した未送信名」を保持し、「編集中の下書きは変更されているため、現在版を取得して比較してください」と表示した。その部分案を下書きへ戻しても未送信名・Claude接続・promptを保持した。
+
+採用後も手動固定のpathを端末の定義下書きへ保持する。最終のHost/精度保持11試験と共通checkは `issue30-host-final2.log` / `issue30-check-final.log`。独立検品の修正差分確認、必須CI、merge後照合は継続中。

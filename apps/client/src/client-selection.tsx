@@ -59,7 +59,11 @@ export type DefinitionTarget = {
   target: VersionRef;
   text: string;
   sources: VersionRef[];
-  onApplied: (ref: VersionRef) => Promise<void>;
+  onApplied: (
+    ref: VersionRef,
+    fixedPaths: string[],
+    isCurrent: () => boolean,
+  ) => Promise<boolean>;
   onDraft: (text: string) => void;
 };
 export function ClientSelection({
@@ -190,7 +194,17 @@ export function ClientSelection({
         );
         return;
       }
-      await definitionCurrent.current.onApplied(ref);
+      const applied = await definitionCurrent.current.onApplied(
+        ref,
+        definitionLocks,
+        () => expected === undefined || expected === inputSignature(),
+      );
+      if (!applied) {
+        setNotice(
+          "定義を保存しました。編集中の下書きは変更されているため、現在版を取得して比較してください。",
+        );
+        return;
+      }
       setNotice(
         "検証した定義版を保存・採用しました。Runの作成・実行は始めていません。",
       );
@@ -263,13 +277,16 @@ export function ClientSelection({
     setRecords(result.items);
     setAfter({ after: result.after, after_id: result.after_id });
   }
-  async function run(current: Saved<ClientOperation>, policy: SelectionPolicy) {
+  async function run(
+    current: Saved<ClientOperation>,
+    policy: SelectionPolicy,
+    signature = inputSignature(),
+  ) {
     if (!profile || !modelReady(ui.native, actor, profile))
       throw new Error("model_key_required");
     const mine = ++epoch.current;
     const namespace = { api: ui.api, user: ui.user, workspace: ui.workspace };
     const permission = answerScopeEpoch(namespace);
-    const signature = inputSignature();
     const port: HostPort = {
       read,
       query: async (root, kind) => {
@@ -339,6 +356,7 @@ export function ClientSelection({
   }
   const transport = useRef<string | undefined>(undefined);
   async function start() {
+    const signature = inputSignature();
     if (!profile) throw new Error("model_required");
     const values = definition
       ? fieldSources(
@@ -387,7 +405,7 @@ export function ClientSelection({
     const current = await read<ClientOperation>(ref);
     setOperation(current);
     setProposal(undefined);
-    await run(current, policy);
+    await run(current, policy, signature);
   }
   async function act(action: string) {
     if (!operation) return;
@@ -415,7 +433,7 @@ export function ClientSelection({
       await apply(current.value.applied, signature);
     if ((action === "resume" || action === "answer") && current) {
       const policy = await read<SelectionPolicy>(current.value.policy);
-      await run(current, policy.value);
+      await run(current, policy.value, signature);
     }
   }
   async function manual() {
@@ -681,10 +699,11 @@ export function ClientSelection({
                   disabled={busy || !profile}
                   onClick={() =>
                     void work(async () => {
+                      const signature = inputSignature();
                       const p = await read<SelectionPolicy>(
                         operation.value.policy,
                       );
-                      await run(operation, p.value);
+                      await run(operation, p.value, signature);
                     })
                   }
                 >

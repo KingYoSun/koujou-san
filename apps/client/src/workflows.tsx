@@ -9,7 +9,12 @@ import {
   saveLocalDraft,
   syncStorage,
 } from "./sync-store";
-import { editField, fieldSource, nodeCount } from "./workflow-json";
+import {
+  editField,
+  fieldSource,
+  mergeFields,
+  nodeCount,
+} from "./workflow-json";
 import type { JSONPath } from "jsonc-parser";
 import { WorkflowExecution } from "./workflow-execution";
 import { DefinitionRun } from "./definition-run";
@@ -870,12 +875,12 @@ export function Workflows({
           onDraft={(text) =>
             persist({
               ...draft,
-              text,
+              text: mergeFields(compose(draft), text),
               fields: {},
               manual_paths: definitionFields.map(([path]) => path),
             })
           }
-          onApplied={async (ref) => {
+          onApplied={async (ref, fixedPaths, isCurrent) => {
             const applied = (await call(
               `/records/${encodeURIComponent(ref.id)}?version=${encodeURIComponent(ref.version)}`,
             )) as { value: { definition: Ref } };
@@ -883,10 +888,17 @@ export function Workflows({
               `/records/${encodeURIComponent(applied.value.definition.id)}?version=${encodeURIComponent(applied.value.definition.version)}&format=source`,
             )) as DefinitionRecord;
             const next = {
+              manual_paths: fixedPaths,
               version: saved.version,
               text: saved.value_utf8,
               fields: {},
             };
+            if (!isCurrent()) return false;
+            setRecord(saved);
+            setDraft(next);
+            setAdoption(applied.value.definition);
+            setVerified(undefined);
+            setValidation(undefined);
             await saveLocalDraft(
               native,
               namespace,
@@ -894,11 +906,7 @@ export function Workflows({
               next,
               "workflow-definition",
             );
-            setRecord(saved);
-            setDraft(next);
-            setAdoption(applied.value.definition);
-            setVerified(undefined);
-            setValidation(undefined);
+            return true;
           }}
         />
       )}
