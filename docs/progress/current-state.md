@@ -115,6 +115,6 @@
 
 ## Issue #27の判定
 
-状態: In progress。Scope revision 1。[Draft PR #61](https://github.com/KingYoSun/koujou-san/pull/61)。任意Bifrost、変更可能な初期上限、関係する証拠だけの再評価を実装し、所有CLI/HTTP・PG・Ory/MCP・共通画面とGateway復元を検証した。固定`7c4766d`の独立コード検品と全CIは成功。本人が許可したOpenAI API二要求のうち、第一は上流URL設定の誤りで404、第二は構造化候補とusageを取得したが、合成入力の証拠不足により判断不能となり、発行していない。修正した具体的な陽性入力の所有試験は成功した。追加の実要求前には消費枠の判断が必要である。[計画](2026-10-18-issue-27-plan.md)、[証跡と残る確認](2026-10-18-issue-27-evidence.md)、[ADR](../adr/0027-server-hopper-semantics.md)を参照する。未確認の陽性発行・最終差分の検品/CI・マージ後照合を達成とは扱わない。
+状態: In progress。Scope revision 1。[PR #61](https://github.com/KingYoSun/koujou-san/pull/61)。所有CLI/HTTP・PG・Ory/MCP・共通画面・Gateway復元と、本人が許可したOpenAI APIの三要求を確認した。第一404と第二の判断不能を保持し、追加許可の第三で固定証拠からの候補・保存・後続Run作成に成功した。元Runの成功を維持し、入力487・出力442 token、cache 0・reasoning欠測を記録した。固定`1315b02`のコードと実接続証跡の[独立検品](2026-10-18-issue-27-inspection.md)は全条件PASS・blocker 0件。残る作業は最新headの必須CIとマージ後照合である。[計画](2026-10-18-issue-27-plan.md)、[証跡](2026-10-18-issue-27-evidence.md)、[ADR](../adr/0027-server-hopper-semantics.md)を参照する。
 
 #28〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。

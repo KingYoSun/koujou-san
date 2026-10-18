@@ -50,7 +50,7 @@ PRは[Draft #61](https://github.com/KingYoSun/koujou-san/pull/61)。先行CI `39
 
 ## OpenAI APIの二要求
 
-本人がOpenAI APIの専用キー設定と合成入力の最大二要求を許可し、Git管理外の`provider.env`へキーを保存した。既存CLIやクライアントOAuthの秘密値は使っていない。モデルは公式の[モデル仕様](https://developers.openai.com/api/docs/models/gpt-6.1-sol)と、本人のAPIで取得したモデル一覧で`gpt-6.1-sol`を確認した。Chat Completionsと構造化応答の対応範囲で、入力4 KiB・出力2048 token・30秒・fallbackなしとした。
+本人がOpenAI APIの専用キー設定と合成入力の推論要求を最大二回許可し、Git管理外の`provider.env`へキーを保存した。既存CLIやクライアントOAuthの秘密値は使っていない。モデルは公式の[モデル仕様](https://developers.openai.com/api/docs/models/gpt-6.1-sol)と、本人のAPIで一回読み取ったモデル一覧で`gpt-6.1-sol`を確認した。Chat Completionsと構造化応答の対応範囲で、入力4 KiB・出力2048 token・30秒・fallbackなしとした。
 
 第一要求は404。私の上流`base_url`設定に`/v1`を含めたため、Bifrostの`/v1/chat/completions`と重複した。採用・発行はなく、利用量は欠測として保持した。`issue27-openai-live-first.log/json`。所有providerのパス検証が緩かったため、この不備を隔離probeで見逃していた。厳密なパス検証を追加し、変更前404・変更後成功を`issue27-gateway-path-before.log / after.log`で確認した。
 
@@ -60,4 +60,6 @@ PRは[Draft #61](https://github.com/KingYoSun/koujou-san/pull/61)。先行CI `39
 
 陽性fixtureを、契約・所有コード・実際のNaN観測・見送り理由を持つNode出力へ修正した。`unknown`は条件判断を妨げる証拠不足を表すことをschemaで明確にし、疑いの同定と、確認・外部追跡の判断を初期指示で分けた。未知点がある応答を判断不能にする処理は維持する。通常PG試験と4 KiBの所有HTTP入口が成功し、所有HTTPの送信数は一回だった。`issue27-concrete-evidence-owned.log / issue27-concrete-live-entry-owned.log/json`。
 
-承認された二要求は使い切った。修正した陽性入力を実providerへ送る前に、追加枠の判断を確認する。
+二要求を使い切った後、本人が同条件の追加一要求を許可した。第三はHTTP200、実モデル`gpt-6.1-sol`、`complete / true / unknown=[]`となった。入力487・出力442 token、cache 0、reasoningは欠測。`issue27-openai-live-third.log/json`のPASSから、元Runの成功、後続Run作成、入力分離、完了lease再送拒否を確認した。外部APIへ障害fixtureや後続CLIを送っていない。全三要求で実試験を終了し、Gatewayを通常停止した。専用設定・認証はGit管理外に保持した。
+
+固定`1315b02`のコード差分と三要求の実接続証跡を独立検品し、全条件PASS・blocker 0件となった。[独立検品記録](2026-10-18-issue-27-inspection.md)に、JSONのSHA-256、欠測の扱い、所有試験と実接続で確認した範囲を記録した。残る作業は最新headのCIとマージ後照合である。
