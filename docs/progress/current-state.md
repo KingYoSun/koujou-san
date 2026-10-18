@@ -133,6 +133,6 @@
 
 状態: Complete。Scope revision 1。[PR #66](https://github.com/KingYoSun/koujou-san/pull/66)を最終head `1c8fd239038a90ec5711485c74a537cb364cb27c` の全CI成功後にマージした。全AC・INVARの[独立検品](2026-10-18-issue-31-inspection.md)はPASS、blockerなし。merge `cfca32923449ce6f24347088c12ea0ad1834b204`と最終headのtreeは`c27c07810e107d3bd226bd6cb6d35a409734db6d`で一致、差分0。Linux配布物のschema 22→24更新と復元、Windows配布物もCIで成功し、#31を手動Closeした。[証跡](2026-10-18-issue-31-evidence.md)を参照する。
 
-## Issue #32の準備
+## Issue #32の判定
 
-状態: 判断待ち。初期比較画面を条件による二群の保存・サーバー集計にするか、Run単位の比較にするかを本人へ提示済み。判断に依存する実装は未着手。#33へ移した実S3スリープと初見操作は未確認のまま保持する。
+状態: In progress。本人が、条件で二群を保存しサーバー集計を並べる初期画面を承認した。[計画](2026-10-19-issue-32-plan.md)の六条件と維持条件で実装・検証する。#33へ移した実S3スリープと初見操作は未確認のまま保持する。
