@@ -194,6 +194,14 @@ func checkDefinitions(t *testing.T, s *Service) {
 			t.Fatal("required Context disappeared when model omitted selection")
 		}
 	}
+
+	emptyPolicy := policy
+	emptyPolicy.Definition = &DefinitionPolicy{Sources: []Ref{capability}, FixedPaths: []string{"/inputs", "/required"}, FixedValues: map[string]string{"/inputs": "[]", "/required": "[]"}}
+	emptyPolicyRef := must(s.PutPolicy(ctx, p, "one", "definition-policy:empty-fixed", Write{Mutation: m("0"), Value: raw(emptyPolicy)}))
+	emptyOp := start("empty-fixed", Ref{ID: "run-definition:empty-fixed", Version: "0"}, emptyPolicyRef, "owned-model-claude")
+	if readOp(finish(emptyOp, proposal(original, []string{}))).State != "applied" {
+		t.Fatal("unchanged empty fixed inputs or capabilities rejected")
+	}
 	var runCount, pauses, executions int
 	if err := s.Store.Database().QueryRow(ctx, `SELECT (SELECT count(*) FROM run_records),(SELECT count(*) FROM run_records WHERE kind='pause'),(SELECT count(*) FROM workflow_records WHERE kind='execution')`).Scan(&runCount, &pauses, &executions); err != nil || runCount != 0 || pauses != 0 || executions != 0 {
 		t.Fatal("generation started work", runCount, pauses, executions, err)

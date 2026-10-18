@@ -33,3 +33,5 @@ Chrome、日本語、通常のviewport・既存theme、`https://localhost:54724`
 ## 必須Contextの省略
 
 最後の照合で、definition-policyの必須Contextを指定しても、モデルがselection全体を省略するとその必須参照が採用定義から消えるAC-6の未達を実PGで確認した（`issue30-required-before2.log`）。生成案の省略時にも既存の選択処理を通し、必須・除外を維持するよう修正した。正規化後にも手動固定pathを照合する。`issue30-required-final.log` の実PG試験と `issue30-domain-final.log` の関連Go試験はPASS。Go vetも成功した。新しい利用場面や制限は追加していない。
+
+追加の差分検品では、固定値を構造体へ変換した後に全pathを比較すると、未送信の `inputs: []` / `required: []` がomitemptyで省略され、自動採用を誤って拒否する回帰を確認した。固定値の原文比較は変換前に維持し、共通選択の正規化が変更する `/selection` だけを正規化後にも比較するよう限定した。`issue30-empty-fixed-before.log` のFAILと `issue30-empty-fixed-after.log` のPASSで、空配列・必須Context・元の固定項目を同じ実PG fixtureから確認した。
