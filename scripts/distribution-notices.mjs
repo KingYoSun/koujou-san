@@ -183,6 +183,8 @@ export async function notices(root, stage, target) {
         "cargo",
         [
           "metadata",
+          "--features",
+          "custom-protocol",
           "--locked",
           "--offline",
           "--format-version",

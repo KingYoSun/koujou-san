@@ -260,6 +260,8 @@ if (kind === "server") {
       "exec",
       "tauri",
       "build",
+      "--features",
+      "custom-protocol",
       "--config",
       config,
     ]),
