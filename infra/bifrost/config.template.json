@@ -1,0 +1,50 @@
+{
+  "source_of_truth": "config.json",
+  "client": {
+    "enable_logging": true,
+    "disable_content_logging": true,
+    "retain_content_in_object_storage": false,
+    "allow_per_request_content_storage_override": false,
+    "enforce_auth_on_inference": true
+  },
+  "framework": {
+    "pricing": {
+      "mcp_library_sync_interval": 0,
+      "live_models_sync_interval": 0
+    }
+  },
+  "providers": {},
+  "config_store": {
+    "enabled": true,
+    "type": "sqlite",
+    "config": { "path": "/app/data/config.db" }
+  },
+  "logs_store": {
+    "enabled": true,
+    "type": "sqlite",
+    "config": { "path": "/app/data/logs.db" },
+    "retention_days": 0
+  },
+  "governance": {
+    "auth_config": {
+      "is_enabled": true,
+      "admin_username": "koujou-admin",
+      "admin_password": "env.BIFROST_ADMIN_PASSWORD"
+    },
+    "virtual_keys": [
+      {
+        "id": "koujou-worker",
+        "name": "koujou-server",
+        "value": "env.BIFROST_WORKER_KEY",
+        "is_active": true,
+        "provider_configs": []
+      }
+    ]
+  },
+  "feature_flags": { "flags": { "warp": { "enabled": false } } },
+  "plugins": [
+    { "name": "semanticcache", "enabled": false },
+    { "name": "maxim", "enabled": false },
+    { "name": "otel", "enabled": false }
+  ]
+}

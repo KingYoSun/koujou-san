@@ -89,10 +89,14 @@ type OwnerWrite struct {
 	Actor        string
 	Dependencies []Ref
 	Check        func(context.Context, pgx.Tx) error
+	// Reserved permits completing an already-recorded effect after its actor's
+	// authority changes. Check must validate the immutable owning reservation;
+	// dependencies remain attached for all current read/export authorization.
+	Reserved bool
 }
 
 func (s *Service) PutFromOwner(ctx context.Context, p access.Principal, w, id string, req Write, guard OwnerWrite, within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
-	if kindOf(id) != "usage" || guard.Check == nil || guard.Actor == "" {
+	if kindOf(id) != "usage" || guard.Check == nil || guard.Actor == "" || (guard.Reserved && req.ExpectedVersion == "0") {
 		return apicontract.Response[apicontract.Reference]{}, access.ErrForbidden
 	}
 	var tx pgx.Tx
@@ -114,8 +118,11 @@ func (s *Service) put(ctx context.Context, p access.Principal, w, id string, req
 	if len(within) > 0 {
 		tx = within[0]
 	}
-	if err := s.authorizeWrite(ctx, tx, p, w, id); err != nil {
-		return empty, err
+	reserved := guard != nil && guard.Reserved
+	if !reserved {
+		if err := s.authorizeWrite(ctx, tx, p, w, id); err != nil {
+			return empty, err
+		}
 	}
 	kind := kindOf(id)
 	var value any
@@ -124,6 +131,9 @@ func (s *Service) put(ctx context.Context, p access.Principal, w, id string, req
 		var v Observation
 		if decode(req.Value, &v) != nil || v.validate() != nil || id != ObservationID(v) {
 			return empty, ErrInvalid
+		}
+		if strings.HasPrefix(v.Source, "server-model:") && guard == nil {
+			return empty, access.ErrForbidden
 		}
 		value = v
 	case "price":
@@ -152,11 +162,13 @@ func (s *Service) put(ctx context.Context, p access.Principal, w, id string, req
 				return &apicontract.Problem{Code: "forbidden"}
 			}
 		}
-		if err := s.authorizeWrite(ctx, tx, p, w, id); err != nil {
-			return &apicontract.Problem{Code: "forbidden"}
-		}
-		if err := s.Access.CheckVersion(ctx, tx, p, w, id, req.ExpectedVersion); err != nil {
-			return &apicontract.Problem{Code: "forbidden"}
+		if !reserved {
+			if err := s.authorizeWrite(ctx, tx, p, w, id); err != nil {
+				return &apicontract.Problem{Code: "forbidden"}
+			}
+			if err := s.Access.CheckVersion(ctx, tx, p, w, id, req.ExpectedVersion); err != nil {
+				return &apicontract.Problem{Code: "forbidden"}
+			}
 		}
 		return nil
 	}}
@@ -173,6 +185,17 @@ func (s *Service) put(ctx context.Context, p access.Principal, w, id string, req
 		switch v := value.(type) {
 		case Observation:
 			group = v.Group
+			if reserved {
+				var previousDependencies []byte
+				if err := tx.QueryRow(ctx, `SELECT dependencies FROM usage_records WHERE workspace_id=$1 AND id=$2 ORDER BY position DESC LIMIT 1`, w, id).Scan(&previousDependencies); err != nil {
+					return nil, err
+				}
+				var previous []Ref
+				if err := json.Unmarshal(previousDependencies, &previous); err != nil {
+					return nil, err
+				}
+				deps = uniqueRefs(append(deps, previous...))
+			}
 			var previous []byte
 			err := tx.QueryRow(ctx, `SELECT payload FROM usage_records WHERE workspace_id=$1 AND id=$2 ORDER BY position DESC LIMIT 1`, w, id).Scan(&previous)
 			old := v
@@ -204,6 +227,9 @@ func (s *Service) put(ctx context.Context, p access.Principal, w, id string, req
 				deps = append(deps, Ref{ID: "scope:" + scope})
 			}
 			for _, r := range deps {
+				if reserved {
+					continue
+				}
 				if err = s.Access.CheckTx(ctx, tx, p, w, r.ID, "get"); err != nil {
 					return nil, err
 				}

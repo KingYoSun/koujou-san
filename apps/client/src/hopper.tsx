@@ -10,9 +10,42 @@ export const hopperRef = (ref: Ref): Ref => ({
 });
 type Version = Ref & { kind: string; position: number; value: unknown };
 type Page = { items: Version[]; after: number; after_id: string };
+type ModelConnection = {
+  id: string;
+  name: string;
+  revision: string;
+  models: { requested: string; allowed_actual: string[] }[];
+};
+type SemanticSettings = {
+  connection: string;
+  revision: string;
+  model: string;
+  allowed_models: string[];
+  fallbacks: string[];
+  instructions: string;
+  limits: { input_bytes: number; output_tokens: number; seconds: number };
+  reevaluate_evidence: boolean;
+};
 type Evaluation = {
   definition: Ref;
-  source: { target: Ref; facts: unknown };
+  source: { target: Ref; facts: unknown; previous_evaluation?: Ref };
+  reevaluation?: string;
+  semantic?: {
+    input?: Ref;
+    response?: Ref;
+    state: string;
+    reason?: string;
+    decision?: {
+      verdict: string;
+      reason: string;
+      candidate: unknown;
+      evidence: unknown[];
+      unknown: string[];
+    };
+    usage: Ref[];
+    costs: Ref[];
+    usage_state: string;
+  };
   root: string;
   depth: number;
   state: string;
@@ -35,6 +68,8 @@ const states: Record<string, string> = {
   blocked: "停止・上限・権限の確認待ち",
   unknown: "判断不能",
   input_waiting: "入力待ち",
+  failed: "意味判断に失敗",
+  complete: "意味判断を保存済み",
   not_matched: "条件不成立",
   matched: "条件成立・発行なし",
 };
@@ -58,6 +93,16 @@ const reasons: Record<string, string> = {
     "発行・実行・入力の現在の許可を確認してください",
   mapped_input_unavailable: "発行先へ渡す入力を確定できません",
   template_input_invalid: "テンプレートと入力の対応を確認してください",
+  model_connection_unavailable:
+    "サーバーのモデル接続設定・認証・稼働状態を確認してください",
+  model_not_permitted: "指定モデルとfallbackの許可設定を確認してください",
+  model_request_failed:
+    "モデル要求が失敗しました。原応答と試行履歴を確認してください",
+  invalid_semantic_response:
+    "応答形式または引用した証拠が不正のため採用していません",
+  evaluation_context_unavailable:
+    "評価Contextの権限・送信分類・固定版を確認してください",
+  model_input_capacity: "評価入力の容量上限を超えたため、省略せず保留しました",
 };
 
 export function Hopper({
@@ -86,6 +131,9 @@ export function Hopper({
   const [pastAfter, setPastAfter] = useState(0);
   const [trial, setTrial] = useState<Version | null>(null);
   const [bounds, setBounds] = useState("");
+  const [connections, setConnections] = useState<ModelConnection[]>([]);
+  const [attempts, setAttempts] = useState<Page | null>(null);
+  const [detail, setDetail] = useState<Version | null>(null);
   const pending = useRef<{ key: string; id: string } | null>(null);
   const admin = role === "admin";
   const call = <T,>(path: string, body?: unknown) =>
@@ -103,12 +151,15 @@ export function Hopper({
       setPage(null);
       setSelected(null);
       setTrial(null);
+      setAttempts(null);
+      setDetail(null);
       if (
         e instanceof SyncHTTPError &&
         (e.status === 401 || e.status === 403)
       ) {
         setDraft("");
         setSaved(null);
+        setConnections([]);
         setID("");
         setVersion("0");
         pending.current = null;
@@ -198,8 +249,35 @@ export function Hopper({
         : "連鎖を再開可能にしました。保留した発行は履歴から明示して再開してください。",
     );
   };
+  let semantic: SemanticSettings | undefined;
+  try {
+    semantic = JSON.parse(draft).semantic;
+  } catch {
+    /* The JSON editor can be incomplete. */
+  }
+  const editSemantic = (change: Partial<SemanticSettings>) => {
+    const value = JSON.parse(draft);
+    value.semantic = { ...value.semantic, ...change };
+    setDraft(JSON.stringify(value, null, 2));
+  };
+  const fixedDetail = async (ref: Ref) =>
+    setDetail(
+      await call<Version>(
+        `/records/${encodeURIComponent(ref.id)}?version=${encodeURIComponent(ref.version)}`,
+      ),
+    );
+  const loadAttempts = async (record: Version, after = 0, after_id = "") =>
+    setAttempts(
+      await call<Page>("/query", {
+        mode: "attempts",
+        id: record.id,
+        limit: 50,
+        after,
+        after_id,
+      }),
+    );
   return (
-    <details className="workspace-management">
+    <details className="workspace-management workflow-editor hopper-editor">
       <summary>Hopper: 結果から次の仕事を発行</summary>
       <p>
         共有された結果をサーバーが評価します。画面を閉じても動作し、発行・Run作成・実行開始はそれぞれ現在の権限で確認します。
@@ -252,6 +330,8 @@ export function Hopper({
               <button
                 onClick={() => {
                   setSelected(r);
+                  setAttempts(null);
+                  setDetail(null);
                   if (r.kind === "definition") {
                     setID(r.id);
                     setVersion(r.version);
@@ -288,6 +368,132 @@ export function Hopper({
                     {e.dry_run ? "（過去の試行・発行なし）" : ""}
                   </h3>
                   <p>{reasons[e.reason] ?? e.reason}</p>
+                  {e.semantic && (
+                    <section aria-label="意味判断の根拠と消費">
+                      <h4>
+                        意味判断: {states[e.semantic.state] ?? e.semantic.state}
+                      </h4>
+                      <p>
+                        {reasons[e.semantic.reason ?? ""] ?? e.semantic.reason}
+                      </p>
+                      <p>
+                        この評価のモデル消費: {e.semantic.usage.length}件 /
+                        費用:{" "}
+                        {e.semantic.usage_state === "complete"
+                          ? "算定済み"
+                          : e.semantic.usage_state === "not_applicable"
+                            ? "要求なし"
+                            : "欠測・未算定あり"}
+                        。元のRunや発行先の消費とは分けて記録します。
+                      </p>
+                      {e.semantic.decision && (
+                        <>
+                          <p>{e.semantic.decision.reason}</p>
+                          <pre>
+                            {JSON.stringify(
+                              {
+                                candidate: e.semantic.decision.candidate,
+                                evidence: e.semantic.decision.evidence,
+                                unknown: e.semantic.decision.unknown,
+                              },
+                              null,
+                              2,
+                            )}
+                          </pre>
+                        </>
+                      )}
+                      {e.semantic.input && (
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            void run(() => fixedDetail(e.semantic!.input!))
+                          }
+                        >
+                          固定した評価入力を確認
+                        </button>
+                      )}
+                      {e.semantic.response && (
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            void run(() => fixedDetail(e.semantic!.response!))
+                          }
+                        >
+                          採用したモデルの原応答を確認
+                        </button>
+                      )}
+                      <button
+                        disabled={busy}
+                        onClick={() => void run(() => loadAttempts(selected))}
+                      >
+                        この評価の試行・消費履歴を取得
+                      </button>
+                      {attempts && (
+                        <>
+                          <ul>
+                            {attempts.items.map((a) => (
+                              <li key={`${a.id}/${a.version}`}>
+                                <button
+                                  disabled={busy}
+                                  onClick={() => void run(() => fixedDetail(a))}
+                                >
+                                  試行 {(a.value as { number: number }).number}{" "}
+                                  · {a.id}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                          {attempts.items.length === 50 && (
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                void run(() =>
+                                  loadAttempts(
+                                    selected,
+                                    attempts.after,
+                                    attempts.after_id,
+                                  ),
+                                )
+                              }
+                            >
+                              次の50試行
+                            </button>
+                          )}
+                        </>
+                      )}
+                      {admin && (
+                        <button
+                          disabled={busy}
+                          onClick={() =>
+                            void run(() => decide(selected, "reevaluate"))
+                          }
+                        >
+                          同じ結果を新しい履歴で再評価
+                        </button>
+                      )}
+                      <p>
+                        再評価は現在の証拠と許可を確認してモデルを要求し、追加の消費を記録します。過去の判定と発行先は保持します。
+                      </p>
+                    </section>
+                  )}
+                  {e.source.previous_evaluation && (
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await fixedDetail(e.source.previous_evaluation!);
+                        })
+                      }
+                    >
+                      前の評価と発行先を確認
+                    </button>
+                  )}
+                  {e.reevaluation && (
+                    <p>
+                      再評価を受付済み: {e.reevaluation}
+                      。一覧を更新して結果を確認してください。
+                    </p>
+                  )}
                   {e.cost && (
                     <p>
                       記録済み費用（{e.cost.valuation}）:{" "}
@@ -338,16 +544,17 @@ export function Hopper({
                         "held",
                         "blocked",
                         "input_waiting",
-                      ].includes(e.state) && (
-                        <button
-                          disabled={busy}
-                          onClick={() =>
-                            void run(() => decide(selected, "publish"))
-                          }
-                        >
-                          この提案・保留を発行する
-                        </button>
-                      )}
+                      ].includes(e.state) &&
+                        (!e.semantic || e.semantic.state === "complete") && (
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void run(() => decide(selected, "publish"))
+                            }
+                          >
+                            この提案・保留を発行する
+                          </button>
+                        )}
                       <button
                         disabled={busy}
                         onClick={() => void run(() => chain(true))}
@@ -377,6 +584,12 @@ export function Hopper({
             <summary>固定版・条件・根拠の詳細</summary>
             <pre>{JSON.stringify(selected, null, 2)}</pre>
           </details>
+          {detail && (
+            <details open>
+              <summary>選択した固定版の内容</summary>
+              <pre>{JSON.stringify(detail, null, 2)}</pre>
+            </details>
+          )}
         </section>
       )}
       {role !== "viewer" && (
@@ -397,6 +610,151 @@ export function Hopper({
           <p>
             初期設定は自動発行・通常の割当と開始です。対象・型付き条件・登録済みテンプレートの固定版を指定してください。保存と有効化は別の操作です。
           </p>
+          <button
+            onClick={() =>
+              void run(async () => {
+                setConnections(
+                  await call<ModelConnection[]>("/model-connections"),
+                );
+              })
+            }
+          >
+            サーバーのモデル接続を取得
+          </button>
+          {connections.length === 0 && (
+            <p>
+              接続が表示されない場合は、運用者がWorkspace用のサーバー接続を登録してください。クライアントのAPIキーやCLI認証は使いません。
+            </p>
+          )}
+          <button
+            disabled={!draft || connections.length === 0 || !!semantic}
+            onClick={() =>
+              void run(async () => {
+                const value = JSON.parse(draft),
+                  connection = connections[0],
+                  model = connection.models[0];
+                value.semantic = {
+                  ...(await call<SemanticSettings>("/semantic-template")),
+                  connection: connection.id,
+                  revision: connection.revision,
+                  model: model.requested,
+                  allowed_models: model.allowed_actual,
+                };
+                value.condition = {
+                  all: [value.condition, { semantic: true }],
+                };
+                setDraft(JSON.stringify(value, null, 2));
+              })
+            }
+          >
+            現在の条件に意味判断を追加
+          </button>
+          {semantic && (
+            <fieldset>
+              <legend>サーバーモデルによる意味判断</legend>
+              <label>
+                モデル接続
+                <select
+                  value={semantic.connection}
+                  onChange={(e) => {
+                    const c = connections.find((c) => c.id === e.target.value);
+                    if (c)
+                      editSemantic({
+                        connection: c.id,
+                        revision: c.revision,
+                        model: c.models[0].requested,
+                        allowed_models: c.models[0].allowed_actual,
+                        fallbacks: [],
+                      });
+                  }}
+                >
+                  <option value={semantic.connection}>
+                    {semantic.connection}
+                  </option>
+                  {connections
+                    .filter((c) => c.id !== semantic!.connection)
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                要求モデル
+                <select
+                  value={semantic.model}
+                  onChange={(e) => {
+                    const m = connections
+                      .find((c) => c.id === semantic!.connection)
+                      ?.models.find((m) => m.requested === e.target.value);
+                    if (m)
+                      editSemantic({
+                        model: m.requested,
+                        allowed_models: m.allowed_actual,
+                        fallbacks: [],
+                      });
+                  }}
+                >
+                  <option value={semantic.model}>{semantic.model}</option>
+                  {connections
+                    .find((c) => c.id === semantic!.connection)
+                    ?.models.filter((m) => m.requested !== semantic!.model)
+                    .map((m) => (
+                      <option key={m.requested} value={m.requested}>
+                        {m.requested}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label>
+                評価への指示
+                <textarea
+                  value={semantic.instructions}
+                  onChange={(e) =>
+                    editSemantic({ instructions: e.target.value })
+                  }
+                />
+              </label>
+              {(
+                [
+                  ["input_bytes", "入力上限（UTF-8 byte）"],
+                  ["output_tokens", "出力上限（token）"],
+                  ["seconds", "要求の時間上限（秒）"],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key}>
+                  {label}
+                  <input
+                    type="number"
+                    min={1}
+                    value={semantic!.limits[key]}
+                    onChange={(e) =>
+                      editSemantic({
+                        limits: {
+                          ...semantic!.limits,
+                          [key]: Number(e.target.value),
+                        },
+                      })
+                    }
+                  />
+                </label>
+              ))}
+              <label>
+                <input
+                  type="checkbox"
+                  checked={semantic.reevaluate_evidence}
+                  onChange={(e) =>
+                    editSemantic({ reevaluate_evidence: e.target.checked })
+                  }
+                />
+                必要な証拠の遅着・変更時に関連評価だけ再評価する
+              </label>
+              <p>
+                評価Context・必要な証拠・fallback・料金版は下のJSONで指定します。Contextは選択条件と固定参照で扱い、全件を取得しません。容量超過は省略せず保留します。評価入力は発行先へ自動注入しません。
+              </p>
+            </fieldset>
+          )}
           <label>
             定義ID
             <input
@@ -458,7 +816,7 @@ export function Hopper({
         <fieldset disabled={busy || !saved}>
           <legend>過去の結果を発行せずに試す</legend>
           <p>
-            保存した固定版で50件ずつ評価します。Issue・Runの作成や開始は行いません。
+            保存した固定版で50件ずつ評価します。Issue・Runの作成や開始は行いません。意味判断はサーバーWorkerへ受付し、モデル消費が発生します。結果は「評価と発行」の一覧を更新して確認してください。
           </p>
           <label>
             結果の種類
@@ -504,7 +862,19 @@ export function Hopper({
           </button>
           {trial && (
             <>
-              <pre>{JSON.stringify(trial.value, null, 2)}</pre>
+              <p>
+                {(trial.value as { items: Ref[] }).items.length}
+                件を受け付けました。
+                {(trial.value as { items: Ref[] }).items.some(
+                  (item) => !item.version,
+                )
+                  ? "サーバーで処理します。「評価と発行」の一覧から結果を確認してください。"
+                  : "発行しない評価結果を保存しました。"}
+              </p>
+              <details>
+                <summary>受付範囲と参照の詳細</summary>
+                <pre>{JSON.stringify(trial.value, null, 2)}</pre>
+              </details>
               <button
                 onClick={() => {
                   setPastAfter((trial.value as { after: number }).after);

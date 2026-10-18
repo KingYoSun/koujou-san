@@ -12,6 +12,7 @@
     "test:clientops": "node scripts/dev.mjs test:clientops",
     "test:clientops:ui": "node scripts/dev.mjs test:clientops:ui",
     "test:hopper": "node scripts/dev.mjs test:hopper",
+    "test:hopper:live": "node scripts/dev.mjs test:hopper:live",
     "test:hopper:ui": "node scripts/dev.mjs test:hopper:ui",
     "test:workbench": "node scripts/dev.mjs test:workbench",
     "test:workbench:ui": "node scripts/dev.mjs test:workbench:ui",
@@ -52,6 +53,8 @@
     "infra:up": "node scripts/dev.mjs infra:up",
     "infra:down": "node scripts/dev.mjs infra:down",
     "infra:status": "node scripts/dev.mjs infra:status",
+    "infra:llm:up": "node scripts/dev.mjs infra:llm:up",
+    "infra:llm:stop": "node scripts/dev.mjs infra:llm:stop",
     "format": "prettier --write package.json pnpm-workspace.yaml contracts scripts .github infra apps/client",
     "format:check": "prettier --check package.json pnpm-workspace.yaml contracts scripts .github infra apps/client"
   },

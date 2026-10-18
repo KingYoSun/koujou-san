@@ -106,6 +106,13 @@ func checkHopperMCP(t *testing.T, s *Service, p access.Principal, ordinary strin
 		t.Fatal("private basis leaked", string(page))
 	}
 	call(reader, "hopper_get", pin, false)
+	connections := call(reader, "hopper_model_connections", map[string]any{}, false)
+	if strings.Contains(string(connections), "key_file") {
+		t.Fatal("gateway credential metadata leaked")
+	}
+	call(reader, "hopper_semantic_template", map[string]any{}, false)
+	// Public Workspace connection metadata contains neither Context bodies nor keys.
+	call(none, "hopper_model_connections", map[string]any{}, false)
 	_ = s.Hopper.Store.Database().QueryRow(ctx, `SELECT count(*) FROM automation_jobs`).Scan(&after)
 	if before != after {
 		t.Fatal("read created work")

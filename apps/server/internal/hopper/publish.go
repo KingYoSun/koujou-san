@@ -34,6 +34,7 @@ func (s *Service) relation(ctx context.Context, tx pgx.Tx, p access.Principal, w
 func (s *Service) publish(ctx context.Context, tx pgx.Tx, p access.Principal, w string, d Definition, e *Evaluation, ref, control Ref) (Ref, error) {
 	suffix := "hopper-" + hash([]string{ref.ID})
 	provenance := append(append([]Ref{}, e.Source.Refs...), e.Source.Target, d.Action.Template, e.Definition)
+	provenance = append(provenance, e.protected...)
 	templateRefs, err := s.template(ctx, p, w, d)
 	if err != nil {
 		return Ref{}, err
@@ -64,7 +65,7 @@ func (s *Service) publish(ctx context.Context, tx pgx.Tx, p access.Principal, w 
 			repository = &copy
 		}
 		for _, m := range d.Action.Mappings {
-			value, ok := selected(decodeValue(e.Source.Facts.Report), m.Path)
+			value, ok := selected(evaluationData(e), m.Path)
 			if !ok {
 				return Ref{}, ErrState
 			}
@@ -127,7 +128,7 @@ func (s *Service) publish(ctx context.Context, tx pgx.Tx, p access.Principal, w 
 	var draft publications.Draft
 	_ = json.Unmarshal(r.Value, &draft)
 	for _, m := range d.Action.Mappings {
-		value, ok := selected(decodeValue(e.Source.Facts.Report), m.Path)
+		value, ok := selected(evaluationData(e), m.Path)
 		if !ok {
 			return Ref{}, ErrState
 		}

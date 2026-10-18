@@ -18,12 +18,12 @@ type Decision struct {
 }
 
 func (s *Service) Decide(ctx context.Context, p access.Principal, w, id string, req Decision) (apicontract.Response[apicontract.Reference], error) {
-	if req.Action != "publish" && req.Action != "stop" && req.Action != "resume" {
+	if req.Action != "publish" && req.Action != "stop" && req.Action != "resume" && req.Action != "reevaluate" {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
 	return s.mutation(ctx, p, w, id, "manage", req.Mutation, req, func(tx pgx.Tx, ref Ref) (Record, error) {
 		if strings.HasPrefix(id, "hopper-chain:") {
-			if req.Action == "publish" {
+			if req.Action == "publish" || req.Action == "reevaluate" {
 				return Record{}, ErrInvalid
 			}
 			root := strings.TrimPrefix(id, "hopper-chain:")
@@ -53,7 +53,7 @@ func (s *Service) Decide(ctx context.Context, p access.Principal, w, id string, 
 				Bounds  json.RawMessage `json:"bounds"`
 			}{root, req.Action == "stop", b}, dependencies)
 		}
-		if req.Action != "publish" && req.Action != "resume" {
+		if req.Action != "publish" && req.Action != "resume" && req.Action != "reevaluate" {
 			return Record{}, ErrInvalid
 		}
 		r, err := record(ctx, tx, w, Ref{ID: id, Version: req.ExpectedVersion})
@@ -64,16 +64,18 @@ func (s *Service) Decide(ctx context.Context, p access.Principal, w, id string, 
 			return Record{}, err
 		}
 		var e Evaluation
-		if json.Unmarshal(r.Value, &e) != nil || e.DryRun || (req.Action == "resume" && (e.State != "published" || e.Destination == nil || !strings.HasPrefix(e.Destination.ID, "run:"))) || (req.Action == "publish" && e.State != "proposal" && e.State != "held" && e.State != "blocked" && e.State != "input_waiting") {
+		if json.Unmarshal(r.Value, &e) != nil || (e.DryRun && req.Action != "reevaluate") || (req.Action == "resume" && (e.State != "published" || e.Destination == nil || !strings.HasPrefix(e.Destination.ID, "run:"))) || (req.Action == "publish" && e.State != "proposal" && e.State != "held" && e.State != "blocked" && e.State != "input_waiting") {
 			return Record{}, ErrState
 		}
-		a, err := s.active(ctx, tx, w, e.Definition)
-		if err != nil {
-			return Record{}, err
-		}
 		controller, control, err := s.Automation.CheckManualTx(ctx, tx, w, r.Refs)
-		if err != nil || controller.Controller != a.Controller {
+		if err != nil {
 			return Record{}, access.ErrForbidden
+		}
+		if !e.DryRun {
+			a, err := s.active(ctx, tx, w, e.Definition)
+			if err != nil || controller.Controller != a.Controller {
+				return Record{}, access.ErrForbidden
+			}
 		}
 		actor := access.Principal{UserID: controller.Controller}
 		if err = s.Access.CheckTx(ctx, tx, actor, w, "", "manage"); err != nil {
@@ -85,6 +87,19 @@ func (s *Service) Decide(ctx context.Context, p access.Principal, w, id string, 
 		}
 		var d Definition
 		_ = json.Unmarshal(dr.Value, &d)
+		if req.Action == "reevaluate" {
+			if !hasSemantic(d.Condition) {
+				return Record{}, ErrInvalid
+			}
+			source := e.Source
+			source.Previous, source.RequestedBy = &r.Ref, p.UserID
+			source.Event = "reevaluate:" + hash([]any{r.Ref, req.OperationID})
+			if err = s.AcceptSourceTx(ctx, tx, w, source, e.Definition); err != nil {
+				return Record{}, err
+			}
+			e.Reevaluation = "hopper-evaluation:" + hash([]string{w, source.Event, source.Target.ID, source.Target.Version, e.Definition.ID, e.Definition.Version})
+			return s.save(ctx, tx, w, ref, "evaluation", e, r.Refs)
+		}
 		e.At = time.Now().UTC()
 		if req.Action == "resume" {
 			tag, err := tx.Exec(ctx, `UPDATE hopper_dispatch q SET state='waiting',reason='',due_at=now() FROM run_records r JOIN shared_versions h ON h.workspace_id=r.workspace_id AND h.resource_id=r.id AND h.version=r.version WHERE q.workspace_id=$1 AND q.run_id=$2 AND q.state IN ('waiting','held') AND r.workspace_id=q.workspace_id AND r.id=q.run_id AND r.payload->>'state'='queued' AND r.payload->'assignment' IS NULL AND COALESCE((r.payload->>'cancel_requested')::boolean,false)=false`, w, e.Destination.ID)
@@ -99,13 +114,16 @@ func (s *Service) Decide(ctx context.Context, p access.Principal, w, id string, 
 		}
 		e.Reason = ""
 		e.State = "evaluated"
+		if err = s.recheckSemantic(ctx, tx, actor, w, &e, d); err != nil {
+			return Record{}, err
+		}
 		if err = s.evaluate(ctx, tx, w, actor, &e, d, ref, control, true); err != nil {
 			return Record{}, err
 		}
 		if e.Cost != nil {
 			r.Refs = append(r.Refs, e.Cost.Sources...)
 		}
-		r.Refs = append(r.Refs, e.Source.Refs...)
+		r.Refs = append(append(r.Refs, e.Source.Refs...), e.audit...)
 		return s.save(ctx, tx, w, ref, "evaluation", e, r.Refs)
 	})
 }
@@ -150,6 +168,18 @@ func (s *Service) Past(ctx context.Context, p access.Principal, w string, req Pa
 		items := []Ref{}
 		dependencies := append(append([]Ref{}, r.Refs...), r.Ref)
 		for _, source := range sources {
+			if hasSemantic(d.Condition) || req.Publish {
+				source.Event = "past:" + hash([]any{req.OperationID, source.Event, r.Ref})
+				source.DryRun = !req.Publish
+				source.RequestedBy = p.UserID
+				if err = s.AcceptSourceTx(ctx, tx, w, source, r.Ref); err != nil {
+					return Record{}, err
+				}
+				items = append(items, Ref{ID: "hopper-evaluation:" + hash([]string{w, source.Event, source.Target.ID, source.Target.Version, r.ID, r.Version})})
+				dependencies = append(dependencies, source.Refs...)
+				dependencies = append(dependencies, source.Target)
+				continue
+			}
 			e := Evaluation{Definition: r.Ref, Source: source, Root: source.Root, Depth: source.Depth, DryRun: true, State: "evaluated", At: time.Now().UTC()}
 			trial := Ref{ID: "hopper-trial:" + hash([]string{ref.ID, source.Event, source.Target.Version}), Version: ref.Version}
 			if err = s.evaluate(ctx, tx, w, p, &e, d, trial, Ref{}, false); err != nil {

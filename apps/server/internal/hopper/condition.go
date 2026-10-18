@@ -51,6 +51,9 @@ func field(f Facts, path string) (any, bool) {
 }
 func validCondition(c Condition) bool {
 	branches := 0
+	if c.Semantic {
+		branches++
+	}
 	for _, children := range [][]Condition{c.All, c.Any} {
 		if len(children) > 0 {
 			branches++
@@ -94,6 +97,12 @@ func validCondition(c Condition) bool {
 // Three-valued ordered evaluation: false dominates AND, true dominates OR.
 // Unknown evidence is never silently converted to a negative decision.
 func Evaluate(c Condition, f Facts) string {
+	return evaluateCondition(c, f, "unknown")
+}
+func evaluateCondition(c Condition, f Facts, semantic string) string {
+	if c.Semantic {
+		return semantic
+	}
 	if len(c.All) > 0 || len(c.Any) > 0 {
 		children, stop, result := c.All, "false", "true"
 		if len(c.Any) > 0 {
@@ -101,7 +110,7 @@ func Evaluate(c Condition, f Facts) string {
 		}
 		unknown := false
 		for _, child := range children {
-			v := Evaluate(child, f)
+			v := evaluateCondition(child, f, semantic)
 			if v == stop {
 				return stop
 			}
@@ -113,7 +122,7 @@ func Evaluate(c Condition, f Facts) string {
 		return result
 	}
 	if c.Not != nil {
-		switch Evaluate(*c.Not, f) {
+		switch evaluateCondition(*c.Not, f, semantic) {
 		case "true":
 			return "false"
 		case "false":

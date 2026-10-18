@@ -41,6 +41,22 @@ func readBody(w http.ResponseWriter, r *http.Request, value any) bool {
 	return true
 }
 func (s *Service) Register(mux *http.ServeMux) {
+	mux.HandleFunc("GET /hopper/workspaces/{workspace}/semantic-template", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := s.Access.User(w, r)
+		if !ok {
+			return
+		}
+		err := s.Access.Check(r.Context(), access.Principal{UserID: user}, r.PathValue("workspace"), "", "read")
+		respond(w, DefaultSemantic(), err)
+	})
+	mux.HandleFunc("GET /hopper/workspaces/{workspace}/model-connections", func(w http.ResponseWriter, r *http.Request) {
+		user, ok := s.Access.User(w, r)
+		if !ok {
+			return
+		}
+		value, err := s.Connections(r.Context(), access.Principal{UserID: user}, r.PathValue("workspace"))
+		respond(w, value, err)
+	})
 	mux.HandleFunc("GET /hopper/workspaces/{workspace}/template", func(w http.ResponseWriter, r *http.Request) {
 		user, ok := s.Access.User(w, r)
 		if !ok {

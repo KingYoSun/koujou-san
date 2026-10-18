@@ -81,6 +81,9 @@ var hopperSchema string
 //go:embed 021_client_operations.sql
 var clientOperationsSchema string
 
+//go:embed 022_hopper_semantic.sql
+var hopperSemanticSchema string
+
 type Store struct {
 	pool *pgxpool.Pool
 	// Accepted is installed once at startup. It may write an outbox in this same
@@ -94,7 +97,7 @@ func Open(ctx context.Context, url string) (*Store, error) {
 		return nil, errors.New("invalid PostgreSQL configuration")
 	}
 	if err = pool.Ping(ctx); err == nil {
-		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema, contextSchema, syncSchema, searchSchema, graphSchema, operationsSchema, catalogSchema, githubSchema, usageSchema, automationSchema, runsSchema, assignmentSchema, runnerQueueSchema, workflowSchema, inspectionSchema, publicationSchema, workbenchSchema, hopperSchema, clientOperationsSchema})
+		err = migrate(ctx, pool, []string{initialSchema, authSchema, accessSchema, contextSchema, syncSchema, searchSchema, graphSchema, operationsSchema, catalogSchema, githubSchema, usageSchema, automationSchema, runsSchema, assignmentSchema, runnerQueueSchema, workflowSchema, inspectionSchema, publicationSchema, workbenchSchema, hopperSchema, clientOperationsSchema, hopperSemanticSchema})
 	}
 	if err != nil {
 		pool.Close()

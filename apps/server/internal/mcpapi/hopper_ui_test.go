@@ -43,6 +43,7 @@ func prepareHopperUI(t *testing.T, ctx context.Context, s *Service, p access.Pri
 	definition.Condition = hopper.Condition{Field: "run.state", Op: "eq", Value: json.RawMessage(`"failed"`)}
 	definition.Action.Template = template.Ref
 	must(s.Hopper.Put(ctx, p, "mcp-one", "hopper:ui-next-work", hopper.Write{Mutation: mutation("0"), Value: encodeTest(definition)}))
+	prepareSemanticHopperUI(t, ctx, s, p, source.ID)
 	s.Hopper.Start(ctx)
 	// This route exists only on the owned test gateway. It accepts no result data
 	// from the browser and emits one fixed synthetic acceptance, never a real CLI.
@@ -63,6 +64,7 @@ func prepareHopperUI(t *testing.T, ctx context.Context, s *Service, p access.Pri
 			_ = json.Unmarshal(b, &run)
 			_ = json.Unmarshal(dependencies, &refs)
 			run.State = "failed"
+			run.Assessment = &runs.Assessment{Verdict: "failed", Report: json.RawMessage(`{"deferred":"OWNED_UI_DEFERRED: separate issue needs reproduction"}`)}
 			run.FinishedAt = &doneAt
 			if _, err := tx.Exec(ctx, `INSERT INTO run_records SELECT $1,$2,$2,$3,'run',sequence+1,$4,$5 FROM shared_streams WHERE workspace_id=$1`, "mcp-one", source.ID, ref.Version, encodeTest(run), dependencies); err != nil {
 				return nil, err
