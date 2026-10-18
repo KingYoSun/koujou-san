@@ -221,7 +221,12 @@ if (kind === "server") {
     config,
     JSON.stringify(
       {
-        build: { frontendDist: web, beforeBuildCommand: "" },
+        build: {
+          frontendDist: path
+            .relative(path.join(root, "apps/client/src-tauri"), web)
+            .replaceAll("\\", "/"),
+          beforeBuildCommand: "",
+        },
         bundle: {
           active: true,
           targets: ["nsis"],
