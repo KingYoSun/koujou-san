@@ -15,16 +15,16 @@ import (
 
 type Reply = modelreply.Reply
 
-func ReadTool(name string) bool {
-	return name == "context_search" || name == "context_graph" || name == "context_get" || name == "context_resolve"
+func ReadTool(name string, purpose ...string) bool {
+	return name == "context_search" || name == "context_graph" || name == "context_get" || name == "context_resolve" || (len(purpose) > 0 && purpose[0] == "definition" && (name == "workflow_get" || name == "workflow_query" || name == "workflow_capabilities"))
 }
-func parseReply(b json.RawMessage, m Model) (Reply, string) {
+func parseReply(b json.RawMessage, m Model, purpose ...string) (Reply, string) {
 	r, reason := modelreply.Parse(b, m.Allowed)
 	if reason != "" && reason != "incomplete_model_response" {
 		return r, reason
 	}
 	for _, call := range r.Choices[0].Message.Calls {
-		if call.ID == "" || call.Type != "function" || !ReadTool(call.Function.Name) || !json.Valid([]byte(call.Function.Arguments)) {
+		if call.ID == "" || call.Type != "function" || !ReadTool(call.Function.Name, purpose...) || !json.Valid([]byte(call.Function.Arguments)) {
 			return r, "tool_not_allowed"
 		}
 	}
@@ -61,7 +61,7 @@ func (s *Service) Finish(ctx context.Context, p access.Principal, w, id string, 
 		turn.Status = req.Status
 		turn.Failure = req.Failure
 		turn.State = "response"
-		result, reason := parseReply(req.Response, turn.Model)
+		result, reason := parseReply(req.Response, turn.Model, op.Purpose)
 		if req.Failure != "" {
 			reason = "model_connection_failed"
 		}
@@ -100,7 +100,7 @@ func (s *Service) Finish(ctx context.Context, p access.Principal, w, id string, 
 				op.State = "ready"
 			} else {
 				var proposal Proposal
-				if result.Choices[0].Message.Content == nil || decodeProposal([]byte(*result.Choices[0].Message.Content), &proposal) != nil {
+				if result.Choices[0].Message.Content == nil || decodeOperationProposal([]byte(*result.Choices[0].Message.Content), op.Purpose, &proposal) != nil {
 					op.Reason = "invalid_selection_response"
 				} else {
 					proposalRef, err := s.writeRelated(ctx, tx, p, w, "client-proposal:"+r.Version, "proposal", proposal, append(deps, pin), id)

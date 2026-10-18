@@ -10,6 +10,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/workflows"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -18,14 +19,15 @@ type query interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Service struct {
-	Store    *persistence.Store
-	Access   *access.Service
-	Contexts *contexts.Service
-	Usage    *usage.Service
+	Definitions *workflows.Service
+	Store       *persistence.Store
+	Access      *access.Service
+	Contexts    *contexts.Service
+	Usage       *usage.Service
 }
 
 func New(s *persistence.Store, a *access.Service, c *contexts.Service, u *usage.Service) *Service {
-	return &Service{s, a, c, u}
+	return &Service{Store: s, Access: a, Contexts: c, Usage: u}
 }
 func raw(v any) json.RawMessage { b, _ := json.Marshal(v); return b }
 func pinned(r Ref) bool {
@@ -134,7 +136,7 @@ type Write struct {
 
 func (s *Service) PutPolicy(ctx context.Context, p access.Principal, w, id string, req Write) (apicontract.Response[apicontract.Reference], error) {
 	var v Policy
-	if !strings.HasPrefix(id, "selection-policy:") || decode(req.Value, &v) != nil || (v.Mode != "manual" && v.Mode != "proposal" && v.Mode != "auto") || (v.Fixed.Mode != "none" && v.Fixed.Mode != "select") || v.Limits.Models < 1 || v.Limits.MCP < 1 || v.Limits.Seconds < 1 {
+	if decode(req.Value, &v) != nil || !validPolicyKind(id, v) || (v.Mode != "manual" && v.Mode != "proposal" && v.Mode != "auto") || (v.Fixed.Mode != "none" && v.Fixed.Mode != "select") || v.Limits.Models < 1 || v.Limits.MCP < 1 || v.Limits.Seconds < 1 {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
 	if v.Limits.Cost != nil && !usage.ValidCostBudget(*v.Limits.Cost) {
@@ -145,6 +147,12 @@ func (s *Service) PutPolicy(ctx context.Context, p access.Principal, w, id strin
 			return Record{}, ErrInvalid
 		}
 		rs := refs(v.Fixed)
+		if v.Definition != nil {
+			rs = append(rs, v.Definition.Sources...)
+			if err := s.checkRefs(ctx, tx, p, w, v.Definition.Sources); err != nil {
+				return Record{}, err
+			}
+		}
 		for _, scope := range v.Scopes {
 			if err := s.Access.CheckTx(ctx, tx, p, w, "scope:"+scope, "get"); err != nil {
 				return Record{}, err

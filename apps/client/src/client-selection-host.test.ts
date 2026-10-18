@@ -32,6 +32,7 @@ function fixture(
   beginAckLost = false,
   finishAckLost = false,
   anotherIntent = false,
+  purpose = "selection",
 ) {
   let revision = 1;
   let op: Saved<ClientOperation> = {
@@ -45,7 +46,7 @@ function fixture(
       policy: { id: "policy", version: "v1" },
       target: { id: "selection", version: "0" },
       goal: "owned goal",
-      purpose: "selection",
+      purpose,
       model: {
         connection: "owned",
         revision: "v1",
@@ -156,6 +157,132 @@ function fixture(
   };
 }
 describe("client selection Host", () => {
+  it("uses the shared Host for definition generation while none exposes only metadata tools", async () => {
+    const f = fixture(false, false, false, "definition");
+    const names = ["workflow_get", "workflow_query", "workflow_capabilities"];
+    f.rpc.mockImplementation(async (wire: { method: string }) => ({
+      status: 200,
+      body: {
+        result:
+          wire.method === "tools/list"
+            ? {
+                tools: [...names, "context_get", "context_edit"].map(
+                  (name) => ({ name, inputSchema: { type: "object" } }),
+                ),
+              }
+            : {},
+      },
+    }));
+    await runSelection(
+      f.start,
+      {
+        ...policy,
+        definition: {
+          fixed_paths: [],
+          sources: [{ id: "runner:owned", version: "v1" }],
+        },
+      },
+      profile,
+      "client",
+      f.port,
+      () => {},
+    );
+    expect(f.model).toHaveBeenCalledTimes(1);
+    const body = f.port.model === f.model ? f.model.mock.calls[0] : undefined;
+    expect(body).toBeDefined();
+    const input = (
+      f.model.mock.calls as unknown as [Record<string, unknown>][]
+    )[0][0];
+    expect(
+      (input.tools as { function: { name: string } }[]).map(
+        (t) => t.function.name,
+      ),
+    ).toEqual(names);
+    expect(input.response_format).toMatchObject({
+      json_schema: {
+        name: "run_definition",
+        schema: {
+          required: ["definition_utf8", "reason", "questions", "unknown"],
+        },
+      },
+    });
+    expect(f.rpc.mock.calls.map((c) => c[0].method)).toEqual([
+      "server/discover",
+      "tools/list",
+    ]);
+    const privatePolicy: SelectionPolicy = {
+      ...policy,
+      definition: {
+        sources: [],
+        fixed_paths: ["/spec/input/command/parameters"],
+        fixed_values: {
+          "/spec/input/command/parameters": '["private-fixed-argument"]',
+        },
+      },
+    };
+    expect(
+      JSON.stringify(
+        initialMessages(
+          { ...f.start.value, purpose: "definition" },
+          privatePolicy,
+        ),
+      ),
+    ).not.toContain("private-fixed-argument");
+  });
+  it("does not dispatch a Context tool invented by a definition model under none", async () => {
+    const f = fixture(false, false, false, "definition");
+    f.rpc.mockResolvedValue({
+      status: 200,
+      body: {
+        result: {
+          tools: [
+            "workflow_get",
+            "workflow_query",
+            "workflow_capabilities",
+          ].map((name) => ({ name, inputSchema: { type: "object" } })),
+        },
+      },
+    });
+    f.model.mockResolvedValueOnce({
+      status: 200,
+      body: {
+        model: "fixed",
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              tool_calls: [
+                {
+                  id: "forbidden",
+                  type: "function",
+                  function: { name: "context_get", arguments: "{}" },
+                },
+              ],
+            },
+            finish_reason: "tool_calls",
+          },
+        ],
+      },
+    });
+    await expect(
+      runSelection(
+        f.start,
+        { ...policy, definition: { fixed_paths: [], sources: [] } },
+        profile,
+        "client",
+        f.port,
+        () => {},
+      ),
+    ).rejects.toThrow("tool_not_allowed");
+    const result = await f.port.read<ClientOperation>({
+      id: f.start.id,
+      version: "head",
+    });
+    expect(result.value.state).toBe("incomplete");
+    expect(f.rpc.mock.calls.some((c) => c[0].method === "tools/call")).toBe(
+      false,
+    );
+  });
   it("does not carry previous selections into an explicit none save", () => {
     const ref = { kind: "sentence", id: "previous", revision: "v1" };
     expect(selectionInput("none", [ref], [ref])).toEqual({

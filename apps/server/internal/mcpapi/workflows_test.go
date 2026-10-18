@@ -67,7 +67,7 @@ func checkWorkflowsMCP(t *testing.T, s *Service, p access.Principal, reader, non
 	if err != nil {
 		t.Fatal(err)
 	}
-	contact := must(s.Runs.ContactRunner(ctx, device, w, runs.RunnerContact{Mutation: apicontract.Mutation{OperationID: "workflow-contact", ExpectedVersion: "0"}, RunnerID: "workflow-fixture", Connections: []runs.Connection{{Kind: "cli", Target: "fixture", Version: "v1", Environment: "fixture", Subject: "fixture", Confirmed: true, Users: []string{p.UserID}}}}))
+	contact := must(s.Runs.ContactRunner(ctx, device, w, runs.RunnerContact{Mutation: apicontract.Mutation{OperationID: "workflow-contact", ExpectedVersion: "0"}, RunnerID: "workflow-fixture", Connections: []runs.Connection{{Kind: "cli", Target: "fixture", Version: "v1", Environment: "fixture", Subject: "fixture", Confirmed: true, Users: []string{p.UserID}}, {Kind: "cli", Target: "codex", Version: "0.162.1", Environment: "windows", Subject: "owned-codex", Confirmed: true, Bindings: []string{"stdin"}}, {Kind: "cli", Target: "claude", Version: "2.1.300", Environment: "windows", Subject: "owned-claude", Confirmed: true, Bindings: []string{"stdin"}}}}))
 	args := map[string]string{"device": "workflow-fixture", "version": contact.Version}
 	body = call(reader, "workflow_capabilities", args, false)
 	res, other := request("GET", site+"/workflows/workspaces/"+w+"/capabilities/workflow-fixture?version="+contact.Version, nil, map[string]string{"Authorization": "Bearer " + ordinary})

@@ -9,9 +9,17 @@ import {
   saveLocalDraft,
   syncStorage,
 } from "./sync-store";
-import { editField, fieldSource, nodeCount } from "./workflow-json";
+import {
+  editField,
+  fieldSource,
+  mergeFields,
+  nodeCount,
+} from "./workflow-json";
 import type { JSONPath } from "jsonc-parser";
 import { WorkflowExecution } from "./workflow-execution";
+import { DefinitionRun } from "./definition-run";
+import { DefinitionGeneration } from "./definition-generation";
+import { definitionFields } from "./definition-proposal";
 
 type Ref = { id: string; version: string };
 type DefinitionRecord = Ref & { kind: string; value_utf8: string };
@@ -26,6 +34,7 @@ type Validation = {
   checked: Ref[];
 };
 type Draft = {
+  manual_paths?: string[];
   version: string;
   text: string;
   fields: Record<string, string | null>;
@@ -654,6 +663,7 @@ export function Workflows({
                   ...draft,
                   text: e.target.value,
                   fields: {},
+                  manual_paths: definitionFields.map(([path]) => path),
                   pending: undefined,
                 })
               }
@@ -842,6 +852,76 @@ export function Workflows({
         </button>
         {capabilities && <pre>{capabilities}</pre>}
       </details>
+      {kind === "run-definition" && draft && id && (
+        <DefinitionGeneration
+          key={`${api}:${user}:${workspace}:${id}`}
+          native={native}
+          api={api}
+          user={user}
+          workspace={workspace}
+          canEdit={canEdit && !draft.pending}
+          target={{ id, version: draft.version }}
+          text={compose(draft)}
+          manualPaths={Array.from(
+            new Set([
+              ...(draft.manual_paths ?? []),
+              ...Object.keys(draft.fields).map(
+                (path) => "/" + (JSON.parse(path) as JSONPath).join("/"),
+              ),
+            ]),
+          ).filter((path) =>
+            definitionFields.some(([allowed]) => allowed === path),
+          )}
+          onDraft={(text) =>
+            persist({
+              ...draft,
+              text: mergeFields(compose(draft), text),
+              fields: {},
+              manual_paths: definitionFields.map(([path]) => path),
+            })
+          }
+          onApplied={async (ref, fixedPaths, isCurrent) => {
+            const applied = (await call(
+              `/records/${encodeURIComponent(ref.id)}?version=${encodeURIComponent(ref.version)}`,
+            )) as { value: { definition: Ref } };
+            const saved = (await call(
+              `/records/${encodeURIComponent(applied.value.definition.id)}?version=${encodeURIComponent(applied.value.definition.version)}&format=source`,
+            )) as DefinitionRecord;
+            const next = {
+              manual_paths: fixedPaths,
+              version: saved.version,
+              text: saved.value_utf8,
+              fields: {},
+            };
+            if (!isCurrent()) return false;
+            setRecord(saved);
+            setDraft(next);
+            setAdoption(applied.value.definition);
+            setVerified(undefined);
+            setValidation(undefined);
+            await saveLocalDraft(
+              native,
+              namespace,
+              id,
+              next,
+              "workflow-definition",
+            );
+            return true;
+          }}
+        />
+      )}
+      {record?.kind === "run-definition" &&
+        adoption?.version === record.version && (
+          <DefinitionRun
+            key={`${api}:${user}:${workspace}:${record.id}:${record.version}`}
+            native={native}
+            api={api}
+            user={user}
+            workspace={workspace}
+            definition={record}
+            canEdit={canEdit}
+          />
+        )}
       <WorkflowExecution
         native={native}
         api={api}

@@ -148,8 +148,8 @@ func addTool[In any](server *mcp.Server, s *Service, name, description string, r
 	mcp.AddTool[In, any](server, &mcp.Tool{Name: name, Description: description, InputSchema: schema}, func(ctx context.Context, _ *mcp.CallToolRequest, args In) (*mcp.CallToolResult, any, error) {
 		if s.ClientOps != nil {
 			b := ctx.Value(operationKey{}).(boundary)
-			_, found, err := s.ClientOps.MCPBinding(ctx, s.ClientOps.Store.Database(), b.Principal, b.Workspace)
-			if err != nil || (found && !clientops.ReadTool(name)) {
+			op, found, err := s.ClientOps.MCPBinding(ctx, s.ClientOps.Store.Database(), b.Principal, b.Workspace)
+			if err != nil || (found && !clientops.ReadTool(name, op.Purpose)) {
 				return &mcp.CallToolResult{IsError: true, Content: []mcp.Content{&mcp.TextContent{Text: "forbidden"}}}, nil, nil
 			}
 		}

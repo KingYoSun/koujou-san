@@ -4,7 +4,7 @@ import {
   modify,
   parseTree,
 } from "jsonc-parser";
-import type { JSONPath, ParseError } from "jsonc-parser";
+import type { JSONPath, ParseError, Node } from "jsonc-parser";
 
 const tree = (text: string) => {
   const errors: ParseError[] = [];
@@ -16,8 +16,15 @@ const tree = (text: string) => {
   return root;
 };
 export function fieldSource(text: string, path: JSONPath): string {
-  const node = findNodeAtLocation(tree(text), path);
-  return node ? text.slice(node.offset, node.offset + node.length) : "";
+  return fieldSources(text, [path])[0];
+}
+export function fieldSources(text: string, paths: JSONPath[]): string[] {
+  if (!paths.length) return [];
+  const root = tree(text);
+  return paths.map((path) => {
+    const node = findNodeAtLocation(root, path);
+    return node ? text.slice(node.offset, node.offset + node.length) : "";
+  });
 }
 export function editField(
   text: string,
@@ -41,4 +48,30 @@ export function editField(
 }
 export function nodeCount(text: string): number {
   return findNodeAtLocation(tree(text), ["nodes"])?.children?.length ?? 0;
+}
+
+export function mergeFields(base: string, changes: string): string {
+  const source = tree(changes);
+  if (source.type !== "object" || tree(base).type !== "object")
+    throw Error("定義のJSON objectを指定してください。");
+  let merged = base;
+  const visit = (node: Node, path: JSONPath) => {
+    if (
+      node.type === "object" &&
+      findNodeAtLocation(tree(merged), path)?.type === "object"
+    ) {
+      for (const property of node.children ?? [])
+        visit(property.children![1], [
+          ...path,
+          property.children![0].value as string,
+        ]);
+    } else
+      merged = editField(
+        merged,
+        path,
+        changes.slice(node.offset, node.offset + node.length),
+      );
+  };
+  visit(source, []);
+  return merged;
 }

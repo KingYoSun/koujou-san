@@ -108,6 +108,7 @@ func TestMCPIntegration(t *testing.T) {
 	s := &Service{Auth: identity, Access: a, Contexts: c, Search: search, Graph: graph, Usage: usage.New(store, a), Automation: automation.New(store, a), Runs: runs.New(store, a, c)}
 	s.ClientOps = clientops.New(store, a, c, s.Usage)
 	s.Workflows = workflows.New(store, a, c, s.Runs)
+	s.ClientOps.Definitions = s.Workflows
 	inspectionService := inspections.New(store, a, c, s.Runs, s.Workflows)
 	publicationService := publications.New(store, a, s.Runs, &publicationUIBackend{})
 	s.Hopper = hopper.New(store, a, s.Automation, s.Runs, s.Workflows, publicationService, graph)

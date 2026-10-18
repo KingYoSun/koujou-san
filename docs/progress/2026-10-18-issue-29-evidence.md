@@ -1,6 +1,6 @@
 # Issue #29の検証記録
 
-状態: In progress。Scope revision 1。基準main `fb336a0df3ac10f4d6b03c7e9ecfc3db6994c399`。配布物の受入、独立検品、CI、マージは未完了。
+状態: Complete。Scope revision 1。基準main `fb336a0df3ac10f4d6b03c7e9ecfc3db6994c399`。PR #64の最終head `d36ca862`でCI 39113715998の全jobが成功し、独立検品とmerge後tree一致・差分0を確認した。途中の未完了記述は各検証時点の記録として残す。最終判定は[現在状態](current-state.md)を参照する。
 
 ## 判断と実装
 

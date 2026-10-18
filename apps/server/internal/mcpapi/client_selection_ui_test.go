@@ -47,6 +47,10 @@ func (f *clientSelectionUI) Wait(t *testing.T, s *Service, ctx context.Context) 
 	if f.violation {
 		t.Fatal("owned model receiver detected prohibited credentials or data")
 	}
+	if os.Getenv("KOUJOU_TEST_DEFINITION_UI") == "1" {
+		definitionUIEvidence(t, s, ctx, f.site, f.observed)
+		return
+	}
 	rows, err := s.ClientOps.Store.Database().Query(ctx, `SELECT jsonb_build_object('id',c.id,'version',c.version,'mode',c.payload#>>'{input,mode}','roots',jsonb_array_length(COALESCE(c.payload#>'{input,include}','[]'::jsonb)),'placements',jsonb_array_length(COALESCE(r.payload->'placements','[]'::jsonb)),'run_id',r.payload->>'run_id') FROM client_operation_records c JOIN context_records r ON r.workspace_id=c.workspace_id AND r.resource_id='manifest:'||(c.payload#>>'{manifest,id}') AND r.revision=c.payload#>>'{manifest,revision}' WHERE c.workspace_id='mcp-one' AND c.kind='selection' AND c.payload->>'name' LIKE '受入%' ORDER BY c.position LIMIT 100`)
 	if err != nil {
 		t.Fatal(err)
@@ -234,6 +238,11 @@ func driveOwnedAuthorization(ctx context.Context, client *http.Client, cfg auth.
 }
 func (f *clientSelectionUI) model(w http.ResponseWriter, r *http.Request, s *Service, ctx context.Context) {
 	var body struct {
+		Format struct {
+			Schema struct {
+				Name string `json:"name"`
+			} `json:"json_schema"`
+		} `json:"response_format"`
 		Model    string `json:"model"`
 		Messages []struct {
 			Role, Content string
@@ -252,6 +261,10 @@ func (f *clientSelectionUI) model(w http.ResponseWriter, r *http.Request, s *Ser
 	f.mu.Unlock()
 	if bad {
 		http.Error(w, "owned receiver boundary failed", 400)
+		return
+	}
+	if body.Format.Schema.Name == "run_definition" {
+		definitionUIModel(w, raw)
 		return
 	}
 	_ = s.Search.Sync(ctx)

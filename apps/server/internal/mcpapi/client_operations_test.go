@@ -14,6 +14,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/workflows"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -151,6 +152,75 @@ func checkClientSelectionMCP(t *testing.T, s *Service, p access.Principal, apiTo
 	if bad, err := connect(handle, "different-client"); err == nil {
 		_ = bad.Close()
 		t.Fatal("another client used the owned transport")
+	}
+
+	template, err := s.Workflows.Read(ctx, p, "mcp-one", workflows.Ref{ID: "run-definition:ui-command", Version: "head"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	capability, err := s.Workflows.Capabilities(ctx, p, "mcp-one", "workflow-fixture", "head")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mode := range []string{"none", "select"} {
+		policy.Fixed.Mode = mode
+		policy.Definition = &clientops.DefinitionPolicy{Sources: []clientops.Ref{template.Ref, capability.Ref}, FixedPaths: []string{}}
+		if mode == "none" {
+			policy.Fixed = contexts.Selection{Mode: "none"}
+		}
+		b, _ = json.Marshal(policy)
+		ref := must(s.ClientOps.PutPolicy(ctx, p, "mcp-one", "definition-policy:mcp-"+mode, clientops.Write{Mutation: m("0"), Value: b}))
+		opRef := must(s.ClientOps.Start(ctx, p, "mcp-one", "client-operation:definition-"+mode, clientops.Start{Mutation: m("0"), Policy: ref, Target: clientops.Ref{ID: "run-definition:mcp-generated-" + mode, Version: "0"}, Purpose: "definition", Goal: "Generate without execution", Client: "owned-client", Model: clientops.Model{Connection: "owned", Revision: "1", Requested: "owned", Allowed: []string{"owned"}}}))
+		load := func(ref clientops.Ref) clientops.Operation {
+			r, err := s.ClientOps.Read(ctx, p, "mcp-one", ref)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var op clientops.Operation
+			json.Unmarshal(r.Value, &op)
+			return op
+		}
+		op := load(opRef)
+		handle := s.Access.OperationHandle("mcp-one", op.ReadOperation, p.UserID)
+		peer, err := connect(handle, "owned-client")
+		if err != nil {
+			t.Fatal(err)
+		}
+		body := call(peer, "workflow_get", template.Ref, false)
+		if !strings.Contains(string(body), "metadata_only") || strings.Contains(string(body), "parameters") {
+			t.Fatal("template body leaked", string(body))
+		}
+		call(peer, "workflow_query", workflows.Request{Kind: "heads", Type: "run-definition", Limit: 1}, false)
+		capBody := call(peer, "workflow_capabilities", map[string]string{"device": "workflow-fixture", "version": capability.Version}, false)
+		var capReply struct {
+			Meta apicontract.Meta `json:"meta"`
+		}
+		if json.Unmarshal(capBody, &capReply) != nil || capReply.Meta.Completeness.State != "complete" {
+			t.Fatal("capability completeness missing", string(capBody))
+		}
+		call(peer, "workflow_get", workflows.Ref{ID: "workflow-definition:ui-workflow", Version: template.Version}, true)
+		call(peer, "workflow_validate", template.Ref, true)
+		call(peer, "context_get", secret, true)
+		call(peer, "context_get", public, mode == "none")
+		call(peer, "run_query", map[string]any{"limit": 1}, true)
+		peer.Close()
+		peer, err = connect(handle, "owned-client")
+		if err != nil {
+			t.Fatal("definition reconnect", err)
+		}
+		call(peer, "workflow_get", template.Ref, false)
+		peer.Close()
+		opRef = must(s.ClientOps.Act(ctx, p, "mcp-one", opRef.ID, clientops.Action{Mutation: m(opRef.Version), Kind: "takeover", Client: "next-client"}))
+		if old, err := connect(handle, "owned-client"); err == nil {
+			old.Close()
+			t.Fatal("old definition owner client accepted")
+		}
+		peer, err = connect(handle, "next-client")
+		if err != nil {
+			t.Fatal("definition handoff", err)
+		}
+		call(peer, "workflow_get", template.Ref, false)
+		peer.Close()
 	}
 	t.Log("client selection: HTTP/MCP fixed versions/replay, purpose separation, owned-client transport and no excluded metadata passed")
 }

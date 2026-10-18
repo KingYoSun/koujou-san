@@ -160,6 +160,19 @@ func (s *Service) Register(mux *http.ServeMux) {
 		id, ok := s.Access.User(w, r)
 		return access.Principal{UserID: id}, ok
 	}
+	mux.HandleFunc("POST "+base+"/runs/{id}", func(w http.ResponseWriter, r *http.Request) {
+		p, ok := principal(w, r)
+		if !ok {
+			return
+		}
+		var req CreateRun
+		if !body(r, &req) {
+			reply(w, r.PathValue("workspace"), nil, ErrInvalid)
+			return
+		}
+		v, err := s.CreateRun(r.Context(), p, r.PathValue("workspace"), r.PathValue("id"), req)
+		reply(w, r.PathValue("workspace"), v, err)
+	})
 	mux.HandleFunc("GET "+base+"/capabilities/{device}", func(w http.ResponseWriter, r *http.Request) {
 		p, ok := principal(w, r)
 		if !ok {

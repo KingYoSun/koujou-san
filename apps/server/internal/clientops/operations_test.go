@@ -45,6 +45,16 @@ func checkOperations(t *testing.T, s *Service) {
 	policy.Fixed.Mode = "none"
 	policyRef := must(s.PutPolicy(ctx, p, "one", "selection-policy:flow", Write{Mutation: m("0"), Value: raw(policy)}))
 	model := Model{Connection: "owned", Revision: "v1", Requested: "owned-model", Allowed: []string{"owned-model"}}
+	t.Run("definition_generation_can_start_before_a_Run_exists", func(t *testing.T) {
+		var value map[string]any
+		_ = json.Unmarshal(raw(policy), &value)
+		value["definition"] = map[string]any{"fixed_paths": []string{}, "sources": []Ref{}}
+		ref := must(s.PutPolicy(ctx, p, "one", "definition-policy:flow", Write{Mutation: m("0"), Value: raw(value)}))
+		created := must(s.Start(ctx, p, "one", "client-operation:definition-before-run", Start{Mutation: m("0"), Policy: ref, Target: Ref{ID: "run-definition:generated", Version: "0"}, Goal: "create a definition without starting a command", Purpose: "definition", Model: model, Client: "alpha"}))
+		if read(created).State != "ready" {
+			t.Fatal("definition operation is not ready")
+		}
+	})
 	start := func(label string, policy Ref) Ref {
 		t.Helper()
 		return must(s.Start(ctx, p, "one", "client-operation:"+label, Start{Mutation: m("0"), Policy: policy, Target: Ref{ID: "client-selection:" + label, Version: "0"}, Goal: "select existing Context according to the fixed policy", Purpose: "selection", Model: model, Client: "alpha"}))
