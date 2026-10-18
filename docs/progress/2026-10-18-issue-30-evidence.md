@@ -35,3 +35,9 @@ Chrome、日本語、通常のviewport・既存theme、`https://localhost:54724`
 最後の照合で、definition-policyの必須Contextを指定しても、モデルがselection全体を省略するとその必須参照が採用定義から消えるAC-6の未達を実PGで確認した（`issue30-required-before2.log`）。生成案の省略時にも既存の選択処理を通し、必須・除外を維持するよう修正した。正規化後にも手動固定pathを照合する。`issue30-required-final.log` の実PG試験と `issue30-domain-final.log` の関連Go試験はPASS。Go vetも成功した。新しい利用場面や制限は追加していない。
 
 追加の差分検品では、固定値を構造体へ変換した後に全pathを比較すると、未送信の `inputs: []` / `required: []` がomitemptyで省略され、自動採用を誤って拒否する回帰を確認した。固定値の原文比較は変換前に維持し、共通選択の正規化が変更する `/selection` だけを正規化後にも比較するよう限定した。`issue30-empty-fixed-before.log` のFAILと `issue30-empty-fixed-after.log` のPASSで、空配列・必須Context・元の固定項目を同じ実PG fixtureから確認した。
+
+## 独立検品とCI
+
+[独立検品](2026-10-18-issue-30-inspection.md)は最終コード `6d3156e532be8dd63b1fccb3faec438d2a69e99d` のAC-1〜6・INVAR-1〜3を全てPASSとした。必須Context・空配列固定も別コンテキストの実PG再実行で確認した。最終の共通checkは `issue30-check-final2.log` でPASS。
+
+PR #65の途中のCI `39118697484` は、MCP fixture起動時にDockerの127.0.0.1:38503が割当済みとなり、試験開始前に共有jobが失敗した。ログは `issue30-ci9b-shared.log`。製品の試験失敗としては扱わず、最終headの新しい試験環境でCIを確認する。必須CIとmerge後の内容照合は継続中。

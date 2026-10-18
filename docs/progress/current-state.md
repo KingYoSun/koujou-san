@@ -131,4 +131,4 @@
 
 ## Issue #30の判定
 
-状態: In progress。本人が検証済み定義の自動反映と、接続設定・Run専用worktreeによる作業場所を承認した。[計画](2026-10-18-issue-30-plan.md)のAC-1〜6を実装・検証中。[検証記録](2026-10-18-issue-30-evidence.md)を参照する。
+状態: In progress。本人が検証済み定義の自動反映と、接続設定・Run専用worktreeによる作業場所を承認した。[計画](2026-10-18-issue-30-plan.md)のAC-1〜6・INVAR-1〜3は実PG・実Ory/MCP・二モデルHTTPの共通画面と[独立検品](2026-10-18-issue-30-inspection.md)でPASS。必須CIとmerge後照合を継続中。[検証記録](2026-10-18-issue-30-evidence.md)を参照する。
