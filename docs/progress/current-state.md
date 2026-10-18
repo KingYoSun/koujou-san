@@ -123,6 +123,8 @@
 
 ## Issue #29の判定
 
-状態: Inspection pending。Scope revision 1。[PR #64](https://github.com/KingYoSun/koujou-san/pull/64)。初期方針の四判断を反映し、Linux配布物の導入・二人の参加・backup/restore・投影再構築・schema 22→23の成功/失敗復旧、Windowsの初回URL保存・再起動・NSIS導入・Runner保護と再導入を確認した。固定候補`6189df56`は[独立検品](2026-10-18-issue-29-inspection.md)でAC-1〜5・INVAR-1〜3がPASS、blocker 0件。[検証記録](2026-10-18-issue-29-evidence.md)に失敗と修正、対象版とhashを保持する。実際の最終CIとマージ後照合は未完了。
+状態: Complete。Scope revision 1。[PR #64](https://github.com/KingYoSun/koujou-san/pull/64)を最終head `d36ca8624a5228e255d7b2a3afcc051070fa66d3`の全CI（39113715998）と[独立検品](2026-10-18-issue-29-inspection.md)PASS後にマージした。merge `c7ac1c40c3d8d45a8d1731c0e3931a0c9ba3c3f8`とのtreeは`9badcda20bc4de06d9525c39efd0672504787892`で一致、差分0。五ACと三維持条件を確認して#29を手動Closeした。配布物・復旧/更新・Windows・OSS表示と失敗履歴は[証跡](2026-10-18-issue-29-evidence.md)を参照する。
 
-#30〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。
+## Issue #30の準備
+
+状態: In progress。Scope revision 1。本人は検証済みの定義案を自動反映する初期値を承認した。[計画](2026-10-18-issue-30-plan.md)に六条件と維持条件、共通操作・定義保存・モデル接続の再利用、検証を記録した。#31〜#34は未着手。#33へ移管した実S3スリープと初見操作は未確認のまま保持する。
