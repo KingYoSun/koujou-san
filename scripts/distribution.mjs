@@ -216,19 +216,6 @@ if (kind === "server") {
 } else if (kind === "desktop") {
   if (process.platform !== "win32")
     throw Error("Build the Windows installer on Windows");
-  await run("cargo", [
-    "build",
-    "--release",
-    "--locked",
-    "--bin",
-    "koujou-san-runner",
-  ]);
-  const binaries = path.join(stage, "binaries");
-  await mkdir(binaries, { recursive: true });
-  await copyFile(
-    path.join(root, "target/release/koujou-san-runner.exe"),
-    path.join(binaries, "koujou-san-runner-x86_64-pc-windows-msvc.exe"),
-  );
   const config = path.join(stage, "tauri.json");
   await writeFile(
     config,
@@ -238,7 +225,6 @@ if (kind === "server") {
         bundle: {
           active: true,
           targets: ["nsis"],
-          externalBin: [path.join(binaries, "koujou-san-runner")],
           resources: {
             [path.join(stage, "sources.tar.gz")]: "sources.tar.gz",
             [path.join(stage, "licenses")]: "licenses/",
@@ -277,6 +263,12 @@ if (kind === "server") {
       "--config",
       config,
     ]),
+  );
+  const binaries = path.join(stage, "binaries");
+  await mkdir(binaries, { recursive: true });
+  await copyFile(
+    path.join(root, "target/release/koujou-san-runner.exe"),
+    path.join(binaries, "koujou-san-runner.exe"),
   );
   const nsis = path.join(root, "target/release/bundle/nsis");
   for (const name of await readdir(nsis))

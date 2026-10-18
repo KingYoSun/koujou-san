@@ -99,7 +99,7 @@ class Browser:
                 next_url = result["redirect"]
             else:
                 status, headers, _ = self.request("GET", next_url)
-                assert status in (302, 303), "authorization did not redirect"
+                assert status in (302, 303), "authorization did not redirect: " + target.path + " " + str(status)
                 if target.path == "/auth/callback":
                     return self.json("GET", "/auth/me")
                 next_url = headers["Location"]
@@ -110,15 +110,19 @@ def mutation(version="0", **value):
     return {"operation_id": secrets.token_hex(16), "expected_version": version, **value}
 
 
+used_messages = set()
+
+
 def mail_code(address):
     for _ in range(150):
         messages = json.loads(urllib.request.urlopen(mail_url + "/api/v1/messages").read())
         for message in messages["messages"]:
-            if any(to["Address"] == address for to in message["To"]) and "verify" in message["Subject"].lower():
+            if message["ID"] not in used_messages and any(to["Address"] == address for to in message["To"]) and "verify" in message["Subject"].lower():
                 content = json.loads(urllib.request.urlopen(mail_url + "/api/v1/message/" + message["ID"]).read())
                 for word in content["Text"].split():
                     word = word.strip(".,:;\r\n")
                     if len(word) == 6 and word.isascii() and word.isdigit():
+                        used_messages.add(message["ID"])
                         return word
         time.sleep(.1)
     raise AssertionError("local verification mail not delivered")
@@ -137,7 +141,11 @@ def verify(fixture_root):
     assert len(browser.json("GET", "/access/workspaces/" + workspace + "/members")["data"]["items"]) == 2
     for engine, query in fixture["projections"].items():
         for _ in range(60):
-            result = browser.json("POST", "/" + engine + "/workspaces/" + workspace + "/query", query)
+            status, _, result = browser.request("POST", "/" + engine + "/workspaces/" + workspace + "/query", query)
+            if status == 503:
+                time.sleep(.5)
+                continue
+            assert status == 200 and result is not None and not result.get("error"), engine + " query failed"
             evidence = result.get("data", {}).get("evidence", {})
             if result["meta"]["completeness"]["state"] == "complete" and evidence.get("position") == evidence.get("required_position"):
                 break
@@ -178,7 +186,12 @@ try:
         if role == "member":
             browser.flow("registration", {"method": "password", "traits.email": email, "password": password})
         flow_id, _ = browser.flow("verification", {"method": "code", "email": email})
-        browser.flow("verification", {"method": "code", "code": mail_code(email)}, "flow=" + flow_id)
+        for _ in range(3):
+            browser.flow("verification", {"method": "code", "code": mail_code(email)}, "flow=" + flow_id)
+            if browser.json("GET", "/auth/flow/verification?flow=" + flow_id).get("state") == "passed_challenge":
+                break
+        else:
+            raise AssertionError("verification did not complete")
         identities.append(browser.login(email, password))
         browsers.append(browser)
     admin, member = browsers
