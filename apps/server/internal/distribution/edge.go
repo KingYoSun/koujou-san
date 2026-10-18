@@ -24,14 +24,13 @@ func Edge(web, site, api, hydra, kratos, hydraAdmin, kratosAdmin string) (http.H
 		if err != nil || u.Host == "" {
 			return nil, errors.New("invalid upstream")
 		}
-		p := httputil.NewSingleHostReverseProxy(u)
-		direct := p.Director
-		p.Director = func(r *http.Request) {
-			direct(r)
-			r.Header.Set("X-Forwarded-Proto", "https")
-			r.Header.Set("X-Forwarded-Host", origin.Host)
-			r.Header.Del("Forwarded")
-		}
+		p := &httputil.ReverseProxy{Rewrite: func(r *httputil.ProxyRequest) {
+			r.SetURL(u)
+			r.SetXForwarded()
+			r.Out.Host = origin.Host
+			r.Out.Header.Set("X-Forwarded-Proto", "https")
+			r.Out.Header.Set("X-Forwarded-Host", origin.Host)
+		}}
 		if secure {
 			transport := http.DefaultTransport.(*http.Transport).Clone()
 			transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12, ServerName: origin.Hostname()}

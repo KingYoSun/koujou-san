@@ -48,6 +48,7 @@ func TestEdgePublicAndAdministrationStaySeparate(t *testing.T) {
 		r.Header.Set("X-Forwarded-Proto", "http")
 		r.Header.Set("X-Forwarded-Host", "attacker")
 		r.Header.Set("Forwarded", "proto=http;host=attacker")
+		r.Header.Set("Connection", "X-Forwarded-Proto, X-Forwarded-Host")
 		w := httptest.NewRecorder()
 		test.handler.ServeHTTP(w, r)
 		body := w.Body.String()
