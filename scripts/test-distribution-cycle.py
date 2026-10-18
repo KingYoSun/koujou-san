@@ -113,7 +113,7 @@ try:
     old = root / "schema22"
     initialize(old, old_bundle)
     assert sql(old, "SELECT max(version) FROM shared_migrations") == "22"
-    sql(old, "CREATE FUNCTION owned_reject_migration() RETURNS event_trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'owned migration failure'; END $$; CREATE EVENT TRIGGER owned_reject_migration ON ddl_command_end WHEN TAG IN ('CREATE TABLE') EXECUTE FUNCTION owned_reject_migration();")
+    sql(old, "CREATE FUNCTION owned_reject_migration() RETURNS event_trigger LANGUAGE plpgsql AS $$ BEGIN IF EXISTS(SELECT 1 FROM pg_event_trigger_ddl_commands() WHERE object_identity='public.triage_targets') THEN RAISE EXCEPTION 'owned migration failure'; END IF; END $$; CREATE EVENT TRIGGER owned_reject_migration ON ddl_command_end WHEN TAG IN ('CREATE TABLE') EXECUTE FUNCTION owned_reject_migration();")
     run([cli, "update", "--state", old, "--bundle", bundle], success=False)
     assert not (old / ".operation").exists()
     assert json.loads((old / "settings.json").read_text())["release"]["schema"] == 22
