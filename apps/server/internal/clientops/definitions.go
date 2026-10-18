@@ -8,6 +8,7 @@ import (
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/workflows"
 	"github.com/jackc/pgx/v5"
 )
@@ -224,13 +225,6 @@ func (s *Service) adoptDefinition(ctx context.Context, tx pgx.Tx, p access.Princ
 	if beforePresent != afterPresent || !bytes.Equal(raw(beforeContext), raw(afterContext)) {
 		return ErrState
 	}
-	for _, path := range policy.Definition.FixedPaths {
-		before, exists := field(base, path)
-		after, present := field(proposed, path)
-		if exists != present || !bytes.Equal(raw(before), raw(after)) {
-			return ErrState
-		}
-	}
 	var d workflows.Definition
 	if decode(raw(proposed), &d) != nil || d.Schema != "run-definition-v1" || d.Spec == nil || d.DeviceID == "" {
 		return ErrInvalid
@@ -239,7 +233,10 @@ func (s *Service) adoptDefinition(ctx context.Context, tx pgx.Tx, p access.Princ
 		if d.Selection != nil && d.Selection.Mode != "none" {
 			return ErrState
 		}
-	} else if d.Selection != nil {
+	} else if d.Selection != nil || len(policy.Fixed.Include) > 0 || len(policy.Fixed.Exclude) > 0 {
+		if d.Selection == nil {
+			d.Selection = &contexts.Selection{}
+		}
 		selectionProposal := Proposal{Items: []Item{}, Questions: []string{}, Unknown: []string{}}
 		for _, ref := range d.Selection.Include {
 			selectionProposal.Items = append(selectionProposal.Items, Item{Ref: ref, Reason: proposal.Reason})
@@ -259,6 +256,14 @@ func (s *Service) adoptDefinition(ctx context.Context, tx pgx.Tx, p access.Princ
 			return ErrState
 		}
 		d.Selection = &input
+	}
+	proposed, _ = definitionObject(raw(d))
+	for _, path := range policy.Definition.FixedPaths {
+		before, exists := field(base, path)
+		after, present := field(proposed, path)
+		if exists != present || !bytes.Equal(raw(before), raw(after)) {
+			return ErrState
+		}
 	}
 	definitions := s.Definitions.InTransaction(tx)
 	current, err := definitions.Capabilities(ctx, p, w, d.DeviceID, "head")

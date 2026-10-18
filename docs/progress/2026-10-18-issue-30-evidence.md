@@ -29,3 +29,7 @@ Chrome、日本語、通常のviewport・既存theme、`https://localhost:54724`
 5. 生成開始直後の画面編集でも、送信準備後に比較基準を取ってしまう時間差を検出した。比較基準を依頼操作の最初で固定し、定義取得後にも照合する修正を行った。同じ画面操作で修正前は名称が戻ったが、修正後は「受入: 生成中に編集した未送信名」を保持し、「編集中の下書きは変更されているため、現在版を取得して比較してください」と表示した。その部分案を下書きへ戻しても未送信名・Claude接続・promptを保持した。
 
 採用後も手動固定のpathを端末の定義下書きへ保持する。最終のHost/精度保持11試験と共通checkは `issue30-host-final2.log` / `issue30-check-final.log`。独立検品の修正差分確認、必須CI、merge後照合は継続中。
+
+## 必須Contextの省略
+
+最後の照合で、definition-policyの必須Contextを指定しても、モデルがselection全体を省略するとその必須参照が採用定義から消えるAC-6の未達を実PGで確認した（`issue30-required-before2.log`）。生成案の省略時にも既存の選択処理を通し、必須・除外を維持するよう修正した。正規化後にも手動固定pathを照合する。`issue30-required-final.log` の実PG試験と `issue30-domain-final.log` の関連Go試験はPASS。Go vetも成功した。新しい利用場面や制限は追加していない。

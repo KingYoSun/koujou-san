@@ -167,6 +167,33 @@ func checkDefinitions(t *testing.T, s *Service) {
 	if readOp(selected).State != "applied" {
 		t.Fatal("field adoption did not reuse validation")
 	}
+
+	requiredText := "Owned required Context"
+	sentence := must(s.Contexts.Put(ctx, p, "one", contexts.Identity{Kind: "sentence", ID: "generation-required"}, contexts.Write{Mutation: m("0"), Value: raw(contexts.Unit{Kind: "sentence", Text: &requiredText})}))
+	requiredRef := contexts.Ref{Kind: "sentence", ID: "generation-required", Revision: sentence.Version}
+	requiredPolicy := policy
+	requiredPolicy.Definition = &DefinitionPolicy{Sources: []Ref{capability}, FixedPaths: []string{}}
+	requiredPolicy.Fixed = contexts.Selection{Mode: "select", Include: []contexts.Ref{requiredRef}}
+	requiredPolicyRef := must(s.PutPolicy(ctx, p, "one", "definition-policy:required", Write{Mutation: m("0"), Value: raw(requiredPolicy)}))
+	requiredDefinition := original
+	requiredDefinition.Selection = nil
+	requiredDefinition.Spec.Input.Command.Binding = map[string]string{"context": "stdin"}
+	requiredOp := start("required", Ref{ID: "run-definition:generated-required", Version: "0"}, requiredPolicyRef, "owned-model-claude")
+	completedRequired := readOp(finish(requiredOp, proposal(requiredDefinition, []string{})))
+	if completedRequired.State != "applied" {
+		t.Fatal("valid required selection was not adopted", completedRequired.State)
+	}
+	{
+		rec, err := s.Definitions.Read(ctx, p, "one", Ref{ID: "run-definition:generated-required", Version: "head"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got workflows.Definition
+		json.Unmarshal(rec.Value, &got)
+		if got.Selection == nil || len(got.Selection.Include) != 1 || got.Selection.Include[0] != requiredRef {
+			t.Fatal("required Context disappeared when model omitted selection")
+		}
+	}
 	var runCount, pauses, executions int
 	if err := s.Store.Database().QueryRow(ctx, `SELECT (SELECT count(*) FROM run_records),(SELECT count(*) FROM run_records WHERE kind='pause'),(SELECT count(*) FROM workflow_records WHERE kind='execution')`).Scan(&runCount, &pauses, &executions); err != nil || runCount != 0 || pauses != 0 || executions != 0 {
 		t.Fatal("generation started work", runCount, pauses, executions, err)
