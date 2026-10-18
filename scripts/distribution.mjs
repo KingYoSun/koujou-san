@@ -240,6 +240,7 @@ if (kind === "server") {
           targets: ["nsis"],
           externalBin: [path.join(binaries, "koujou-san-runner")],
           resources: {
+            [path.join(stage, "sources.tar.gz")]: "sources.tar.gz",
             [path.join(stage, "licenses")]: "licenses/",
             [path.join(stage, "LICENSE")]: "LICENSE",
             [path.join(stage, "NOTICE")]: "NOTICE",
