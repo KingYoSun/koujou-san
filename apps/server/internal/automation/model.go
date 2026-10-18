@@ -9,6 +9,7 @@ import (
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/serverllm"
 )
 
 var ErrInvalid = errors.New("invalid_automation")
@@ -26,12 +27,14 @@ func DefaultLevels() []Level {
 }
 
 type Policy struct {
-	Name       string   `json:"name"`
-	Scopes     []string `json:"scopes"`
-	Precedence int      `json:"precedence"`
-	Levels     []Level  `json:"levels"`
-	Criteria   string   `json:"criteria"`
-	Context    []Ref    `json:"context"`
+	External   *ExternalPolicy `json:"external,omitempty"`
+	Model      *serverllm.Spec `json:"model,omitempty"`
+	Name       string          `json:"name"`
+	Scopes     []string        `json:"scopes"`
+	Precedence int             `json:"precedence"`
+	Levels     []Level         `json:"levels"`
+	Criteria   string          `json:"criteria"`
+	Context    []Ref           `json:"context"`
 }
 type Activation struct {
 	Policy    Ref  `json:"policy"`
@@ -59,6 +62,8 @@ type Control struct {
 	Budget         *Budget `json:"budget"`
 }
 type Priority struct {
+	AdoptedPolicy        *Ref    `json:"adopted_policy,omitempty"`
+	Basis                string  `json:"basis,omitempty"`
 	Target               Ref     `json:"target"`
 	Policy               Ref     `json:"policy"`
 	Adopted              *string `json:"adopted"`
@@ -99,6 +104,8 @@ type Source struct {
 	Scopes []string `json:"scopes"`
 }
 type Result struct {
+	State      string  `json:"state,omitempty"`
+	Basis      string  `json:"basis,omitempty"`
 	Priority   *string `json:"priority"`
 	Reason     string  `json:"reason"`
 	Refs       []Ref   `json:"refs"`
@@ -138,6 +145,9 @@ func hasLevel(p Policy, id string) bool {
 	return false
 }
 func validPolicy(p Policy) bool {
+	if p.Model != nil && !serverllm.Valid(p.Model) {
+		return false
+	}
 	if p.Name == "" || p.Criteria == "" || len(p.Scopes) == 0 || len(p.Levels) == 0 {
 		return false
 	}

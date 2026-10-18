@@ -66,6 +66,9 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 	principal := access.Principal{UserID: user.ID}
 	refreshRunner := prepareRunnerUI(t, client, target, tokens, service, user.ID)
 	prepareInspectionUI(t, inspectionService, principal, cfg.Key)
+	if os.Getenv("KOUJOU_TEST_TRIAGE_UI") == "1" {
+		prepareTriageUI(t, ctx, service, principal)
+	}
 	var hopperFixture func(http.ResponseWriter, *http.Request) bool
 	if os.Getenv("KOUJOU_TEST_HOPPER_UI") == "1" {
 		hopperFixture = prepareHopperUI(t, ctx, service, principal)

@@ -25,10 +25,11 @@ type Connection struct {
 	InstallationID int64  `json:"installation_id"`
 }
 type Config struct {
-	AppID          string       `json:"app_id"`
-	PrivateKeyFile string       `json:"private_key_file"`
-	Connections    []Connection `json:"connections"`
-	key            *rsa.PrivateKey
+	PriorityIntervalSeconds int          `json:"priority_interval_seconds,omitempty"`
+	AppID                   string       `json:"app_id"`
+	PrivateKeyFile          string       `json:"private_key_file"`
+	Connections             []Connection `json:"connections"`
+	key                     *rsa.PrivateKey
 }
 
 var repositoryName = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
@@ -43,7 +44,7 @@ func Environment() (*Config, error) {
 		return nil, ErrInvalid
 	}
 	var c Config
-	if decode(b, &c) != nil || c.AppID == "" {
+	if decode(b, &c) != nil || c.AppID == "" || c.PriorityIntervalSeconds < 0 {
 		return nil, ErrInvalid
 	}
 	seen := map[string]bool{}

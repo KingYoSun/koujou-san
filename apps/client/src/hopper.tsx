@@ -1,3 +1,8 @@
+import {
+  ServerModelFields,
+  type ModelConnection,
+  type SemanticSettings,
+} from "./server-model";
 import { useRef, useState } from "react";
 import { syncRequest } from "./auth";
 import { SyncHTTPError } from "./sync-error";
@@ -10,22 +15,6 @@ export const hopperRef = (ref: Ref): Ref => ({
 });
 type Version = Ref & { kind: string; position: number; value: unknown };
 type Page = { items: Version[]; after: number; after_id: string };
-type ModelConnection = {
-  id: string;
-  name: string;
-  revision: string;
-  models: { requested: string; allowed_actual: string[] }[];
-};
-type SemanticSettings = {
-  connection: string;
-  revision: string;
-  model: string;
-  allowed_models: string[];
-  fallbacks: string[];
-  instructions: string;
-  limits: { input_bytes: number; output_tokens: number; seconds: number };
-  reevaluate_evidence: boolean;
-};
 type Evaluation = {
   definition: Ref;
   source: { target: Ref; facts: unknown; previous_evaluation?: Ref };
@@ -652,94 +641,11 @@ export function Hopper({
           {semantic && (
             <fieldset>
               <legend>サーバーモデルによる意味判断</legend>
-              <label>
-                モデル接続
-                <select
-                  value={semantic.connection}
-                  onChange={(e) => {
-                    const c = connections.find((c) => c.id === e.target.value);
-                    if (c)
-                      editSemantic({
-                        connection: c.id,
-                        revision: c.revision,
-                        model: c.models[0].requested,
-                        allowed_models: c.models[0].allowed_actual,
-                        fallbacks: [],
-                      });
-                  }}
-                >
-                  <option value={semantic.connection}>
-                    {semantic.connection}
-                  </option>
-                  {connections
-                    .filter((c) => c.id !== semantic!.connection)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label>
-                要求モデル
-                <select
-                  value={semantic.model}
-                  onChange={(e) => {
-                    const m = connections
-                      .find((c) => c.id === semantic!.connection)
-                      ?.models.find((m) => m.requested === e.target.value);
-                    if (m)
-                      editSemantic({
-                        model: m.requested,
-                        allowed_models: m.allowed_actual,
-                        fallbacks: [],
-                      });
-                  }}
-                >
-                  <option value={semantic.model}>{semantic.model}</option>
-                  {connections
-                    .find((c) => c.id === semantic!.connection)
-                    ?.models.filter((m) => m.requested !== semantic!.model)
-                    .map((m) => (
-                      <option key={m.requested} value={m.requested}>
-                        {m.requested}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label>
-                評価への指示
-                <textarea
-                  value={semantic.instructions}
-                  onChange={(e) =>
-                    editSemantic({ instructions: e.target.value })
-                  }
-                />
-              </label>
-              {(
-                [
-                  ["input_bytes", "入力上限（UTF-8 byte）"],
-                  ["output_tokens", "出力上限（token）"],
-                  ["seconds", "要求の時間上限（秒）"],
-                ] as const
-              ).map(([key, label]) => (
-                <label key={key}>
-                  {label}
-                  <input
-                    type="number"
-                    min={1}
-                    value={semantic!.limits[key]}
-                    onChange={(e) =>
-                      editSemantic({
-                        limits: {
-                          ...semantic!.limits,
-                          [key]: Number(e.target.value),
-                        },
-                      })
-                    }
-                  />
-                </label>
-              ))}
+              <ServerModelFields
+                settings={semantic}
+                connections={connections}
+                onChange={editSemantic}
+              />
               <label>
                 <input
                   type="checkbox"

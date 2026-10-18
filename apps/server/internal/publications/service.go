@@ -25,11 +25,12 @@ type Backend interface {
 	Observe(context.Context, Connection, string, int64) Outcome
 }
 type Service struct {
-	tx      pgx.Tx
-	Store   *persistence.Store
-	Access  *access.Service
-	Runs    *runs.Service
-	Backend Backend
+	Automation *automation.Service
+	tx         pgx.Tx
+	Store      *persistence.Store
+	Access     *access.Service
+	Runs       *runs.Service
+	Backend    Backend
 }
 
 func New(store *persistence.Store, a *access.Service, r *runs.Service, b Backend) *Service {

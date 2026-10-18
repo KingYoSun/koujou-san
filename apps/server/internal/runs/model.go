@@ -39,6 +39,7 @@ type Contract struct {
 	VerdictField string          `json:"verdict_field,omitempty"`
 }
 type Spec struct {
+	Issue      *Ref             `json:"issue,omitempty"`
 	Name       string           `json:"name,omitempty"`
 	Input      Input            `json:"input"`
 	Manifest   *contexts.Ref    `json:"manifest,omitempty"`
@@ -187,6 +188,9 @@ func terminal(state string) bool {
 	return state == "succeeded" || state == "failed" || state == "cancelled"
 }
 func validate(s Spec) error {
+	if s.Issue != nil && (!fixed(*s.Issue) || !strings.HasPrefix(s.Issue.ID, "scope:")) {
+		return ErrInvalid
+	}
 	c := s.Input.Command
 	if strings.TrimSpace(c.Kind) == "" || strings.TrimSpace(c.Target) == "" {
 		return ErrInvalid

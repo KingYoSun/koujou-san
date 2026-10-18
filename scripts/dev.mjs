@@ -497,6 +497,38 @@ const tasks = {
     );
     return testDatabase("hopper", "TestHopperSemanticPostgres");
   },
+  "test:triage:live": () => {
+    const owned = process.argv[3] === "--owned";
+    if (
+      !owned &&
+      (!process.argv[3] ||
+        !process.argv[4] ||
+        !existsSync(path.resolve(root, process.argv[3])) ||
+        !existsSync(path.resolve(root, process.argv[4])))
+    )
+      throw new Error(
+        "Pass the approved live connection JSON and request allowance ledger, or --owned.",
+      );
+    env.KOUJOU_TEST_TRIAGE_LIVE_CONFIG = owned
+      ? "owned"
+      : path.resolve(root, process.argv[3]);
+    env.KOUJOU_TEST_TRIAGE_LIVE_BUDGET = owned
+      ? ""
+      : path.resolve(root, process.argv[4]);
+    env.KOUJOU_TEST_TRIAGE_LIVE_REPORT = path.join(
+      root,
+      owned
+        ? "test-results/issue28-live-owned.json"
+        : "test-results/issue28-live.json",
+    );
+    return testDatabase("automation", "TestTriagePostgres");
+  },
+  "test:triage:ui": async () => {
+    env.KOUJOU_TEST_TRIAGE_UI = "1";
+    env.KOUJOU_TEST_MCP_UI = "1";
+    await client("build");
+    await testDatabase("mcpapi");
+  },
   "test:hopper:ui": async () => {
     env.KOUJOU_TEST_HOPPER_UI = "1";
     env.KOUJOU_TEST_MCP_UI = "1";
@@ -512,6 +544,24 @@ const tasks = {
   },
   "test:publications": () =>
     testDatabase("publications", "TestPublicationsPostgres"),
+  "test:triage:github-live": () => {
+    if (
+      !process.argv[3] ||
+      !process.argv[4] ||
+      !existsSync(path.resolve(root, process.argv[3])) ||
+      !existsSync(path.resolve(root, process.argv[4]))
+    )
+      throw new Error(
+        "Pass the approved publisher App config and trial allowance ledger.",
+      );
+    env.KOUJOU_TEST_PRIORITY_LIVE_CONFIG = path.resolve(root, process.argv[3]);
+    env.KOUJOU_TEST_PRIORITY_LIVE_BUDGET = path.resolve(root, process.argv[4]);
+    env.KOUJOU_TEST_PRIORITY_LIVE_REPORT = path.join(
+      root,
+      "test-results/issue28-github-live.json",
+    );
+    return testDatabase("publications", "TestPriorityLive");
+  },
   "test:publications:live": () => {
     env.KOUJOU_TEST_PUBLICATION_LIVE = "1";
     return testDatabase("publications", "TestPublicationsLive");
@@ -520,7 +570,8 @@ const tasks = {
     testDatabase("inspections", "TestInspectionsPostgres"),
   "test:runs": () => testDatabase("runs", "TestRunsPostgres"),
   "test:workflows": () => testDatabase("workflows", "TestWorkflowsPostgres"),
-  "test:automation": () => testDatabase("automation", "TestAutomationPostgres"),
+  "test:automation": () =>
+    testDatabase("automation", "TestAutomationPostgres|TestTriagePostgres"),
   "test:usage": () => testDatabase("usage", "TestUsagePostgres"),
   "test:github": () => testDatabase("githubobserve"),
   "test:github:live": async () => {

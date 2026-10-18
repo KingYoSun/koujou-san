@@ -504,11 +504,13 @@ button:disabled {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.hopper-editor {
+.hopper-editor,
+.triage-editor {
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.hopper-editor pre {
+.hopper-editor pre,
+.triage-editor pre {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   max-height: 420px;

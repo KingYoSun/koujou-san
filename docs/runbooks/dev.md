@@ -43,6 +43,8 @@ Codexのworktree向けに `.codex/environments/environment.toml` のsetupにも 
 | `pnpm run test:workbench` | 試験専用DBによる作業一覧・現在権限・回付・回答・差し戻しとRun関連 |
 | `pnpm run test:workbench:ui` | 実Ory・二アカウント・所有CLIで作業と判断を実操作する専用環境 |
 | `pnpm run test:automation` | 試験専用DBによる受理・永続Worker・Triage方針と優先度 |
+| `pnpm run test:triage:ui` | 実Oryと所有モデルHTTPによるTriageの共通画面 |
+| `pnpm run test:triage:live --owned` | 実接続用の二要求上限・合成入力を所有HTTPで検証 |
 | `pnpm run test:hopper` | 試験専用PG・ArcadeDB・固定HTTPによる決定論評価・発行・由来・割当待ち |
 | `pnpm run test:hopper:ui` | 実Ory・所有する合成結果で共通Hopper画面を確認する専用環境 |
 | `pnpm run test:usage` | 試験専用DBによる利用量・料金版・費用評価・認可・集計 |

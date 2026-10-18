@@ -3,11 +3,8 @@ package hopper
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"time"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
-	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/modelreply"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/serverllm"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
@@ -59,50 +56,6 @@ func (s *Service) semanticUsage(ctx context.Context, w, evaluation string, outco
 }
 
 func (s *Service) observeSemantic(ctx context.Context, tx pgx.Tx, p access.Principal, w string, d Definition, evaluation string, intent Ref, input Record, reply modelreply.Reply, response *serverllm.Response, provisional bool) ([]Ref, []Ref, error) {
-	quantities := reply.Quantities()
-	request, coverage, state := "", "unknown", "provisional"
-	var actual *string
-	if !provisional {
-		state = "final"
-		request = reply.ID
-		if reply.Model != "" {
-			actual = &reply.Model
-		}
-		if response != nil && response.RequestID != "" {
-			request = response.RequestID
-		}
-		if request != "" {
-			coverage = "confirmed"
-		}
-		var extra struct {
-			Extra struct {
-				Routing struct {
-					Fallback bool `json:"is_fallback"`
-				} `json:"routing_info"`
-			} `json:"extra_fields"`
-		}
-		if response != nil {
-			_ = json.Unmarshal(response.Body, &extra)
-		}
-		if extra.Extra.Routing.Fallback {
-			state = "partial"
-			coverage = "unknown"
-			// The final provider's usage does not report earlier fallback attempts.
-			// Preserve it in the raw response, while the total remains unmeasured.
-			for k := range quantities {
-				quantities[k] = modelreply.Quantity(nil, nil)
-			}
-		}
-		if reply.Usage.Input == nil || reply.Usage.Output == nil {
-			state = "unavailable"
-		}
-	}
-	observation := usage.Observation{Source: "server-model:" + d.Semantic.Connection, Transform: "server-chat-v1", Event: intent.ID, Series: intent.ID, Mode: "delta", Group: intent.ID, Request: request, Covers: []string{}, Coverage: coverage, Connection: d.Semantic.Connection, Contract: d.Semantic.Contract, RequestedModel: d.Semantic.Model, ActualModel: actual, At: time.Now().UTC(), Attribution: usage.Attribution{Kind: "hopper", ID: evaluation, Resource: input.ID, Scopes: []string{}}, Quantities: quantities, Measurement: &usage.Measurement{State: state, Protocol: "openai-chat-completions", Scope: "hopper_evaluation_request", Generation: intent.ID, Billing: "unknown", SourceRef: intent.ID, SourceDigest: hash(response)}}
-	id := usage.ObservationID(observation)
-	var expected string
-	if err := tx.QueryRow(ctx, `SELECT COALESCE((SELECT version FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2),'0')`, w, id).Scan(&expected); err != nil {
-		return nil, nil, err
-	}
 	deps := []usage.Ref{}
 	for _, ref := range append(append([]Ref{}, input.Refs...), input.Ref, intent) {
 		deps = append(deps, usage.Ref{ID: ref.ID, Version: ref.Version})
@@ -115,36 +68,5 @@ func (s *Service) observeSemantic(ctx context.Context, tx pgx.Tx, p access.Princ
 		}
 		return err
 	}}
-	observed, err := s.Usage.PutFromOwner(ctx, p, w, id, usage.Write{Mutation: apicontract.Mutation{OperationID: semanticAttemptOperation(intent.ID, provisional), ExpectedVersion: expected}, Value: raw(observation)}, guard, tx)
-	ref, err := accepted(observed, err)
-	if err != nil {
-		return nil, nil, err
-	}
-	refs := []Ref{ref}
-	costs := []Ref{}
-	if actual != nil {
-		if price, ok := d.Semantic.Prices[*actual]; ok {
-			valuation := d.Semantic.Valuation
-			if valuation == "" {
-				valuation = "estimated"
-			}
-			nested, err := tx.Begin(ctx)
-			if err != nil {
-				return nil, nil, err
-			}
-			cost, err := accepted(s.Usage.Put(ctx, p, w, "evaluation:"+hash([]string{intent.ID, valuation}), usage.Write{Mutation: mutation("hopper-price:" + intent.ID), Value: raw(usage.Evaluation{Group: observation.Group, Kind: valuation, Usage: []usage.Ref{{ID: ref.ID, Version: ref.Version}}, Price: &price})}, nested))
-			if err != nil {
-				_ = nested.Rollback(ctx)
-				if !errors.Is(err, usage.ErrInvalid) && !errors.Is(err, access.ErrForbidden) && !errors.Is(err, ErrState) {
-					return nil, nil, err
-				}
-			} else {
-				if err = nested.Commit(ctx); err != nil {
-					return nil, nil, err
-				}
-				costs = append(costs, cost)
-			}
-		}
-	}
-	return refs, costs, nil
+	return serverllm.Observe(ctx, tx, p, w, "hopper", evaluation, semanticAttemptOperation(intent.ID, provisional), intent, serverllm.MeterInput{ID: input.ID, Version: input.Version, Refs: input.Refs}, d.Semantic, reply, response, provisional, s.Usage, guard)
 }

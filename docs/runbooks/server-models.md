@@ -45,6 +45,8 @@ Gateway設定JSONは`source_of_truth=config.json`である。管理画面だけ�
 
 ## 本文ログと外部通信
 
+Triageも同じ接続登録と要求・応答・利用量の保存処理を使う。方針・指示・Context・上限・処理枠はHopperとは別に設定する。操作と実接続用の有界な入口は[Triageの手順](automation.md)を参照する。
+
 共有雛形では本文ログ・object storageへの本文保存・要求単位の本文保存上書き、semantic cache、Maxim、OTEL、Warpを無効にする。Gatewayの稼働・要求状態のメタデータは専用SQLiteへ保存する。Go側の固定入力・原応答・費用履歴は別に保存し、Gatewayのログを判定の正本にしない。
 
 上流への通信先は、運用者が登録したproviderと明示したfallbackである。加えてBifrostの起動時のモデル・料金カタログ取得がある。定期のlive model・MCP library同期は無効とする。外部送信先を固定する運用では、`framework.pricing.pricing_url`と`model_parameters_url`を所有するミラーへ向け、providerとそのミラーだけをネットワークで許可する。隔離probeでは所有HTTPと内部ネットワークで検証した。標準Compose自体にホスト全体の通信制限を設定するものではない。

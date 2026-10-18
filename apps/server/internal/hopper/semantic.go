@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/automation"
@@ -158,75 +157,75 @@ func (s *Service) semantic(ctx context.Context, j automation.Job, evaluation str
 	if !made {
 		return nil, ErrState
 	}
-	call, cancel := context.WithTimeout(ctx, time.Duration(d.Semantic.Limits.Seconds)*time.Second)
-	response, callErr := connection.Call(call, input.Request, id)
-	cancel()
-	attempt.Response = &response
-	if callErr != nil {
-		attempt.Error = "model_connection_unavailable"
-	}
-	reply, reason := modelreply.Parse(response.Body, d.Semantic.Allowed)
-	outcome.State = "complete"
-	outcome.Reason = ""
-	if callErr != nil || response.Status != 200 {
-		outcome.State = "failed"
-		outcome.Reason = "model_request_failed"
-	} else if reason != "" {
-		outcome.State = "failed"
-		outcome.Reason = reason
-	} else {
-		var decision SemanticDecision
-		if len(reply.Choices[0].Message.Calls) > 0 || reply.Choices[0].Message.Content == nil || json.Unmarshal([]byte(*reply.Choices[0].Message.Content), &decision) != nil || !decision.validate(input) {
+	err = serverllm.Dispatch(ctx, connection, d.Semantic, input.Request, id, func(saveCtx context.Context, response serverllm.Response, reply modelreply.Reply, reason string) error {
+		attempt.Response = &response
+		if reason == "model_request_failed" {
+			attempt.Error = "model_connection_unavailable"
+		}
+		outcome.State = "complete"
+		outcome.Reason = ""
+		if reason == "model_request_failed" {
 			outcome.State = "failed"
-			outcome.Reason = "invalid_semantic_response"
+			outcome.Reason = "model_request_failed"
+		} else if reason != "" {
+			outcome.State = "failed"
+			outcome.Reason = reason
 		} else {
-			outcome.Decision = &decision
-			if decision.Verdict == "unknown" || len(decision.Unknown) > 0 {
-				outcome.State = "unknown"
-				outcome.Reason = decision.Reason
+			var decision SemanticDecision
+			if len(reply.Choices[0].Message.Calls) > 0 || reply.Choices[0].Message.Content == nil || json.Unmarshal([]byte(*reply.Choices[0].Message.Content), &decision) != nil || !decision.validate(input) {
+				outcome.State = "failed"
+				outcome.Reason = "invalid_semantic_response"
+			} else {
+				outcome.Decision = &decision
+				if decision.Verdict == "unknown" || len(decision.Unknown) > 0 {
+					outcome.State = "unknown"
+					outcome.Reason = decision.Reason
+				}
 			}
 		}
-	}
-	saveCtx, stop := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
-	defer stop()
-	reserved := func(tx pgx.Tx) error {
-		var exists bool
-		err := tx.QueryRow(saveCtx, `SELECT EXISTS(SELECT 1 FROM hopper_model_attempts WHERE workspace_id=$1 AND resource_id=$2 AND job_id=$3 AND lease=$4 AND input_id=$5 AND input_version=$6 AND actor=$7)`, j.Workspace, id, j.ID, j.Lease, prepared.ID, prepared.Version, attempt.Actor).Scan(&exists)
-		if err == nil && !exists {
-			return access.ErrForbidden
+		reserved := func(tx pgx.Tx) error {
+			var exists bool
+			err := tx.QueryRow(saveCtx, `SELECT EXISTS(SELECT 1 FROM hopper_model_attempts WHERE workspace_id=$1 AND resource_id=$2 AND job_id=$3 AND lease=$4 AND input_id=$5 AND input_version=$6 AND actor=$7)`, j.Workspace, id, j.ID, j.Lease, prepared.ID, prepared.Version, attempt.Actor).Scan(&exists)
+			if err == nil && !exists {
+				return access.ErrForbidden
+			}
+			return err
 		}
-		return err
-	}
-	responseRef, err := s.system(saveCtx, j.Workspace, id, "model-response", "response:"+id, intent.Version, reserved, func(tx pgx.Tx, ref Ref) (Record, error) {
-		outcome.Response = &ref
-		usage, costs, err := s.observeSemantic(saveCtx, tx, actor, j.Workspace, d, evaluation, intent, prepared, reply, &response, false)
-		if err != nil {
-			return Record{}, err
-		}
-		outcome.Usage = usage
-		outcome.Costs = costs
-		outcome.UsageState = "missing"
-		if len(costs) > 0 {
-			var rated bool
-			if err = tx.QueryRow(saveCtx, `SELECT payload->>'state'='rated' FROM usage_records WHERE workspace_id=$1 AND id=$2 AND version=$3`, j.Workspace, costs[0].ID, costs[0].Version).Scan(&rated); err != nil {
+		responseRef, err := s.system(saveCtx, j.Workspace, id, "model-response", "response:"+id, intent.Version, reserved, func(tx pgx.Tx, ref Ref) (Record, error) {
+			outcome.Response = &ref
+			usage, costs, err := s.observeSemantic(saveCtx, tx, actor, j.Workspace, d, evaluation, intent, prepared, reply, &response, false)
+			if err != nil {
 				return Record{}, err
 			}
-			if rated {
-				outcome.UsageState = "complete"
+			outcome.Usage = usage
+			outcome.Costs = costs
+			outcome.UsageState = "missing"
+			if len(costs) > 0 {
+				var rated bool
+				if err = tx.QueryRow(saveCtx, `SELECT payload->>'state'='rated' FROM usage_records WHERE workspace_id=$1 AND id=$2 AND version=$3`, j.Workspace, costs[0].ID, costs[0].Version).Scan(&rated); err != nil {
+					return Record{}, err
+				}
+				if rated {
+					outcome.UsageState = "complete"
+				}
 			}
+			attempt.Outcome = outcome
+			refs := append(append(append([]Ref{}, prepared.Refs...), prepared.Ref), append(usage, costs...)...)
+			r, err := s.save(saveCtx, tx, j.Workspace, ref, "model-attempt", attempt, refs)
+			if err == nil {
+				_, err = tx.Exec(saveCtx, `UPDATE hopper_model_attempts SET response_version=$3,state='observed' WHERE workspace_id=$1 AND resource_id=$2`, j.Workspace, id, ref.Version)
+			}
+			return r, err
+		})
+		if err != nil {
+			return err
 		}
-		attempt.Outcome = outcome
-		refs := append(append(append([]Ref{}, prepared.Refs...), prepared.Ref), append(usage, costs...)...)
-		r, err := s.save(saveCtx, tx, j.Workspace, ref, "model-attempt", attempt, refs)
-		if err == nil {
-			_, err = tx.Exec(saveCtx, `UPDATE hopper_model_attempts SET response_version=$3,state='observed' WHERE workspace_id=$1 AND resource_id=$2`, j.Workspace, id, ref.Version)
-		}
-		return r, err
+		outcome.Response = &responseRef
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
-	outcome.Response = &responseRef
 	if outcome.State == "failed" && j.Attempts < maxAttempts {
 		return nil, errors.New("retry_semantic_request")
 	}

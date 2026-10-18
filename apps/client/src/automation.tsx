@@ -1,3 +1,10 @@
+import {
+  TriageModelSettings,
+  TriageAudit,
+  TriageIssue,
+  TriageBatch,
+  type TriageModel,
+} from "./triage-panels";
 import { useRef, useState } from "react";
 import { syncRequest } from "./auth";
 import { SyncHTTPError } from "./sync-error";
@@ -5,6 +12,8 @@ import { SyncHTTPError } from "./sync-error";
 type Ref = { id: string; version: string };
 type Level = { id: string; name: string; meaning: string };
 type Policy = {
+  model?: TriageModel;
+  external?: { connection: string; labels: Record<string, string> };
   name: string;
   scopes: string[];
   precedence: number;
@@ -12,7 +21,16 @@ type Policy = {
   criteria: string;
   context: Ref[];
 };
-type Version = Ref & { kind: string; value: unknown };
+type Version = Ref & {
+  kind: string;
+  value: unknown;
+  title?: string;
+  deadline?: string;
+  received_at?: string;
+  next_due?: string;
+  policy_group?: string;
+  observed_at?: string;
+};
 type Job = {
   id: string;
   kind: string;
@@ -25,6 +43,9 @@ type Job = {
 };
 type Page = { data: { items: unknown[]; next: string } };
 type Priority = {
+  job?: string;
+  basis?: string;
+  adopted_policy?: Ref;
   target: Ref;
   policy: Ref;
   adopted: string | null;
@@ -64,17 +85,24 @@ const blankControl = (kind: string): Control => ({
   enabled: false,
   can_read: false,
   can_commit: false,
-  slots: kind === "hopper" ? 2 : 1,
-  max_attempts: kind === "hopper" ? 2 : 3,
-  lease_seconds: kind === "hopper" ? 180 : 60,
-  timeout_seconds: kind === "hopper" ? 120 : 30,
+  slots: 2,
+  max_attempts: 2,
+  lease_seconds: 180,
+  timeout_seconds: 120,
   retry_seconds: 5,
   max_requests: 100,
   period_seconds: 3600,
   budget: null,
 });
 const states: Record<string, string> = {
+  synced: "同期済み",
+  observing: "外部を取得中",
+  reconciling: "書込み結果を照合中",
+  conflict: "競合・判断待ち",
   waiting: "待機",
+  unknown: "判断不能",
+  input_waiting: "入力待ち",
+  superseded: "新しい入力で再評価",
   blocked: "保留",
   running: "処理中",
   retry: "再試行待ち",
@@ -97,6 +125,27 @@ const reasons: Record<string, string> = {
   usage_missing: "利用量が未確定です",
   usage_unavailable: "費用の根拠を確認できません",
   executor_failed: "処理に失敗しました",
+  external_priority_conflict:
+    "GitHubの優先度が競合しています。確認して採用値を選んでください",
+  concurrent_manual_priority:
+    "内外の手動変更が重なっています。確認して採用値を選んでください",
+  external_level_unmapped: "採用値とGitHubラベルの対応を設定してください",
+  external_observation_failed:
+    "GitHubを取得できないため、保存した値を保持しています",
+  batch_cost_unobserved: "先行する評価の消費・料金が確定するまで待っています",
+  batch_cost_exhausted: "一括評価の費用上限に達しています",
+  model_unset: "評価用モデルが未設定です",
+  model_connection_unavailable: "許可されたモデル接続を利用できません",
+  model_input_capacity: "評価入力が設定した容量上限を超えています",
+  evaluation_context_unavailable:
+    "選択Contextの参照・版・除外・送信禁止分類を確認してください",
+  dependency_information_missing: "依存先の情報が不足しています",
+  invalid_triage_response: "モデル応答が必要な形式や根拠を満たしていません",
+  model_request_failed: "モデル要求に失敗しました",
+  newer_input: "新しい入力の評価へ置き換えました",
+  automation_authority_or_budget:
+    "自動化主体の権限または消費上限を確認してください",
+  issue_closed: "このIssueは完了しています",
 };
 
 export function Automation({
@@ -111,7 +160,7 @@ export function Automation({
   const base = `/automation/workspaces/${encodeURIComponent(workspace)}`;
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [mode, setMode] = useState("heads");
+  const [mode, setMode] = useState("priorities");
   const [recordKind, setRecordKind] = useState("policy");
   const [filterID, setFilterID] = useState("");
   const [page, setPage] = useState<Page | null>(null);
@@ -119,11 +168,18 @@ export function Automation({
   const [policyID, setPolicyID] = useState("");
   const [policyVersion, setPolicyVersion] = useState("0");
   const [autoApply, setAutoApply] = useState(true);
-  const [pastAfter, setPastAfter] = useState("");
+
   const [control, setControl] = useState(() => blankControl("triage"));
   const [controlVersion, setControlVersion] = useState("0");
   const [issueID, setIssueID] = useState("");
   const [priority, setPriority] = useState<Version | null>(null);
+  const [detail, setDetail] = useState<Version | null>(null);
+  const [scopeTarget, setScopeTarget] = useState<Ref | null>(null);
+  const [externalState, setExternalState] = useState<{
+    state: string;
+    reason: string;
+    observed_at?: string;
+  } | null>(null);
   const [selected, setSelected] = useState<(Version & { target: Ref }) | null>(
     null,
   );
@@ -149,6 +205,9 @@ export function Automation({
       setPage(null);
       setPriority(null);
       setSelected(null);
+      setDetail(null);
+      setScopeTarget(null);
+      setExternalState(null);
       if (
         e instanceof SyncHTTPError &&
         (e.status === 401 || e.status === 403)
@@ -183,17 +242,33 @@ export function Automation({
   const head = async (kind: string, id: string) =>
     (await query({ mode: "heads", kind, id, limit: 1 })).data.items[0] as
       Version | undefined;
-  const loadPriority = async () => {
-    const [p, s] = await Promise.all([
-      query({ mode: "priority", id: target }),
-      query({ mode: "selection", id: target }),
+  const loadPriority = async (requested = target) => {
+    const [p, s, e] = await Promise.all([
+      query({ mode: "priority", id: requested }),
+      query({ mode: "selection", id: requested }),
+      query({
+        mode: "heads",
+        kind: "sync",
+        id: "priority-sync:" + requested,
+        limit: 1,
+      }),
     ]);
     setPriority(p.data.items[0] as Version);
+    const externalRecord = e.data.items[0] as Version | undefined;
+    setExternalState(
+      externalRecord
+        ? {
+            ...(externalRecord.value as { state: string; reason: string }),
+            observed_at: externalRecord.observed_at,
+          }
+        : null,
+    );
     const choice = s.data.items[0] as {
       target: Ref;
       policy: Version;
       reason: string;
     };
+    setScopeTarget(choice.target);
     setSelected(
       choice.policy.id ? { ...choice.policy, target: choice.target } : null,
     );
@@ -215,10 +290,10 @@ export function Automation({
   };
   const current = priority?.value as Priority | undefined;
   return (
-    <details className="team-details">
+    <details className="team-details workflow-editor triage-editor">
       <summary>Triage方針・優先度・処理状態</summary>
       <p>
-        方針の保存・有効化・過去対象への適用を分けます。現在の段階では永続要求とWorkerの共通基盤を扱い、実際のLLM評価やHopperの発行は後続の実装で接続します。
+        Issueと選択Contextをサーバーで評価し、採用値・推奨・手動固定を分けます。同じ方針・尺度の優先度順、同順位は受付順です。未評価や判断不能を最低優先度として扱わず、長期待機の自動昇格は行いません。
       </p>
       <div className="team-controls">
         <label>
@@ -230,8 +305,11 @@ export function Automation({
               setPage(null);
             }}
           >
+            <option value="priorities">優先度順のIssue一覧</option>
             <option value="heads">現在の版</option>
             <option value="records">版履歴</option>
+            <option value="evaluations">Triageの評価要求</option>
+            <option value="attempts">Triageの根拠・不明点・消費</option>
             <option value="jobs">処理要求</option>
             <option value="history">処理履歴</option>
           </select>
@@ -249,6 +327,11 @@ export function Automation({
             <option value="priority">優先度</option>
             <option value="activation">有効化</option>
             <option value="control">自動化主体・処理枠</option>
+            <option value="issue">Issue情報</option>
+            <option value="model-input">固定した評価入力</option>
+            <option value="model-attempt">原応答・根拠・利用量</option>
+            <option value="sync">GitHub優先度の同期</option>
+            <option value="batch">一括評価</option>
             <option value="">すべて</option>
           </select>
         </label>
@@ -269,7 +352,11 @@ export function Automation({
               setPage(
                 await query({
                   mode,
-                  kind: mode === "jobs" || mode === "history" ? "" : recordKind,
+                  kind: ["jobs", "evaluations", "attempts", "history"].includes(
+                    mode,
+                  )
+                    ? ""
+                    : recordKind,
                   id: filterID,
                   limit: 50,
                 }),
@@ -290,13 +377,60 @@ export function Automation({
                 <li key={i}>
                   <details>
                     <summary>
-                      {mode === "history"
-                        ? `${states[j.state] ?? j.state} · ${(row as { at: string }).at} · ${(row as { attempt: number }).attempt}回`
-                        : `${r.id} ${mode === "jobs" ? `${states[j.state] ?? j.state} · ${j.kind} · ${j.attempts}回` : r.version}`}
+                      {mode === "priorities"
+                        ? `${r.title ?? r.id} · 採用 ${(r.value as Priority).adopted ?? "未設定"} · ${states[(r.value as Priority).state] ?? (r.value as Priority).state}`
+                        : mode === "history"
+                          ? `${states[j.state] ?? j.state} · ${(row as { at: string }).at} · ${(row as { attempt: number }).attempt}回`
+                          : `${r.id} ${["jobs", "evaluations"].includes(mode) ? `${states[j.state] ?? j.state} · ${j.kind} · ${j.attempts}回` : r.version}`}
                     </summary>
+                    {r.title && (
+                      <p>
+                        {r.title} / 採用値:{" "}
+                        {(r.value as Priority).adopted ?? "未設定"} /{" "}
+                        {(r.value as Priority).fixed ? "手動固定" : "自動反映"}{" "}
+                        /{" "}
+                        {states[(r.value as Priority).state] ??
+                          (r.value as Priority).state}
+                      </p>
+                    )}
+                    {r.received_at && (
+                      <p>
+                        受付: {r.received_at}（経過{" "}
+                        {Math.max(
+                          0,
+                          Math.floor(
+                            (Date.now() - new Date(r.received_at).getTime()) /
+                              60000,
+                          ),
+                        )}
+                        分） / 期限: {r.deadline ?? "未設定"} / 次の期限評価:{" "}
+                        {r.next_due ?? "予定なし"}
+                      </p>
+                    )}
+                    {r.policy_group && (
+                      <p>比較する方針・尺度の固定版: {r.policy_group}</p>
+                    )}
+                    {r.kind === "model-attempt" && (
+                      <TriageAudit
+                        value={r.value}
+                        states={states}
+                        reasons={reasons}
+                        onUsage={(ref) =>
+                          void run(async () =>
+                            setDetail(
+                              (await syncRequest(
+                                `/usage/workspaces/${encodeURIComponent(workspace)}/records/${encodeURIComponent(ref.id)}?version=${encodeURIComponent(ref.version)}`,
+                                native,
+                                { method: "GET" },
+                              )) as Version,
+                            ),
+                          )
+                        }
+                      />
+                    )}
                     <pre>{JSON.stringify(row, null, 2)}</pre>
                   </details>
-                  {mode === "jobs" && (
+                  {["jobs", "evaluations"].includes(mode) && (
                     <>
                       <p>
                         {reasons[j.reason] ?? j.reason}
@@ -377,6 +511,38 @@ export function Automation({
                       )}
                     </>
                   )}
+                  {["issue", "model-input", "model-attempt", "sync"].includes(
+                    r.kind,
+                  ) && (
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () =>
+                          setDetail(
+                            (await call(
+                              `/records/${encodeURIComponent(r.id)}?version=${encodeURIComponent(r.version)}`,
+                            )) as Version,
+                          ),
+                        )
+                      }
+                    >
+                      この固定版の本文・原応答を確認
+                    </button>
+                  )}
+                  {r.kind === "priority" && (
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          const issue = (r.value as Priority).target.id;
+                          setIssueID(issue);
+                          await loadPriority(issue);
+                        })
+                      }
+                    >
+                      このIssueの優先度・根拠を確認
+                    </button>
+                  )}
                   {canEdit && r.kind === "policy" && (
                     <button
                       disabled={busy}
@@ -401,8 +567,14 @@ export function Automation({
                   setPage(
                     await query({
                       mode,
-                      kind:
-                        mode === "jobs" || mode === "history" ? "" : recordKind,
+                      kind: [
+                        "jobs",
+                        "evaluations",
+                        "attempts",
+                        "history",
+                      ].includes(mode)
+                        ? ""
+                        : recordKind,
                       id: filterID,
                       after: page.data.next,
                       limit: 50,
@@ -415,6 +587,16 @@ export function Automation({
             </button>
           )}
         </>
+      )}
+      {detail && (
+        <section aria-label="選択したTriage固定版">
+          <h3>選択した固定版</h3>
+          <p>
+            {detail.id} · {detail.version}
+          </p>
+          <pre>{JSON.stringify(detail.value, null, 2)}</pre>
+          <button onClick={() => setDetail(null)}>詳細を閉じる</button>
+        </section>
       )}
       {canEdit && (
         <fieldset disabled={busy}>
@@ -539,6 +721,58 @@ export function Automation({
           >
             段階を追加
           </button>
+          <TriageModelSettings
+            value={policy.model}
+            onChange={(model) => setPolicy({ ...policy, model })}
+            call={call}
+            run={run}
+          />
+          {admin && (
+            <details>
+              <summary>GitHub優先度ラベルの双方向同期</summary>
+              <p>
+                方針ごとに接続と対応ラベルを設定します。外部で人が変えた値を固定として取り込み、同時の手動変更は保留します。既存ラベルを使い、本文・状態・根拠は送信しません。
+              </p>
+              <label>
+                GitHub接続ID
+                <input
+                  value={policy.external?.connection ?? ""}
+                  onChange={(e) =>
+                    setPolicy({
+                      ...policy,
+                      external: e.target.value
+                        ? {
+                            connection: e.target.value,
+                            labels: policy.external?.labels ?? {},
+                          }
+                        : undefined,
+                    })
+                  }
+                />
+              </label>
+              {policy.external &&
+                policy.levels.map((level) => (
+                  <label key={level.id}>
+                    {level.name}のGitHubラベル
+                    <input
+                      value={policy.external?.labels[level.id] ?? ""}
+                      onChange={(e) =>
+                        setPolicy({
+                          ...policy,
+                          external: {
+                            connection: policy.external!.connection,
+                            labels: {
+                              ...policy.external!.labels,
+                              [level.id]: e.target.value,
+                            },
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                ))}
+            </details>
+          )}
           <button
             disabled={
               !policyID ||
@@ -580,35 +814,19 @@ export function Automation({
               <button onClick={() => void run(() => activation(false))}>
                 方針を無効化
               </button>
-              <button
-                onClick={() =>
-                  void run(async () => {
-                    const application = await mutation("/apply-past", "0", {
-                      policy: { id: policyID, version: policyVersion },
-                      after: pastAfter,
-                      limit: 50,
-                    });
-                    setPastAfter(application.data.next ?? "");
-                    setMessage(
-                      `明示したページの適用要求を保存しました（対象 ${application.data.requested ?? 0}件を要求）。続きは対象の確認後に適用してください。`,
-                    );
-                  })
-                }
-              >
-                過去のIssueへ1ページ適用
-              </button>
-              <label>
-                過去対象の継続位置
-                <input
-                  value={pastAfter}
-                  onChange={(e) => setPastAfter(e.target.value)}
-                />
-              </label>
+              <TriageBatch
+                key={`${policyID}@${policyVersion}`}
+                policy={{ id: policyID, version: policyVersion }}
+                scopes={policy.scopes}
+                call={call}
+                write={write}
+                run={run}
+              />
             </>
           )}
         </fieldset>
       )}
-      <fieldset disabled={busy}>
+      <fieldset id="triage-priority-editor" disabled={busy}>
         <legend>Issueの優先度</legend>
         <label>
           Issue Scope ID
@@ -633,6 +851,78 @@ export function Automation({
             </p>
             <p>{reasons[current.reason] ?? current.reason}</p>
             <p>採用理由: {current.adopted_reason || "未設定"}</p>
+            {externalState && (
+              <p
+                role={externalState.state === "conflict" ? "alert" : undefined}
+              >
+                GitHub優先度の同期:{" "}
+                {states[externalState.state] ?? externalState.state} /{" "}
+                {reasons[externalState.reason] ?? externalState.reason} /
+                最終取得: {externalState.observed_at ?? "未取得"}
+              </p>
+            )}
+            <p>
+              採用尺度の固定版: {(current.adopted_policy ?? current.policy).id}{" "}
+              · {(current.adopted_policy ?? current.policy).version}
+            </p>
+            <button
+              onClick={() =>
+                void run(async () => {
+                  setMode("evaluations");
+                  setFilterID(current.target.id);
+                  setPage(
+                    await query({
+                      mode: "evaluations",
+                      id: current.target.id,
+                      limit: 50,
+                    }),
+                  );
+                })
+              }
+            >
+              このIssueの評価要求を取得
+            </button>
+            <button
+              onClick={() =>
+                void run(async () => {
+                  setMode("attempts");
+                  setFilterID(current.target.id);
+                  setPage(
+                    await query({
+                      mode: "attempts",
+                      id: current.target.id,
+                      limit: 50,
+                    }),
+                  );
+                })
+              }
+            >
+              このIssueの根拠・不明点・消費を取得
+            </button>
+            {current.job && current.basis && (
+              <button
+                onClick={() =>
+                  void run(async () =>
+                    setDetail(
+                      (await call(
+                        `/records/${encodeURIComponent("triage-input:" + current.job)}?version=${encodeURIComponent(current.basis!)}`,
+                      )) as Version,
+                    ),
+                  )
+                }
+              >
+                評価に使った固定入力を確認
+              </button>
+            )}
+            <TriageIssue
+              key={`${current.target.id}@${current.target.version}`}
+              scope={scopeTarget ?? current.target}
+              canEdit={canEdit}
+              admin={admin}
+              call={call}
+              write={write}
+              run={run}
+            />
             <p>
               最新推奨: {current.recommendation ?? "未評価"} /{" "}
               {current.recommendation_reason}

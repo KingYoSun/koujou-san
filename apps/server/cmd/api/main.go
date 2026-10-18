@@ -100,6 +100,7 @@ func main() {
 			clientOperations := clientops.New(store, accessService, contextService, usageService)
 			routes = append(routes, clientOperations.Register)
 			automationService := automation.New(store, accessService)
+			automationService.Start(ctx)
 			routes = append(routes, automationService.Register)
 			runService := runs.New(store, accessService, contextService)
 			routes = append(routes, runService.Register)
@@ -111,11 +112,17 @@ func main() {
 				slog.Error("issue publication configuration invalid")
 				os.Exit(1)
 			}
-			publicationService := publications.New(store, accessService, runService, publications.NewRemote(publicationConfig))
+			publicationBackend := publications.NewRemote(publicationConfig)
+			automationService.PriorityBackend = publicationBackend
+			if publicationConfig != nil {
+				automationService.PriorityIntervalSeconds = publicationConfig.PriorityIntervalSeconds
+			}
+			publicationService := publications.New(store, accessService, runService, publicationBackend)
 			hopperService := hopper.New(store, accessService, automationService, runService, workflowService, publicationService, graphService)
 			observer.Accepted = hopperService.GitHubAccepted
 			observer.Start(ctx)
 			hopperService.Start(ctx)
+			automationService.Start(ctx)
 			routes = append(routes, hopperService.Register)
 			publicationService.StartWorker(ctx)
 			routes = append(routes, publicationService.Register)

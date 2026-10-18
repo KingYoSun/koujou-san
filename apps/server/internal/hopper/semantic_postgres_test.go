@@ -358,7 +358,9 @@ process.stdout.write([
 			}
 			job, err := auto.Claim(ctx, "hopper", root)
 			if err != nil || job == nil {
-				t.Fatal(job, err)
+				var state, reason string
+				_ = store.Database().QueryRow(ctx, `SELECT state,reason FROM automation_jobs WHERE workspace_id='one' AND event_id=$1`, root).Scan(&state, &reason)
+				t.Fatalf("claim %s: state=%s reason=%s error=%v", root, state, reason, err)
 			}
 			before := calls.Load()
 			value, err := s.Execute(ctx, *job)
