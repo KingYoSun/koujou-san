@@ -42,9 +42,9 @@ Chromeで接続取得、時間上限の編集・版保存、有効化、固定�
 
 初回の復元fixtureはroot所有の新volumeへUID1000で展開して失敗した。復旧先だけをrootで展開し、UID/GIDを1000:0へ合わせて修正した。この手順はrunbookにも反映した。
 
-## 残る確認
+## 先行検品とCI
 
-固定`7c4766da3d83ff2771312447d4ca2e366c981830`のコード検品はblocker 0件、CI `39079911131`も三件とも成功した。次節の実接続で発見した設定・入力fixtureの修正差分は、改めて固定して検品・CIを確認する。実providerの陽性ケースからの発行と、マージ後照合は未確認であり、完了とは扱わない。
+固定`7c4766da3d83ff2771312447d4ca2e366c981830`のコード検品はblocker 0件、CI `39079911131`も三件とも成功した。この時点では実providerの陽性発行とマージ後照合は未確認だった。後続の結果は次節と最終判定へ記録する。
 
 PRは[Draft #61](https://github.com/KingYoSun/koujou-san/pull/61)。先行CI `39079414493`は`infra/README.md`の整形漏れで失敗した。同じ失敗をローカルでも確認し、Prettierを適用した。最新headで再確認する。
 
@@ -63,3 +63,9 @@ PRは[Draft #61](https://github.com/KingYoSun/koujou-san/pull/61)。先行CI `39
 二要求を使い切った後、本人が同条件の追加一要求を許可した。第三はHTTP200、実モデル`gpt-6.1-sol`、`complete / true / unknown=[]`となった。入力487・出力442 token、cache 0、reasoningは欠測。`issue27-openai-live-third.log/json`のPASSから、元Runの成功、後続Run作成、入力分離、完了lease再送拒否を確認した。外部APIへ障害fixtureや後続CLIを送っていない。全三要求で実試験を終了し、Gatewayを通常停止した。専用設定・認証はGit管理外に保持した。
 
 固定`1315b02`のコード差分と三要求の実接続証跡を独立検品し、全条件PASS・blocker 0件となった。[独立検品記録](2026-10-18-issue-27-inspection.md)に、JSONのSHA-256、欠測の扱い、所有試験と実接続で確認した範囲を記録した。残る作業は最新headのCIとマージ後照合である。
+
+## 最終判定
+
+2026-10-18 00:12:00 UTC、[PR #61](https://github.com/KingYoSun/koujou-san/pull/61)をマージした。最終head `04cfa139d66359aef61c85711f2fa723f423bb4b`の[CI 39081291689](https://github.com/KingYoSun/koujou-san/actions/runs/39081291689)はShared UI/server、Windows native、GitGuardianの三件とも成功。検品済みコード`1315b02`からは文書のみの追加で、製品・試験コード差分は0である。
+
+merge `17def2aa914e0c31cf8a03360521e57864d060d0`と最終headのtreeは`1831d670424ebc203b521994c1467715d6a6a331`で一致し、diff 0。AC-1〜10・INVAR-1〜3、独立検品、CI、マージ後照合を確認して#27を手動Closeし、親#2を更新した。最終判断は[Close記録](https://github.com/KingYoSun/koujou-san/issues/27#issuecomment-6243590666)にも保存した。
