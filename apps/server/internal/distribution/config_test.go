@@ -78,6 +78,11 @@ func TestPrivateInitializationAndVerifiedRelease(t *testing.T) {
 	if c.Services["api"].Network != "service:edge" || strings.Contains(string(raw), "password$$") {
 		t.Fatal("private layout or SMTP isolation")
 	}
+	for _, key := range []string{"KOUJOU_HYDRA_ADMIN_URL", "KOUJOU_KRATOS_PUBLIC_URL", "KOUJOU_KRATOS_ADMIN_URL"} {
+		if !strings.HasPrefix(c.Services["api"].Environment[key], "http://127.0.0.1:8081/") {
+			t.Errorf("%s cannot reach the loopback-only administration listener", key)
+		}
+	}
 	info, _ := os.Stat(filepath.Join(root, "settings.json"))
 	if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
 		t.Fatal("settings are not private")

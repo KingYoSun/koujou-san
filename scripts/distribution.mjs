@@ -61,9 +61,22 @@ const stage = path.join(output, `${kind}-${version}-${commit.slice(0, 8)}`);
 await mkdir(stage, { recursive: true });
 for (const name of ["LICENSE", "NOTICE", "CONTRIBUTING.md", "DCO"])
   await copyFile(path.join(root, name), path.join(stage, name));
+const web = path.join(stage, "web");
 await run(
   process.execPath,
-  pnpmArgs(["--filter", "@koujou-san/client", "build"]),
+  pnpmArgs(["--filter", "@koujou-san/client", "check"]),
+);
+await run(
+  process.execPath,
+  pnpmArgs([
+    "--filter",
+    "@koujou-san/client",
+    "exec",
+    "vite",
+    "build",
+    "--outDir",
+    web,
+  ]),
 );
 await notices(root, stage, kind === "desktop" ? "windows" : "linux");
 const source = path.join(stage, "source", "koujou-san");
@@ -107,7 +120,7 @@ if (kind === "server") {
       { cwd: path.join(root, "apps/server"), env },
     );
   }
-  await cp(path.join(root, "apps/client/dist"), path.join(imageDir, "web"), {
+  await cp(web, path.join(imageDir, "web"), {
     recursive: true,
   });
   for (const name of [
@@ -221,6 +234,7 @@ if (kind === "server") {
     config,
     JSON.stringify(
       {
+        build: { frontendDist: web, beforeBuildCommand: "" },
         bundle: {
           active: true,
           targets: ["nsis"],

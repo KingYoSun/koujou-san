@@ -39,6 +39,10 @@ func TestEdgePublicAndAdministrationStaySeparate(t *testing.T) {
 		status     int
 	}{
 		{front, "/auth/login", "application", 200}, {front, "/auth/config", "api:/auth/config", 200}, {front, "/oidc/.well-known/openid-configuration", "public:/.well-known/openid-configuration", 200}, {front, "/auth/identity/self-service/login/browser", "public:/self-service/login/browser", 200}, {back, "/hydra/admin/clients", "private:/admin/clients", 200}, {front, "/hydra/admin/clients", "", 404}, {front, "/admin/identities", "", 404}, {front, "/../key.pem", "", 307}, {front, "/key.pem", "application", 200}, {front, "/%2e%2e/key.pem", "", 404},
+		{front, "/hopper/workspaces/owned/model-connections", "api:/hopper/", 200},
+		{front, "/inspections/workspaces/owned", "api:/inspections/", 200},
+		{front, "/publications/workspaces/owned", "api:/publications/", 200},
+		{front, "/workbench/workspaces/owned/query", "api:/workbench/", 200},
 	} {
 		r := httptest.NewRequest("GET", test.path, nil)
 		r.Header.Set("X-Forwarded-Proto", "http")
