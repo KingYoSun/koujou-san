@@ -393,6 +393,8 @@ func TestUsagePostgres(t *testing.T) {
 			t.Fatal("parent group missing")
 		}
 	})
+	t.Run("saved_condition_comparison", func(t *testing.T) { checkComparison(t, s) })
+
 	t.Run("ten_thousand_three_versions", func(t *testing.T) {
 		exec(`INSERT INTO access_workspaces VALUES('load','load','admin'); INSERT INTO access_members(workspace_id,user_id,role) VALUES('load','admin','admin'); INSERT INTO shared_streams(workspace_id,origin,position,sequence) VALUES('load','load-origin','load-final',30000)`)
 		exec(`INSERT INTO access_resources SELECT 'load','scope:'||i,false,NULL FROM generate_series(0,99) i;
@@ -431,6 +433,15 @@ func TestUsagePostgres(t *testing.T) {
 		if err != nil || len(history.Data.Items) != 2 || history.Meta.NextCursor == nil {
 			t.Fatal(history, err)
 		}
+		comparison := period
+		comparison.Mode = "compare"
+		comparison.Limit = 2
+		comparisonStart := time.Now()
+		compared, err := s.Query(ctx, access.Principal{UserID: "admin"}, "load", comparison)
+		if err != nil || compared.Data == nil || len(compared.Data.Items) != 2 || compared.Meta.NextCursor == nil {
+			t.Fatal("large comparison page", compared, err)
+		}
+		t.Logf("10,000 x 3 versions comparison server page=%d took %s", len(compared.Data.Items), time.Since(comparisonStart))
 		var plan string
 		if err = store.Database().QueryRow(ctx, `EXPLAIN SELECT * FROM usage_records WHERE workspace_id='load' AND coverage_group='group-1' AND kind='usage' ORDER BY id,position DESC`).Scan(&plan); err != nil {
 			t.Fatal(err)

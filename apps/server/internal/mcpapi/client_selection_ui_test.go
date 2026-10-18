@@ -75,6 +75,10 @@ func (f *clientSelectionUI) Wait(t *testing.T, s *Service, ctx context.Context) 
 		contextGenerationUIEvidence(t, s, ctx, f.site, f.observed)
 		return
 	}
+	if os.Getenv("KOUJOU_TEST_USAGE_COMPARISON_UI") == "1" {
+		usageComparisonUIEvidence(t, s, ctx, f.site)
+		return
+	}
 	if os.Getenv("KOUJOU_TEST_DEFINITION_UI") == "1" {
 		definitionUIEvidence(t, s, ctx, f.site, f.observed)
 		return
@@ -127,6 +131,9 @@ func newClientSelectionUI(t *testing.T, ctx context.Context, s *Service, client 
 	f.modelSite = strings.Replace(modelServer.URL, "127.0.0.1", "localhost", 1)
 	if os.Getenv("KOUJOU_TEST_OUTPUT_CONTEXT_UI") == "1" {
 		seedContextGenerationUI(t, ctx, s, p, cfg, f)
+	}
+	if os.Getenv("KOUJOU_TEST_USAGE_COMPARISON_UI") == "1" {
+		seedUsageComparisonUI(t, ctx, s, p, cfg)
 	}
 	serial := 0
 	put := func(kind, id string, children []contexts.Ref) contexts.Ref {

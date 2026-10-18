@@ -702,8 +702,10 @@ func TestMCPIntegration(t *testing.T) {
 		selectionBrowser = fixture.Handler
 		fixture.Wait(t, s, ctx)
 	}
-	if os.Getenv("KOUJOU_TEST_MCP_UI") == "1" {
-		inspectBrowser()
+	if selectionUI || os.Getenv("KOUJOU_TEST_MCP_UI") == "1" {
+		if !selectionUI {
+			inspectBrowser()
+		}
 		_ = session.Close()
 		tokens = issue(cfg.MCPResource(), "koujou.mcp")
 		session, err = connect(tokens.Access, "mcp-one", handle)

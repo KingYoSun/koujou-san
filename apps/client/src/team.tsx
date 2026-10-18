@@ -438,6 +438,8 @@ export function Team({ native }: { native: boolean }) {
             />
           )}
           <UsagePricing
+            api={apiIdentity}
+            user={me.id}
             key={`usage/${apiIdentity}/${me.id}/${selected}`}
             native={native}
             workspace={selected}

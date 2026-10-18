@@ -15,6 +15,7 @@ import (
 )
 
 type Request struct {
+	Basis         []Ref     `json:"basis,omitempty"`
 	Mode          string    `json:"mode"` // aggregate, export, records, changes
 	Kind          string    `json:"kind"` // exactly one valuation or usage; never sum alternatives
 	From          time.Time `json:"from"`
@@ -32,6 +33,7 @@ type Request struct {
 	Limit         int       `json:"limit"`
 }
 type Page struct {
+	Summary  json.RawMessage   `json:"summary,omitempty"`
 	Items    []json.RawMessage `json:"items"`
 	AsOf     time.Time         `json:"as_of"`
 	Timezone string            `json:"timezone"`
@@ -118,7 +120,7 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, req R
 			return empty, err
 		}
 	}
-	var sql string
+	var sql, summarySQL string
 	var args []any
 	base := []any{w, p.UserID, p.OperationID, c.Through, req.Kind}
 	switch req.Mode {
@@ -135,7 +137,7 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, req R
  FROM latest e WHERE e.attribution_kind='run' AND e.attribution_id=$6 AND ` + access.ReadFilterSQL("e.refs") + ` ORDER BY e.projection_key LIMIT $8`
 		args = append(base, req.AttributionID, c.After, req.Limit+1)
 	case "records":
-		if req.Kind != "usage" && req.Kind != "price" && req.Kind != "evaluation" {
+		if req.Kind != "usage" && req.Kind != "price" && req.Kind != "evaluation" && req.Kind != "comparison" {
 			return empty, ErrInvalid
 		}
 		sql = `SELECT jsonb_build_object('id',e.id,'version',e.version,'position',e.position,'kind',e.kind,'value',e.payload),lpad(e.position::text,20,'0') FROM usage_records e
@@ -147,7 +149,7 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, req R
  FROM usage_group_updates e JOIN usage_records r ON r.workspace_id=e.workspace_id AND r.id=e.resource_id AND r.version=e.version
  WHERE e.workspace_id=$1 AND e.position<=$4 AND $5<>'' AND e.position>$6 AND lpad(e.position::text,20,'0')>$7 AND ` + access.ReadFilterSQL(`r.dependencies||jsonb_build_array(jsonb_build_object('id',r.id,'version',r.version))`) + ` ORDER BY e.position LIMIT $8`
 		args = append(base, req.Since, c.After, req.Limit+1)
-	case "aggregate", "export":
+	case "aggregate", "export", "compare", "compare_details", "compare_quality":
 		if req.Kind != "usage" && req.Kind != "reported" && req.Kind != "estimated" && req.Kind != "api_equivalent" && req.Kind != "allocated" {
 			return empty, ErrInvalid
 		}
@@ -160,12 +162,36 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, req R
 		common := `WITH latest AS (SELECT DISTINCT ON(projection_key) * FROM usage_entries WHERE workspace_id=$1 AND kind=$5 AND position<=$4 ORDER BY projection_key,position DESC), eligible AS (
  SELECT e.*,CASE WHEN e.kind<>'usage' AND EXISTS(SELECT 1 FROM usage_group_updates u WHERE u.workspace_id=$1 AND u.coverage_group=e.coverage_group AND u.position>e.position AND u.position<=$4) THEN 'pending' ELSE e.state END AS current_state
  FROM latest e WHERE e.at>=$6 AND e.at<$7 AND ($8='' OR e.attribution_kind=$8) AND ($9='' OR e.attribution_id=$9) AND ($10='' OR e.workflow=$10)
- AND (cardinality($11::text[])=0 OR e.scopes && $11) AND ($12='' OR e.model=$12) AND ($13='' OR e.currency=$13) AND ` + access.ReadFilterSQL("e.refs") + `) `
+ AND (cardinality($11::text[])=0 OR e.scopes && $11) AND ($12='' OR e.model=$12) AND ($13='' OR e.currency=$13) AND ` + access.ReadFilterSQL("e.refs") + ` AND e.refs @> $17::jsonb) `
 		args = append(base, req.From, req.Until, req.Attribution, req.AttributionID, req.Workflow, req.Scopes, req.Model, req.Currency, req.Timezone, c.After, req.Limit+1)
 		if req.Scopes == nil {
 			args[10] = []string{}
 		}
-		if req.Mode == "export" {
+
+		basis := req.Basis
+		if basis == nil {
+			basis = []Ref{}
+		}
+		for _, ref := range basis {
+			if !fixedBasis(ref) || s.Access.CheckVersion(ctx, nil, p, w, ref.ID, ref.Version) != nil {
+				return empty, access.ErrForbidden
+			}
+		}
+		basisJSON, _ := json.Marshal(basis)
+		args = append(args, basisJSON)
+		if req.Mode == "compare_quality" {
+			args[4] = "usage"
+			args[12] = ""
+			sql = comparisonQualitySQL(common)
+		} else if req.Mode == "compare" || req.Mode == "compare_details" {
+			args[4] = "usage"
+			args[12] = ""
+			args = append(args, req.Kind, req.Currency)
+			sql = comparisonSQL(common, req.Mode == "compare_details")
+			if req.Mode == "compare" {
+				summarySQL = common + comparisonSummarySQL()
+			}
+		} else if req.Mode == "export" {
 			sql = common + `SELECT jsonb_build_object('key',projection_key,'group',coverage_group,'position',position,'at',at,'timezone',$14::text,'kind',kind,'currency',currency,'amount',CASE WHEN current_state='rated' THEN amount::text END,'state',current_state,'refs',refs,'quantities',quantities,'value',payload),projection_key FROM eligible WHERE projection_key>$15 ORDER BY projection_key LIMIT $16`
 		} else {
 			sql = common + `, buckets AS (
@@ -215,5 +241,16 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, req R
 		next := s.cursor(c)
 		meta.NextCursor = &next
 	}
-	return apicontract.Response[Page]{Data: &Page{Items: items, AsOf: c.AsOf, Timezone: req.Timezone, Kind: req.Kind, Through: c.Through}, Meta: meta}, nil
+	page := Page{Items: items, AsOf: c.AsOf, Timezone: req.Timezone, Kind: req.Kind, Through: c.Through}
+	if req.Mode == "compare" {
+		err = s.Store.Database().QueryRow(ctx, summarySQL, args[:17]...).Scan(&page.Summary)
+		if err != nil {
+			return empty, err
+		}
+		now, err = s.Access.CursorSubject(ctx, p, w)
+		if err != nil || now != subject {
+			return empty, access.ErrForbidden
+		}
+	}
+	return apicontract.Response[Page]{Data: &page, Meta: meta}, nil
 }

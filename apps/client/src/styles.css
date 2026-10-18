@@ -568,3 +568,55 @@ button:disabled {
   vertical-align: top;
   overflow-wrap: anywhere;
 }
+
+.cost-comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.cost-comparison-grid > section {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cost-comparison-grid fieldset {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.cost-comparison-grid label {
+  display: grid;
+  gap: 5px;
+}
+.cost-comparison-grid :is(input, select, textarea) {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.cost-comparison-grid table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+.cost-comparison-grid :is(th, td) {
+  padding: 8px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+.cost-comparison-grid td button {
+  display: block;
+  margin-bottom: 8px;
+  overflow-wrap: anywhere;
+}
+.cost-comparison-grid dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.cost-comparison-grid dd {
+  margin: 0;
+}
+@media (max-width: 1000px) {
+  .cost-comparison-grid {
+    grid-template-columns: 1fr;
+  }
+}

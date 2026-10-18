@@ -18,7 +18,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func generationSourceFixture(t *testing.T, ctx context.Context, s *Service, p access.Principal, key []byte, id string, basis contexts.Ref) (clientops.GenerationSource, string) {
+func generationSourceFixture(t *testing.T, ctx context.Context, s *Service, p access.Principal, key []byte, id string, basis contexts.Ref, explicit ...runs.Spec) (clientops.GenerationSource, string) {
 	t.Helper()
 	serial := 0
 	mutation := func(v string) apicontract.Mutation {
@@ -50,7 +50,12 @@ func generationSourceFixture(t *testing.T, ctx context.Context, s *Service, p ac
 	if basis.ID != "" {
 		sourceRefs = append(sourceRefs, runs.Ref{ID: "context:" + basis.ID, Version: basis.Revision})
 	}
-	run := must(s.Runs.Create(ctx, p, "mcp-one", "run:"+id, runs.Create{Mutation: mutation("0"), Spec: runs.Spec{Name: "受入: 出力からContextへ " + id, Input: runs.Input{Prompt: json.RawMessage(`"FORBIDDEN_OTHER_INPUT"`), Command: runs.Command{Kind: "cli", Target: "owned-generator", Parameters: json.RawMessage(`[]`), Binding: map[string]string{"prompt": "stdin"}}}, Sources: sourceRefs}}))
+	spec := runs.Spec{Name: "受入: 出力からContextへ " + id, Input: runs.Input{Prompt: json.RawMessage(`"FORBIDDEN_OTHER_INPUT"`), Command: runs.Command{Kind: "cli", Target: "owned-generator", Parameters: json.RawMessage(`[]`), Binding: map[string]string{"prompt": "stdin"}}}, Sources: sourceRefs}
+	if len(explicit) > 0 {
+		spec = explicit[0]
+		spec.Sources = append(spec.Sources, sourceRefs...)
+	}
+	run := must(s.Runs.Create(ctx, p, "mcp-one", "run:"+id, runs.Create{Mutation: mutation("0"), Spec: spec}))
 	run = must(s.Runs.Action(ctx, p, "mcp-one", run.ID, "request-start", mutation(run.Version)))
 	if _, err = s.Access.DB.Exec(ctx, `UPDATE access_resources SET assigned_device=$3 WHERE workspace_id=$1 AND id=$2`, "mcp-one", run.ID, deviceID); err != nil {
 		t.Fatal(err)
