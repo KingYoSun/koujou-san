@@ -113,6 +113,7 @@ func main() {
 			runService := runs.New(store, accessService, contextService)
 			routes = append(routes, runService.Register)
 			workflowService := workflows.New(store, accessService, contextService, runService)
+			clientOperations.Definitions = workflowService
 			inspectionService := inspections.New(store, accessService, contextService, runService, workflowService)
 			routes = append(routes, inspectionService.Register)
 			publicationConfig, err := publications.Environment()

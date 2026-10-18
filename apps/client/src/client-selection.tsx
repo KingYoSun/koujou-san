@@ -4,6 +4,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { mcpRequest, syncRequest } from "./auth";
 import { refKey, refLabel, type UI, type Ref } from "./context-ui";
 import { ModelConnectionSettings } from "./model-connection-settings";
+import { DefinitionProposal, definitionFields } from "./definition-proposal";
+import { allowAnswerScope, answerScopeEpoch } from "./sync-store";
+import { fieldSources } from "./workflow-json";
 import {
   modelReady,
   modelRequest,
@@ -23,6 +26,8 @@ import {
 const clientID = crypto.randomUUID();
 const pin = (v: VersionRef): VersionRef => ({ id: v.id, version: v.version });
 type Proposal = {
+  definition_utf8?: string;
+  reason?: string;
   items: { ref: Ref; reason: string }[];
   questions: string[];
   unknown: string[];
@@ -44,7 +49,39 @@ const labels: Record<string, string> = {
   failed: "接続・応答の確認が必要",
   cancelled: "操作を終了",
 };
-export function ClientSelection({ ui }: { ui: UI }) {
+export type OperationUI = Pick<
+  UI,
+  "native" | "api" | "workspace" | "user" | "store" | "canCreate"
+>;
+export type DefinitionTarget = {
+  manualPaths?: string[];
+  request?: string;
+  target: VersionRef;
+  text: string;
+  sources: VersionRef[];
+  onApplied: (ref: VersionRef) => Promise<void>;
+  onDraft: (text: string) => void;
+};
+export function ClientSelection({
+  ui,
+  definition,
+}: {
+  ui: OperationUI;
+  definition?: DefinitionTarget;
+}) {
+  const definitionCurrent = useRef(definition);
+  definitionCurrent.current = definition;
+  const [definitionLocks, setDefinitionLocks] = useState<string[]>([]);
+  const manualSignature = JSON.stringify(definition?.manualPaths ?? []);
+  useEffect(() => {
+    const paths = JSON.parse(manualSignature) as string[];
+    setDefinitionLocks((current) =>
+      Array.from(new Set([...current, ...paths])),
+    );
+  }, [manualSignature, definition?.text]);
+  const [definitionPaths, setDefinitionPaths] = useState<string[]>(
+    definitionFields.map(([path]) => path),
+  );
   const state = useStore(ui.store),
     actor = ui.api + "\0" + ui.user,
     base = `/client-operations/workspaces/${encodeURIComponent(ui.workspace)}`;
@@ -118,6 +155,12 @@ export function ClientSelection({ ui }: { ui: UI }) {
       `/records/${encodeURIComponent(ref.id)}?version=${encodeURIComponent(ref.version)}`,
     );
   const inputSignature = () => {
+    if (definitionCurrent.current)
+      return JSON.stringify({
+        text: definitionCurrent.current.text,
+        sources: definitionCurrent.current.sources,
+        request: definitionCurrent.current.request,
+      });
     const { include, exclude, mode } = ui.store.getState();
     return JSON.stringify([include, exclude, mode]);
   };
@@ -140,6 +183,19 @@ export function ClientSelection({ ui }: { ui: UI }) {
     return pin(result.data);
   };
   async function apply(ref: VersionRef, expected?: string) {
+    if (definitionCurrent.current) {
+      if (expected !== undefined && expected !== inputSignature()) {
+        setNotice(
+          "定義を保存しました。編集中の下書きは変更されているため、現在版を取得して比較してください。",
+        );
+        return;
+      }
+      await definitionCurrent.current.onApplied(ref);
+      setNotice(
+        "検証した定義版を保存・採用しました。Runの作成・実行は始めていません。",
+      );
+      return;
+    }
     const saved = await read<Selection>(ref);
     setSelection(pin(saved));
     if (expected !== undefined && expected !== inputSignature()) {
@@ -170,6 +226,8 @@ export function ClientSelection({ ui }: { ui: UI }) {
       id: selected.id,
       version: "head",
     });
+    if ((current.value.purpose === "definition") !== !!definition)
+      throw new Error("different_operation_kind");
     setOperation(current);
     setSelection(pin(current.value.applied ?? current.value.target));
     if (current.value.proposal)
@@ -183,7 +241,9 @@ export function ClientSelection({ ui }: { ui: UI }) {
       await action();
     } catch {
       setNotice(
-        "入力・現在の版・権限・接続を確認してください。未確認のモデル要求は自動再送しません。手動で選択・保存することもできます。",
+        definition
+          ? "入力・現在の定義版・権限・接続を確認してください。未確認の要求は自動再送しません。定義の下書きから手動編集もできます。"
+          : "入力・現在の版・権限・接続を確認してください。未確認のモデル要求は自動再送しません。手動で選択・保存することもできます。",
       );
     } finally {
       setBusy(false);
@@ -207,6 +267,8 @@ export function ClientSelection({ ui }: { ui: UI }) {
     if (!profile || !modelReady(ui.native, actor, profile))
       throw new Error("model_key_required");
     const mine = ++epoch.current;
+    const namespace = { api: ui.api, user: ui.user, workspace: ui.workspace };
+    const permission = answerScopeEpoch(namespace);
     const signature = inputSignature();
     const port: HostPort = {
       read,
@@ -236,9 +298,10 @@ export function ClientSelection({ ui }: { ui: UI }) {
         mcpRequest(ui.native, ui.workspace, transport.current!, body, clientID),
       model: (body, timeout) =>
         modelRequest(ui.native, actor, profile, body, timeout),
-      active: () => epoch.current === mine,
+      active: () =>
+        epoch.current === mine && allowAnswerScope(namespace, permission),
     };
-    if (policy.fixed.mode !== "none") {
+    if (policy.fixed.mode !== "none" || policy.definition) {
       const info = await call<{ handle: string }>(
         `/operations/${encodeURIComponent(current.id)}/transport`,
       );
@@ -277,14 +340,31 @@ export function ClientSelection({ ui }: { ui: UI }) {
   const transport = useRef<string | undefined>(undefined);
   async function start() {
     if (!profile) throw new Error("model_required");
+    const values = definition
+      ? fieldSources(
+          definition.text,
+          definitionLocks.map((path) => path.slice(1).split("/")),
+        )
+      : [];
     const policy: SelectionPolicy = {
       mode,
       fixed: selectionInput(state.mode, fixed, state.exclude),
       scopes: scopes.split(/[,\s]+/).filter(Boolean),
       limits: { model_requests: models, mcp_requests: mcp, seconds },
+      ...(definition
+        ? {
+            definition: {
+              fixed_paths: definitionLocks,
+              fixed_values: Object.fromEntries(
+                definitionLocks.map((path, index) => [path, values[index]]),
+              ),
+              sources: definition.sources,
+            },
+          }
+        : {}),
     };
     const policyRef = await mutate(
-      `/policies/selection-policy:${crypto.randomUUID()}`,
+      `/policies/${definition ? "definition" : "selection"}-policy:${crypto.randomUUID()}`,
       "0",
       { value: policy },
     );
@@ -293,12 +373,13 @@ export function ClientSelection({ ui }: { ui: UI }) {
       "0",
       {
         policy: policyRef,
-        target: selection ?? {
-          id: `client-selection:${crypto.randomUUID()}`,
-          version: "0",
-        },
-        goal,
-        purpose,
+        target: definition?.target ??
+          selection ?? {
+            id: `client-selection:${crypto.randomUUID()}`,
+            version: "0",
+          },
+        goal: definition?.request ? goal + "\n" + definition.request : goal,
+        purpose: definition ? "definition" : purpose,
         model: modelSnapshot(profile, ui.workspace),
         client: clientID,
       },
@@ -312,7 +393,16 @@ export function ClientSelection({ ui }: { ui: UI }) {
     if (!operation) return;
     const signature = inputSignature();
     const value: Record<string, unknown> = { kind: action, client: clientID };
-    if (action === "answer") value.answer = answer;
+    if (action === "answer") {
+      value.answer = definition?.request
+        ? answer + "\n" + definition.request
+        : answer;
+      if (definition) value.definition_sources = definition.sources;
+    }
+    if (action === "adopt" && definition) {
+      if (!definitionPaths.length) throw new Error("choose_fields");
+      value.paths = definitionPaths;
+    }
     if (action === "takeover" && profile)
       value.model = modelSnapshot(profile, ui.workspace);
     const ref = await mutate(
@@ -356,8 +446,15 @@ export function ClientSelection({ ui }: { ui: UI }) {
     }
   }
   return (
-    <section className="context-preview" aria-label="Contextの自動選択と保存">
-      <h3>Contextの選択と保存</h3>
+    <section
+      className="context-preview"
+      aria-label={
+        definition ? "自由入力からRun定義を生成" : "Contextの自動選択と保存"
+      }
+    >
+      <h3>
+        {definition ? "自由入力からRun定義を作る" : "Contextの選択と保存"}
+      </h3>
       <p>
         手動の必須・除外を保ち、許された候補から選びます。取得範囲・未確認事項・固定版は履歴で確認できます。
       </p>
@@ -369,11 +466,13 @@ export function ClientSelection({ ui }: { ui: UI }) {
         onSelected={setProfile}
       />
       <fieldset disabled={!ui.canCreate || busy}>
-        <legend>選択する目的と方針</legend>
+        <legend>
+          {definition ? "生成する目的と方針" : "選択する目的と方針"}
+        </legend>
         <label>
           作業の目的
           <textarea
-            aria-label="Contextを選ぶ目的"
+            aria-label={definition ? "Run定義を作る依頼" : "Contextを選ぶ目的"}
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
           />
@@ -384,18 +483,69 @@ export function ClientSelection({ ui }: { ui: UI }) {
             value={mode}
             onChange={(e) => setMode(e.target.value as SelectionPolicy["mode"])}
           >
-            <option value="auto">検証済みの選択を自動反映</option>
+            <option value="auto">
+              {definition
+                ? "検証済みの定義を自動反映"
+                : "検証済みの選択を自動反映"}
+            </option>
             <option value="proposal">案を確認して採用</option>
-            <option value="manual">手動で選択</option>
+            <option value="manual">
+              {definition ? "手動で定義を編集" : "手動で選択"}
+            </option>
           </select>
         </label>
-        <label>
-          用途
-          <select value={purpose} onChange={(e) => setPurpose(e.target.value)}>
-            <option value="selection">作業用の選択</option>
-            <option value="inspection">検品用の選択</option>
-          </select>
-        </label>
+        {!definition && (
+          <label>
+            用途
+            <select
+              value={purpose}
+              onChange={(e) => setPurpose(e.target.value)}
+            >
+              <option value="selection">作業用の選択</option>
+              <option value="inspection">検品用の選択</option>
+            </select>
+          </label>
+        )}
+        {definition && (
+          <>
+            <p>
+              作業場所は接続設定とRun専用worktreeを使い、リポジトリ・commitはRun割当時に指定します。
+            </p>
+            <label>
+              Contextの取得
+              <select
+                value={state.mode}
+                onChange={(e) =>
+                  ui.store.setState({
+                    mode: e.target.value as "none" | "select",
+                  })
+                }
+              >
+                <option value="select">許可範囲を検索して選ぶ</option>
+                <option value="none">Contextを参照・追加しない</option>
+              </select>
+            </label>
+            <details>
+              <summary>変更させない定義の項目</summary>
+              {definitionFields.map(([path, label]) => (
+                <label key={path}>
+                  <input
+                    type="checkbox"
+                    checked={definitionLocks.includes(path)}
+                    onChange={(e) =>
+                      setDefinitionLocks(
+                        e.target.checked
+                          ? [...definitionLocks, path]
+                          : definitionLocks.filter((p) => p !== path),
+                      )
+                    }
+                  />
+                  {label}を固定
+                </label>
+              ))}
+            </details>
+          </>
+        )}
         <details>
           <summary>対象Scope・上限・必須項目</summary>
           <label>
@@ -466,9 +616,11 @@ export function ClientSelection({ ui }: { ui: UI }) {
             </>
           )}
         </details>
-        <button onClick={() => void work(manual)}>
-          現在の選択を手動で保存
-        </button>
+        {!definition && (
+          <button onClick={() => void work(manual)}>
+            現在の選択を手動で保存
+          </button>
+        )}
         <button
           disabled={
             mode === "manual" ||
@@ -478,7 +630,7 @@ export function ClientSelection({ ui }: { ui: UI }) {
           }
           onClick={() => void work(start)}
         >
-          Contextの選択を依頼
+          {definition ? "Run定義の生成を依頼" : "Contextの選択を依頼"}
         </button>
       </fieldset>
       <button
@@ -498,8 +650,12 @@ export function ClientSelection({ ui }: { ui: UI }) {
         MCPへ接続
       </button>
       {operation && (
-        <section aria-label="選択操作の状態">
-          <h4>{labels[operation.value.state] ?? operation.value.state}</h4>
+        <section aria-label={definition ? "定義生成の状態" : "選択操作の状態"}>
+          <h4>
+            {definition && operation.value.state === "applied"
+              ? "定義を保存・採用済み"
+              : (labels[operation.value.state] ?? operation.value.state)}
+          </h4>
           <p>{operation.value.goal}</p>
           <p>{operation.value.reason ?? ""}</p>
           {operation.value.user === ui.user && (
@@ -515,7 +671,9 @@ export function ClientSelection({ ui }: { ui: UI }) {
                   disabled={busy || !profile}
                   onClick={() => void work(() => act("resume"))}
                 >
-                  接続・条件を確認して選択を再開
+                  {definition
+                    ? "接続・条件を確認して生成を再開"
+                    : "接続・条件を確認して選択を再開"}
                 </button>
               )}
               {operation.value.state === "ready" && (
@@ -530,7 +688,9 @@ export function ClientSelection({ ui }: { ui: UI }) {
                     })
                   }
                 >
-                  このクライアントで選択を続ける
+                  {definition
+                    ? "このクライアントで生成を続ける"
+                    : "このクライアントで選択を続ける"}
                 </button>
               )}
               {operation.value.state === "question" && (
@@ -546,7 +706,9 @@ export function ClientSelection({ ui }: { ui: UI }) {
                     disabled={busy || !answer}
                     onClick={() => void work(() => act("answer"))}
                   >
-                    回答して選択を再開
+                    {definition
+                      ? "回答して定義生成を再開"
+                      : "回答して選択を再開"}
                   </button>
                 </>
               )}
@@ -564,7 +726,7 @@ export function ClientSelection({ ui }: { ui: UI }) {
                   void work(() => act("cancel"));
                 }}
               >
-                この選択操作を終了
+                {definition ? "この定義生成を終了" : "この選択操作を終了"}
               </button>
             </>
           )}
@@ -582,62 +744,92 @@ export function ClientSelection({ ui }: { ui: UI }) {
           </button>
           {proposal && (
             <>
-              <h4>選択案・未確認事項</h4>
+              <h4>
+                {definition ? "定義案・未確認事項" : "選択案・未確認事項"}
+              </h4>
+              {definition && proposal.value.definition_utf8 && (
+                <>
+                  <p>{proposal.value.reason}</p>
+                  <pre aria-label="原依頼">{operation.value.goal}</pre>
+                  <textarea
+                    aria-label="生成した定義JSON"
+                    readOnly
+                    value={proposal.value.definition_utf8}
+                  />
+                  <DefinitionProposal
+                    before={definition.text}
+                    after={proposal.value.definition_utf8}
+                    paths={definitionPaths}
+                    onPaths={setDefinitionPaths}
+                  />
+                  <button
+                    onClick={() =>
+                      definition.onDraft(proposal.value.definition_utf8!)
+                    }
+                  >
+                    この案を下書きで編集
+                  </button>
+                </>
+              )}
               {proposal.value.questions.map((q, i) => (
                 <p key={i}>{q}</p>
               ))}
               {proposal.value.unknown.map((q, i) => (
                 <p key={i}>{q}</p>
               ))}
-              <ul>
-                {proposal.value.items
-                  .slice(proposalPage * 50, proposalPage * 50 + 50)
-                  .map((item, i) => (
-                    <li key={i}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={state.include.some(
-                            (r) => refKey(r) === refKey(item.ref),
-                          )}
-                          onChange={(e) =>
-                            ui.store.setState({
-                              mode: "select",
-                              include: e.target.checked
-                                ? [...state.include, item.ref]
-                                : state.include.filter(
-                                    (r) => refKey(r) !== refKey(item.ref),
-                                  ),
-                            })
-                          }
-                        />
-                        {refLabel(item.ref)} · {item.reason}
-                      </label>
-                    </li>
-                  ))}
-              </ul>
-              {proposal.value.items.length > 50 && (
+              {!definition && (
                 <>
-                  <button
-                    disabled={proposalPage === 0}
-                    onClick={() => setProposalPage(proposalPage - 1)}
-                  >
-                    案の前の50件
-                  </button>
-                  <span>{proposalPage * 50 + 1}件目から表示</span>
-                  <button
-                    disabled={
-                      (proposalPage + 1) * 50 >= proposal.value.items.length
-                    }
-                    onClick={() => setProposalPage(proposalPage + 1)}
-                  >
-                    案の次の50件
-                  </button>
+                  <ul>
+                    {proposal.value.items
+                      .slice(proposalPage * 50, proposalPage * 50 + 50)
+                      .map((item, i) => (
+                        <li key={i}>
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={state.include.some(
+                                (r) => refKey(r) === refKey(item.ref),
+                              )}
+                              onChange={(e) =>
+                                ui.store.setState({
+                                  mode: "select",
+                                  include: e.target.checked
+                                    ? [...state.include, item.ref]
+                                    : state.include.filter(
+                                        (r) => refKey(r) !== refKey(item.ref),
+                                      ),
+                                })
+                              }
+                            />
+                            {refLabel(item.ref)} · {item.reason}
+                          </label>
+                        </li>
+                      ))}
+                  </ul>
+                  {proposal.value.items.length > 50 && (
+                    <>
+                      <button
+                        disabled={proposalPage === 0}
+                        onClick={() => setProposalPage(proposalPage - 1)}
+                      >
+                        案の前の50件
+                      </button>
+                      <span>{proposalPage * 50 + 1}件目から表示</span>
+                      <button
+                        disabled={
+                          (proposalPage + 1) * 50 >= proposal.value.items.length
+                        }
+                        onClick={() => setProposalPage(proposalPage + 1)}
+                      >
+                        案の次の50件
+                      </button>
+                    </>
+                  )}
+                  <p>
+                    項目を選び直したら「現在の選択を手動で保存」で反映できます。
+                  </p>
                 </>
               )}
-              <p>
-                項目を選び直したら「現在の選択を手動で保存」で反映できます。
-              </p>
             </>
           )}
           <details>
@@ -665,7 +857,9 @@ export function ClientSelection({ ui }: { ui: UI }) {
         </section>
       )}
       <details>
-        <summary>保存済みの選択・操作を探す</summary>
+        <summary>
+          {definition ? "共通の操作履歴を探す" : "保存済みの選択・操作を探す"}
+        </summary>
         <select
           aria-label="選択履歴の種類"
           value={kind}

@@ -22,6 +22,7 @@ type query interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Service struct {
+	tx       pgx.Tx
 	Store    *persistence.Store
 	Access   *access.Service
 	Contexts *contexts.Service
@@ -29,6 +30,18 @@ type Service struct {
 	Observer interface {
 		Current(context.Context, access.Principal, string, string) (githubobserve.Snapshot, error)
 	}
+}
+
+func (s *Service) InTransaction(tx pgx.Tx) *Service {
+	copy := *s
+	copy.tx = tx
+	return &copy
+}
+func (s *Service) database() query {
+	if s.tx != nil {
+		return s.tx
+	}
+	return s.Store.Database()
 }
 
 func New(store *persistence.Store, a *access.Service, c *contexts.Service, r *runs.Service) *Service {
@@ -83,7 +96,7 @@ func (s *Service) Read(ctx context.Context, p access.Principal, w string, ref Re
 	if !fixed(ref) && ref.Version != "head" {
 		return Record{}, ErrInvalid
 	}
-	r, err := record(ctx, s.Store.Database(), w, ref)
+	r, err := record(ctx, s.database(), w, ref)
 	if err != nil {
 		return Record{}, access.ErrForbidden
 	}
@@ -94,15 +107,15 @@ func (s *Service) Read(ctx context.Context, p access.Principal, w string, ref Re
 		if err = s.Access.Check(ctx, p, w, r.Owner, "get"); err != nil {
 			return Record{}, err
 		}
-		owner, err := record(ctx, s.Store.Database(), w, Ref{ID: r.Owner, Version: "head"})
+		owner, err := record(ctx, s.database(), w, Ref{ID: r.Owner, Version: "head"})
 		if err != nil {
 			return Record{}, err
 		}
-		if err = s.checkRefs(ctx, s.Store.Database(), p, w, owner.Refs); err != nil {
+		if err = s.checkRefs(ctx, s.database(), p, w, owner.Refs); err != nil {
 			return Record{}, err
 		}
 	}
-	if err = s.checkRefs(ctx, s.Store.Database(), p, w, append(r.Refs, r.Ref)); err != nil {
+	if err = s.checkRefs(ctx, s.database(), p, w, append(r.Refs, r.Ref)); err != nil {
 		return Record{}, err
 	}
 	if r.Kind == "run-definition" {
@@ -110,7 +123,7 @@ func (s *Service) Read(ctx context.Context, p access.Principal, w string, ref Re
 		if decode(r.Value, &d) != nil {
 			return Record{}, ErrInvalid
 		}
-		if err = s.externalAccess(ctx, s.Store.Database(), p, w, d); err != nil {
+		if err = s.externalAccess(ctx, s.database(), p, w, d); err != nil {
 			return Record{}, err
 		}
 	}
@@ -134,7 +147,7 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, action,
 		return apicontract.Response[apicontract.Reference]{}, access.ErrForbidden
 	}
 	check := func(tx pgx.Tx) error {
-		var q query = s.Store.Database()
+		var q query = s.database()
 		if tx != nil {
 			q = tx
 		}
@@ -162,7 +175,7 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, action,
 		}
 		return s.Access.Check(ctx, p, w, target, permission)
 	}
-	if err := check(nil); err != nil {
+	if err := check(s.tx); err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err
 	}
 	scope := persistence.Scope{ActorID: "user:" + p.UserID, Grant: apicontract.Grant{WorkspaceID: w, CanRead: true, CanUpdate: true}, Recheck: func(tx pgx.Tx) *apicontract.Problem {
@@ -174,7 +187,7 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, action,
 	return s.Store.Apply(ctx, scope, persistence.Command{WorkspaceID: w, ResourceID: id, Kind: "workflow-" + k, Mutation: m, Payload: raw(payload)}, func(tx pgx.Tx, ref apicontract.Reference) (json.RawMessage, error) {
 		r, err := apply(tx, Ref{ID: ref.ID, Version: ref.Version})
 		return raw(r), err
-	})
+	}, s.tx)
 }
 func (s *Service) definition(ctx context.Context, q query, p access.Principal, w string, ref Ref) (Definition, Record, error) {
 	r, err := record(ctx, q, w, ref)
@@ -333,7 +346,7 @@ func (s *Service) validation(ctx context.Context, q query, p access.Principal, w
 	return Validation{Definition: r.Ref, Valid: len(problems) == 0, Problems: problems, Checked: checked}, nil
 }
 func (s *Service) Validate(ctx context.Context, p access.Principal, w string, ref Ref) (Validation, error) {
-	return s.validation(ctx, s.Store.Database(), p, w, ref)
+	return s.validation(ctx, s.database(), p, w, ref)
 }
 
 type Verify struct {

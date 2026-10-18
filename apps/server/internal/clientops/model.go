@@ -39,6 +39,7 @@ type Model struct {
 	Valuation  string               `json:"valuation,omitempty"`
 }
 type Operation struct {
+	AdoptPaths         []string         `json:"adopt_paths,omitempty"`
 	Policy             Ref              `json:"policy"`
 	Target             Ref              `json:"target"`
 	Goal               string           `json:"goal"`
@@ -73,10 +74,11 @@ type Limits struct {
 	Cost    *usage.CostBudget `json:"cost,omitempty"`
 }
 type Policy struct {
-	Mode   string             `json:"mode"`
-	Limits Limits             `json:"limits"`
-	Fixed  contexts.Selection `json:"fixed"`
-	Scopes []string           `json:"scopes"`
+	Definition *DefinitionPolicy  `json:"definition,omitempty"`
+	Mode       string             `json:"mode"`
+	Limits     Limits             `json:"limits"`
+	Fixed      contexts.Selection `json:"fixed"`
+	Scopes     []string           `json:"scopes"`
 }
 
 func DefaultPolicy() Policy {
@@ -88,9 +90,11 @@ type Item struct {
 	Reason string       `json:"reason"`
 }
 type Proposal struct {
-	Items     []Item   `json:"items"`
-	Questions []string `json:"questions"`
-	Unknown   []string `json:"unknown"`
+	DefinitionUTF8 string   `json:"definition_utf8,omitempty"`
+	Reason         string   `json:"reason,omitempty"`
+	Items          []Item   `json:"items"`
+	Questions      []string `json:"questions"`
+	Unknown        []string `json:"unknown"`
 }
 
 func complete(p Proposal) bool { return len(p.Questions) == 0 && len(p.Unknown) == 0 }

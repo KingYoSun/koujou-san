@@ -16,8 +16,15 @@ const tree = (text: string) => {
   return root;
 };
 export function fieldSource(text: string, path: JSONPath): string {
-  const node = findNodeAtLocation(tree(text), path);
-  return node ? text.slice(node.offset, node.offset + node.length) : "";
+  return fieldSources(text, [path])[0];
+}
+export function fieldSources(text: string, paths: JSONPath[]): string[] {
+  if (!paths.length) return [];
+  const root = tree(text);
+  return paths.map((path) => {
+    const node = findNodeAtLocation(root, path);
+    return node ? text.slice(node.offset, node.offset + node.length) : "";
+  });
 }
 export function editField(
   text: string,

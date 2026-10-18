@@ -65,7 +65,11 @@ type Start struct {
 }
 
 func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, req Start) (apicontract.Response[apicontract.Reference], error) {
-	if !strings.HasPrefix(id, "client-operation:") || !strings.HasPrefix(req.Target.ID, "client-selection:") || req.Target.Version == "" || req.Target.Version == "head" || req.Goal == "" || !validModel(req.Model) || (req.Purpose != "selection" && req.Purpose != "inspection") || p.OperationID != "" {
+	targetPrefix := "client-selection:"
+	if req.Purpose == "definition" {
+		targetPrefix = "run-definition:"
+	}
+	if !strings.HasPrefix(id, "client-operation:") || !strings.HasPrefix(req.Target.ID, targetPrefix) || req.Target.Version == "" || req.Target.Version == "head" || req.Goal == "" || !validModel(req.Model) || (req.Purpose != "selection" && req.Purpose != "inspection" && req.Purpose != "definition") || p.OperationID != "" {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
 	return s.mutate(ctx, p, w, id, req.Mutation, req, func(tx pgx.Tx, r Ref) (Record, error) {
@@ -76,8 +80,11 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 		if policy.Mode == "manual" {
 			return Record{}, ErrState
 		}
+		if (policy.Definition != nil) != (req.Purpose == "definition") {
+			return Record{}, ErrInvalid
+		}
 		if req.Target.Version != "0" {
-			v, err := record(ctx, tx, w, req.Target)
+			v, err := s.target(ctx, tx, p, w, req.Target, req.Purpose)
 			if err != nil {
 				return Record{}, err
 			}
@@ -98,7 +105,14 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 			id      string
 			bounded bool
 		}{{op.ReadOperation, policy.Fixed.Mode == "none" || len(policy.Scopes) > 0}, {op.CandidateOperation, policy.Fixed.Mode == "none"}} {
-			if _, err = accepted(s.Access.CreateOperation(ctx, p, w, o.id, "read", o.bounded, refs(policy.Fixed), apicontract.Mutation{OperationID: "client-read:" + o.id, ExpectedVersion: "0"}, tx)); err != nil {
+			allowed := refs(policy.Fixed)
+			if policy.Definition != nil {
+				allowed = append(allowed, policy.Definition.Sources...)
+				if req.Target.Version != "0" {
+					allowed = append(allowed, req.Target)
+				}
+			}
+			if _, err = accepted(s.Access.CreateOperation(ctx, p, w, o.id, "read", o.bounded, allowed, apicontract.Mutation{OperationID: "client-read:" + o.id, ExpectedVersion: "0"}, tx)); err != nil {
 				return Record{}, err
 			}
 		}
@@ -123,6 +137,9 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 			}
 		}
 		dependencies := append([]Ref{req.Policy}, refs(policy.Fixed)...)
+		if policy.Definition != nil {
+			dependencies = append(dependencies, policy.Definition.Sources...)
+		}
 		for _, price := range req.Model.Prices {
 			dependencies = append(dependencies, Ref{ID: price.ID, Version: price.Version})
 		}
@@ -137,6 +154,8 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 }
 
 type Action struct {
+	DefinitionSources []Ref    `json:"definition_sources,omitempty"`
+	Paths             []string `json:"paths,omitempty"`
 	apicontract.Mutation
 	Client string `json:"client"`
 	Kind   string `json:"kind"`
@@ -194,10 +213,35 @@ func (s *Service) Act(ctx context.Context, p access.Principal, w, id string, req
 			if op.Client != req.Client || op.State != "question" || req.Answer == "" {
 				return Record{}, ErrState
 			}
+			if len(req.DefinitionSources) > 0 {
+				policy, err := s.currentPolicy(ctx, tx, p, w, op)
+				if err != nil || op.Purpose != "definition" || policy.Definition == nil {
+					return Record{}, ErrInvalid
+				}
+				policy.Definition.Sources = unique(append(policy.Definition.Sources, req.DefinitionSources...))
+				if !validPolicyKind("definition-policy:answer", policy) {
+					return Record{}, ErrInvalid
+				}
+				if err := s.checkRefs(ctx, tx, p, w, policy.Definition.Sources); err != nil {
+					return Record{}, err
+				}
+				newPolicy, err := s.writeRelated(ctx, tx, p, w, "definition-policy:answer:"+r.Version, "policy", policy, append(old.Refs, policy.Definition.Sources...), id)
+				if err != nil {
+					return Record{}, err
+				}
+				op.Policy = newPolicy
+				old.Refs = unique(append(append(old.Refs, newPolicy), policy.Definition.Sources...))
+				for _, source := range req.DefinitionSources {
+					if _, err := tx.Exec(ctx, `INSERT INTO access_operation_refs(workspace_id,operation_id,resource_id,version) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`, w, op.ReadOperation, source.ID, source.Version); err != nil {
+						return Record{}, err
+					}
+				}
+			}
 			event, err := s.writeRelated(ctx, tx, p, w, "client-answer:"+r.Version, "answer", struct {
 				Operation Ref    `json:"operation"`
 				Text      string `json:"text"`
-			}{old.Ref, req.Answer}, append(append([]Ref{}, old.Refs...), old.Ref), id)
+				Sources   []Ref  `json:"definition_sources,omitempty"`
+			}{old.Ref, req.Answer, req.DefinitionSources}, append(append([]Ref{}, old.Refs...), old.Ref), id)
 			if err != nil {
 				return Record{}, err
 			}
@@ -233,6 +277,7 @@ func (s *Service) Act(ctx context.Context, p access.Principal, w, id string, req
 			if op.Client != req.Client || op.Proposal == nil {
 				return Record{}, ErrState
 			}
+			op.AdoptPaths = req.Paths
 			if err = s.adopt(ctx, tx, p, w, old.Ref, &op); err != nil {
 				return Record{}, err
 			}
@@ -352,6 +397,9 @@ func (s *Service) Begin(ctx context.Context, p access.Principal, w, id string, r
 	})
 }
 func (s *Service) adopt(ctx context.Context, tx pgx.Tx, p access.Principal, w string, operation Ref, op *Operation) error {
+	if op.Purpose == "definition" {
+		return s.adoptDefinition(ctx, tx, p, w, operation, op)
+	}
 	policy, err := s.currentPolicy(ctx, tx, p, w, *op)
 	if err != nil {
 		return err

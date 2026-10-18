@@ -84,6 +84,9 @@ func (s *Service) saveExecution(ctx context.Context, tx pgx.Tx, w string, ref Re
 	return s.save(ctx, tx, w, ref, "execution", e, refs)
 }
 func (s *Service) adopted(ctx context.Context, q query, p access.Principal, w string, ref Ref) (Definition, []Ref, error) {
+	return s.adoptedDefinition(ctx, q, p, w, ref, "workflow-definition-v1")
+}
+func (s *Service) adoptedDefinition(ctx context.Context, q query, p access.Principal, w string, ref Ref, schema string) (Definition, []Ref, error) {
 	r, err := record(ctx, q, w, ref)
 	if err != nil {
 		return Definition{}, nil, err
@@ -103,7 +106,7 @@ func (s *Service) adopted(ctx context.Context, q query, p access.Principal, w st
 	if err != nil {
 		return d, nil, err
 	}
-	if d.Schema != "workflow-definition-v1" {
+	if d.Schema != schema {
 		return d, nil, ErrInvalid
 	}
 	return d, unique(append(append(v.Checked, r.Refs...), r.Ref)), s.checkRefs(ctx, q, p, w, append(r.Refs, r.Ref))
