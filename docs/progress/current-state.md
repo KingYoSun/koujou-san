@@ -135,4 +135,10 @@
 
 ## Issue #32の判定
 
-状態: In progress（独立検品PASS、CI確認中）。本人が承認した条件による二群比較、料金根拠と明示再評価、通常編集への導線を実装した。[計画](2026-10-19-issue-32-plan.md)の六条件と維持条件に対応する実PG・実Ory/MCP・共有Chrome操作と回帰試験は[証跡](2026-10-19-issue-32-evidence.md)を参照。[固定commitの独立検品](2026-10-19-issue-32-inspection.md)は全条件PASS。最終CIとmerge後照合が残る。#33へ移した実S3スリープと初見操作は未確認のまま保持する。
+状態: Complete。Scope revision 1。[PR #67](https://github.com/KingYoSun/koujou-san/pull/67)を最終head `dc8e3e28f302a77fcaa070f163dd4ccb82b021a6` の全CI成功後にマージした。全AC・INVARの[独立検品](2026-10-19-issue-32-inspection.md)はPASS、blocker・必要修正なし。merge `1b7cb6f8f961d447ef7737329ac65ea8685614ad` と最終headのtreeは `261798f9cbd898ccdfa6fab635890c10434957f3` で一致、差分0。Linux配布物のschema 22→25更新と復元、Windows配布物もCIで成功し、#32を手動Closeした。[証跡](2026-10-19-issue-32-evidence.md)を参照する。
+
+## Issue #33・#34の保留
+
+2026-10-19、本人は適切な未完了kukuri Issueが無いため、#33を後回しにする方針を選択した。対象案件が決まるまで実行・実接続・外部変更は始めず、依存する#34も未着手とする。受入条件は変えず、実S3スリープと人の初見操作は未確認のまま保持する。
+
+[Issue #33](https://github.com/KingYoSun/koujou-san/issues/33)に、本人が承認した実接続の枠を記録した。Codex・Claude Code合計最大6回（各10分以内）、専用OpenAI APIをBifrost経由で最大20要求（各32 KiB・4096 token・90秒、fallback/自動retryなし）。選定する案件の必要なコードと合成データが対象で、現在の消費はCLI 0回・API 0要求。対象の指定後も同じ枠を使い、承認済みの枠を重複して取り直さない。

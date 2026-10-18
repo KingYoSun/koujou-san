@@ -51,3 +51,9 @@ Tabで固定版入力から集計ボタンへ進み、Enterで取得・保存・
 ## 独立検品
 
 実装commit `8ef65c23c89a306be0e7e950485ffa072eefdac4` を実装履歴を継承しない別コンテキストで検品し、全AC-1〜6・INVAR-1〜3がPASS、blocker・必要修正なし。[検品記録](2026-10-19-issue-32-inspection.md)を参照する。以後は記録だけを追加し、PR #67の最終headで必須CIを確認する。
+
+## CI・マージ後の完了照合
+
+最終head `dc8e3e28f302a77fcaa070f163dd4ccb82b021a6` の[CI 39142441853](https://github.com/KingYoSun/koujou-san/actions/runs/39142441853)は全成功。共有UI・サーバー11分7秒、Windows11分54秒、GitGuardian1秒。`test-results/issue32-ci-shared.log` で配布物のbackup/restoreとschema 22→25の実migration、失敗時の元release/三DB/session復元と再試行成功を確認した。検品記録追加前のrun 39142096855は最終headの検査へ枠を渡すため途中停止した。
+
+[PR #67](https://github.com/KingYoSun/koujou-san/pull/67)をマージし、merge `1b7cb6f8f961d447ef7737329ac65ea8685614ad` と最終headのtreeが `261798f9cbd898ccdfa6fab635890c10434957f3` で一致、差分0。全条件・独立検品・最終CI・merge後照合を満たして#32を手動Closeし、親#2を更新した。現在の判定と#33を後回しにする本人判断は[current-state](current-state.md)へ集約する。
