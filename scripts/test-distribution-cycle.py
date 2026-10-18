@@ -58,32 +58,33 @@ def verify(state, fixture):
 try:
     (root / "smtp").write_text("smtp://mailpit:1025/?disable_starttls=true")
     (root / "smtp").chmod(0o600)
-    current = root / "current"
-    initialize(current, bundle)
-    run([cli, "bootstrap", "--state", current], success=False)
-    assert not (current / ".operation").exists(), "failed operation retained its lock"
-    # Every private service stays unpublished in the actual Docker configuration.
-    config = json.loads((current / "compose.json").read_text())
-    for service, spec in config["services"].items():
-        if service != "edge":
-            assert not spec.get("ports"), "private service exposed"
-    backup = root / "backup.tgz"
-    run([cli, "backup", "--state", current, "--backup", backup])
-    assert backup.stat().st_mode & 0o777 == 0o600
-    run([cli, "stop", "--state", current])
-    restored = root / "restored"
-    deployments.append(restored)
-    run([cli, "restore", "--state", restored, "--bundle", bundle, "--backup", backup])
-    running = run(compose(restored, "ps", "--status", "running", "--services")).decode().split()
-    assert running == ["postgres"], "restore implicitly started writers"
-    assert not any((restored / "search").iterdir()), "restored a stale search projection"
-    run([cli, "up", "--state", restored])
-    verify(restored, current)
-    run([cli, "up", "--state", restored, "--llm"])
-    verify(restored, current)
-    run([cli, "backup", "--state", restored, "--backup", root / "gateway-backup.tgz"])
-    run([cli, "stop", "--state", restored])
-    print("PASS: private backup, data-only restore, rebuilt projections and optional empty-provider Gateway", flush=True)
+    if "--updates-only" not in sys.argv[4:]:
+        current = root / "current"
+        initialize(current, bundle)
+        run([cli, "bootstrap", "--state", current], success=False)
+        assert not (current / ".operation").exists(), "failed operation retained its lock"
+        # Every private service stays unpublished in the actual Docker configuration.
+        config = json.loads((current / "compose.json").read_text())
+        for service, spec in config["services"].items():
+            if service != "edge":
+                assert not spec.get("ports"), "private service exposed"
+        backup = root / "backup.tgz"
+        run([cli, "backup", "--state", current, "--backup", backup])
+        assert backup.stat().st_mode & 0o777 == 0o600
+        run([cli, "stop", "--state", current])
+        restored = root / "restored"
+        deployments.append(restored)
+        run([cli, "restore", "--state", restored, "--bundle", bundle, "--backup", backup])
+        running = run(compose(restored, "ps", "--status", "running", "--services")).decode().split()
+        assert running == ["postgres"], "restore implicitly started writers"
+        assert not any((restored / "search").iterdir()), "restored a stale search projection"
+        run([cli, "up", "--state", restored])
+        verify(restored, current)
+        run([cli, "up", "--state", restored, "--llm"])
+        verify(restored, current)
+        run([cli, "backup", "--state", restored, "--backup", root / "gateway-backup.tgz"])
+        run([cli, "stop", "--state", restored])
+        print("PASS: private backup, data-only restore, rebuilt projections and optional empty-provider Gateway", flush=True)
 
     # This is an owned compatibility fixture, not a previously released package:
     # actual #27 API 17def2aa / schema 22 + current deployment edge and templates.
@@ -91,9 +92,11 @@ try:
     old_bundle.mkdir()
     shutil.copytree(bundle / "templates", old_bundle / "templates")
     shutil.copy(previous_api, old_bundle / "api")
+    # Current stdin command entry against the same schema-22 persistence source.
+    shutil.copy(previous_api.with_name(previous_api.name.replace("-api", "-auth-bootstrap")), old_bundle / "auth-bootstrap")
     release = json.loads((bundle / "release.json").read_text())
-    old_image = config["name"] + ":schema22-fixture"
-    (old_bundle / "Dockerfile").write_text("FROM " + release["image"] + "\nCOPY api /app/api\n")
+    old_image = "koujou-owned-update:" + root.name
+    (old_bundle / "Dockerfile").write_text("FROM " + release["image"] + "\nCOPY api auth-bootstrap /app/\n")
     run(["docker", "build", "--platform", "linux/amd64", "-t", old_image, old_bundle])
     run(["docker", "save", "-o", old_bundle / "server-image.tar", old_image])
     release.update(image=old_image, image_id=run(["docker", "image", "inspect", "--format", "{{.Id}}", old_image]).decode().strip(),

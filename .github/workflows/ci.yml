@@ -124,6 +124,8 @@ jobs:
           mkdir -p .cache/distribution-previous
           git archive 17def2aa914e0c31cf8a03360521e57864d060d0 apps/server | tar -x -C .cache/distribution-previous
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 GOWORK=off "$PWD/.tools/go/bin/go" -C "$PWD/.cache/distribution-previous/apps/server" build -trimpath -o "$PWD/.cache/distribution-schema22-api" ./cmd/api
+          cp apps/server/cmd/auth-bootstrap/main.go .cache/distribution-previous/apps/server/cmd/auth-bootstrap/main.go
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 GOWORK=off "$PWD/.tools/go/bin/go" -C "$PWD/.cache/distribution-previous/apps/server" build -trimpath -o "$PWD/.cache/distribution-schema22-auth-bootstrap" ./cmd/auth-bootstrap
           .tools/go/bin/go -C apps/server run ./cmd/devcert "$PWD/.cache/distribution-tls"
           bundle=$(find "$PWD/artifacts" -maxdepth 1 -type d -name 'server-*' -print -quit)
           python3 scripts/test-distribution-cycle.py "$bundle" "$PWD/.cache/distribution-schema22-api" "$PWD/.cache/distribution-tls" | tee test-results/distribution-cycle.log
