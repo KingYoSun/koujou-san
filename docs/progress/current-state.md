@@ -117,8 +117,12 @@
 
 状態: Complete。Scope revision 1。[PR #61](https://github.com/KingYoSun/koujou-san/pull/61)を最終head `04cfa139d66359aef61c85711f2fa723f423bb4b`の全CIと[独立検品](2026-10-18-issue-27-inspection.md)PASS後にマージした。merge `17def2aa914e0c31cf8a03360521e57864d060d0`とのtreeは`1831d670424ebc203b521994c1467715d6a6a331`で一致、差分0。#27を手動Closeし、親#2を更新した。所有CLI/HTTP・PG・Ory/MCP・共通画面・Gateway復元と、本人が許可したOpenAI API三要求の結果は[証跡](2026-10-18-issue-27-evidence.md)を参照する。第三で元Run成功を保った固定証拠からの後続Run作成を確認した。実要求は終了し、Gatewayは通常停止。未検証のproviderやモデルへ結果を一般化しない。
 
-## Issue #28の実装
+## Issue #28の判定
 
-状態: In progress。Scope revision 2。[PR #62](https://github.com/KingYoSun/koujou-san/pull/62)で、承認済みの優先度・同期方針と取得10万固定版の上限を実装した。共通画面・所有試験・二修正の差分検品と実OpenAI二要求は成功。実GitHubの修正と同じ合成Issueでの試験も成功し、全AC/INVARの独立検品はPASS・blocker 0件。最終文書を含むHEADのCI・マージ後照合が残っている。詳細は[検証記録](2026-10-18-issue-28-evidence.md)。#27の消費枠は流用していない。
+状態: Complete。Scope revision 2。[PR #62](https://github.com/KingYoSun/koujou-san/pull/62)を最終head `fd620c07a5711246f0038d488d201d207c33b102`の全CI・全AC/INVARの独立検品PASS後にマージした。merge `fb336a0df3ac10f4d6b03c7e9ecfc3db6994c399`とのtreeは`d2647b333315069f2680a6487a0513056228993d`で一致、差分0。実OpenAI二要求、同じ合成Issue #63でのGitHub双方向同期・外部手動固定・後片付けまで確認し、#28を手動Closeした。失敗履歴・承認枠・未確認の実機条件は[検証記録](2026-10-18-issue-28-evidence.md)へ保持する。
 
-#29〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。
+## Issue #29の準備
+
+状態: Planned。Scope revision 1。基準mainは`fb336a0df3ac10f4d6b03c7e9ecfc3db6994c399`。共有サーバーの配布先、Windows配布の署名・初期操作、自身のOSSライセンス、外部投稿の方針の四点を本人へ質問済み。[計画](2026-10-18-issue-29-plan.md)に五条件の判定方法と調査範囲を記録し、判断に依存する配布・UI・ライセンス変更は未着手。既存の配布設定と依存ライセンス情報の下見を行った。
+
+#30〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。
