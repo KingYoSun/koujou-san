@@ -119,6 +119,6 @@
 
 ## Issue #28の実装
 
-状態: In progress。Scope revision 2。[PR #62](https://github.com/KingYoSun/koujou-san/pull/62)で、承認済みの優先度・同期方針と取得10万固定版の上限を実装した。共通画面・所有試験・二修正の差分検品と実OpenAI二要求は成功。実GitHubで判明したApp由来の修正・同じ合成Issueでの継続試験、取得上限の最終検品・CI・マージ後照合を進めている。詳細は[検証記録](2026-10-18-issue-28-evidence.md)。#27の消費枠は流用していない。
+状態: In progress。Scope revision 2。[PR #62](https://github.com/KingYoSun/koujou-san/pull/62)で、承認済みの優先度・同期方針と取得10万固定版の上限を実装した。共通画面・所有試験・二修正の差分検品と実OpenAI二要求は成功。実GitHubの修正と同じ合成Issueでの試験も成功し、全AC/INVARの独立検品はPASS・blocker 0件。最終文書を含むHEADのCI・マージ後照合が残っている。詳細は[検証記録](2026-10-18-issue-28-evidence.md)。#27の消費枠は流用していない。
 
 #29〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。

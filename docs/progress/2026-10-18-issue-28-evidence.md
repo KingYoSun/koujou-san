@@ -1,6 +1,6 @@
 # Issue #28の検証記録
 
-状態: In progress。Scope revision 2。基準は`17def2aa914e0c31cf8a03360521e57864d060d0`。PR #62でCIと独立検品を進めている。実OpenAI二要求は成功し、実GitHubの継続試験とマージが残っている。
+状態: In progress。Scope revision 2。基準は`17def2aa914e0c31cf8a03360521e57864d060d0`。実OpenAI二要求・実GitHub・独立検品はPASS。PR #62の最終文書を含むHEADのCIとマージ後照合が残っている。
 
 ## 確定した判断
 
@@ -16,7 +16,7 @@
 - 独立検品で、一括停止後のWorker巡回が要求を復帰不能にすることと、旧`apply-past`が現在要求の索引を更新しないことを検出した。`issue28-review-legacy-before.log`で両方を再現した。停止は再開できる待機とし、旧APIも共通の受付処理へ接続した。応答後の停止では保存済み結果と試行数を維持し、再開時に再送しない。
 - この修正の途中でSQLのNULLとJSONのnullの区別を誤り、試行数が増えない失敗を`issue28-review-fixes-after.log`で検出した。両方を未完了として扱い、`issue28-review-fixes-after2.log`で既存条件と追加した三条件がPASSした。29要求と29利用量を照合した。
 - API起動時にTriageのStartが二度呼ばれていた。独立検品の指摘を受け、依存先の設定後に一度だけ起動するよう修正した。
-- 選択Contextの全子孫取得後にしか配置上限が効かない点も検出した。読み込み上限を追加すると、除外後の入力が小さい既存選択も保留になり得る。既存の「入力配置数」から「取得する固定版数」へ意味を広げる変更は未承認のため、実装せず本人の判断を確認する。
+- 選択Contextの全子孫取得後にしか配置上限が効かない点も検出した。読み込み上限を追加すると、除外後の入力が小さい既存選択も保留になり得る。既存の「入力配置数」と異なる制限のため本人の判断を確認し、Scope revision 2で承認後に実装した。
 
 ## 取得済みの証拠
 
@@ -37,7 +37,7 @@
 | `test-results/issue28-independent-migration-upgrade.log` | 001〜022の旧Scope・Grouping・固定/採用値・Hopper設定・jobを投入して023へ移行。既存3テーブルの双方向EXCEPT一致、新規jobゼロ、旧受付日時維持がPASS |
 | `test-results/issue28-review-fixes-after2.log`、`issue28-review-fixes-final.log` | 一括停止→Worker巡回→再開、応答後停止→期限/試行上限後の保存結果の採用、旧API経由の実評価がPASS。修正差分は再検品の対象 |
 
-これらの合格は記録を取得した時点の範囲であり、最新差分の全条件合格を意味しない。[独立検品](2026-10-18-issue-28-inspection.md)の初回結果はblocker三件。二修正の差分再検品は`c0daf08`でPASS。Context取得上限の判断、実provider・実GitHub・必須CI・マージ後照合が残っている。
+これらの合格は記録を取得した時点の範囲であり、最新差分の全条件合格を意味しない。[独立検品](2026-10-18-issue-28-inspection.md)の初回結果はblocker三件。二修正の差分再検品は`c0daf08`でPASS。取得上限は`37659e4`の差分検品でPASS。実接続の最終結果と残作業は末尾へ集約する。
 
 ## 共通画面の観測
 
@@ -82,3 +82,13 @@ App自身をJWTで照合し、そのslugから取得したbotの数値IDとイ�
 現在の累積消費はIssue作成1・Close1、ラベル作成4・削除4、Appのラベル作用1、人の外部変更0、モデル0。承認枠の追加なしにラベルを再作成しない。既存のカウンタをリセットせず、継続する場合も同じIssue・同じ二ラベルだけを使う。実GitHubの外部手動変更・固定の最終判定は未確認。
 
 `issue28-contexts-regression.log`と`issue28-publisher-regression.log`は既存PG試験がPASS。追加差分の独立検品は固定`37659e4`でPASS、blocker 0件。最新CIはrun `39095566623`で進行中。GitHub二ラベルの追加作成・削除を各一回だけ求める質問を提示済みで、回答前に三回目の実試験は実行しない。
+
+## 実GitHubの最終結果と全条件の判定
+
+本人が同じ#63の同じ二ラベルをもう一度だけ作成・削除する第二追加枠を承認した。再送された第一追加枠の回答は重複として扱い、カウンタをリセットせず追加回数だけを記録した。`issue28-github-final.log`はPASS、`issue28-github-live.json`はApp由来識別、履歴競合の明示解消、外部の人の変更からP2固定、最終同期synced、本文・状態不変更、モデル要求0を示す。
+
+累積消費はIssue作成1・Close1、ラベル作成6・削除6、App作用2（総上限4以内）、外部手動変更1。#63を再Openせず、最後の読取りでもClose・ラベルなしを確認した。二つの一時ラベル自体もrepositoryから削除済み。OpenAIの消費は二要求のままである。
+
+別コンテキストの検品者が最終のログ・結果JSON・累積カウンタと検品済みコードの一致を照合し、AC-1〜13・INVAR-1〜4すべてPASS、blocker 0件として検品を終了した。過去の失敗と原因未確定のHopper観測は消さない。#33へ移した本人の初見操作・S3スリープは未確認のまま維持する。
+
+HEAD `82781f9d2d4dce9f65c512d3841613be23588b8d`のCI run `39095730596`はShared UI and server・Windows native client・GitGuardianすべてPASS。現在の残作業は、この最終文書を含むHEADのCI確認、マージ、tree照合と手動Closeである。
