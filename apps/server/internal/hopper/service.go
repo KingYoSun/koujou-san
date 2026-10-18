@@ -42,6 +42,10 @@ type Service struct {
 
 func New(store *persistence.Store, a *access.Service, auto *automation.Service, r *runs.Service, w *workflows.Service, p *publications.Service, g *graphindex.Service) *Service {
 	s := &Service{Store: store, Access: a, Automation: auto, Runs: r, Workflows: w, Publications: p, Graph: g, Gateway: &serverllm.Gateway{ConfigFile: os.Getenv("KOUJOU_SERVER_LLM_CONFIG")}, Usage: usage.New(store, a)}
+	auto.AttachRuns(r)
+	if p != nil {
+		p.Automation = auto
+	}
 	previous := store.Accepted
 	store.Accepted = func(ctx context.Context, tx pgx.Tx, c persistence.Command, ref apicontract.Reference, state json.RawMessage) error {
 		if previous != nil {

@@ -67,6 +67,9 @@ func (s *Service) authority(ctx context.Context, tx pgx.Tx, j Job, commit bool) 
 		return c, ErrInvalid
 	}
 	if j.Kind == "triage" {
+		if err = s.checkBatch(ctx, tx, j, access.Principal{UserID: c.Controller}, false); err != nil {
+			return c, err
+		}
 		r, reason, _, err := s.selectPolicy(ctx, tx, j.Workspace, j.Target)
 		if err != nil || reason != "" || r.Ref != j.Definition {
 			return c, ErrInvalid
@@ -88,6 +91,9 @@ func (s *Service) budget(ctx context.Context, tx pgx.Tx, j Job, c Control, reser
 	}
 	if c.Budget == nil {
 		return "", nil
+	}
+	if j.Kind == "triage" {
+		return s.triageBudget(ctx, tx, j, c)
 	}
 	var missing bool
 	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM automation_jobs WHERE workspace_id=$1 AND kind=$2 AND updated_at>now()-make_interval(secs=>$3) AND result<>'null'::jsonb AND result->>'usage_state' NOT IN ('complete','not_applicable'))`, j.Workspace, j.Kind, c.PeriodSeconds).Scan(&missing); err != nil {
@@ -156,6 +162,27 @@ func (s *Service) Claim(ctx context.Context, k, worker string) (*Job, error) {
 				continue
 			}
 			c, authErr := s.authority(ctx, tx, j, false)
+			if j.Kind == "triage" {
+				err := authErr
+				if err == nil {
+					err = s.checkBatch(ctx, tx, j, access.Principal{UserID: c.Controller}, j.Result == nil)
+				}
+				var wait triageWait
+				if errors.As(err, &wait) {
+					if _, err = tx.Exec(ctx, `UPDATE automation_jobs SET state='waiting',reason=$3,due_at=now()+interval '5 seconds',lease_until=NULL WHERE workspace_id=$1 AND id=$2`, j.Workspace, j.ID, string(wait)); err != nil {
+						return err
+					}
+					if j.State != "waiting" || j.Reason != string(wait) {
+						if err = logJob(ctx, tx, j.Workspace, j.ID); err != nil {
+							return err
+						}
+					}
+					continue
+				}
+				if authErr == nil && err != nil {
+					return err
+				}
+			}
 			reason := ""
 			if authErr != nil {
 				reason = "authority_revoked"
@@ -163,10 +190,10 @@ func (s *Service) Claim(ctx context.Context, k, worker string) (*Job, error) {
 					reason = "basis_changed"
 				}
 			}
-			if reason == "" && (j.Attempts >= c.MaxAttempts || (j.Deadline != nil && !time.Now().Before(*j.Deadline))) {
+			if reason == "" && (j.Kind != "triage" || j.Result == nil) && (j.Attempts >= c.MaxAttempts || (j.Deadline != nil && !time.Now().Before(*j.Deadline))) {
 				reason = "deadline_or_attempts"
 			}
-			if reason == "" {
+			if reason == "" && (j.Kind != "triage" || j.Result == nil) {
 				reason, err = s.budget(ctx, tx, j, c, false)
 				if err != nil {
 					return err
@@ -188,7 +215,7 @@ func (s *Service) Claim(ctx context.Context, k, worker string) (*Job, error) {
 			if active >= c.Slots {
 				continue
 			}
-			j, err = scanJob(tx.QueryRow(ctx, `UPDATE automation_jobs SET state='running',reason='',worker=$3,lease=$4,lease_until=now()+make_interval(secs=>$5),attempts=attempts+1,deadline=COALESCE(deadline,now()+make_interval(secs=>$6)),updated_at=now() WHERE workspace_id=$1 AND id=$2 RETURNING `+jobColumns, j.Workspace, j.ID, worker, rand.Text(), c.LeaseSeconds, c.MaxAttempts*c.LeaseSeconds+(c.MaxAttempts-1)*c.RetrySeconds))
+			j, err = scanJob(tx.QueryRow(ctx, `UPDATE automation_jobs SET state='running',reason='',worker=$3,lease=$4,lease_until=now()+make_interval(secs=>$5),attempts=attempts+CASE WHEN kind='triage' AND result IS NOT NULL AND result<>'null'::jsonb THEN 0 ELSE 1 END,deadline=COALESCE(deadline,now()+make_interval(secs=>$6)),updated_at=now() WHERE workspace_id=$1 AND id=$2 RETURNING `+jobColumns, j.Workspace, j.ID, worker, rand.Text(), c.LeaseSeconds, c.MaxAttempts*c.LeaseSeconds+(c.MaxAttempts-1)*c.RetrySeconds))
 			if err != nil {
 				return err
 			}
@@ -279,6 +306,10 @@ func (s *Service) RunOne(ctx context.Context, k, worker string, execute Executor
 		result, err = execute(run, *j)
 	}
 	if err != nil {
+		var wait triageWait
+		if j.Kind == "triage" && errors.As(err, &wait) {
+			return true, s.deferTriage(ctx, *j, string(wait))
+		}
 		return true, s.retry(ctx, *j, "executor_failed")
 	}
 	return true, s.Finish(ctx, *j, result)
@@ -342,6 +373,10 @@ func (s *Service) Finish(ctx context.Context, j Job, result Result) error {
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return nil, err
 		}
+		if p.Adopted != nil && p.AdoptedPolicy == nil {
+			basis := p.Policy
+			p.AdoptedPolicy = &basis
+		}
 		p.Target = j.Target
 		p.Policy = j.Definition
 		p.Recommendation = result.Priority
@@ -352,7 +387,33 @@ func (s *Service) Finish(ctx context.Context, j Job, result Result) error {
 		p.Job = j.ID
 		p.Refs = append(append([]Ref{}, result.Refs...), result.Usage...)
 		p.State = "evaluated"
-		if result.Priority == nil {
+		if result.State != "" {
+			p.State = result.State
+		}
+		p.Basis = result.Basis
+		if result.Basis != "" {
+			if definition.Model != nil {
+				connection, err := s.Gateway.Connection(j.Workspace, definition.Model.Connection, definition.Model.Revision)
+				if err != nil || !connection.AllowsChain(definition.Model.Model, definition.Model.Fallbacks, definition.Model.Allowed) {
+					return nil, access.ErrForbidden
+				}
+			}
+			rec, err := record(ctx, tx, j.Workspace, Ref{ID: "triage-input:" + j.ID, Version: result.Basis})
+			if err != nil {
+				return nil, err
+			}
+			var input TriageInput
+			if json.Unmarshal(rec.Value, &input) != nil {
+				return nil, ErrInvalid
+			}
+			if err = s.inputCurrent(ctx, tx, j, input); err != nil {
+				return nil, err
+			}
+			if err = s.triageRefs(ctx, tx, access.Principal{UserID: c.Controller, OperationID: input.Operation}, j.Workspace, rec.Refs); err != nil {
+				return nil, err
+			}
+		}
+		if result.Priority == nil && result.State == "" {
 			p.State = "information_missing"
 		}
 		activation, err := record(ctx, tx, j.Workspace, Ref{ID: "activation:" + strings.TrimPrefix(j.Definition.ID, "policy:"), Version: "head"})
@@ -363,6 +424,7 @@ func (s *Service) Finish(ctx context.Context, j Job, result Result) error {
 		_ = json.Unmarshal(activation.Value, &active)
 		if !p.Fixed && active.AutoApply && result.Priority != nil {
 			p.Adopted = result.Priority
+			p.AdoptedPolicy = &j.Definition
 			p.Origin = "triage"
 			p.AdoptedReason = result.Reason
 		}
@@ -388,6 +450,11 @@ func (s *Service) Finish(ctx context.Context, j Job, result Result) error {
 	}
 	if response.Error != nil {
 		if response.Error.Code == "forbidden" {
+			var wait triageWait
+			checkErr := pgx.BeginFunc(ctx, s.Store.Database(), func(tx pgx.Tx) error { return s.checkBatch(ctx, tx, j, access.Principal{UserID: c.Controller}, false) })
+			if errors.As(checkErr, &wait) {
+				return s.deferTriage(ctx, j, string(wait))
+			}
 			return s.block(ctx, j, "authority_revoked")
 		}
 		return ErrLease

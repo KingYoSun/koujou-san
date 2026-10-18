@@ -262,7 +262,7 @@ func (s *Service) prepare(ctx context.Context, tx pgx.Tx, p access.Principal, w 
 				return nil, invalid("forbidden", nil)
 			}
 		}
-		g := graph{ctx, func(ctx context.Context, r Ref) (Unit, error) { return s.unit(ctx, tx, p, w, r) }, map[string]Unit{}, map[string]bool{}}
+		g := graph{ctx, func(ctx context.Context, r Ref) (Unit, error) { return s.unit(ctx, tx, p, w, r) }, map[string]Unit{}, map[string]bool{}, 0}
 		if err := validateUnit(u); err != nil {
 			return nil, err
 		}
@@ -490,7 +490,7 @@ func (s *Service) resolve(ctx context.Context, q query, p access.Principal, w st
 			return unresolved(err)
 		}
 		allowed := map[string]bool{}
-		g := graph{ctx, func(ctx context.Context, r Ref) (Unit, error) { return s.unit(ctx, q, p, w, r) }, map[string]Unit{}, map[string]bool{}}
+		g := graph{ctx, func(ctx context.Context, r Ref) (Unit, error) { return s.unit(ctx, q, p, w, r) }, map[string]Unit{}, map[string]bool{}, 0}
 		// Candidate identities are fixed by the baseline. Load only candidate roots
 		// needed to locate selected descendants, never inject their contents by default.
 		for _, r := range b.Contexts {

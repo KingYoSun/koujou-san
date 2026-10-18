@@ -45,3 +45,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0026: クライアントによるContext選択と共通の版付き保存](0026-client-context-selection.md)
 
 - [0027: サーバーLLMによるHopperの意味判断](0027-server-hopper-semantics.md)
+
+- [0028: サーバーTriageの評価・採用・外部同期](0028-server-triage.md)

@@ -447,6 +447,27 @@ func TestMCPIntegration(t *testing.T) {
 	checkHopperMCP(t, s, p, ordinary.Access, session, editor, none, secret, func(handle string) (*mcp.ClientSession, error) { return connect(tokens.Access, "mcp-one", handle) }, call, request, cfg.Site)
 	checkRunsMCP(t, s, p, session, none, call, request, cfg.Site, ordinary.Access)
 	checkWorkflowsMCP(t, s, p, session, none, fixed, call, request, cfg.Site, ordinary.Access)
+	inspectBrowser := func() {
+		webTokens := issue("", "koujou offline_access")
+		originalJar := client.Jar
+		client.Jar, _ = cookiejar.New(nil)
+		loginFixture()
+		bobTokens := issue("", "koujou offline_access")
+		client.Jar = originalJar
+		bob, err := identity.User(ctx, bobTokens.Access)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err = store.Database().Exec(ctx, "INSERT INTO access_members(workspace_id,user_id,role,active) VALUES('mcp-one',$1,'editor',true)", bob.ID); err != nil {
+			t.Fatal(err)
+		}
+		inspectUI(t, client, cfg.Site, ordinary, bobTokens, webTokens, server.Certificate().Raw, cfg, s, inspectionService, githubMux, control)
+	}
+	if os.Getenv("KOUJOU_TEST_TRIAGE_UI") == "1" {
+		inspectBrowser()
+		return
+	}
+
 	write := contexts.Write{Mutation: mutation(public.Revision), Value: json.RawMessage(`{"kind":"sentence","text":"edited from ordinary HTTP"}`)}
 	resp, raw = request("POST", cfg.Site+"/contexts/workspaces/mcp-one/sentence/public", write, map[string]string{"Authorization": "Bearer " + ordinary.Access})
 	var saved apicontract.Response[apicontract.Reference]
@@ -681,20 +702,7 @@ func TestMCPIntegration(t *testing.T) {
 		fixture.Wait(t, s, ctx)
 	}
 	if os.Getenv("KOUJOU_TEST_MCP_UI") == "1" {
-		webTokens := issue("", "koujou offline_access")
-		originalJar := client.Jar
-		client.Jar, _ = cookiejar.New(nil)
-		loginFixture()
-		bobTokens := issue("", "koujou offline_access")
-		client.Jar = originalJar
-		bob, err := identity.User(ctx, bobTokens.Access)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err = store.Database().Exec(ctx, "INSERT INTO access_members(workspace_id,user_id,role,active) VALUES('mcp-one',$1,'editor',true)", bob.ID); err != nil {
-			t.Fatal(err)
-		}
-		inspectUI(t, client, cfg.Site, ordinary, bobTokens, webTokens, server.Certificate().Raw, cfg, s, inspectionService, githubMux, control)
+		inspectBrowser()
 		_ = session.Close()
 		tokens = issue(cfg.MCPResource(), "koujou.mcp")
 		session, err = connect(tokens.Access, "mcp-one", handle)

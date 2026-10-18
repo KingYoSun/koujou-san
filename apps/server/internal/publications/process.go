@@ -43,6 +43,11 @@ func (s *Service) observe(ctx context.Context, w string, old Record, result Outc
 		request.ObservedAt = &result.At
 		if result.Issue != nil {
 			request.External = result.Issue
+			if s.Automation != nil {
+				if err := s.Automation.BindPublicationTx(ctx, tx, w, ref, request.Connection.ID, result.Issue.Number, request.Input.Sources); err != nil {
+					return Record{}, err
+				}
+			}
 		}
 		if _, err := s.save(ctx, tx, w, Ref{ID: "publication-observation:" + strings.TrimPrefix(old.ID, "publication:") + ":" + ref.Version, Version: ref.Version}, old.Owner, "observation", result, old.Refs); err != nil {
 			return Record{}, err

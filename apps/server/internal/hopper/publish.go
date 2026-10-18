@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/automation"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/publications"
@@ -144,6 +145,9 @@ func (s *Service) publish(ctx context.Context, tx pgx.Tx, p access.Principal, w 
 	}
 	issue, err := accepted(s.Runs.Contexts.InTransaction(tx).Put(ctx, p, w, contexts.Identity{Kind: "scope", ID: suffix}, contexts.Write{Mutation: mutation("issue:" + ref.ID), Value: raw(contexts.Scope{Kind: "issue", Name: draft.Title, Parent: d.Action.Parent})}))
 	if err != nil {
+		return Ref{}, err
+	}
+	if _, err = accepted(s.Automation.Put(ctx, p, w, "issue:"+suffix, automation.Write{Mutation: mutation("hopper-issue-info:" + suffix), Value: raw(automation.Issue{Scope: issue, Origin: "hopper", Title: draft.Title, Body: draft.Body, State: "open", Dependencies: []Ref{}, Sources: fixedSources})}, tx)); err != nil {
 		return Ref{}, err
 	}
 	if err = s.lineage(ctx, tx, w, issue.ID, e, ref); err != nil {

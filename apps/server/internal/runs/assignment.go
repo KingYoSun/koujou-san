@@ -214,6 +214,16 @@ func (s *Service) Assign(ctx context.Context, p access.Principal, w, id string, 
 		if r.State != "queued" || r.CancelRequested || r.Assignment != nil {
 			return r, nil, ErrState
 		}
+		if s.AssignmentGate != nil {
+			reason, err := s.AssignmentGate(ctx, tx, w, id)
+			if err != nil {
+				return r, nil, err
+			}
+			if reason != "" {
+				r.Preparation = reason
+				return r, old.Refs, nil
+			}
+		}
 		spec, err := s.input(ctx, tx, w, r)
 		if err != nil {
 			return r, nil, err

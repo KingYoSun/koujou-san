@@ -22,10 +22,11 @@ type query interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Service struct {
-	tx       pgx.Tx
-	Store    *persistence.Store
-	Access   *access.Service
-	Contexts *contexts.Service
+	AssignmentGate func(context.Context, pgx.Tx, string, string) (string, error)
+	tx             pgx.Tx
+	Store          *persistence.Store
+	Access         *access.Service
+	Contexts       *contexts.Service
 	// Workflow authorization is supplied by its owner, without a reverse import.
 	BeforeStart func(context.Context, pgx.Tx, string, string) error
 	// Derived contracts may narrow a schema-valid result while preserving its bytes.
@@ -388,6 +389,9 @@ func (s *Service) create(ctx context.Context, p access.Principal, w, id string, 
 	}
 	return s.mutate(ctx, p, w, id, action, "run-create", req.Mutation, payload, func(tx pgx.Tx, ref apicontract.Reference) (Run, []Ref, error) {
 		spec := req.Spec
+		if spec.Issue != nil {
+			spec.Sources = append(append([]Ref{}, spec.Sources...), *spec.Issue)
+		}
 		refs, err := s.SourcesTx(ctx, tx, p, w, spec.Sources)
 		if err != nil {
 			return Run{}, nil, err

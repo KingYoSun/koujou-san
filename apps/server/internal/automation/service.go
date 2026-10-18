@@ -6,7 +6,10 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/serverllm"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
 	"math/big"
+	"os"
 	"regexp"
 	"strings"
 
@@ -22,12 +25,17 @@ type query interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Service struct {
-	Store  *persistence.Store
-	Access *access.Service
+	PriorityBackend         PriorityBackend
+	PriorityIntervalSeconds int
+	Store                   *persistence.Store
+	Access                  *access.Service
+	Gateway                 *serverllm.Gateway
+	Contexts                *contexts.Service
+	Usage                   *usage.Service
 }
 
 func New(store *persistence.Store, a *access.Service) *Service {
-	s := &Service{store, a}
+	s := &Service{Store: store, Access: a, Gateway: &serverllm.Gateway{ConfigFile: os.Getenv("KOUJOU_SERVER_LLM_CONFIG")}, Contexts: contexts.New(store, a, contexts.DefaultLimits()), Usage: usage.New(store, a)}
 	store.Accepted = s.accepted
 	return s
 }
@@ -110,6 +118,11 @@ func (s *Service) Read(ctx context.Context, p access.Principal, w string, r Ref)
 	if err != nil {
 		return v, access.ErrForbidden
 	}
+	if v.Kind == "batch" {
+		if err = s.batchReadable(ctx, s.Store.Database(), p, w, v.ID); err != nil {
+			return Record{}, err
+		}
+	}
 	if err = s.checkRefs(ctx, nil, p, w, append(append([]Ref{}, v.Refs...), v.Ref)); err != nil {
 		return Record{}, err
 	}
@@ -128,7 +141,7 @@ func (s *Service) writable(ctx context.Context, tx pgx.Tx, p access.Principal, w
 	if exists {
 		target, action = id, "update"
 	}
-	if kind(id) == "control" || kind(id) == "activation" {
+	if kind(id) == "control" || kind(id) == "activation" || kind(id) == "batch" {
 		target, action = "", "manage"
 		if p.OperationID != "" {
 			action = "triage_manage"
@@ -141,7 +154,7 @@ func (s *Service) writable(ctx context.Context, tx pgx.Tx, p access.Principal, w
 	}
 	return s.Access.CheckTx(ctx, tx, p, w, target, action)
 }
-func (s *Service) Put(ctx context.Context, p access.Principal, w, id string, req Write) (apicontract.Response[apicontract.Reference], error) {
+func (s *Service) Put(ctx context.Context, p access.Principal, w, id string, req Write, within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
 	if err := s.writable(ctx, nil, p, w, id); err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err
 	}
@@ -168,7 +181,7 @@ func (s *Service) Put(ctx context.Context, p access.Principal, w, id string, req
 			}
 		}
 		return s.save(ctx, tx, w, Ref{ID: id, Version: ref.Version}, kind(id), value, refs)
-	})
+	}, within...)
 }
 func (s *Service) save(ctx context.Context, tx pgx.Tx, w string, ref Ref, k string, value any, refs []Ref) (json.RawMessage, error) {
 	if refs == nil {
@@ -185,10 +198,63 @@ func (s *Service) save(ctx context.Context, tx pgx.Tx, w string, ref Ref, k stri
 func (s *Service) prepare(ctx context.Context, tx pgx.Tx, p access.Principal, w, id string, raw []byte) (any, []Ref, error) {
 	refs := []Ref{}
 	switch kind(id) {
+	case "batch":
+		return s.prepareBatch(ctx, tx, p, w, id, raw)
+	case "issue":
+		return s.prepareIssue(ctx, tx, p, w, id, raw)
 	case "policy":
 		var v Policy
 		if decode(raw, &v) != nil || !validPolicy(v) {
 			return nil, nil, ErrInvalid
+		}
+		oldExternal := (*ExternalPolicy)(nil)
+		if old, err := record(ctx, tx, w, Ref{ID: id, Version: "head"}); err == nil {
+			var before Policy
+			_ = json.Unmarshal(old.Value, &before)
+			oldExternal = before.External
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, err
+		}
+		if digest(oldExternal) != digest(v.External) {
+			if err := s.manage(ctx, tx, p, w); err != nil {
+				return nil, nil, err
+			}
+		}
+		if v.External != nil {
+			if v.External.Connection == "" || len(v.External.Labels) == 0 {
+				return nil, nil, ErrInvalid
+			}
+			seen := map[string]bool{}
+			for level, label := range v.External.Labels {
+				if !hasLevel(v, level) || label == "" || seen[label] {
+					return nil, nil, ErrInvalid
+				}
+				seen[label] = true
+			}
+		}
+		if v.Model != nil {
+			for _, price := range v.Model.Prices {
+				ref := Ref{ID: price.ID, Version: price.Version}
+				if !fixed(ref) {
+					return nil, nil, ErrInvalid
+				}
+				refs = append(refs, ref)
+			}
+			wanted := append([]Ref{}, v.Model.Evidence...)
+			for _, ref := range append(append([]contexts.Ref{}, v.Model.Context.Include...), v.Model.Context.Exclude...) {
+				wanted = append(wanted, Ref{ID: "context:" + ref.ID, Version: ref.Revision})
+			}
+			for _, ref := range wanted {
+				if !strings.HasPrefix(ref.ID, "context:") {
+					return nil, nil, ErrInvalid
+				}
+				if ref.Version == "" || ref.Version == "head" {
+					if err := tx.QueryRow(ctx, `SELECT version FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2 AND NOT deleted`, w, ref.ID).Scan(&ref.Version); err != nil {
+						return nil, nil, ErrInvalid
+					}
+				}
+				refs = append(refs, ref)
+			}
 		}
 		for _, scope := range v.Scopes {
 			refs = append(refs, Ref{ID: "scope:" + scope})
@@ -260,6 +326,10 @@ func (s *Service) prepare(ctx context.Context, tx pgx.Tx, p access.Principal, w,
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil, err
 		}
+		if current.Adopted != nil && current.AdoptedPolicy == nil {
+			basis := current.Policy
+			current.AdoptedPolicy = &basis
+		}
 		current.Target = v.Target
 		current.Policy = v.Policy
 		current.Reason = v.Reason
@@ -269,13 +339,28 @@ func (s *Service) prepare(ctx context.Context, tx pgx.Tx, p access.Principal, w,
 		}
 		if v.Unlock {
 			current.Fixed = false
+			basisValid := true
+			if current.Basis != "" {
+				rec, err := record(ctx, tx, w, Ref{ID: "triage-input:" + current.Job, Version: current.Basis})
+				if err != nil {
+					return nil, nil, err
+				}
+				var input TriageInput
+				if json.Unmarshal(rec.Value, &input) != nil {
+					return nil, nil, ErrInvalid
+				}
+				if err = s.inputCurrent(ctx, tx, Job{ID: current.Job, Workspace: w, Target: current.Target}, input); err != nil {
+					basisValid = false
+				}
+			}
 			chosen, why, _, err := s.selectPolicy(ctx, tx, w, v.Target)
 			if err != nil {
 				return nil, nil, err
 			}
-			valid := why == "" && chosen.Ref == v.Policy
+			valid := basisValid && why == "" && chosen.Ref == v.Policy
 			if valid && current.RecommendationTarget != nil && *current.RecommendationTarget == v.Target && current.RecommendationPolicy != nil && *current.RecommendationPolicy == v.Policy && current.State == "evaluated" {
 				current.Adopted = current.Recommendation
+				current.AdoptedPolicy = &v.Policy
 				current.Origin = "triage"
 				current.AdoptedReason = current.RecommendationReason
 			}
@@ -284,6 +369,7 @@ func (s *Service) prepare(ctx context.Context, tx pgx.Tx, p access.Principal, w,
 				return nil, nil, ErrInvalid
 			}
 			current.Adopted = v.Value
+			current.AdoptedPolicy = &v.Policy
 			current.Origin = "manual"
 			current.AdoptedReason = v.Reason
 			current.Fixed = true
@@ -376,20 +462,7 @@ func (s *Service) Select(ctx context.Context, p access.Principal, w string, targ
 	return r, reason, err
 }
 func (s *Service) accepted(ctx context.Context, tx pgx.Tx, c persistence.Command, r apicontract.Reference, state json.RawMessage) error {
-	if c.Kind != "context-scope" || c.Deleted {
-		return nil
-	}
-	var rec contexts.Record
-	var scope contexts.Scope
-	if json.Unmarshal(state, &rec) != nil || json.Unmarshal(rec.Value, &scope) != nil || scope.Kind != "issue" {
-		return nil
-	}
-	source := Source{Event: r.ID + "@" + r.Version, Target: Ref{ID: r.ID, Version: r.Version}}
-	policy, reason, refs, err := s.selectPolicy(ctx, tx, c.WorkspaceID, source.Target)
-	if err != nil {
-		return err
-	}
-	return s.enqueue(ctx, tx, c.WorkspaceID, "triage", source, policy.Ref, reason, refs)
+	return s.triageAccepted(ctx, tx, c, r, state)
 }
 
 // AcceptResultTx is the contract for an owning result domain after acceptance.

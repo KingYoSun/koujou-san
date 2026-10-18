@@ -13,7 +13,7 @@ import (
 
 func EnvironmentLimits() (Limits, error) {
 	limits := DefaultLimits()
-	for name, target := range map[string]*int{"KOUJOU_CONTEXT_MAX_BYTES": &limits.Bytes, "KOUJOU_CONTEXT_MAX_PLACEMENTS": &limits.Placements} {
+	for name, target := range map[string]*int{"KOUJOU_CONTEXT_MAX_BYTES": &limits.Bytes, "KOUJOU_CONTEXT_MAX_PLACEMENTS": &limits.Placements, "KOUJOU_CONTEXT_MAX_LOADED": &limits.Loaded} {
 		if raw, ok := os.LookupEnv(name); ok {
 			n, err := strconv.Atoi(raw)
 			if err != nil || n <= 0 {

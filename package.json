@@ -9,6 +9,9 @@
     "pnpm": "10.16.1"
   },
   "scripts": {
+    "test:triage:github-live": "node scripts/dev.mjs test:triage:github-live",
+    "test:triage:live": "node scripts/dev.mjs test:triage:live",
+    "test:triage:ui": "node scripts/dev.mjs test:triage:ui",
     "test:clientops": "node scripts/dev.mjs test:clientops",
     "test:clientops:ui": "node scripts/dev.mjs test:clientops:ui",
     "test:hopper": "node scripts/dev.mjs test:hopper",

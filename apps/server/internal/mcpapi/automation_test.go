@@ -6,11 +6,13 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/automation"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
 	"github.com/jackc/pgx/v5"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -163,6 +165,32 @@ func checkAutomationMCP(t *testing.T, s *Service, p access.Principal, ordinary s
 	call(manager, "triage_set", args, true)
 	if _, e = s.Access.DB.Exec(ctx, `UPDATE access_members SET role='admin' WHERE workspace_id='mcp-one' AND user_id=$1`, p.UserID); e != nil {
 		t.Fatal(e)
+	}
+
+	batchWrite := triageWrite{ID: "batch:mcp-triage", Write: automation.Write{Mutation: mutation("0"), Value: encodeTest(automation.BatchEdit{Policy: policyRef, Scopes: []string{target.ID}, From: time.Now().Add(-time.Hour), Until: time.Now().Add(time.Hour), Count: 1, PageSize: 1, Cost: &usage.CostBudget{Amount: "1", Currency: "USD", Valuation: "estimated"}})}}
+	call(reader, "triage_set", batchWrite, true)
+	call(contextEditor, "triage_set", batchWrite, true)
+	body = call(manager, "triage_set", batchWrite, false)
+	var batchSaved apicontract.Response[apicontract.Reference]
+	_ = json.Unmarshal(body, &batchSaved)
+	if batchSaved.Data == nil {
+		t.Fatal("MCP batch write", string(body))
+	}
+	replayBody := call(manager, "triage_set", batchWrite, false)
+	var batchReplay apicontract.Response[apicontract.Reference]
+	_ = json.Unmarshal(replayBody, &batchReplay)
+	if batchReplay.Data == nil || batchSaved.Data.Version != batchReplay.Data.Version {
+		t.Fatal("MCP batch replay")
+	}
+	for _, q := range []automation.Request{{Mode: "priorities", Limit: 1}, {Mode: "heads", Kind: "batch", Limit: 10}, {Mode: "records", Kind: "batch", Limit: 10}} {
+		mcpBody := call(reader, "triage_query", q, false)
+		res, httpBody := request("POST", site+"/automation/workspaces/mcp-one/query", q, map[string]string{"Authorization": "Bearer " + ordinary})
+		var m, h apicontract.Response[automation.Page]
+		_ = json.Unmarshal(mcpBody, &m)
+		_ = json.Unmarshal(httpBody, &h)
+		if res.StatusCode != 200 || m.Data == nil || h.Data == nil || string(encodeTest(m.Data.Items)) != string(encodeTest(h.Data.Items)) {
+			t.Fatal("new triage query differs", q, string(mcpBody), string(httpBody))
+		}
 	}
 	t.Log("real Ory + MCP/HTTP triage policy, activation boundary, manual fixed priority, current roles, private basis and bounded state passed")
 }

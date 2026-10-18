@@ -15,7 +15,7 @@ func (s *Service) Dispatch(ctx context.Context) (bool, error) {
 	err := pgx.BeginFunc(ctx, s.Store.Database(), func(tx pgx.Tx) error {
 		var w, id, controller, preferred string
 		var definitionRaw, repositoryRaw, requiredRaw []byte
-		err := tx.QueryRow(ctx, `SELECT workspace_id,run_id,controller,preferred_device,definition,repository,required FROM hopper_dispatch WHERE state='waiting' AND due_at<=now() ORDER BY due_at,workspace_id,run_id LIMIT 1 FOR UPDATE SKIP LOCKED`).Scan(&w, &id, &controller, &preferred, &definitionRaw, &repositoryRaw, &requiredRaw)
+		err := tx.QueryRow(ctx, `SELECT d.workspace_id,d.run_id,d.controller,d.preferred_device,d.definition,d.repository,d.required FROM hopper_dispatch d LEFT JOIN triage_run_links l ON l.workspace_id=d.workspace_id AND l.run_id=d.run_id LEFT JOIN triage_ranks p ON p.workspace_id=l.workspace_id AND p.scope_id=l.scope_id WHERE d.state='waiting' AND d.due_at<=now() ORDER BY COALESCE(p.policy_id,''),COALESCE(p.policy_version,''),p.rank NULLS LAST,l.received_at,d.due_at,d.workspace_id,d.run_id LIMIT 1 FOR UPDATE OF d SKIP LOCKED`).Scan(&w, &id, &controller, &preferred, &definitionRaw, &repositoryRaw, &requiredRaw)
 		if missing(err) {
 			return nil
 		}
@@ -73,6 +73,11 @@ func (s *Service) Dispatch(ctx context.Context) (bool, error) {
 				return update("held", "cost_"+cost.State)
 			}
 		}
+		if reason, err := s.Automation.AssignmentGate(ctx, tx, w, id); err != nil {
+			return err
+		} else if reason != "" {
+			return update("waiting", reason)
+		}
 		actor := access.Principal{UserID: controller}
 		runner := s.Runs.InTransaction(tx)
 		device, err := runner.SelectRunner(ctx, actor, w, id, preferred, repository, required)
@@ -85,6 +90,16 @@ func (s *Service) Dispatch(ctx context.Context) (bool, error) {
 		_, err = accepted(runner.Assign(ctx, actor, w, id, runs.Assign{Mutation: structMutation("hopper-assign:"+id+":"+device+":"+version, version), DeviceID: device, Repository: repository, Required: required}))
 		if err != nil {
 			return err
+		}
+		var currentRaw []byte
+		if err = tx.QueryRow(ctx, `SELECT r.payload FROM run_records r JOIN shared_versions h ON h.workspace_id=r.workspace_id AND h.resource_id=r.id AND h.version=r.version WHERE r.workspace_id=$1 AND r.id=$2`, w, id).Scan(&currentRaw); err != nil {
+			return err
+		}
+		if json.Unmarshal(currentRaw, &run) != nil {
+			return ErrInvalid
+		}
+		if run.Assignment == nil {
+			return update("waiting", run.Preparation)
 		}
 		return update("assigned", "")
 	})

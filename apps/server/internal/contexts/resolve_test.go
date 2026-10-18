@@ -51,6 +51,38 @@ func TestResolutionContract(t *testing.T) {
 	}
 }
 
+func TestResolutionStopsBeforeExcessLoads(t *testing.T) {
+	units, refs := fixtureGraph()
+	t.Setenv("KOUJOU_CONTEXT_MAX_LOADED", "3")
+	limits, err := EnvironmentLimits()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, selection := range []Selection{
+		{Mode: "select", Include: refs[5:6]},
+		{Mode: "select", Include: refs[:1], Exclude: refs[5:6]},
+	} {
+		calls := 0
+		got := Resolve(context.Background(), func(_ context.Context, r Ref) (Unit, error) {
+			calls++
+			return units[r], nil
+		}, "w", ResolveRequest{Selection: selection}, limits)
+		if got.Ready || len(got.Missing) != 1 || got.Missing[0].Code != "load_limit" || calls != 3 {
+			t.Fatalf("unbounded selected/excluded graph: calls=%d result=%+v", calls, got)
+		}
+	}
+	t.Setenv("KOUJOU_CONTEXT_MAX_LOADED", "1")
+	limits, _ = EnvironmentLimits()
+	calls := 0
+	got := Resolve(context.Background(), func(_ context.Context, r Ref) (Unit, error) {
+		calls++
+		return units[r], nil
+	}, "w", ResolveRequest{Selection: Selection{Mode: "select", Include: []Ref{refs[0], refs[0]}, Exclude: refs[:1]}}, limits)
+	if !got.Ready || calls != 1 {
+		t.Fatal("fixed-version reuse counted twice", calls, got)
+	}
+}
+
 func TestResolutionLimitsAndInvalidReferences(t *testing.T) {
 	ctx := context.Background()
 	units, refs := fixtureGraph()
@@ -63,11 +95,11 @@ func TestResolutionLimitsAndInvalidReferences(t *testing.T) {
 	}
 	request := ResolveRequest{Selection: Selection{Mode: "select", Include: refs[5:6]}}
 	result := Resolve(ctx, load, "w", request, DefaultLimits())
-	exact := Limits{len(*result.Manifest.InputUTF8), 7}
+	exact := Limits{len(*result.Manifest.InputUTF8), 7, 100000}
 	if !Resolve(ctx, load, "w", request, exact).Ready {
 		t.Fatal("exact limit rejected")
 	}
-	for _, limit := range []Limits{{exact.Bytes - 1, 7}, {exact.Bytes, 6}} {
+	for _, limit := range []Limits{{exact.Bytes - 1, 7, 100000}, {exact.Bytes, 6, 100000}} {
 		if Resolve(ctx, load, "w", request, limit).Ready {
 			t.Fatal("capacity exceeded accepted")
 		}

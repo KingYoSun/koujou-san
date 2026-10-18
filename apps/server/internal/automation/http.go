@@ -37,8 +37,19 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 	var sql string
 	refs := `e.refs||jsonb_build_array(jsonb_build_object('id',e.id,'version',e.version))`
 	switch r.Mode {
+	case "priorities":
+		refs = `COALESCE(e.refs,'[]'::jsonb)||COALESCE(i.refs,'[]'::jsonb)||jsonb_build_array(jsonb_build_object('id',t.scope_id,'version',t.scope_version))`
+		key := `CASE WHEN rank.policy_id IS NULL THEN '1/' ELSE '0/' END||COALESCE(rank.policy_id,'~')||'/'||COALESCE(rank.policy_version,'~')||'/'||lpad(COALESCE(rank.rank,2147483647)::text,10,'0')||'/'||t.received_at::text||'/'||t.scope_id`
+		sql = `SELECT jsonb_build_object('id',COALESCE(e.id,'priority:'||t.scope_id),'version',COALESCE(e.version,'0'),'kind','priority','value',COALESCE(e.payload-'refs',jsonb_build_object('target',jsonb_build_object('id',t.scope_id,'version',t.scope_version),'adopted',null,'recommendation',null,'fixed',false,'state','unevaluated'))||CASE WHEN j.state IS NOT NULL AND j.state<>'done' THEN jsonb_build_object('state',j.state,'reason',j.reason) ELSE '{}'::jsonb END,'title',COALESCE(i.payload#>>'{observed,title}',i.payload->>'title',c.payload->>'name'),'deadline',t.deadline,'received_at',t.received_at,'next_due',t.next_due,'policy_group',rank.policy_id||'@'||rank.policy_version),` + key + ` FROM triage_targets t
+ LEFT JOIN automation_records i ON i.workspace_id=t.workspace_id AND i.id=t.info_id AND i.version=t.info_version
+ JOIN context_records c ON c.workspace_id=t.workspace_id AND c.resource_id=t.scope_id AND c.revision=t.scope_version
+ LEFT JOIN shared_versions h ON h.workspace_id=t.workspace_id AND h.resource_id='priority:'||t.scope_id
+ LEFT JOIN automation_records e ON e.workspace_id=h.workspace_id AND e.id=h.resource_id AND e.version=h.version
+ LEFT JOIN triage_ranks rank ON rank.workspace_id=t.workspace_id AND rank.scope_id=t.scope_id
+ LEFT JOIN automation_jobs j ON j.workspace_id=t.workspace_id AND j.id=t.latest_job
+ WHERE t.workspace_id=$1 AND $4::text=$4 AND ($5='' OR t.scope_id=$5) AND (` + key + `)>$6 AND ` + access.ReadFilterSQL(refs) + ` ORDER BY ` + key + ` LIMIT $7`
 	case "heads":
-		sql = `SELECT jsonb_build_object('id',e.id,'version',e.version,'kind',e.kind,'position',e.position,'value',e.payload,'refs',e.refs),e.id FROM automation_records e JOIN shared_versions v ON v.workspace_id=e.workspace_id AND v.resource_id=e.id AND v.version=e.version AND NOT v.deleted WHERE e.workspace_id=$1 AND ($4='' OR e.kind=$4) AND ($5='' OR e.id=$5) AND e.id>$6 AND ` + access.ReadFilterSQL(refs) + ` ORDER BY e.id LIMIT $7`
+		sql = `SELECT jsonb_build_object('id',e.id,'version',e.version,'kind',e.kind,'position',e.position,'value',CASE WHEN e.kind='model-input' THEN e.payload-'request'-'evidence'-'issue' WHEN e.kind='model-attempt' THEN e.payload #- '{response,body}' WHEN e.kind='issue' THEN (e.payload-'body'-'sources') #- '{observed,body}' ELSE e.payload END,'refs',CASE WHEN e.kind IN ('model-input','model-attempt','issue') THEN '[]'::jsonb ELSE e.refs END)||CASE WHEN e.kind='sync' THEN jsonb_build_object('observed_at',(SELECT t.observed_at FROM triage_sync t WHERE t.workspace_id=e.workspace_id AND t.scope_id=substring(e.id from 15))) ELSE '{}'::jsonb END,e.id FROM automation_records e JOIN shared_versions v ON v.workspace_id=e.workspace_id AND v.resource_id=e.id AND v.version=e.version AND NOT v.deleted WHERE e.workspace_id=$1 AND ($4='' OR e.kind=$4) AND ($5='' OR e.id=$5) AND e.id>$6 AND ` + access.ReadFilterSQL(refs) + ` AND (e.kind<>'batch' OR NOT EXISTS(SELECT 1 FROM triage_batch_jobs b JOIN automation_jobs bj ON bj.workspace_id=b.workspace_id AND bj.id=b.job_id WHERE b.workspace_id=e.workspace_id AND b.batch_id=e.id AND NOT (` + access.ReadFilterSQL("bj.refs||COALESCE(bj.result->'refs','[]'::jsonb)||COALESCE(bj.result->'usage','[]'::jsonb)") + `))) ORDER BY e.id LIMIT $7`
 	case "priority":
 		value, err := s.Priority(ctx, p, w, r.ID)
 		if err != nil {
@@ -58,7 +69,13 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, r Req
 		page := Page{Items: []json.RawMessage{encode(map[string]any{"target": Ref{ID: r.ID, Version: version}, "policy": policy, "reason": reason})}}
 		return apicontract.Response[Page]{Data: &page, Meta: apicontract.Meta{WorkspaceID: w, Completeness: apicontract.Completeness{State: "complete"}}}, nil
 	case "records":
-		sql = `SELECT jsonb_build_object('id',id,'version',version,'kind',kind,'position',position,'value',payload,'refs',refs),lpad(position::text,20,'0') FROM automation_records e WHERE workspace_id=$1 AND ($4='' OR kind=$4) AND ($5='' OR id=$5) AND lpad(position::text,20,'0')>$6 AND ` + access.ReadFilterSQL(refs) + ` ORDER BY position LIMIT $7`
+		sql = `SELECT jsonb_build_object('id',id,'version',version,'kind',kind,'position',position,'value',CASE WHEN e.kind='model-input' THEN e.payload-'request'-'evidence'-'issue' WHEN e.kind='model-attempt' THEN e.payload #- '{response,body}' WHEN e.kind='issue' THEN (e.payload-'body'-'sources') #- '{observed,body}' ELSE e.payload END,'refs',CASE WHEN e.kind IN ('model-input','model-attempt','issue') THEN '[]'::jsonb ELSE e.refs END),lpad(position::text,20,'0') FROM automation_records e WHERE workspace_id=$1 AND ($4='' OR kind=$4) AND ($5='' OR id=$5) AND lpad(position::text,20,'0')>$6 AND ` + access.ReadFilterSQL(refs) + ` AND (e.kind<>'batch' OR NOT EXISTS(SELECT 1 FROM triage_batch_jobs b JOIN automation_jobs bj ON bj.workspace_id=b.workspace_id AND bj.id=b.job_id WHERE b.workspace_id=e.workspace_id AND b.batch_id=e.id AND NOT (` + access.ReadFilterSQL("bj.refs||COALESCE(bj.result->'refs','[]'::jsonb)||COALESCE(bj.result->'usage','[]'::jsonb)") + `))) ORDER BY position LIMIT $7`
+
+	case "evaluations":
+		refs = `e.refs||COALESCE(e.result->'refs','[]'::jsonb)||COALESCE(e.result->'usage','[]'::jsonb)`
+		sql = `SELECT (to_jsonb(e)-'checkpoint'-'lease'-'refs'-'result')||jsonb_build_object('result',e.result-'refs','has_checkpoint',checkpoint<>'null'::jsonb,'control_version',COALESCE((SELECT version FROM shared_versions WHERE workspace_id=$1 AND resource_id='job-control:'||e.id),'0')),e.id FROM automation_jobs e WHERE e.workspace_id=$1 AND e.kind='triage' AND $4::text=$4 AND ($5='' OR e.id=$5 OR e.target_id=$5) AND e.id>$6 AND ` + access.ReadFilterSQL(refs) + ` ORDER BY e.id LIMIT $7`
+	case "attempts":
+		sql = `SELECT jsonb_build_object('id',e.id,'version',e.version,'kind',e.kind,'value',e.payload #- '{response,body}'),e.id FROM triage_model_attempts a JOIN automation_jobs j ON j.workspace_id=a.workspace_id AND j.id=a.job_id JOIN shared_versions h ON h.workspace_id=a.workspace_id AND h.resource_id=a.resource_id JOIN automation_records e ON e.workspace_id=h.workspace_id AND e.id=h.resource_id AND e.version=h.version WHERE e.workspace_id=$1 AND $4::text=$4 AND ($5='' OR a.job_id=$5 OR j.target_id=$5) AND e.id>$6 AND ` + access.ReadFilterSQL(refs) + ` ORDER BY e.id LIMIT $7`
 	case "jobs":
 		refs = `e.refs||COALESCE(e.result->'refs','[]'::jsonb)||COALESCE(e.result->'usage','[]'::jsonb)`
 		sql = `SELECT (to_jsonb(e)-'checkpoint'-'lease')||jsonb_build_object('has_checkpoint',checkpoint<>'null'::jsonb,'control_version',COALESCE((SELECT version FROM shared_versions WHERE workspace_id=$1 AND resource_id='job-control:'||e.id),'0')),id FROM automation_jobs e WHERE workspace_id=$1 AND ($4='' OR kind=$4) AND ($5='' OR id=$5 OR target_id=$5) AND id>$6 AND ` + access.ReadFilterSQL(refs) + ` ORDER BY id LIMIT $7`
@@ -232,7 +249,7 @@ func (s *Service) ApplyPast(ctx context.Context, p access.Principal, w string, r
 			if s.checkRefs(ctx, tx, p, w, refs) != nil {
 				continue
 			}
-			if err = s.enqueue(ctx, tx, w, "triage", Source{Event: "explicit:" + target.ID + "@" + target.Version, Target: target}, r.Policy, "", refs); err != nil {
+			if err = s.queueTriage(ctx, tx, w, target, "explicit:"+r.OperationID+":"+target.ID+"@"+target.Version); err != nil {
 				return nil, err
 			}
 			dependencies = append(dependencies, refs...)
@@ -346,6 +363,26 @@ func wire(r *http.Request, v any) error {
 	return nil
 }
 func (s *Service) Register(mux *http.ServeMux) {
+	for _, name := range []string{"model-template", "model-connections"} {
+		mux.HandleFunc("GET /automation/workspaces/{workspace}/"+name, func(w http.ResponseWriter, r *http.Request) {
+			user, ok := s.Access.User(w, r)
+			if !ok {
+				return
+			}
+			p := access.Principal{UserID: user}
+			workspace := r.PathValue("workspace")
+			if err := s.Access.Check(r.Context(), p, workspace, "", "read"); err != nil {
+				reply(w, nil, err)
+				return
+			}
+			if name == "model-template" {
+				reply(w, DefaultModel(), nil)
+				return
+			}
+			value, err := s.Gateway.Connections(workspace)
+			reply(w, value, err)
+		})
+	}
 	mux.HandleFunc("GET /automation/workspaces/{workspace}/template", func(w http.ResponseWriter, r *http.Request) {
 		user, ok := s.Access.User(w, r)
 		if !ok {

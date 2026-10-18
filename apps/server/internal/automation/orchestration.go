@@ -23,6 +23,11 @@ func (s *Service) CheckJobTx(ctx context.Context, tx pgx.Tx, j Job) (Control, Re
 	if reason != "" {
 		return c, Ref{}, access.ErrForbidden
 	}
+	if j.Kind == "triage" {
+		if err = s.checkBatch(ctx, tx, j, access.Principal{UserID: c.Controller}, true); err != nil {
+			return c, Ref{}, err
+		}
+	}
 	r, err := record(ctx, tx, j.Workspace, Ref{ID: "control:" + j.Kind, Version: "head"})
 	return c, r.Ref, err
 }

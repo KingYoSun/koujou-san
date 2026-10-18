@@ -115,6 +115,10 @@
 
 ## Issue #27の判定
 
-状態: In progress。Scope revision 1。[PR #61](https://github.com/KingYoSun/koujou-san/pull/61)。所有CLI/HTTP・PG・Ory/MCP・共通画面・Gateway復元と、本人が許可したOpenAI APIの三要求を確認した。第一404と第二の判断不能を保持し、追加許可の第三で固定証拠からの候補・保存・後続Run作成に成功した。元Runの成功を維持し、入力487・出力442 token、cache 0・reasoning欠測を記録した。固定`1315b02`のコードと実接続証跡の[独立検品](2026-10-18-issue-27-inspection.md)は全条件PASS・blocker 0件。残る作業は最新headの必須CIとマージ後照合である。[計画](2026-10-18-issue-27-plan.md)、[証跡](2026-10-18-issue-27-evidence.md)、[ADR](../adr/0027-server-hopper-semantics.md)を参照する。
+状態: Complete。Scope revision 1。[PR #61](https://github.com/KingYoSun/koujou-san/pull/61)を最終head `04cfa139d66359aef61c85711f2fa723f423bb4b`の全CIと[独立検品](2026-10-18-issue-27-inspection.md)PASS後にマージした。merge `17def2aa914e0c31cf8a03360521e57864d060d0`とのtreeは`1831d670424ebc203b521994c1467715d6a6a331`で一致、差分0。#27を手動Closeし、親#2を更新した。所有CLI/HTTP・PG・Ory/MCP・共通画面・Gateway復元と、本人が許可したOpenAI API三要求の結果は[証跡](2026-10-18-issue-27-evidence.md)を参照する。第三で元Run成功を保った固定証拠からの後続Run作成を確認した。実要求は終了し、Gatewayは通常停止。未検証のproviderやモデルへ結果を一般化しない。
 
-#28〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。
+## Issue #28の実装
+
+状態: In progress。Scope revision 2。[PR #62](https://github.com/KingYoSun/koujou-san/pull/62)で、承認済みの優先度・同期方針と取得10万固定版の上限を実装した。共通画面・所有試験・二修正の差分検品と実OpenAI二要求は成功。実GitHubの修正と同じ合成Issueでの試験も成功し、全AC/INVARの独立検品はPASS・blocker 0件。最終文書を含むHEADのCI・マージ後照合が残っている。詳細は[検証記録](2026-10-18-issue-28-evidence.md)。#27の消費枠は流用していない。
+
+#29〜#34は未着手（#33は実スリープと初見操作の確認移管を反映済み）。初期リリースの完成とは扱わない。
