@@ -2,7 +2,9 @@
 
 現在の条件と手順は[計画](2026-10-19-issue-33-plan.md)、現在の判定は[current-state](current-state.md)を参照する。実施中であり、初期リリース受入を完了したとは扱わない。
 
-PR #70の実装差分は[独立コード検品](2026-10-20-issue-33-code-inspection.md)でR1〜R4がPASSとなった。初見操作・実S3・全体停止後の継続を含む#33全体の独立受入検品は、残る観測の取得後に行う。
+PR #70の実装差分は[独立コード検品](2026-10-20-issue-33-code-inspection.md)でR1〜R4がPASSとなった。取得済みの受入証拠を独立検品し、#33全体の最終判定は実S3の観測後に行う。
+
+以下の途中記録にある残作業・未確認は、各段階の時点を表す。2026-10-20 JSTの追加結果は、末尾の「本人の初見操作」「全体停止後の継続」を参照する。実S3は本人の指示で後に残している。
 
 ## 条件付きマージとexport
 
@@ -123,3 +125,29 @@ release Runnerの実検品中、所有APIだけを停止した。Runner PID 8790
 `comparison:1887-coverage@AM2PVNPZAJAHNTTE6OF7PNICJJ` は、同じ期間の利用量/API換算額を帰属別に確認した。API 18要求は操作16・Hopper1・Triage1の計測に一致し、元Runへ加算していない。操作16件の提供元合計と、既知cache/推論内訳を含む投影の合計も一致した。推論内訳12件の欠測は残す。Codexのgpt-6-astraとClaudeの実モデルを記録し、起動前に失敗した接続のモデル未取得も保持した。定額契約・単価未設定の金額は未算定で、0円ではない。費用優劣や節約率は主張しない。画面とJSONは `comparison-*.jpg/json` に保持した。
 
 実接続はCLI 5/6回・API 18/20要求。残る枠は使っていない。本人用HumanReviewRunは固定成果物・役割・質問を用意して未回答で待機。実スリープ用工程も、本人の開始時刻の判断までCLIを作らない状態で待機している。
+
+## 本人の初見操作
+
+本人は初見操作だけを先に行う方針を選び、2026-10-20 02:06:34 JSTに通常のWeb画面から回答した。事前に固定した編集者・実行依頼不許可のアカウント `DHD2LZRAAIASE24V5YQLPAWBGO` が、判断FAIL、理由「ボタンのラベルが『保存』になっており、『保存して戻る』ではない」と成果物URLを送信した。画面内の目的・条件・固定ビルドを使った回答であり、回答内容や期待判定を事前に教えていない。
+
+API受付、Runner配送、実際の継続は別の時刻で記録された。同じHumanReviewRunが終了コード0で正常終了し、派生した検品判定はFAILとなった。合成ビルドの条件未達と、初見操作の確認成功を区別する。この合成ビルドを新たな製品修正の対象へ広げない。
+
+- API回答受付: `2026-10-19T17:06:34.3255584Z`。
+- Runner配送: `2026-10-19T17:06:34.5035938Z`。
+- 継続確認: `2026-10-19T17:06:34.6190895Z`。
+- 固定Pause: `run-pause:kukuri-1887-human-review:review@FN67B3OYGBGVEJJDCDHTSUN5NM`。
+- 固定Run: `run:kukuri-1887-human-review@EC6ZXBSXFGMCMSEA3CRAXYVDVN`。
+
+原回答と由来は `run-pause-kukuri-1887-human-review-review-observed.json`、共通画面は `human-review-completed.jpg` に保存した。#23から移管した初見操作は実施済みとなった。実S3は、本人の「後にして」の指示を維持する。開始時刻の工程はcount 0の判断待ちで、sleep用CLIは作っていない。
+
+## 全体停止後の継続
+
+HumanReviewの終了後、共通Webタブ、Web配信、APIと全Worker、Windows Runnerを停止した。Runnerはactive 0、未送信frame/usageなしを先に確認した。保存用のPostgreSQL・Ory・ArcadeDBと外部Gatewayは維持し、製品の二つの待受portは閉じ、製品API/ネイティブ実行プロセスが残っていないことを `whole-stop.json` へ記録した。
+
+停止中に、元のCodex/Claude Codeの版取得、Gitによる固定commit/treeと作業差分なしの確認、GitHubによるmerge結果の取得を行った。kukuriの通常の `pnpm -C apps/desktop exec vitest run src/shell/DesktopShellPage.publicThreads.test.tsx --reporter=verbose` も9件PASSとなった。終了後も二つのportが閉じていることを確認した。有料モデルは呼んでいない。
+
+六つのexportを製品APIなしで読み、JSONの構文、固定版、SHA-256、末尾completeとerrorなしを照合した。最終検品・実装・HumanReviewのexportは、参照渡しの添付とunfetchedを維持しており、外部本文を取得済みへ補完していない。全体停止中の結果は `stopped-original-continuation.json` と `issue33-stopped-original-test.log`、exportは `exports/manifest.json` に保存した。
+
+検証後は、CI成功済みcommit `b43f77e2f8d49e1952a56b3b6ce250509945272b` からbuildしたAPI、同じrelease RunnerとWebを起動した。元のWeb認証・編集権限と本人の回答・継続・FAIL表示が保持された。完了したmerge工程の固定版/count 5と、sleep工程の固定版/count 0も変わっていない。Runnerはactive 0・未送信frame/usageなしで再接続した。最初の未開始Runに関する未確認記録はそのまま残し、全実行の所在が確認済みとはしていない。復帰結果は `whole-stop-restored.json` と `whole-stop-restored-ui.txt` に保持した。
+
+kukuriの作業用worktreeではCodeGraph CLIが有効な索引なしを返したため、通常の検索へ切り替えた。索引は作成していない。実接続の消費はCLI 5/6回・API 18/20要求のまま。残るリリース前観測は実S3一回であり、#33の完了条件を緩和しない。
