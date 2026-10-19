@@ -2,6 +2,30 @@
 
 現在の条件と手順は[計画](2026-10-19-issue-33-plan.md)、現在の判定は[current-state](current-state.md)を参照する。実施中であり、初期リリース受入を完了したとは扱わない。
 
+PR #70の実装差分は[独立コード検品](2026-10-20-issue-33-code-inspection.md)でR1〜R4がPASSとなった。初見操作・実S3・全体停止後の継続を含む#33全体の独立受入検品は、残る観測の取得後に行う。
+
+## 条件付きマージとexport
+
+2026-10-20（JST）、kukuriの固定候補 `82ff9f50d37b89ad8c7b58b9ba1baadb2a719b8d` に対するFast（39277853160）、Linux Package（39277852971）、Windows Store Package（39277852972）、Refactoring Audit（39277852977）が成功した。Fastの任意macOS・Androidジョブはskipであり、実行成功とは扱わない。
+
+通常の工程 `workflow-execution:1887-final-merge` は、固定した独立検品結果、Fast、Linux Package、Windows Store Packageの四つのPASSを得てからmergeノードを開始した。検品ノードは既存の固定結果を読み取る照合であり、新しい独立検品を行ったとは扱わない。merge用のRunは `gh pr merge --match-head-commit` を実行し、[kukuri PR #1890](https://github.com/kukuri-app/kukuri/pull/1890)を16:25:04 UTCにマージした。工程の最終版は `FFRAUDYBD5HMQPZDKEC764QILM`、countは5、stateはcompleted。外部操作の再実行はしていない。
+
+merge `92299fb938106e6a0c506128d999b176f7e336c3` と候補のtreeは、ともに `6e0821b96509932b19cbbc68cbdff9dde76e9441` で一致した。元のkukuri checkoutは変更せず、Runのworktreeでfetchと差分0を確認し、Issue #1887をCloseした。
+
+対照例 `workflow-execution:1887-stale` は、対象を新候補へ変えて旧commitの検品PASSを参照させた。照合はINCONCLUSIVE、mergeノードはskipped、merge用Runは未作成となった。旧版のPASSを新しい成果物へ流用していない。
+
+五つの固定版を通常APIからNDJSONでexportした。旧PASSの対照工程・完了したmerge工程・開始時刻を待つsleep工程と、最終検品Run・実装Runが対象である。全て末尾のcompleteとerrorなしを確認し、ファイルごとの固定版、件数、サイズ、SHA-256を `.cache/issue33-native/exports/manifest.json` に保存した。未取得の添付はその状態を維持し、全ての外部成果物をコピーできたとは扱わない。既知の試験用OAuth・DB・APIキー・認証用秘密値との完全一致検査では、いずれのexportにも一致しなかった。CLIの秘密ファイルは読んでいない。
+
+初見操作の回答待ちのため、全体停止を伴うS6後半はまだ実行していない。exportの成功だけで停止後の継続を達成扱いにしない。
+
+## 本人確認の待機環境
+
+初見操作のHumanReviewは未回答のまま、通常のWeb認証と現在の編集権限で回答できる状態にした。実S3の工程は「準備ができたので開始」の判断待ちであり、sleep用CLIは未起動。実施時刻を一度まとめて本人へ確認している。
+
+準備用の `test:acceptance` には4時間の上限があるため、通常APIへ移した状態を継続できるよう、専用Composeの削除を行う親プロセスを対象確認後に停止し、準備用Go試験も終了した。この準備コマンド全体をPASSとは記録しない。専用DB・Ory・通常API・release Runner・Webは維持した。
+
+操作補助の二アカウントは、同じ既存の合成Ory identityからPKCEで試験トークンを取得する専用loopback transportへ移した。管理用の試験login/consent受理を使い、通常の本人ログイン成功の証拠とは分ける。Workspaceや端末の許可は変更せず、通常APIの `/auth/me` で元と同じ二つのUser IDを確認した。トークンは補助プロセスのメモリ内にだけ保持する。ブラウザの本人用タスクとWindowsのDPAPI認証は維持している。
+
 ## 環境と入力
 
 koujou-sanの作業ブランチは `codex/issue-33-kukuri-1887`。kukuriの固定基準は `dea966f6866d9b3978a5a9db1add7f1e3e8e5d5e`（origin/main、0.4.6）。元checkoutは `997653347` のまま変更していない。Codex CLIは0.162.1、Claude Codeは2.1.300。両CLIの既存認証を使い、新しいOAuth・契約・キーは作成していない。
