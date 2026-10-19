@@ -147,7 +147,7 @@
 
 ## Issue #33の判定
 
-状態: In progress。[計画](2026-10-19-issue-33-plan.md)に固定したkukuri #1887で再開した。Windowsの長いパスによるworktree作成失敗を修正前後の試験で確認し、別メンバーによる2回のPause回答から同じRunを継続した。Claudeの修正前FAILとCodexによる修正案を記録し、同じ回帰試験で固定基準commitは5件FAIL、修正案は13件PASSとなった。実接続消費はCLI 4/6回、API 18/20要求。固定commitの独立検品PASS、LLM三機能からの手動編集・採用、実通信断、合成Issue一件の作成応答喪失と照合・Close、Hopper/Triageの実モデル評価を記録した。最終候補のCI・再検品、条件付きmerge・比較・export、無クライアント連鎖、人の初見操作・実スリープは未完了。[証跡](2026-10-19-issue-33-evidence.md)を参照する。
+状態: In progress。[計画](2026-10-19-issue-33-plan.md)に固定したkukuri #1887で再開した。Windowsの長いパスによるworktree作成失敗を修正前後の試験で確認し、別メンバーによる2回のPause回答から同じRunを継続した。Claudeの修正前FAILとCodexによる修正案を記録し、同じ回帰試験で固定基準commitは5件FAIL、修正案は13件PASSとなった。実接続消費はCLI 5/6回、API 18/20要求。固定commitの独立検品PASS、LLM三機能からの手動編集・採用、実通信断、合成Issue一件の作成応答喪失と照合・Close、Hopper/Triageの実モデル評価を記録した。最終候補のCI・再検品、条件付きmerge・比較・export、人の初見操作・実スリープは未完了。無クライアントでの固定CI受信・Hopper発行・P2・Runner待機と、再接続後の同じRunの継続を確認した。[証跡](2026-10-19-issue-33-evidence.md)を参照する。
 
 ## Issue #47の判定
 

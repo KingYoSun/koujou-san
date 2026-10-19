@@ -83,3 +83,19 @@ release Runnerの実検品中、所有APIだけを停止した。Runner PID 8790
 実接続の現在消費はCLI 4/6回、API 18/20要求。APIはContext選択3、定義生成11、出力Context生成2、Hopper1、Triage1。承認枠をリセットせず、残る2要求は未使用。失敗要求・保留・料金未設定を成功や0費用へ補完しない。
 
 [全68条件の対応表](2026-10-19-issue-33-ac-matrix.md)に既存の有効な機能証拠と今回の範囲をまとめた。CIと条件付きmerge、比較、export/停止後継続、人の初見操作、実スリープと最終の独立受入検品は、完了するまで未確認・待ちのまま残す。
+
+## 無クライアント連鎖と再接続の確認
+
+旧Fast CIのjobs一覧APIが502となった間は、観測をunknown / source_unavailableとして保持し、完了や成功へ補完しなかった。同じ最終commitの既存監査CI [39277852977](https://github.com/kukuri-app/kukuri/actions/runs/39277852977)を、run ID・commit・successの三条件で絞って登録した。画面とRunnerを閉じた後に通常のサーバーWorkerが実際の完了を受信し、Run `run:hopper-ecbf1e75f23c4e4a083b374ba53f373ae001dc90fda819f5c8b76e39886141fd` を一件発行。P2とrunner_unavailableを、started_atなし・assignmentなしで記録した。15:40:21 UTCのCI観測を含む `clients-absent-results.json` に、全製品クライアント不在と同じ固定参照を保存した。
+
+再接続すると同じRunへ割当が付き、別メンバーの二回答から同じRunが正常終了した。別の旧版CI中断から生じたRunも保存されているが、定義更新でdefinition_or_controller_changedとして保留され、CLIは未起動のまま。別起点の二つの履歴を同じ発行の重複とは扱わず、保留を完了へ変換しない。
+
+最終commit `82ff9f50d37b89ad8c7b58b9ba1baadb2a719b8d` のInspectionRunも、製品の採用判定までPASS。固定resultは `run-result:kukuri-1887-inspection-final@KKVZ45T4THX5IDKQPPKCLDQEQR`。同じ旧PASSを新commitへ使う実工程では、照合RunがINCONCLUSIVE、mergeノードがskipped、merge用Runが未作成となった。CLIの終了コード0を検品PASSへ読み替えていない。
+
+## 比較画面
+
+`comparison:1887-inspection@Q2B2QFUMYP2EWTMCUDZOU7B7OV` は、同じ期間・claude-fable-5-1・無注入・三条件の基準版/修正後を固定テンプレート版で絞った。画面で独立FAIL/PASS、実行/待機時間、取得範囲と未算定を並べ、CLI自己申告と独立結果を区別した。基準側はsource検品、修正側は92試験・対象のブラウザ試験も実行した違いを、原検品記録から確認できる。
+
+`comparison:1887-coverage@AM2PVNPZAJAHNTTE6OF7PNICJJ` は、同じ期間の利用量/API換算額を帰属別に確認した。API 18要求は操作16・Hopper1・Triage1の計測に一致し、元Runへ加算していない。操作16件の提供元合計と、既知cache/推論内訳を含む投影の合計も一致した。推論内訳12件の欠測は残す。Codexのgpt-6-astraとClaudeの実モデルを記録し、起動前に失敗した接続のモデル未取得も保持した。定額契約・単価未設定の金額は未算定で、0円ではない。費用優劣や節約率は主張しない。画面とJSONは `comparison-*.jpg/json` に保持した。
+
+実接続はCLI 5/6回・API 18/20要求。残る枠は使っていない。本人用HumanReviewRunは固定成果物・役割・質問を用意して未回答で待機。実スリープ用工程も、本人の開始時刻の判断までCLIを作らない状態で待機している。
