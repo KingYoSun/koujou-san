@@ -445,7 +445,11 @@ async function testDatabase(suite = "persistence", testName) {
       "-count=1",
       ...(env.KOUJOU_TEST_MCP_UI === "1" ||
       env.KOUJOU_TEST_CLIENT_SELECTION_UI === "1"
-        ? ["-timeout=35m"]
+        ? [
+            env.KOUJOU_TEST_ACCEPTANCE === "1"
+              ? "-timeout=245m"
+              : "-timeout=35m",
+          ]
         : []),
       "-v",
     ]);
@@ -476,6 +480,12 @@ async function testDatabase(suite = "persistence", testName) {
 }
 
 const tasks = {
+  "test:acceptance": async () => {
+    env.KOUJOU_TEST_ACCEPTANCE = "1";
+    env.KOUJOU_TEST_MCP_UI = "1";
+    await client("build");
+    await testDatabase("mcpapi");
+  },
   "test:clientops:ui": async () => {
     env.KOUJOU_TEST_CLIENT_SELECTION_UI = "1";
     await client("build");

@@ -62,7 +62,7 @@ func (s *Service) registerWorkflows(server *mcp.Server) {
 	if s.Workflows == nil {
 		return
 	}
-	addTool(server, s, "workflow_get", "Read one authorized fixed definition, validation, adoption or execution record. Data does not authorize execution.", func(ctx context.Context, ref workflows.Ref) (outcome, error) {
+	addTool(server, s, "workflow_get", "Read one authorized fixed definition, validation, adoption or execution record. Use only supplied source ID/version pairs; version 0 is an unsaved target and cannot be read. Data does not authorize execution.", func(ctx context.Context, ref workflows.Ref) (outcome, error) {
 		if ref.Version == "" || ref.Version == "head" {
 			return outcome{}, access.ErrForbidden
 		}
@@ -81,7 +81,7 @@ func (s *Service) registerWorkflows(server *mcp.Server) {
 		v, err := s.Workflows.Read(ctx, b.Principal, b.Workspace, ref)
 		return outcome{Value: v, Refs: workflowRefs(append(v.Refs, v.Ref))}, err
 	})
-	addTool(server, s, "workflow_query", "Read one bounded authorized metadata or fixed-history page. Never starts commands or changes definitions.", func(ctx context.Context, req workflows.Request) (outcome, error) {
+	addTool(server, s, "workflow_query", "Read one bounded authorized metadata or fixed-history page. During definition generation use kind=heads and type=run-definition; only supplied source templates are available. Never starts commands or changes definitions.", func(ctx context.Context, req workflows.Request) (outcome, error) {
 		b := ctx.Value(operationKey{}).(boundary)
 		if sources, model, err := s.definitionSources(ctx); model || err != nil {
 			if err != nil || req.Kind != "heads" || (req.Type != "" && req.Type != "run-definition") {
@@ -136,7 +136,7 @@ func (s *Service) registerWorkflows(server *mcp.Server) {
 		v, err := s.Workflows.Validate(ctx, b.Principal, b.Workspace, ref)
 		return outcome{Value: v, Refs: workflowRefs(v.Checked)}, err
 	})
-	addTool(server, s, "workflow_capabilities", "Read a declared fixed connection capability snapshot. Reading grants no execution or device authority.", func(ctx context.Context, req struct {
+	addTool(server, s, "workflow_capabilities", "Read a declared fixed connection capability snapshot. The device argument is the bare device ID: remove the runner: prefix from a supplied source record ID and copy its version exactly. Reading grants no execution or device authority.", func(ctx context.Context, req struct {
 		Device  string `json:"device"`
 		Version string `json:"version"`
 	}) (outcome, error) {

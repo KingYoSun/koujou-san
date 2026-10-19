@@ -28,7 +28,10 @@ fn config(root: &Path) -> Result<Configuration, String> {
         .map_err(|_| "invalid_runner_configuration".into())
 }
 fn git(repo: &Path, args: &[&str]) -> Result<String, String> {
-    let output = Command::new("git")
+    let mut command = Command::new("git");
+    #[cfg(windows)]
+    command.args(["-c", "core.longpaths=true"]);
+    let output = command
         .arg("-C")
         .arg(git_path(repo)?)
         .args(args)
@@ -226,6 +229,20 @@ mod tests {
         git(&repo, &["init"]).unwrap();
         fs::write(repo.join("source.txt"), "original").unwrap();
         git(&repo, &["add", "source.txt"]).unwrap();
+        #[cfg(windows)]
+        let long_relative = {
+            // The actual kukuri acceptance checkout failed on its visual baselines.
+            let relative = format!(
+                "apps/desktop/tests/playwright/__screenshots__/visual.spec.ts/{}.png",
+                "public-thread-acceptance-".repeat(3)
+            );
+            git(&repo, &["config", "core.longpaths", "false"]).unwrap();
+            let file = repo.join(&relative);
+            fs::create_dir_all(file.parent().unwrap()).unwrap();
+            fs::write(&file, "fixed visual baseline").unwrap();
+            git(&repo, &["add", &relative]).unwrap();
+            relative
+        };
         git(
             &repo,
             &[
@@ -267,6 +284,18 @@ mod tests {
         )
         .unwrap();
         assert_ne!(first, second);
+        #[cfg(windows)]
+        {
+            assert!(first.join(&long_relative).as_os_str().len() > 260);
+            assert_eq!(
+                fs::read_to_string(first.join(&long_relative)).unwrap(),
+                "fixed visual baseline"
+            );
+            assert_eq!(
+                git(&repo, &["config", "--local", "--get", "core.longpaths"]).unwrap(),
+                "false"
+            );
+        }
         fs::write(first.join("source.txt"), "run one edited").unwrap();
         assert_eq!(
             prepare_area(

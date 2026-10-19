@@ -143,6 +143,12 @@
 
 [Issue #33](https://github.com/KingYoSun/koujou-san/issues/33)に、本人が承認した実接続の枠を記録した。Codex・Claude Code合計最大6回（各10分以内）、専用OpenAI APIをBifrost経由で最大20要求（各32 KiB・4096 token・90秒、fallback/自動retryなし）。選定する案件の必要なコードと合成データが対象で、現在の消費はCLI 0回・API 0要求。対象の指定後も同じ枠を使い、承認済みの枠を重複して取り直さない。
 
+同日、本人がkukuri #1887を指定したため、#33の対象未定による保留を解除した。上記の0回は保留時点の記録である。#34は保留を維持する。
+
+## Issue #33の判定
+
+状態: In progress。[計画](2026-10-19-issue-33-plan.md)に固定したkukuri #1887で再開した。Windowsの長いパスによるworktree作成失敗を修正前後の試験で確認し、別メンバーによる2回のPause回答から同じRunを継続した。Claudeの修正前FAILとCodexによる修正案を記録し、同じ回帰試験で固定基準commitは5件FAIL、修正案は13件PASSとなった。実接続消費はCLI 4/6回、API 18/20要求。固定commitの独立検品PASS、LLM三機能からの手動編集・採用、実通信断、合成Issue一件の作成応答喪失と照合・Close、Hopper/Triageの実モデル評価を記録した。最終候補のCI・再検品、条件付きmerge・比較・export、無クライアント連鎖、人の初見操作・実スリープは未完了。[証跡](2026-10-19-issue-33-evidence.md)を参照する。
+
 ## Issue #47の判定
 
 状態: Complete。[PR #68](https://github.com/KingYoSun/koujou-san/pull/68)を最終head `81372688549d5a7b95a87e637b9750ab0bbfedd9` の全CI成功後にマージした。merge `35995f473e58ee0d27399acaa60d1ebf9ae3cd79` と最終headのtreeは `3a5d6f9a8629cc6fa38b14cf30699b78691d2c69` で一致、差分0。AC-1〜7・INVAR-1〜4を照合し、#47をCloseした。DESIGN.mdと関連文書、原本、三つの参照見本を追加した。本番UIの変更は含めない。[検証記録](2026-10-19-issue-47-evidence.md)に初回CIのポート競合と再実行成功、表示・操作・拡大・印刷の確認範囲を保持する。#33・#34は保留を維持する。
