@@ -50,6 +50,16 @@ export function nodeCount(text: string): number {
   return findNodeAtLocation(tree(text), ["nodes"])?.children?.length ?? 0;
 }
 
+export const applyFields = (
+  text: string,
+  fields: Record<string, string | null>,
+) =>
+  Object.entries(fields).reduce(
+    (source, [path, value]) =>
+      editField(source, JSON.parse(path) as JSONPath, value ?? undefined),
+    text,
+  );
+
 export function mergeFields(base: string, changes: string): string {
   const source = tree(changes);
   if (source.type !== "object" || tree(base).type !== "object")

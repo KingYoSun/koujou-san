@@ -1,12 +1,22 @@
-import { ScreenContent, NavigationLink } from "./navigation";
+import {
+  ScreenContent,
+  NavigationLink,
+  useNavigation,
+  useScreenActive,
+} from "./navigation";
 import {
   ServerModelFields,
   type ModelConnection,
   type SemanticSettings,
 } from "./server-model";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { syncRequest } from "./auth";
 import { SyncHTTPError } from "./sync-error";
+import { Tabs } from "./tabs";
+import { StatusBadge } from "./status-badge";
+import { Disclosure } from "./disclosure";
+import { HopperRuleFields } from "./hopper-rule-fields";
+import { applyFields } from "./workflow-json";
 
 type Ref = { id: string; version: string };
 // Both record pages and mutation replies contain fields outside a fixed Ref.
@@ -104,6 +114,11 @@ export function Hopper({
   workspace: string;
   role: string;
 }) {
+  const navigation = useNavigation();
+  const active = useScreenActive();
+  const running = useRef(0);
+  const view = navigation?.route.view ?? "rules";
+  const [fields, setFields] = useState<Record<string, string | null>>({});
   const base = `/hopper/workspaces/${encodeURIComponent(workspace)}`;
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -132,12 +147,14 @@ export function Hopper({
       native,
       body === undefined ? { method: "GET" } : { method: "POST", body },
     ) as Promise<T>;
-  const run = async (f: () => Promise<void>) => {
+  const run = async (f: () => Promise<void>, current = () => true) => {
+    running.current++;
     setBusy(true);
     setNotice("");
     try {
       await f();
     } catch (e) {
+      if (!current()) return;
       setPage(null);
       setSelected(null);
       setTrial(null);
@@ -148,6 +165,7 @@ export function Hopper({
         (e.status === 401 || e.status === 403)
       ) {
         setDraft("");
+        setFields({});
         setSaved(null);
         setConnections([]);
         setID("");
@@ -159,7 +177,8 @@ export function Hopper({
           "入力・接続・現在の版を確認してください。同じ内容は同じ操作として再送します。",
         );
     } finally {
-      setBusy(false);
+      running.current--;
+      setBusy(running.current > 0);
     }
   };
   const mutate = async (path: string, expected: string, value: object) => {
@@ -241,14 +260,15 @@ export function Hopper({
   };
   let semantic: SemanticSettings | undefined;
   try {
-    semantic = JSON.parse(draft).semantic;
+    semantic = JSON.parse(applyFields(draft, fields)).semantic;
   } catch {
     /* The JSON editor can be incomplete. */
   }
   const editSemantic = (change: Partial<SemanticSettings>) => {
-    const value = JSON.parse(draft);
+    const value = JSON.parse(applyFields(draft, fields));
     value.semantic = { ...value.semantic, ...change };
     setDraft(JSON.stringify(value, null, 2));
+    setFields({});
   };
   const fixedDetail = async (ref: Ref) =>
     setDetail(
@@ -266,6 +286,109 @@ export function Hopper({
         after_id,
       }),
     );
+  useEffect(() => {
+    if (!active) return;
+    let current = true;
+    const route = navigation?.route;
+    let nextKind =
+      view === "evaluations"
+        ? "evaluation"
+        : view === "chains"
+          ? route?.query
+            ? "evaluation"
+            : "chain"
+          : "definition";
+    let requestedRoot = route?.query ?? "",
+      nextMode = "heads";
+    try {
+      const filter = JSON.parse(requestedRoot) as {
+        kind: string;
+        mode: string;
+        root: string;
+      };
+      if (
+        ["definition", "activation", "evaluation", "chain"].includes(
+          filter.kind,
+        ) &&
+        ["heads", "history"].includes(filter.mode) &&
+        typeof filter.root === "string"
+      ) {
+        nextKind = filter.kind;
+        nextMode = filter.mode;
+        requestedRoot = filter.root;
+      }
+    } catch {
+      /* plain chain root */
+    }
+    setKind(nextKind);
+    setMode(nextMode);
+    setPage(null);
+    let after = 0,
+      after_id = "";
+    try {
+      const cursor = JSON.parse(route?.cursor ?? "[]") as [number, string];
+      after = typeof cursor[0] === "number" ? cursor[0] : 0;
+      after_id = typeof cursor[1] === "string" ? cursor[1] : "";
+    } catch {
+      /* first page */
+    }
+    setRoot(requestedRoot);
+    if (view !== "trial")
+      void run(
+        async () => {
+          const result = await call<Page>("/query", {
+            mode: nextMode,
+            kind: nextKind,
+            root: requestedRoot,
+            after,
+            after_id,
+            limit: 50,
+          });
+          if (current) setPage(result);
+        },
+        () => current,
+      );
+    return () => {
+      current = false;
+    };
+  }, [active, view, navigation?.route.query, navigation?.route.cursor]);
+  useEffect(() => {
+    if (!active) return;
+    let current = true;
+    const target = navigation?.route.target;
+    setSelected(null);
+    setAttempts(null);
+    setDetail(null);
+    if (target?.kind.startsWith("hopper-"))
+      void run(
+        async () => {
+          const record = await call<Version>(
+            `/records/${encodeURIComponent(target.id)}?version=${encodeURIComponent(target.version)}`,
+          );
+          if (!current) return;
+          setSelected(record);
+          if (record.kind === "definition") {
+            if (id !== record.id || version !== record.version) {
+              setDraft(JSON.stringify(record.value, null, 2));
+              setFields({});
+            }
+            setID(record.id);
+            setVersion(record.version);
+            setSaved(hopperRef(record));
+          }
+        },
+        () => current,
+      );
+    return () => {
+      current = false;
+    };
+  }, [active, navigation?.route.target?.id, navigation?.route.target?.version]);
+  let composed: string | undefined;
+  try {
+    composed = applyFields(draft, fields);
+  } catch {
+    /* invalid fields remain editable */
+  }
   return (
     <ScreenContent>
       {
@@ -278,537 +401,779 @@ export function Hopper({
             共有された結果をサーバーが評価します。画面を閉じても動作し、発行・Run作成・実行開始はそれぞれ現在の権限で確認します。
           </p>
           <p>
-            処理枠・自動化主体・費用上限は「Triage方針・優先度・処理状態」のHopper管理設定で指定します。
+            Hopperは仕事を発行し、Triageは優先度を評価します。主体・処理枠・費用上限は「共通処理制御」で設定します。
           </p>
           <p role="status">{notice}</p>
-          <fieldset disabled={busy}>
-            <legend>定義と履歴</legend>
-            <label>
-              表示対象
-              <select
-                value={kind}
-                onChange={(e) => {
-                  setKind(e.target.value);
-                  setPage(null);
-                  setSelected(null);
-                }}
-              >
-                <option value="definition">定義</option>
-                <option value="activation">有効な版と停止状態</option>
-                <option value="evaluation">評価と発行</option>
-                <option value="chain">連鎖の停止・再開</option>
-              </select>
-            </label>
-            <label>
-              版の範囲
-              <select
-                value={mode}
-                onChange={(e) => {
-                  setMode(e.target.value);
-                  setPage(null);
-                }}
-              >
-                <option value="heads">現在</option>
-                <option value="history">履歴・過去の試行を含む</option>
-              </select>
-            </label>
-            <label>
-              起点で絞る
-              <input value={root} onChange={(e) => setRoot(e.target.value)} />
-            </label>
-            <button onClick={() => void run(() => query())}>
-              Hopperの一覧を取得
-            </button>
-            <ul>
-              {page?.items.map((r) => (
-                <li key={`${r.id}/${r.version}`}>
+          <Tabs
+            id="hopper-purpose"
+            label="Hopperの目的"
+            items={[
+              { id: "rules", label: "ルール" },
+              { id: "trial", label: "発行せずに試す" },
+              { id: "evaluations", label: "評価・発行履歴" },
+              { id: "chains", label: "連鎖・停止" },
+            ]}
+            value={view}
+            onChange={(next) =>
+              navigation?.navigate(
+                {
+                  workspace,
+                  screen: "hopper",
+                  view: next,
+                  ...(next === "trial" && saved
+                    ? { target: { ...saved, kind: "hopper-definition" } }
+                    : {}),
+                },
+                { focus: false },
+              )
+            }
+          />
+          <section
+            role="tabpanel"
+            id={`hopper-purpose-panel-${view}`}
+            aria-labelledby={`hopper-purpose-tab-${view}`}
+            tabIndex={0}
+          >
+            {view !== "trial" && (
+              <fieldset disabled={busy}>
+                <legend>
+                  {view === "evaluations"
+                    ? "評価・発行履歴"
+                    : view === "chains"
+                      ? "連鎖の起点と停止状態"
+                      : "ルール一覧"}
+                </legend>
+                <details>
+                  <summary>
+                    履歴の範囲・記録種別・起点を指定（詳細操作）
+                  </summary>
+
+                  <label>
+                    表示対象
+                    <select
+                      value={kind}
+                      onChange={(e) => {
+                        setKind(e.target.value);
+                        setPage(null);
+                        setSelected(null);
+                      }}
+                    >
+                      <option value="definition">定義</option>
+                      <option value="activation">有効な版と停止状態</option>
+                      <option value="evaluation">評価と発行</option>
+                      <option value="chain">連鎖の停止・再開</option>
+                    </select>
+                  </label>
+                  <label>
+                    版の範囲
+                    <select
+                      value={mode}
+                      onChange={(e) => {
+                        setMode(e.target.value);
+                        setPage(null);
+                      }}
+                    >
+                      <option value="heads">現在</option>
+                      <option value="history">履歴・過去の試行を含む</option>
+                    </select>
+                  </label>
+                  <label>
+                    起点で絞る
+                    <input
+                      value={root}
+                      onChange={(e) => setRoot(e.target.value)}
+                    />
+                  </label>
+                </details>
+                <button
+                  onClick={() =>
+                    navigation?.navigate({
+                      ...navigation.route,
+                      target: undefined,
+                      query: JSON.stringify({ kind, mode, root }),
+                      cursor: undefined,
+                    })
+                  }
+                >
+                  Hopperの一覧を取得
+                </button>
+                <ul>
+                  {page?.items.map((r) => (
+                    <li key={`${r.id}/${r.version}`}>
+                      <NavigationLink
+                        to={{
+                          ...(navigation?.route ?? {
+                            workspace,
+                            screen: "hopper",
+                          }),
+                          target: { ...hopperRef(r), kind: `hopper-${r.kind}` },
+                        }}
+                        related
+                      >
+                        {r.kind === "definition"
+                          ? (r.value as { name: string }).name
+                          : (states[(r.value as Evaluation).state] ??
+                            r.kind)}{" "}
+                        · {r.id}
+                      </NavigationLink>
+                    </li>
+                  ))}
+                </ul>
+                {page?.items.length === 50 && (
                   <button
-                    onClick={() => {
-                      setSelected(r);
-                      setAttempts(null);
-                      setDetail(null);
-                      if (r.kind === "definition") {
-                        setID(r.id);
-                        setVersion(r.version);
-                        setDraft(JSON.stringify(r.value, null, 2));
-                        setSaved(hopperRef(r));
-                      }
-                    }}
+                    onClick={() =>
+                      navigation?.navigate({
+                        ...navigation.route,
+                        target: undefined,
+                        cursor: JSON.stringify([page.after, page.after_id]),
+                      })
+                    }
                   >
-                    {r.kind === "definition"
-                      ? (r.value as { name: string }).name
-                      : (states[(r.value as Evaluation).state] ?? r.kind)}{" "}
-                    · {r.id}
+                    次の50件
                   </button>
-                </li>
-              ))}
-            </ul>
-            {page?.items.length === 50 && (
-              <button
-                onClick={() => void run(() => query(page.after, page.after_id))}
-              >
-                次の50件
-              </button>
+                )}
+              </fieldset>
             )}
-          </fieldset>
-          {selected && (
-            <section aria-label="Hopperの詳細">
-              {selected.kind === "evaluation" &&
-                (() => {
-                  const e = selected.value as Evaluation;
-                  return (
-                    <>
-                      <h3>
-                        {states[e.state] ?? e.state}
-                        {e.dry_run ? "（過去の試行・発行なし）" : ""}
-                      </h3>
-                      <p>{reasons[e.reason] ?? e.reason}</p>
-                      {e.semantic && (
-                        <section aria-label="意味判断の根拠と消費">
-                          <h4>
-                            意味判断:{" "}
-                            {states[e.semantic.state] ?? e.semantic.state}
-                          </h4>
-                          <p>
-                            {reasons[e.semantic.reason ?? ""] ??
-                              e.semantic.reason}
-                          </p>
-                          <p>
-                            この評価のモデル消費: {e.semantic.usage.length}件 /
-                            費用:{" "}
-                            {e.semantic.usage_state === "complete"
-                              ? "算定済み"
-                              : e.semantic.usage_state === "not_applicable"
-                                ? "要求なし"
-                                : "欠測・未算定あり"}
-                            。元のRunや発行先の消費とは分けて記録します。
-                          </p>
-                          {e.semantic.decision && (
-                            <>
-                              <p>{e.semantic.decision.reason}</p>
-                              <pre>
-                                {JSON.stringify(
-                                  {
-                                    candidate: e.semantic.decision.candidate,
-                                    evidence: e.semantic.decision.evidence,
-                                    unknown: e.semantic.decision.unknown,
-                                  },
-                                  null,
-                                  2,
+            {selected && (
+              <section aria-label="Hopperの詳細">
+                {selected.kind === "evaluation" &&
+                  (() => {
+                    const e = selected.value as Evaluation;
+                    return (
+                      <>
+                        <h3>
+                          {states[e.state] ?? e.state}
+                          {e.dry_run ? "（過去の試行・発行なし）" : ""}
+                        </h3>
+                        <p>{reasons[e.reason] ?? e.reason}</p>
+                        {e.semantic && (
+                          <section aria-label="意味判断の根拠と消費">
+                            <h4>
+                              意味判断:{" "}
+                              {states[e.semantic.state] ?? e.semantic.state}
+                            </h4>
+                            <p>
+                              {reasons[e.semantic.reason ?? ""] ??
+                                e.semantic.reason}
+                            </p>
+                            <p>
+                              この評価のモデル消費: {e.semantic.usage.length}件
+                              / 費用:{" "}
+                              {e.semantic.usage_state === "complete"
+                                ? "算定済み"
+                                : e.semantic.usage_state === "not_applicable"
+                                  ? "要求なし"
+                                  : "欠測・未算定あり"}
+                              。元のRunや発行先の消費とは分けて記録します。
+                            </p>
+                            {e.semantic.decision && (
+                              <>
+                                <p>{e.semantic.decision.reason}</p>
+                                <pre>
+                                  {JSON.stringify(
+                                    {
+                                      candidate: e.semantic.decision.candidate,
+                                      evidence: e.semantic.decision.evidence,
+                                      unknown: e.semantic.decision.unknown,
+                                    },
+                                    null,
+                                    2,
+                                  )}
+                                </pre>
+                              </>
+                            )}
+                            {e.semantic.input && (
+                              <button
+                                disabled={busy}
+                                onClick={() =>
+                                  void run(() =>
+                                    fixedDetail(e.semantic!.input!),
+                                  )
+                                }
+                              >
+                                固定した評価入力を確認
+                              </button>
+                            )}
+                            {e.semantic.response && (
+                              <button
+                                disabled={busy}
+                                onClick={() =>
+                                  void run(() =>
+                                    fixedDetail(e.semantic!.response!),
+                                  )
+                                }
+                              >
+                                採用したモデルの原応答を確認
+                              </button>
+                            )}
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                void run(() => loadAttempts(selected))
+                              }
+                            >
+                              この評価の試行・消費履歴を取得
+                            </button>
+                            {attempts && (
+                              <>
+                                <ul>
+                                  {attempts.items.map((a) => (
+                                    <li key={`${a.id}/${a.version}`}>
+                                      <button
+                                        disabled={busy}
+                                        onClick={() =>
+                                          void run(() => fixedDetail(a))
+                                        }
+                                      >
+                                        試行{" "}
+                                        {(a.value as { number: number }).number}{" "}
+                                        · {a.id}
+                                      </button>
+                                    </li>
+                                  ))}
+                                </ul>
+                                {attempts.items.length === 50 && (
+                                  <button
+                                    disabled={busy}
+                                    onClick={() =>
+                                      void run(() =>
+                                        loadAttempts(
+                                          selected,
+                                          attempts.after,
+                                          attempts.after_id,
+                                        ),
+                                      )
+                                    }
+                                  >
+                                    次の50試行
+                                  </button>
                                 )}
-                              </pre>
-                            </>
-                          )}
-                          {e.semantic.input && (
-                            <button
-                              disabled={busy}
-                              onClick={() =>
-                                void run(() => fixedDetail(e.semantic!.input!))
-                              }
-                            >
-                              固定した評価入力を確認
-                            </button>
-                          )}
-                          {e.semantic.response && (
-                            <button
-                              disabled={busy}
-                              onClick={() =>
-                                void run(() =>
-                                  fixedDetail(e.semantic!.response!),
-                                )
-                              }
-                            >
-                              採用したモデルの原応答を確認
-                            </button>
-                          )}
+                              </>
+                            )}
+                            {admin && (
+                              <button
+                                disabled={busy}
+                                onClick={() =>
+                                  void run(() => decide(selected, "reevaluate"))
+                                }
+                              >
+                                同じ結果を新しい履歴で再評価
+                              </button>
+                            )}
+                            <p>
+                              再評価は現在の証拠と許可を確認してモデルを要求し、追加の消費を記録します。過去の判定と発行先は保持します。
+                            </p>
+                          </section>
+                        )}
+                        {e.source.previous_evaluation && (
                           <button
                             disabled={busy}
                             onClick={() =>
-                              void run(() => loadAttempts(selected))
+                              void run(async () => {
+                                await fixedDetail(
+                                  e.source.previous_evaluation!,
+                                );
+                              })
                             }
                           >
-                            この評価の試行・消費履歴を取得
+                            前の評価と発行先を確認
                           </button>
-                          {attempts && (
-                            <>
-                              <ul>
-                                {attempts.items.map((a) => (
-                                  <li key={`${a.id}/${a.version}`}>
-                                    <button
-                                      disabled={busy}
-                                      onClick={() =>
-                                        void run(() => fixedDetail(a))
-                                      }
-                                    >
-                                      試行{" "}
-                                      {(a.value as { number: number }).number} ·{" "}
-                                      {a.id}
-                                    </button>
-                                  </li>
-                                ))}
-                              </ul>
-                              {attempts.items.length === 50 && (
+                        )}
+                        {e.reevaluation && (
+                          <p>
+                            再評価を受付済み: {e.reevaluation}
+                            。一覧を更新して結果を確認してください。
+                          </p>
+                        )}
+                        {e.cost && (
+                          <p>
+                            記録済み費用（{e.cost.valuation}）:{" "}
+                            {e.cost.amount === null
+                              ? "未確定"
+                              : `${e.cost.amount} ${e.cost.currency}`}
+                            。欠測・遅着を含む実請求額の上限は保証しません。
+                          </p>
+                        )}
+                        <p>
+                          条件の判定:{" "}
+                          {e.verdict === "true"
+                            ? "成立"
+                            : e.verdict === "false"
+                              ? "不成立"
+                              : "判断不能"}{" "}
+                          / 深度: {e.depth}
+                        </p>
+                        <div className="team-controls">
+                          <StatusBadge
+                            label="発行"
+                            value={states[e.state] ?? e.state}
+                          />
+                          <StatusBadge
+                            label="評価方法"
+                            value={e.dry_run ? "試行・発行なし" : "本番の結果"}
+                          />
+                          <NavigationLink
+                            to={{
+                              workspace,
+                              screen: e.source.target.id.startsWith("run:")
+                                ? "work"
+                                : "hopper",
+                              target: {
+                                ...e.source.target,
+                                kind: e.source.target.id.startsWith("run:")
+                                  ? "run"
+                                  : "hopper-source",
+                              },
+                              view: e.source.target.id.startsWith("run:")
+                                ? "evidence"
+                                : "evaluations",
+                            }}
+                            related
+                          >
+                            元の固定結果を確認
+                          </NavigationLink>
+                          <NavigationLink
+                            to={{
+                              workspace,
+                              screen: "hopper",
+                              view: "rules",
+                              target: {
+                                ...e.definition,
+                                kind: "hopper-definition",
+                              },
+                            }}
+                            related
+                          >
+                            使用したルールの固定版
+                          </NavigationLink>
+                          {e.destination && (
+                            <NavigationLink
+                              to={{
+                                workspace,
+                                screen: e.destination.id.startsWith("run:")
+                                  ? "work"
+                                  : e.destination.id.startsWith("scope:")
+                                    ? "priority"
+                                    : "publications",
+                                target: {
+                                  ...e.destination,
+                                  kind: e.destination.id.startsWith("run:")
+                                    ? "run"
+                                    : e.destination.id.startsWith("scope:")
+                                      ? "scope"
+                                      : "publication",
+                                },
+                                view: e.destination.id.startsWith("run:")
+                                  ? "overview"
+                                  : undefined,
+                              }}
+                              related
+                            >
+                              発行先を確認（作成・起動とは別）
+                            </NavigationLink>
+                          )}
+                          {!e.destination && <p>発行先は未確定です。</p>}
+                        </div>
+                        <button
+                          disabled={busy}
+                          onClick={() => {
+                            navigation?.navigate({
+                              workspace,
+                              screen: "hopper",
+                              view: "chains",
+                              query: e.root,
+                              target: {
+                                ...hopperRef(selected),
+                                kind: "hopper-evaluation",
+                              },
+                            });
+                          }}
+                        >
+                          この起点の連鎖を絞り込む
+                        </button>
+                        {admin && !e.dry_run && (
+                          <>
+                            {e.state === "published" &&
+                              e.destination?.id.startsWith("run:") && (
                                 <button
                                   disabled={busy}
                                   onClick={() =>
-                                    void run(() =>
-                                      loadAttempts(
-                                        selected,
-                                        attempts.after,
-                                        attempts.after_id,
-                                      ),
-                                    )
+                                    void run(() => decide(selected, "resume"))
                                   }
                                 >
-                                  次の50試行
+                                  割当の保留を再開
                                 </button>
                               )}
-                            </>
-                          )}
-                          {admin && (
+                            {[
+                              "proposal",
+                              "held",
+                              "blocked",
+                              "input_waiting",
+                            ].includes(e.state) &&
+                              (!e.semantic ||
+                                e.semantic.state === "complete") && (
+                                <button
+                                  disabled={busy}
+                                  onClick={() =>
+                                    void run(() => decide(selected, "publish"))
+                                  }
+                                >
+                                  この提案・保留を発行する
+                                </button>
+                              )}
                             <button
                               disabled={busy}
-                              onClick={() =>
-                                void run(() => decide(selected, "reevaluate"))
-                              }
+                              onClick={() => void run(() => chain(true))}
                             >
-                              同じ結果を新しい履歴で再評価
+                              この連鎖を停止
                             </button>
-                          )}
-                          <p>
-                            再評価は現在の証拠と許可を確認してモデルを要求し、追加の消費を記録します。過去の判定と発行先は保持します。
-                          </p>
-                        </section>
-                      )}
-                      {e.source.previous_evaluation && (
-                        <button
-                          disabled={busy}
-                          onClick={() =>
-                            void run(async () => {
-                              await fixedDetail(e.source.previous_evaluation!);
-                            })
-                          }
-                        >
-                          前の評価と発行先を確認
-                        </button>
-                      )}
-                      {e.reevaluation && (
-                        <p>
-                          再評価を受付済み: {e.reevaluation}
-                          。一覧を更新して結果を確認してください。
-                        </p>
-                      )}
-                      {e.cost && (
-                        <p>
-                          記録済み費用（{e.cost.valuation}）:{" "}
-                          {e.cost.amount === null
-                            ? "未確定"
-                            : `${e.cost.amount} ${e.cost.currency}`}
-                          。欠測・遅着を含む実請求額の上限は保証しません。
-                        </p>
-                      )}
-                      <p>
-                        条件の判定:{" "}
-                        {e.verdict === "true"
-                          ? "成立"
-                          : e.verdict === "false"
-                            ? "不成立"
-                            : "判断不能"}{" "}
-                        / 深度: {e.depth}
-                      </p>
-                      <p>
-                        元の結果: {e.source.target.id} / 発行先:{" "}
-                        {e.destination?.id ?? "未発行"}
-                      </p>
-                      <button
-                        disabled={busy}
-                        onClick={() => {
-                          setRoot(e.root);
-                          setKind("evaluation");
-                          setPage(null);
-                        }}
-                      >
-                        この起点の連鎖を絞り込む
-                      </button>
-                      {admin && !e.dry_run && (
-                        <>
-                          {e.state === "published" &&
-                            e.destination?.id.startsWith("run:") && (
-                              <button
-                                disabled={busy}
-                                onClick={() =>
-                                  void run(() => decide(selected, "resume"))
-                                }
-                              >
-                                割当の保留を再開
-                              </button>
-                            )}
-                          {[
-                            "proposal",
-                            "held",
-                            "blocked",
-                            "input_waiting",
-                          ].includes(e.state) &&
-                            (!e.semantic ||
-                              e.semantic.state === "complete") && (
-                              <button
-                                disabled={busy}
-                                onClick={() =>
-                                  void run(() => decide(selected, "publish"))
-                                }
-                              >
-                                この提案・保留を発行する
-                              </button>
-                            )}
-                          <button
-                            disabled={busy}
-                            onClick={() => void run(() => chain(true))}
-                          >
-                            この連鎖を停止
-                          </button>
-                          <label>
-                            再開時の連鎖上限（変更する場合だけJSONで指定）
-                            <textarea
-                              aria-label="再開時の連鎖上限"
-                              value={bounds}
-                              onChange={(e) => setBounds(e.target.value)}
-                            />
-                          </label>
-                          <button
-                            disabled={busy}
-                            onClick={() => void run(() => chain(false))}
-                          >
-                            この連鎖を明示的に再開
-                          </button>
-                        </>
-                      )}
-                    </>
-                  );
-                })()}
-              <details>
-                <summary>固定版・条件・根拠の詳細</summary>
-                <pre>{JSON.stringify(selected, null, 2)}</pre>
-              </details>
-              {detail && (
-                <details open>
-                  <summary>選択した固定版の内容</summary>
-                  <pre>{JSON.stringify(detail, null, 2)}</pre>
-                </details>
-              )}
-            </section>
-          )}
-          {role !== "viewer" && (
-            <fieldset disabled={busy}>
-              <legend>Hopper定義を編集</legend>
-              <button
-                onClick={() =>
-                  void run(async () => {
-                    setDraft(JSON.stringify(await call("/template"), null, 2));
-                    setID(`hopper:${crypto.randomUUID()}`);
-                    setVersion("0");
-                    setSaved(null);
-                  })
-                }
-              >
-                初期設定で新しいHopperを作る
-              </button>
-              <p>
-                初期設定は自動発行・通常の割当と開始です。対象・型付き条件・登録済みテンプレートの固定版を指定してください。保存と有効化は別の操作です。
-              </p>
-              <button
-                onClick={() =>
-                  void run(async () => {
-                    setConnections(
-                      await call<ModelConnection[]>("/model-connections"),
+                            <label>
+                              再開時の連鎖上限（変更する場合だけJSONで指定）
+                              <textarea
+                                aria-label="再開時の連鎖上限"
+                                value={bounds}
+                                onChange={(e) => setBounds(e.target.value)}
+                              />
+                            </label>
+                            <button
+                              disabled={busy}
+                              onClick={() => void run(() => chain(false))}
+                            >
+                              この連鎖を明示的に再開
+                            </button>
+                          </>
+                        )}
+                      </>
                     );
-                  })
-                }
-              >
-                サーバーのモデル接続を取得
-              </button>
-              {connections.length === 0 && (
-                <p>
-                  接続が表示されない場合は、運用者がWorkspace用のサーバー接続を登録してください。クライアントのAPIキーやCLI認証は使いません。
-                </p>
-              )}
-              <button
-                disabled={!draft || connections.length === 0 || !!semantic}
-                onClick={() =>
-                  void run(async () => {
-                    const value = JSON.parse(draft),
-                      connection = connections[0],
-                      model = connection.models[0];
-                    value.semantic = {
-                      ...(await call<SemanticSettings>("/semantic-template")),
-                      connection: connection.id,
-                      revision: connection.revision,
-                      model: model.requested,
-                      allowed_models: model.allowed_actual,
-                    };
-                    value.condition = {
-                      all: [value.condition, { semantic: true }],
-                    };
-                    setDraft(JSON.stringify(value, null, 2));
-                  })
-                }
-              >
-                現在の条件に意味判断を追加
-              </button>
-              {semantic && (
-                <fieldset>
-                  <legend>サーバーモデルによる意味判断</legend>
-                  <ServerModelFields
-                    settings={semantic}
-                    connections={connections}
-                    onChange={editSemantic}
-                  />
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={semantic.reevaluate_evidence}
-                      onChange={(e) =>
-                        editSemantic({ reevaluate_evidence: e.target.checked })
+                  })()}
+                {selected.kind === "source" && (
+                  <p>
+                    元結果の固定版：{selected.id}@{selected.version}
+                    。観測した本文・状態は原記録で確認できます。
+                  </p>
+                )}
+                {selected.kind === "chain" && (
+                  <>
+                    <StatusBadge
+                      label="連鎖"
+                      value={
+                        (selected.value as { stopped: boolean }).stopped
+                          ? "停止"
+                          : "再開を許可"
                       }
                     />
-                    必要な証拠の遅着・変更時に関連評価だけ再評価する
-                  </label>
-                  <p>
-                    評価Context・必要な証拠・fallback・料金版は下のJSONで指定します。Contextは選択条件と固定参照で扱い、全件を取得しません。容量超過は省略せず保留します。評価入力は発行先へ自動注入しません。
-                  </p>
-                </fieldset>
-              )}
-              <label>
-                定義ID
-                <input
-                  value={id}
-                  onChange={(e) => {
-                    setID(e.target.value);
-                    setSaved(null);
-                    setVersion("0");
-                  }}
-                />
-              </label>
-              <label>
-                条件・発行先・連鎖上限・重複の設定（JSON）
-                <textarea
-                  aria-label="条件・発行先・連鎖上限・重複の設定（JSON）"
-                  rows={16}
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                />
-              </label>
-              <button
-                disabled={!id || !draft}
-                onClick={() =>
-                  void run(async () => {
-                    const pin = await mutate(
-                      `/records/${encodeURIComponent(id)}`,
-                      version,
-                      { value: JSON.parse(draft) },
-                    );
-                    setSaved(pin);
-                    setVersion(pin.version);
-                    setNotice(
-                      "新しい版を保存しました。有効な版はまだ切り替わっていません。",
-                    );
-                  })
-                }
-              >
-                定義の版を保存
-              </button>
-              {admin && (
-                <>
-                  <button
-                    disabled={!saved}
-                    onClick={() => void run(() => activation(true))}
+                    <p>
+                      起点：{(selected.value as { root: string }).root}
+                      。Hopperの仕事発行の連鎖であり、Workflowの工程制御やContext参照とは別です。
+                    </p>
+                    <NavigationLink
+                      to={{
+                        workspace,
+                        screen: "hopper",
+                        view: "chains",
+                        query: (selected.value as { root: string }).root,
+                      }}
+                      related
+                    >
+                      この起点の評価・発行を確認
+                    </NavigationLink>
+                    {admin && (
+                      <fieldset disabled={busy}>
+                        <button onClick={() => void run(() => chain(true))}>
+                          この連鎖を停止
+                        </button>
+                        <label>
+                          再開時の連鎖上限
+                          <textarea
+                            value={bounds}
+                            onChange={(e) => setBounds(e.target.value)}
+                          />
+                        </label>
+                        <button onClick={() => void run(() => chain(false))}>
+                          この連鎖を明示的に再開
+                        </button>
+                      </fieldset>
+                    )}
+                  </>
+                )}
+                <Disclosure title="固定版・条件・根拠の詳細">
+                  {() => <pre>{JSON.stringify(selected, null, 2)}</pre>}
+                </Disclosure>
+                {detail && (
+                  <details open>
+                    <summary>選択した固定版の内容</summary>
+                    <pre>{JSON.stringify(detail, null, 2)}</pre>
+                  </details>
+                )}
+              </section>
+            )}
+            {view === "rules" && role !== "viewer" && (
+              <fieldset disabled={busy}>
+                <legend>Hopper定義を編集</legend>
+                <p>
+                  編集中：{id || "未選択"} / 前提版：{version} /
+                  有効化する保存版：{saved?.version ?? "未保存"}
+                  。項目の変更は端末内の下書きです。
+                </p>
+                <button
+                  onClick={() =>
+                    void run(async () => {
+                      setDraft(
+                        JSON.stringify(await call("/template"), null, 2),
+                      );
+                      setFields({});
+                      setID(`hopper:${crypto.randomUUID()}`);
+                      setVersion("0");
+                      setSaved(null);
+                    })
+                  }
+                >
+                  初期設定で新しいHopperを作る
+                </button>
+                <p>
+                  初期設定は自動発行・通常の割当と開始です。対象・型付き条件・登録済みテンプレートの固定版を指定してください。保存と有効化は別の操作です。
+                </p>
+                <label>
+                  定義ID
+                  <input
+                    value={id}
+                    onChange={(e) => {
+                      setID(e.target.value);
+                      setSaved(null);
+                      setVersion("0");
+                    }}
+                  />
+                </label>
+                {draft && (
+                  <HopperRuleFields
+                    text={draft}
+                    fields={fields}
+                    onChange={(key, raw) =>
+                      setFields({ ...fields, [key]: raw })
+                    }
                   >
-                    保存した版を有効化
-                  </button>
-                  <button
-                    disabled={!saved}
-                    onClick={() => void run(() => activation(false))}
-                  >
-                    このHopperを無効化
-                  </button>
-                </>
-              )}
-            </fieldset>
-          )}
-          {admin && (
-            <fieldset disabled={busy || !saved}>
-              <legend>過去の結果を発行せずに試す</legend>
-              <p>
-                保存した固定版で50件ずつ評価します。Issue・Runの作成や開始は行いません。意味判断はサーバーWorkerへ受付し、モデル消費が発生します。結果は「評価と発行」の一覧を更新して確認してください。
-              </p>
-              <label>
-                結果の種類
-                <select
-                  value={pastKind}
-                  onChange={(e) => {
-                    setPastKind(e.target.value);
-                    setPastAfter(0);
+                    <button
+                      onClick={() =>
+                        void run(async () => {
+                          setConnections(
+                            await call<ModelConnection[]>("/model-connections"),
+                          );
+                        })
+                      }
+                    >
+                      サーバーのモデル接続を取得
+                    </button>
+                    {connections.length === 0 && (
+                      <p>
+                        接続が表示されない場合は、運用者がWorkspace用のサーバー接続を登録してください。クライアントのAPIキーやCLI認証は使いません。
+                      </p>
+                    )}
+                    <button
+                      disabled={
+                        !draft || connections.length === 0 || !!semantic
+                      }
+                      onClick={() =>
+                        void run(async () => {
+                          const value = JSON.parse(applyFields(draft, fields)),
+                            connection = connections[0],
+                            model = connection.models[0];
+                          value.semantic = {
+                            ...(await call<SemanticSettings>(
+                              "/semantic-template",
+                            )),
+                            connection: connection.id,
+                            revision: connection.revision,
+                            model: model.requested,
+                            allowed_models: model.allowed_actual,
+                          };
+                          value.condition = {
+                            all: [value.condition, { semantic: true }],
+                          };
+                          setDraft(JSON.stringify(value, null, 2));
+                          setFields({});
+                        })
+                      }
+                    >
+                      現在の条件に意味判断を追加
+                    </button>
+                    {semantic && (
+                      <fieldset>
+                        <legend>サーバーモデルによる意味判断</legend>
+                        <ServerModelFields
+                          settings={semantic}
+                          connections={connections}
+                          onChange={editSemantic}
+                        />
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={semantic.reevaluate_evidence}
+                            onChange={(e) =>
+                              editSemantic({
+                                reevaluate_evidence: e.target.checked,
+                              })
+                            }
+                          />
+                          必要な証拠の遅着・変更時に関連評価だけ再評価する
+                        </label>
+                        <p>
+                          評価Context・必要な証拠・fallback・料金版は下のJSONで指定します。Contextは選択条件と固定参照で扱い、全件を取得しません。容量超過は省略せず保留します。評価入力は発行先へ自動注入しません。
+                        </p>
+                      </fieldset>
+                    )}
+                  </HopperRuleFields>
+                )}
+                <button
+                  disabled={!composed}
+                  data-variant="secondary"
+                  onClick={() => {
+                    if (composed) {
+                      setDraft(composed);
+                      setFields({});
+                    }
                   }}
                 >
-                  <option value="github">外部CI</option>
-                  <option value="run">Run</option>
-                </select>
-              </label>
-              <label>
-                対象（全ては *）
-                <input
-                  value={pastTarget}
-                  onChange={(e) => {
-                    setPastTarget(e.target.value);
-                    setPastAfter(0);
-                  }}
-                />
-              </label>
-              <button
-                onClick={() =>
-                  void run(async () => {
-                    const pin = await mutate("/evaluate-past", "0", {
-                      definition: saved,
-                      kind: pastKind,
-                      target: pastTarget,
-                      after: pastAfter,
-                      limit: 50,
-                    });
-                    const result = await call<Version>(
-                      `/records/${encodeURIComponent(pin.id)}?version=${encodeURIComponent(pin.version)}`,
-                    );
-                    setTrial(result);
-                  })
-                }
-              >
-                過去50件を発行せずに評価
-              </button>
-              {trial && (
-                <>
-                  <p>
-                    {(trial.value as { items: Ref[] }).items.length}
-                    件を受け付けました。
-                    {(trial.value as { items: Ref[] }).items.some(
-                      (item) => !item.version,
-                    )
-                      ? "サーバーで処理します。「評価と発行」の一覧から結果を確認してください。"
-                      : "発行しない評価結果を保存しました。"}
-                  </p>
-                  <details>
-                    <summary>受付範囲と参照の詳細</summary>
-                    <pre>{JSON.stringify(trial.value, null, 2)}</pre>
-                  </details>
-                  <button
-                    onClick={() => {
-                      setPastAfter((trial.value as { after: number }).after);
-                      setTrial(null);
+                  項目をJSONへ反映
+                </button>
+                <details>
+                  <summary>定義のJSON原文を確認・編集（詳細操作）</summary>
+                  <label>
+                    条件・発行先・連鎖上限・重複の設定（JSON）
+                    <textarea
+                      aria-label="条件・発行先・連鎖上限・重複の設定（JSON）"
+                      rows={16}
+                      value={draft}
+                      onChange={(e) => {
+                        setDraft(e.target.value);
+                        setFields({});
+                      }}
+                    />
+                  </label>
+                </details>
+                <button
+                  disabled={!id || !composed}
+                  onClick={() =>
+                    void run(async () => {
+                      const pin = await mutate(
+                        `/records/${encodeURIComponent(id)}`,
+                        version,
+                        { value: JSON.parse(applyFields(draft, fields)) },
+                      );
+                      setSaved(pin);
+                      setVersion(pin.version);
+                      setDraft(applyFields(draft, fields));
+                      setFields({});
+                      navigation?.navigate(
+                        {
+                          workspace,
+                          screen: "hopper",
+                          view: "rules",
+                          target: { ...pin, kind: "hopper-definition" },
+                        },
+                        { replace: true },
+                      );
+                      setNotice(
+                        "新しい版を保存しました。有効な版はまだ切り替わっていません。",
+                      );
+                    })
+                  }
+                >
+                  定義の版を保存
+                </button>
+                {admin && (
+                  <>
+                    <button
+                      disabled={!saved}
+                      onClick={() => void run(() => activation(true))}
+                    >
+                      保存した版を有効化
+                    </button>
+                    <button
+                      disabled={!saved}
+                      onClick={() => void run(() => activation(false))}
+                    >
+                      このHopperを無効化
+                    </button>
+                  </>
+                )}
+              </fieldset>
+            )}
+            {view === "trial" && admin && (
+              <fieldset disabled={busy || !saved}>
+                <legend>過去の結果を発行せずに試す</legend>
+                <p>
+                  保存した固定版で50件ずつ評価します。Issue・Runの作成や開始は行いません。意味判断はサーバーWorkerへ受付し、モデル消費が発生します。結果は「評価と発行」の一覧を更新して確認してください。
+                </p>
+                <label>
+                  結果の種類
+                  <select
+                    value={pastKind}
+                    onChange={(e) => {
+                      setPastKind(e.target.value);
+                      setPastAfter(0);
                     }}
                   >
-                    この続きの範囲を選ぶ
-                  </button>
-                </>
-              )}
-            </fieldset>
-          )}
+                    <option value="github">外部CI</option>
+                    <option value="run">Run</option>
+                  </select>
+                </label>
+                <label>
+                  対象（全ては *）
+                  <input
+                    value={pastTarget}
+                    onChange={(e) => {
+                      setPastTarget(e.target.value);
+                      setPastAfter(0);
+                    }}
+                  />
+                </label>
+                <button
+                  onClick={() =>
+                    void run(async () => {
+                      const pin = await mutate("/evaluate-past", "0", {
+                        definition: saved,
+                        kind: pastKind,
+                        target: pastTarget,
+                        after: pastAfter,
+                        limit: 50,
+                      });
+                      const result = await call<Version>(
+                        `/records/${encodeURIComponent(pin.id)}?version=${encodeURIComponent(pin.version)}`,
+                      );
+                      setTrial(result);
+                    })
+                  }
+                >
+                  過去50件を発行せずに評価
+                </button>
+                {trial && (
+                  <>
+                    <p>
+                      {(trial.value as { items: Ref[] }).items.length}
+                      件を受け付けました。
+                      {(trial.value as { items: Ref[] }).items.some(
+                        (item) => !item.version,
+                      )
+                        ? "サーバーで処理します。「評価と発行」の一覧から結果を確認してください。"
+                        : "発行しない評価結果を保存しました。"}
+                    </p>
+                    <details>
+                      <summary>受付範囲と参照の詳細</summary>
+                      <pre>{JSON.stringify(trial.value, null, 2)}</pre>
+                    </details>
+                    <button
+                      onClick={() => {
+                        setPastAfter((trial.value as { after: number }).after);
+                        setTrial(null);
+                      }}
+                    >
+                      この続きの範囲を選ぶ
+                    </button>
+                  </>
+                )}
+              </fieldset>
+            )}
+          </section>
         </section>
       }
     </ScreenContent>

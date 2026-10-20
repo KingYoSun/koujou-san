@@ -686,6 +686,9 @@ button:disabled {
 .work-list tbody th {
   min-width: 180px;
 }
+.work-list tbody th a {
+  display: inline-block;
+}
 .record-link {
   color: var(--primary);
   font-weight: 700;
@@ -784,6 +787,15 @@ button[data-variant="secondary"]:hover {
 .field {
   display: grid;
   gap: 8px;
+}
+.field-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rule-groups {
+  display: grid;
+  gap: 20px;
 }
 .field small {
   font-size: 13px;

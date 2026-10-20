@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   ServerModelFields,
   type ModelConnection,
@@ -216,6 +216,7 @@ export function TriageIssue({
   call,
   write,
   run,
+  render,
 }: {
   scope: Ref;
   canEdit: boolean;
@@ -223,6 +224,7 @@ export function TriageIssue({
   call: Call;
   write: Write;
   run: Run;
+  render?: (content: ReactNode) => ReactNode;
 }) {
   const [value, setValue] = useState<IssueInfo>({
       scope,
@@ -236,7 +238,7 @@ export function TriageIssue({
     [deps, setDeps] = useState("[]"),
     [loaded, setLoaded] = useState(false);
   const id = `issue:${scope.id.replace(/^scope:/, "")}`;
-  return (
+  const content = (
     <fieldset>
       <legend>Issueの本文・期限・依存</legend>
       <button
@@ -406,6 +408,7 @@ export function TriageIssue({
       )}
     </fieldset>
   );
+  return render ? render(content) : content;
 }
 
 type Batch = {
@@ -423,12 +426,14 @@ export function TriageBatch({
   call,
   write,
   run,
+  render,
 }: {
   policy: Ref;
   scopes: string[];
   call: Call;
   write: Write;
   run: Run;
+  render?: (content: ReactNode) => ReactNode;
 }) {
   const [id, setID] = useState(""),
     [version, setVersion] = useState("0"),
@@ -452,7 +457,7 @@ export function TriageBatch({
     const saved = await write(name, version, value);
     await load(saved.data.id);
   };
-  return (
+  const content = (
     <fieldset>
       <legend>既存Issueの一括評価</legend>
       <p>
@@ -588,4 +593,5 @@ export function TriageBatch({
       )}
     </fieldset>
   );
+  return render ? render(content) : content;
 }

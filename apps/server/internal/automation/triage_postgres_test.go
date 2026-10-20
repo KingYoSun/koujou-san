@@ -233,6 +233,28 @@ func TestTriagePostgres(t *testing.T) {
 	pump(time.Now())
 	sql(`UPDATE automation_jobs SET state='stopped' WHERE state IN ('waiting','blocked','retry')`)
 	scope, infoRef, info := create("manual", "human")
+	pendingPage, pendingErr := s.Query(ctx, p, "one", Request{Mode: "evaluations", ID: scope.ID, Limit: 50})
+	if pendingErr != nil || pendingPage.Data == nil || len(pendingPage.Data.Items) == 0 {
+		t.Fatal("pending evaluation query failed", pendingPage, pendingErr)
+	}
+	foundPending := false
+	pendingStates := []string{}
+	for _, item := range pendingPage.Data.Items {
+		var job struct {
+			State  string          `json:"state"`
+			Result json.RawMessage `json:"result"`
+		}
+		if json.Unmarshal(item, &job) != nil {
+			t.Fatal("invalid evaluation metadata")
+		}
+		pendingStates = append(pendingStates, job.State)
+		if job.State == "waiting" && string(job.Result) == "null" {
+			foundPending = true
+		}
+	}
+	if !foundPending {
+		t.Fatal("waiting evaluation with an unknown result was lost", pendingStates)
+	}
 	onResponse := func() {
 		rec, _ := priority(scope)
 		put(rec.ID, rec.Version, PriorityEdit{Target: scope, Policy: pol, Value: ptr("P2"), Reason: "human decides"})

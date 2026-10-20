@@ -264,7 +264,8 @@ export function NavigationProvider({
       !options.replace &&
       routeHref(route) === routeHref(current.current.route)
     ) {
-      document.getElementById("screen-title")?.focus();
+      if (options.focus !== false)
+        document.getElementById("screen-title")?.focus();
       return;
     }
     const old = {

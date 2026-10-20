@@ -239,10 +239,15 @@ export function Publications({
       setBusy(false);
     }
   };
-  const load = async (target = id, requested = version) => {
+  const load = async (
+    target = id,
+    requested = version,
+    current = () => true,
+  ) => {
     const value = (await call(
       `/records/${encodeURIComponent(target)}?version=${encodeURIComponent(requested)}`,
     )) as Entry;
+    if (!current()) return;
     setID(target);
     setEntry(value);
     setHistory(undefined);
@@ -452,6 +457,15 @@ export function Publications({
     navigation?.route.origin?.id,
     navigation?.route.origin?.version,
   ]);
+  useEffect(() => {
+    const target = navigation?.route.target;
+    if (!active || target?.kind !== "publication") return;
+    let current = true;
+    void act(() => load(target.id, target.version, () => current));
+    return () => {
+      current = false;
+    };
+  }, [active, navigation?.route.target?.id, navigation?.route.target?.version]);
   const shared = entry?.kind === "draft" ? entry : undefined;
   const result = request?.value as Request | undefined;
   return (

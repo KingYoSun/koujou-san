@@ -10,7 +10,8 @@ import {
   saveLocalDraft,
   syncStorage,
 } from "./sync-store";
-import { editField, fieldSource, mergeFields } from "./workflow-json";
+import { applyFields, fieldSource, mergeFields } from "./workflow-json";
+import { JSONField } from "./json-field";
 import type { JSONPath } from "jsonc-parser";
 import { WorkflowExecution } from "./workflow-execution";
 import { DefinitionRun } from "./definition-run";
@@ -64,12 +65,7 @@ const problems: Record<string, string> = {
   join_policy_required: "先行工程の合流条件を指定してください",
   return_run_required: "差し戻す先にはRunノードを指定してください",
 };
-const compose = (draft: Draft) =>
-  Object.entries(draft.fields).reduce(
-    (text, [path, value]) =>
-      editField(text, JSON.parse(path) as JSONPath, value ?? undefined),
-    draft.text,
-  );
+const compose = (draft: Draft) => applyFields(draft.text, draft.fields);
 
 export function Workflows({
   native,
@@ -344,51 +340,23 @@ export function Workflows({
     label: string,
     path: JSONPath,
     format: "text" | "json" | "number" = "text",
-  ) => {
-    if (!draft) return null;
-    const key = JSON.stringify(path);
-    let source = key in draft.fields ? (draft.fields[key] ?? "") : undefined;
-    try {
-      source ??= fieldSource(draft.text, path);
-    } catch {
-      source ??= "";
-    }
-    let value = source ?? "";
-    if (format === "text") {
-      try {
-        value = JSON.parse(value) as string;
-      } catch {
-        value = "";
-      }
-    }
-    const change = (next: string) =>
-      persist({
-        ...draft,
-        pending: undefined,
-        fields: {
-          ...draft.fields,
-          [key]: format === "text" ? JSON.stringify(next) : next || null,
-        },
-      });
-    return (
-      <label>
-        {label}
-        {format === "json" ? (
-          <textarea
-            rows={3}
-            value={value}
-            onChange={(e) => change(e.target.value)}
-          />
-        ) : (
-          <input
-            type={format === "number" ? "number" : "text"}
-            value={value}
-            onChange={(e) => change(e.target.value)}
-          />
-        )}
-      </label>
+  ) =>
+    draft && (
+      <JSONField
+        label={label}
+        path={path}
+        format={format}
+        text={draft.text}
+        fields={draft.fields}
+        onChange={(key, raw) =>
+          persist({
+            ...draft,
+            pending: undefined,
+            fields: { ...draft.fields, [key]: raw },
+          })
+        }
+      />
     );
-  };
   const save = async () => {
     if (!draft) return;
     const text = compose(draft);
