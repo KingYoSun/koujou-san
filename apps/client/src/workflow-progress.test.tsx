@@ -97,7 +97,7 @@ test("reinspection returning to the same node is shown once as the new result", 
   const graph: WorkflowGraph = {
     nodes: [{ id: "検品", retry: { STALE: "検品" } }],
   };
-  const old = { ...task("検品", 1, "PASS"), stale: true };
+  const old = { ...task("検品", 1, "STALE"), stale: true };
   const html = renderToStaticMarkup(
     <WorkflowProgress
       graph={graph}

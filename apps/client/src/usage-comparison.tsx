@@ -259,7 +259,7 @@ export function UsageComparison({
                   {comparison[side].model || "モデル指定なし"} /{" "}
                   {comparison[side].from} ～ {comparison[side].until}
                 </p>
-                <details open={!saved}>
+                <details>
                   <summary>比較{i === 0 ? "A" : "B"}の条件を確認・編集</summary>
                   <ComparisonConditions
                     name={"比較" + (i === 0 ? "A" : "B")}
