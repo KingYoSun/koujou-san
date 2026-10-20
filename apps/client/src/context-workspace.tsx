@@ -125,14 +125,19 @@ export function ContextWorkspace({
         const fixed =
           next.historical ??
           engine?.state.items[identityKey(next.selected)]?.record.ref;
-        nav.navigate({
-          ...nav.route,
-          target: {
-            kind: next.selected.kind,
-            id: next.selected.id,
-            version: fixed?.revision ?? "head",
+        nav.navigate(
+          {
+            ...nav.route,
+            target: {
+              kind: next.selected.kind,
+              id: next.selected.id,
+              version: fixed?.revision ?? "head",
+            },
           },
-        });
+          {
+            focus: nav.route.view === "input" ? false : "context-editor-title",
+          },
+        );
       }),
     [store, engine],
   );

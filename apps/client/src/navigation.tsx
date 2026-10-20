@@ -50,8 +50,10 @@ type Entry = {
   scope: string;
   route: Route;
   scroll: number;
+  focus?: string;
   returnTo?: Route;
   returnScroll?: number;
+  returnFocus?: string;
 };
 
 export function historyActorMatches(scope: string, api: string, user: string) {
@@ -142,7 +144,7 @@ type Navigation = {
   destination: (screen: Screen) => Route;
   navigate: (
     route: Route,
-    options?: { replace?: boolean; related?: boolean },
+    options?: { replace?: boolean; related?: boolean; focus?: string | false },
   ) => void;
 };
 const NavigationContext = createContext<Navigation | undefined>(undefined);
@@ -240,7 +242,10 @@ export function NavigationProvider({
         routeHref(next.route) + location.hash,
       );
       setEntry(next);
-      requestAnimationFrame(() => window.scrollTo(0, next.scroll));
+      requestAnimationFrame(() => {
+        document.getElementById(next.focus ?? "screen-title")?.focus();
+        window.scrollTo(0, next.scroll);
+      });
     };
     history.replaceState(
       { ...history.state, koujou: current.current },
@@ -262,7 +267,11 @@ export function NavigationProvider({
       document.getElementById("screen-title")?.focus();
       return;
     }
-    const old = { ...current.current, scroll: window.scrollY };
+    const old = {
+      ...current.current,
+      scroll: window.scrollY,
+      focus: document.activeElement?.id || undefined,
+    };
     history.replaceState({ ...history.state, koujou: old }, "");
     const returning =
       old.returnTo && routeHref(route) === routeHref(old.returnTo);
@@ -280,6 +289,8 @@ export function NavigationProvider({
           ? undefined
           : old.returnTo,
       returnScroll: options.related ? old.scroll : old.returnScroll,
+      returnFocus: options.related ? old.focus : old.returnFocus,
+      focus: returning ? old.returnFocus : undefined,
     };
     history[options.replace ? "replaceState" : "pushState"](
       { ...history.state, koujou: next },
@@ -290,7 +301,15 @@ export function NavigationProvider({
     setEntry(next);
     if (!options.replace)
       requestAnimationFrame(() => {
-        document.getElementById("screen-title")?.focus();
+        if (options.focus === false) return;
+        (
+          document.getElementById(
+            next.focus ??
+              (typeof options.focus === "string"
+                ? options.focus
+                : "screen-title"),
+          ) ?? document.getElementById("screen-title")
+        )?.focus();
         window.scrollTo(0, next.scroll);
       });
   };
@@ -318,6 +337,7 @@ export function NavigationLink({
   to: Route;
   children: ReactNode;
   related?: boolean;
+  id?: string;
   className?: string;
   "aria-current"?: "page";
 }) {
@@ -333,6 +353,7 @@ export function NavigationLink({
     )
       return;
     event.preventDefault();
+    event.currentTarget.focus();
     navigation.navigate(to, { related });
   };
   return (

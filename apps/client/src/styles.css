@@ -686,11 +686,9 @@ button:disabled {
 .work-list tbody th {
   min-width: 180px;
 }
-.work-list tbody th button {
-  padding: 0;
-  background: transparent;
-  border: 0;
+.record-link {
   color: var(--primary);
+  font-weight: 700;
   text-decoration: underline;
   text-underline-offset: 3px;
   text-align: left;

@@ -1,5 +1,11 @@
-import { ScreenContent } from "./navigation";
+import { ScreenContent, NavigationLink } from "./navigation";
+import {
+  sourceKey,
+  sourceRoute,
+  type GenerationSource,
+} from "./context-generation-source";
 import { useEffect, useRef, useState } from "react";
+import { SyncHTTPError } from "./sync-error";
 import { useStore } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { syncRequest } from "./auth";
@@ -16,6 +22,8 @@ import {
 } from "./client-operation-port";
 import {
   ContextGenerationProposal,
+  type ContextProposalDraft,
+  type ContextChanges,
   emptyContextChanges,
 } from "./context-generation-proposal";
 import { fieldSources } from "./workflow-json";
@@ -96,7 +104,12 @@ export function ClientSelection({
 }) {
   const generationCurrent = useRef(generation);
   generationCurrent.current = generation;
-  const [changePaths, setChangePaths] = useState<string[]>([]);
+  const [generationDraft, setGenerationDraft] = useState<ContextProposalDraft>({
+    text: emptyContextChanges,
+    page: 0,
+    candidatePage: 0,
+    chosen: [],
+  });
   const definitionCurrent = useRef(definition);
   definitionCurrent.current = definition;
   const [definitionLocks, setDefinitionLocks] = useState<string[]>([]);
@@ -125,6 +138,27 @@ export function ClientSelection({
     [operation, setOperation] = useState<Saved<ClientOperation>>(),
     [proposal, setProposal] = useState<Saved<Proposal>>(),
     [selection, setSelection] = useState<VersionRef>();
+  const [operationSource, setOperationSource] = useState<GenerationSource>();
+  useEffect(() => {
+    if (!generation) return;
+    const text = proposal?.value.changes_utf8 ?? emptyContextChanges;
+    const value = JSON.parse(text) as ContextChanges;
+    setGenerationDraft({
+      text,
+      page: 0,
+      candidatePage: 0,
+      chosen: [...value.changes, ...value.grouping].map((v) => v.key),
+    });
+  }, [operation?.id, proposal?.id, proposal?.version]);
+  const generationMatches =
+    !generation ||
+    sourceKey(operationSource) === sourceKey(generation.policy.source);
+  const ownsOperation =
+    operation?.value.user === ui.user && operation.value.client === clientID;
+  const generationDirty =
+    !!generation &&
+    generationDraft.text !==
+      (proposal?.value.changes_utf8 ?? emptyContextChanges);
   const [records, setRecords] = useState<Saved[]>([]),
     [kind, setKind] = useState("operation"),
     [after, setAfter] = useState<{ after: number; after_id: string }>({
@@ -166,6 +200,7 @@ export function ClientSelection({
     epoch.current++;
     setGoal("");
     setOperation(undefined);
+    setOperationSource(undefined);
     setProposal(undefined);
     setRecords([]);
     setHistory([]);
@@ -284,6 +319,10 @@ export function ClientSelection({
       (current.value.purpose === "context-generation") !== !!generation
     )
       throw new Error("different_operation_kind");
+    if (generation) {
+      const policy = await read<SelectionPolicy>(current.value.policy);
+      setOperationSource(policy.value.generation?.source);
+    }
     setOperation(current);
     setSelection(pin(current.value.applied ?? current.value.target));
     if (current.value.proposal)
@@ -295,11 +334,15 @@ export function ClientSelection({
     setNotice("");
     try {
       await action();
-    } catch {
+    } catch (error) {
       setNotice(
-        definition
-          ? "入力・現在の定義版・権限・接続を確認してください。未確認の要求は自動再送しません。定義の下書きから手動編集もできます。"
-          : "入力・現在の版・権限・接続を確認してください。未確認のモデル要求は自動再送しません。手動で選択・保存することもできます。",
+        error instanceof SyncHTTPError && error.status === 409
+          ? "操作の版または担当クライアントが変わっています。入力を保持したまま、処理状況と担当を確認してください。"
+          : error instanceof SyncHTTPError && error.status === 400
+            ? "入力または変更案の形式を受け付けられませんでした。固定参照・新規作成のIDと版・変更案JSONを確認してください。編集内容は保持しています。"
+            : definition
+              ? "入力・現在の定義版・権限・接続を確認してください。未確認の要求は自動再送しません。定義の下書きから手動編集もできます。"
+              : "入力・現在の版・権限・接続を確認してください。未確認のモデル要求は自動再送しません。手動で選択・保存することもできます。",
       );
     } finally {
       setBusy(false);
@@ -417,12 +460,27 @@ export function ClientSelection({
       },
     );
     const current = await read<ClientOperation>(ref);
+    setOperationSource(policy.generation?.source);
     setOperation(current);
     setProposal(undefined);
     if (!manual) await run(current, policy, signature);
   }
   async function act(action: string) {
     if (!operation) return;
+    if (action === "adopt" && generationDirty) {
+      setNotice("手動修正したContext案を保存してから採用してください。");
+      return;
+    }
+    if (["adopt", "answer", "resume"].includes(action) && !ownsOperation) {
+      setNotice("このクライアントへ明示的に引き継いでから操作してください。");
+      return;
+    }
+    if (!generationMatches && action !== "cancel" && action !== "takeover") {
+      setNotice(
+        "この操作は別の固定出力に対するものです。元の出力を開いてから操作してください。",
+      );
+      return;
+    }
     const signature = inputSignature();
     const value: Record<string, unknown> = { kind: action, client: clientID };
     if (action === "answer") {
@@ -432,8 +490,8 @@ export function ClientSelection({
       if (definition) value.definition_sources = definition.sources;
     }
     if (action === "adopt" && generation) {
-      if (!changePaths.length) throw Error("choose_changes");
-      value.paths = changePaths;
+      if (!generationDraft.chosen.length) throw Error("choose_changes");
+      value.paths = generationDraft.chosen;
     }
     if (action === "adopt" && definition) {
       if (!definitionPaths.length) throw new Error("choose_fields");
@@ -746,243 +804,292 @@ export function ClientSelection({
               </h4>
               <p>{operation.value.goal}</p>
               <p>{operation.value.reason ?? ""}</p>
-              {operation.value.user === ui.user && (
+              {!ownsOperation && (
+                <p role="status">
+                  この操作は別のクライアントが担当しています。依頼者本人が「このクライアントへ明示して引き継ぐ」を選ぶと、編集・採用・継続できます。
+                </p>
+              )}
+              {generation && operationSource && (
                 <>
-                  <button
-                    disabled={busy}
-                    onClick={() => void work(() => act("takeover"))}
+                  <p>
+                    この操作の元Run：{operationSource.run.id} ·{" "}
+                    {operationSource.run.version} / 出力：
+                    {operationSource.output.id} ·{" "}
+                    {operationSource.output.version}
+                  </p>
+                  {!generationMatches && (
+                    <p role="status">
+                      表示中の出力と、この操作の元出力が異なります。採用・回答・継続は元出力で行ってください。
+                    </p>
+                  )}
+                  <NavigationLink
+                    related
+                    to={sourceRoute(ui.workspace, operationSource)}
                   >
-                    このクライアントへ明示して引き継ぐ
-                  </button>
-                  {["failed", "incomplete"].includes(operation.value.state) && (
-                    <button
-                      disabled={busy || !profile}
-                      onClick={() => void work(() => act("resume"))}
-                    >
-                      {definition || generation
-                        ? "接続・条件を確認して生成を再開"
-                        : "接続・条件を確認して選択を再開"}
-                    </button>
-                  )}
-                  {operation.value.state === "ready" && (
-                    <button
-                      disabled={busy || !profile}
-                      onClick={() =>
-                        void work(async () => {
-                          const signature = inputSignature();
-                          const p = await read<SelectionPolicy>(
-                            operation.value.policy,
-                          );
-                          await run(operation, p.value, signature);
-                        })
-                      }
-                    >
-                      {definition || generation
-                        ? "このクライアントで生成を続ける"
-                        : "このクライアントで選択を続ける"}
-                    </button>
-                  )}
-                  {operation.value.state === "question" && (
-                    <>
-                      <label>
-                        質問への回答
-                        <textarea
-                          value={answer}
-                          onChange={(e) => setAnswer(e.target.value)}
-                        />
-                      </label>
-                      <button
-                        disabled={busy || !answer}
-                        onClick={() => void work(() => act("answer"))}
-                      >
-                        {generation
-                          ? "回答してContext生成を再開"
-                          : definition
-                            ? "回答して定義生成を再開"
-                            : "回答して選択を再開"}
-                      </button>
-                    </>
-                  )}
-                  {operation.value.state === "proposal" && (
+                    この操作の元出力を開く
+                  </NavigationLink>
+                </>
+              )}
+              <fieldset disabled={!generationMatches}>
+                {operation.value.user === ui.user && (
+                  <>
                     <button
                       disabled={busy}
-                      onClick={() => void work(() => act("adopt"))}
+                      onClick={() => void work(() => act("takeover"))}
                     >
-                      この案を採用
+                      このクライアントへ明示して引き継ぐ
                     </button>
-                  )}
-                  <button
-                    onClick={() => {
-                      epoch.current++;
-                      void work(() => act("cancel"));
-                    }}
-                  >
-                    {generation
-                      ? "このContext生成を終了"
-                      : definition
-                        ? "この定義生成を終了"
-                        : "この選択操作を終了"}
-                  </button>
-                </>
-              )}
-              <button
-                onClick={() =>
-                  void work(async () => {
-                    await refresh();
-                  })
-                }
-              >
-                処理状況を再取得
-              </button>
-              <button onClick={() => void work(() => loadHistory())}>
-                この操作の履歴を50件取得
-              </button>
-              {generation && (
-                <ContextGenerationProposal
-                  value={proposal?.value.changes_utf8 ?? emptyContextChanges}
-                  goal={operation.value.goal}
-                  onPaths={setChangePaths}
-                  editable={
-                    ui.canCreate &&
-                    operation.value.state !== "applied" &&
-                    operation.value.state !== "cancelled"
-                  }
-                  onRevise={(text) =>
+                    {["failed", "incomplete"].includes(
+                      operation.value.state,
+                    ) && (
+                      <button
+                        disabled={busy || !profile || !ownsOperation}
+                        onClick={() => void work(() => act("resume"))}
+                      >
+                        {definition || generation
+                          ? "接続・条件を確認して生成を再開"
+                          : "接続・条件を確認して選択を再開"}
+                      </button>
+                    )}
+                    {operation.value.state === "ready" && (
+                      <button
+                        disabled={busy || !profile || !ownsOperation}
+                        onClick={() =>
+                          void work(async () => {
+                            const signature = inputSignature();
+                            const p = await read<SelectionPolicy>(
+                              operation.value.policy,
+                            );
+                            await run(operation, p.value, signature);
+                          })
+                        }
+                      >
+                        {definition || generation
+                          ? "このクライアントで生成を続ける"
+                          : "このクライアントで選択を続ける"}
+                      </button>
+                    )}
+                    {operation.value.state === "question" && (
+                      <>
+                        <label>
+                          質問への回答
+                          <textarea
+                            value={answer}
+                            onChange={(e) => setAnswer(e.target.value)}
+                          />
+                        </label>
+                        <button
+                          disabled={busy || !answer || !ownsOperation}
+                          onClick={() => void work(() => act("answer"))}
+                        >
+                          {generation
+                            ? "回答してContext生成を再開"
+                            : definition
+                              ? "回答して定義生成を再開"
+                              : "回答して選択を再開"}
+                        </button>
+                      </>
+                    )}
+                    {operation.value.state === "proposal" && (
+                      <button
+                        disabled={
+                          busy ||
+                          !ownsOperation ||
+                          generationDirty ||
+                          (!!generation && !generationDraft.chosen.length)
+                        }
+                        onClick={() => void work(() => act("adopt"))}
+                      >
+                        この案を採用
+                      </button>
+                    )}
+                    {operation.value.state === "proposal" &&
+                      generationDirty && (
+                        <p>
+                          手動修正したContext案を保存してから採用してください。採用は保存済みの案に対して行います。
+                        </p>
+                      )}
+                    {operation.value.state === "proposal" &&
+                      generation &&
+                      !generationDraft.chosen.length && (
+                        <p>採用する変更を選択してください。</p>
+                      )}
+                    <button
+                      onClick={() => {
+                        epoch.current++;
+                        void work(() => act("cancel"));
+                      }}
+                    >
+                      {generation
+                        ? "このContext生成を終了"
+                        : definition
+                          ? "この定義生成を終了"
+                          : "この選択操作を終了"}
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() =>
                     void work(async () => {
-                      const ref = await mutate(
-                        `/operations/${encodeURIComponent(operation.id)}/actions`,
-                        operation.version,
-                        {
-                          kind: "revise",
-                          client: clientID,
-                          changes_utf8: text,
-                        },
-                      );
-                      await refresh(ref);
+                      await refresh();
                     })
                   }
-                />
-              )}
-              {proposal && (
-                <>
-                  <h4>
-                    {generation
-                      ? "Context案・未確認事項"
-                      : definition
-                        ? "定義案・未確認事項"
-                        : "選択案・未確認事項"}
-                  </h4>
-                  {definition && proposal.value.definition_utf8 && (
-                    <>
-                      <p>{proposal.value.reason}</p>
-                      <pre aria-label="原依頼">{operation.value.goal}</pre>
-                      <textarea
-                        aria-label="生成した定義JSON"
-                        readOnly
-                        value={proposal.value.definition_utf8}
-                      />
-                      <DefinitionProposal
-                        before={definition.text}
-                        after={proposal.value.definition_utf8}
-                        paths={definitionPaths}
-                        onPaths={setDefinitionPaths}
-                      />
-                      <button
-                        onClick={() =>
-                          definition.onDraft(proposal.value.definition_utf8!)
-                        }
-                      >
-                        この案を下書きで編集
-                      </button>
-                    </>
-                  )}
-                  {proposal.value.questions.map((q, i) => (
-                    <p key={i}>{q}</p>
-                  ))}
-                  {proposal.value.unknown.map((q, i) => (
-                    <p key={i}>{q}</p>
-                  ))}
-                  {!definition && !generation && (
-                    <>
-                      <ul>
-                        {proposal.value.items
-                          .slice(proposalPage * 50, proposalPage * 50 + 50)
-                          .map((item, i) => (
-                            <li key={i}>
-                              <label>
-                                <input
-                                  type="checkbox"
-                                  checked={state.include.some(
-                                    (r) => refKey(r) === refKey(item.ref),
-                                  )}
-                                  onChange={(e) =>
-                                    ui.store.setState({
-                                      mode: "select",
-                                      include: e.target.checked
-                                        ? [...state.include, item.ref]
-                                        : state.include.filter(
-                                            (r) =>
-                                              refKey(r) !== refKey(item.ref),
-                                          ),
-                                    })
-                                  }
-                                />
-                                {refLabel(item.ref)} · {item.reason}
-                              </label>
-                            </li>
-                          ))}
-                      </ul>
-                      {proposal.value.items.length > 50 && (
-                        <>
-                          <button
-                            disabled={proposalPage === 0}
-                            onClick={() => setProposalPage(proposalPage - 1)}
-                          >
-                            案の前の50件
-                          </button>
-                          <span>{proposalPage * 50 + 1}件目から表示</span>
-                          <button
-                            disabled={
-                              (proposalPage + 1) * 50 >=
-                              proposal.value.items.length
-                            }
-                            onClick={() => setProposalPage(proposalPage + 1)}
-                          >
-                            案の次の50件
-                          </button>
-                        </>
-                      )}
-                      <p>
-                        項目を選び直したら「現在の選択を手動で保存」で反映できます。
-                      </p>
-                    </>
-                  )}
-                </>
-              )}
-              <details>
-                <summary>固定版と原応答の履歴</summary>
-                {history.length === 50 && (
-                  <button onClick={() => void work(() => loadHistory(false))}>
-                    履歴の次の50件
-                  </button>
+                >
+                  処理状況を再取得
+                </button>
+                <button onClick={() => void work(() => loadHistory())}>
+                  この操作の履歴を50件取得
+                </button>
+                {generation && (
+                  <ContextGenerationProposal
+                    draft={generationDraft}
+                    goal={operation.value.goal}
+                    onDraft={setGenerationDraft}
+                    editable={
+                      ui.canCreate &&
+                      !busy &&
+                      generationMatches &&
+                      ownsOperation &&
+                      operation.value.state !== "applied" &&
+                      operation.value.state !== "cancelled"
+                    }
+                    onRevise={(text) =>
+                      void work(async () => {
+                        const ref = await mutate(
+                          `/operations/${encodeURIComponent(operation.id)}/actions`,
+                          operation.version,
+                          {
+                            kind: "revise",
+                            client: clientID,
+                            changes_utf8: text,
+                          },
+                        );
+                        await refresh(ref);
+                      })
+                    }
+                  />
                 )}
-                <ul>
-                  {history.map((r) => (
-                    <li key={r.id + "/" + r.version}>
-                      <button
-                        onClick={() =>
-                          void work(async () => setHistoryItem(await read(r)))
-                        }
-                      >
-                        {r.kind} · 版 {r.version}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                {historyItem && (
-                  <pre>{JSON.stringify(historyItem, null, 2)}</pre>
+                {proposal && (
+                  <>
+                    <h4>
+                      {generation
+                        ? "Context案・未確認事項"
+                        : definition
+                          ? "定義案・未確認事項"
+                          : "選択案・未確認事項"}
+                    </h4>
+                    {definition && proposal.value.definition_utf8 && (
+                      <>
+                        <p>{proposal.value.reason}</p>
+                        <pre aria-label="原依頼">{operation.value.goal}</pre>
+                        <textarea
+                          aria-label="生成した定義JSON"
+                          readOnly
+                          value={proposal.value.definition_utf8}
+                        />
+                        <DefinitionProposal
+                          before={definition.text}
+                          after={proposal.value.definition_utf8}
+                          paths={definitionPaths}
+                          onPaths={setDefinitionPaths}
+                        />
+                        <button
+                          onClick={() =>
+                            definition.onDraft(proposal.value.definition_utf8!)
+                          }
+                        >
+                          この案を下書きで編集
+                        </button>
+                      </>
+                    )}
+                    {proposal.value.questions.map((q, i) => (
+                      <p key={i}>{q}</p>
+                    ))}
+                    {proposal.value.unknown.map((q, i) => (
+                      <p key={i}>{q}</p>
+                    ))}
+                    {!definition && !generation && (
+                      <>
+                        <ul>
+                          {proposal.value.items
+                            .slice(proposalPage * 50, proposalPage * 50 + 50)
+                            .map((item, i) => (
+                              <li key={i}>
+                                <label>
+                                  <input
+                                    type="checkbox"
+                                    checked={state.include.some(
+                                      (r) => refKey(r) === refKey(item.ref),
+                                    )}
+                                    onChange={(e) =>
+                                      ui.store.setState({
+                                        mode: "select",
+                                        include: e.target.checked
+                                          ? [...state.include, item.ref]
+                                          : state.include.filter(
+                                              (r) =>
+                                                refKey(r) !== refKey(item.ref),
+                                            ),
+                                      })
+                                    }
+                                  />
+                                  {refLabel(item.ref)} · {item.reason}
+                                </label>
+                              </li>
+                            ))}
+                        </ul>
+                        {proposal.value.items.length > 50 && (
+                          <>
+                            <button
+                              disabled={proposalPage === 0}
+                              onClick={() => setProposalPage(proposalPage - 1)}
+                            >
+                              案の前の50件
+                            </button>
+                            <span>{proposalPage * 50 + 1}件目から表示</span>
+                            <button
+                              disabled={
+                                (proposalPage + 1) * 50 >=
+                                proposal.value.items.length
+                              }
+                              onClick={() => setProposalPage(proposalPage + 1)}
+                            >
+                              案の次の50件
+                            </button>
+                          </>
+                        )}
+                        <p>
+                          項目を選び直したら「現在の選択を手動で保存」で反映できます。
+                        </p>
+                      </>
+                    )}
+                  </>
                 )}
-              </details>
+                <details>
+                  <summary>固定版と原応答の履歴</summary>
+                  {history.length === 50 && (
+                    <button onClick={() => void work(() => loadHistory(false))}>
+                      履歴の次の50件
+                    </button>
+                  )}
+                  <ul>
+                    {history.map((r) => (
+                      <li key={r.id + "/" + r.version}>
+                        <button
+                          onClick={() =>
+                            void work(async () => setHistoryItem(await read(r)))
+                          }
+                        >
+                          {r.kind} · 版 {r.version}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  {historyItem && (
+                    <pre>{JSON.stringify(historyItem, null, 2)}</pre>
+                  )}
+                </details>
+              </fieldset>
             </section>
           )}
           <details>

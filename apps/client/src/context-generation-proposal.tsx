@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { editField, fieldSource } from "./workflow-json";
 import type { Ref } from "./context-ui";
 
@@ -49,24 +49,32 @@ export const contextStates: Record<string, string> = {
   judgment: "採用する判断",
   proposal: "未確認の提案",
 };
+export type ContextProposalDraft = {
+  text: string;
+  page: number;
+  candidatePage: number;
+  chosen: string[];
+};
 export function ContextGenerationProposal({
-  value,
+  draft,
   goal,
-  onPaths,
+  onDraft,
   onRevise,
   editable,
 }: {
-  value: string;
+  draft: ContextProposalDraft;
   goal: string;
-  onPaths: (paths: string[]) => void;
+  onDraft: (draft: ContextProposalDraft) => void;
   onRevise: (value: string) => void;
   editable: boolean;
 }) {
-  const [text, setText] = useState(value),
-    [page, setPage] = useState(0),
-    [candidatePage, setCandidatePage] = useState(0),
-    [chosen, setChosen] = useState<string[]>([]),
-    [error, setError] = useState("");
+  const { text, page, candidatePage, chosen } = draft;
+  const setText = (text: string) => onDraft({ ...draft, text });
+  const setPage = (page: number) => onDraft({ ...draft, page });
+  const setCandidatePage = (candidatePage: number) =>
+    onDraft({ ...draft, candidatePage });
+  const setChosen = (chosen: string[]) => onDraft({ ...draft, chosen });
+  const [error, setError] = useState("");
   const data = useMemo(() => {
     try {
       return JSON.parse(text) as ContextChanges;
@@ -74,15 +82,6 @@ export function ContextGenerationProposal({
       return undefined;
     }
   }, [text]);
-  useEffect(() => {
-    setText(value);
-    setPage(0);
-    setCandidatePage(0);
-    const parsed = JSON.parse(value) as ContextChanges;
-    const keys = [...parsed.changes, ...parsed.grouping].map((c) => c.key);
-    setChosen(keys);
-    onPaths(keys);
-  }, [value]);
   const rows = [
     ...(data?.changes ?? []).map((c) => ({ key: c.key, change: c })),
     ...(data?.grouping ?? []).map((g) => ({ key: g.key, group: g })),
@@ -122,7 +121,6 @@ export function ContextGenerationProposal({
                     ? [...chosen, row.key]
                     : chosen.filter((k) => k !== row.key);
                   setChosen(next);
-                  onPaths(next);
                 }}
               />
               この変更を採用: {row.key}
@@ -245,6 +243,9 @@ export function ContextGenerationProposal({
       ) : null}
       <details>
         <summary>変更案のJSONを編集</summary>
+        <p>
+          新規作成はtargetのrevisionを「0」とし、idを空欄または「$＋変更のkey」にします。実際のIDは採用時に確定します。
+        </p>
         <textarea
           aria-label="Context変更案のJSON"
           value={text}

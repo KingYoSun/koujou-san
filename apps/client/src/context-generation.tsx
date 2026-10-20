@@ -1,4 +1,15 @@
-import { ScreenContent, useNavigation, useScreenActive } from "./navigation";
+import {
+  Screen,
+  ScreenContent,
+  useNavigation,
+  useScreenActive,
+} from "./navigation";
+import {
+  sourceKey,
+  sourceRoute,
+  pointerPath,
+  pathPointer,
+} from "./context-generation-source";
 import { useEffect, useRef, useState } from "react";
 import { syncRequest } from "./auth";
 import { editorStore, identityKey, contextPath, type UI } from "./context-ui";
@@ -15,6 +26,7 @@ export type OutputContextSource = {
   run: VersionRef;
   output: VersionRef;
   channel: string;
+  path?: string[];
 };
 type Preview = {
   run: VersionRef;
@@ -61,13 +73,17 @@ export function ContextGeneration({
   const namespace = { api: ui.api, user: ui.user, workspace: ui.workspace };
   const base = `/client-operations/workspaces/${encodeURIComponent(ui.workspace)}`;
   const workerNotice = useContextGenerationWorker(ui, setResult);
-  const path = () =>
-    pointer === ""
-      ? []
-      : pointer
-          .replace(/^\//, "")
-          .split("/")
-          .map((p) => p.replace(/~1/g, "/").replace(/~0/g, "~"));
+  const route = navigation?.route;
+  const routeSource =
+    route?.target?.kind === "output" && route.origin?.kind === "run"
+      ? {
+          run: route.origin,
+          output: route.target,
+          path: pointerPath(route.query ?? ""),
+        }
+      : undefined;
+  const matchesRoute =
+    !routeSource || sourceKey(routeSource) === sourceKey(source);
   async function prepare(input?: OutputContextSource) {
     const attempt = ++previewEpoch.current;
     setBusy(true);
@@ -84,8 +100,8 @@ export function ContextGeneration({
       const output = input?.output ?? { id: outputID, version: outputVersion };
       const selected = {
         run: { id: run.id, version: run.version },
-        output,
-        path: path(),
+        output: { id: output.id, version: output.version },
+        path: input ? (input.path ?? []) : pointerPath(pointer),
       };
       const data = (await syncRequest(base + "/generation/preview", ui.native, {
         method: "POST",
@@ -98,16 +114,23 @@ export function ContextGeneration({
         return;
       setSource(selected);
       setPreview(data);
-      setInitial(undefined);
-      target.current = {
-        id: `context-result:${crypto.randomUUID()}`,
-        version: "0",
-      };
+      if (sourceKey(selected) !== sourceKey(source)) {
+        setInitial(undefined);
+        target.current = {
+          id: `context-result:${crypto.randomUUID()}`,
+          version: "0",
+        };
+      }
+      if (!input && navigation)
+        navigation.navigate(sourceRoute(ui.workspace, selected), {
+          replace: true,
+        });
       if (input) {
         setRunID(input.run.id);
         setOutputID(input.output.id);
         setOutputVersion(input.output.version);
         setChannel(input.channel);
+        setPointer(pathPointer(input.path ?? []));
       }
     } catch {
       if (attempt !== previewEpoch.current) return;
@@ -125,14 +148,15 @@ export function ContextGeneration({
       route.target?.kind === "output" &&
       route.origin?.kind === "run"
     ) {
+      if (sourceKey(routeSource) === sourceKey(source) && preview) return;
       setPreview(undefined);
-      setSource(undefined);
       void prepare({
         workspace: ui.workspace,
         run: route.origin,
         output: route.target,
         channel:
           request?.output.id === route.target.id ? request.channel : "report",
+        path: pointerPath(route.query ?? ""),
       });
     } else if (!navigation && request?.workspace === ui.workspace)
       void prepare(request);
@@ -147,6 +171,7 @@ export function ContextGeneration({
     navigation?.route.target?.version,
     navigation?.route.origin?.id,
     navigation?.route.origin?.version,
+    navigation?.route.query,
   ]);
   async function group() {
     try {
@@ -207,6 +232,11 @@ export function ContextGeneration({
       setFixed(policy.value.generation.fixed);
       setGroupScopes(policy.value.generation.group_scopes);
       setInitial(ref);
+      setPreview(undefined);
+      navigation?.navigate(
+        sourceRoute(ui.workspace, policy.value.generation.source),
+        { related: true },
+      );
     } catch {
       setNotice("操作を取得できません。現在の権限を確認してください。");
     }
@@ -215,12 +245,8 @@ export function ContextGeneration({
     <>
       <ScreenContent>
         {
-          <details
-            className="team"
-            open={!!request}
-            aria-label="出力からのContext生成"
-          >
-            <summary>出力からContextを作成・更新</summary>
+          <section className="team" aria-label="出力からのContext生成">
+            <h3>出力からContextを作成・更新</h3>
             <p>
               作業と判断で選んだ出力を使います。原出力・検品判定・過去の入力を置き換えません。
             </p>
@@ -318,29 +344,51 @@ export function ContextGeneration({
               <ContextGenerationResults
                 ui={ui}
                 result={result}
-                onOpen={(ref) => ui.store.getState().choose(ref)}
+                source={routeSource ?? source}
+                onOpen={(ref) =>
+                  navigation
+                    ? navigation.navigate(
+                        {
+                          ...navigation.route,
+                          view: "documents",
+                          target: {
+                            kind: ref.kind,
+                            id: ref.id,
+                            version: ref.revision,
+                          },
+                        },
+                        { related: true },
+                      )
+                    : ui.store.getState().choose(ref)
+                }
               />
             )}
             <p role="status">{notice}</p>
             <p role="status">{workerNotice}</p>
-          </details>
+          </section>
         }
       </ScreenContent>
       {source && (
-        <ClientSelection
-          ui={{ ...ui, store }}
-          generation={{
-            target: target.current,
-            policy: { source, fixed, group_scopes: groupScopes },
-            initial,
-            onProfile: setProfile,
-            onApplied: async (ref) => {
-              target.current = { id: ref.id, version: ref.version };
-              setResult(ref);
-              await ui.engine.refresh();
-            },
-          }}
-        />
+        <Screen
+          screens={["context"]}
+          enabled={matchesRoute && !!preview}
+          background
+        >
+          <ClientSelection
+            ui={{ ...ui, store }}
+            generation={{
+              target: target.current,
+              policy: { source, fixed, group_scopes: groupScopes },
+              initial,
+              onProfile: setProfile,
+              onApplied: async (ref) => {
+                target.current = { id: ref.id, version: ref.version };
+                setResult(ref);
+                await ui.engine.refresh();
+              },
+            }}
+          />
+        </Screen>
       )}
     </>
   );

@@ -72,7 +72,7 @@ type InputSpec = {
   artifacts?: unknown[];
 };
 const stateNames: Record<string, string> = {
-  queued: "起動前",
+  queued: "未実行",
   running: "実行中",
   paused: "質問・条件待ち",
   succeeded: "正常終了",
@@ -418,7 +418,7 @@ export function RunRecords({
       {!canExecute && <p>開始・割当・取消には実行依頼の許可が必要です。</p>}
       {current && runValue && (
         <>
-          <h3>{runValue.name || current.id}</h3>
+          <h4>実行の確認・割当</h4>
           <p>
             {current.id} · {current.version}
           </p>

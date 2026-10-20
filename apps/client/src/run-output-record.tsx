@@ -1,6 +1,7 @@
 import type { OutputContextSource } from "./context-generation";
 import type { VersionRef } from "./model-connections";
 import { NavigationLink } from "./navigation";
+import { Disclosure } from "./disclosure";
 export type OutputRecord = VersionRef & {
   run_id: string;
   kind: string;
@@ -53,12 +54,11 @@ export function RunOutputRecord({
       <p className="target-reference">
         {record.id} · {record.version}
       </p>
-      <details>
-        <summary>内容・原JSONを確認</summary>
-        <pre>{JSON.stringify(record.value, null, 2)}</pre>
-      </details>
+      <Disclosure title="内容・原JSONを確認">
+        {() => <pre>{JSON.stringify(record.value, null, 2)}</pre>}
+      </Disclosure>
       {editable && record.kind === "output" && (
-        <>
+        <div className="team-controls">
           <button disabled={busy} onClick={onHandoff}>
             この固定出力を新Runへ引き継ぐ
           </button>
@@ -93,7 +93,7 @@ export function RunOutputRecord({
           >
             この固定出力から外部起票を準備
           </NavigationLink>
-        </>
+        </div>
       )}
     </section>
   );

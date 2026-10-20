@@ -105,7 +105,9 @@ export function ContextEditor({
     );
   return (
     <section className="context-editor" aria-label="Contextを編集">
-      <h3>{labels[selected.kind]}を編集</h3>
+      <h3 id="context-editor-title" tabIndex={-1}>
+        {labels[selected.kind]}を編集
+      </h3>
       {ref && <p className="context-meta">{refLabel(ref)}</p>}
       {historical && (
         <>

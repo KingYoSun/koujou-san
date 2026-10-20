@@ -1,3 +1,5 @@
+import { PageList } from "./page-list";
+import { Disclosure } from "./disclosure";
 import { useEffect, useRef, useState } from "react";
 import { useNavigation, useScreenActive } from "./navigation";
 import { useStore } from "zustand";
@@ -227,8 +229,12 @@ export function ContextPreview({
             {state[field].length})
           </h4>
           {!state[field].length && <p className="context-meta">未選択</p>}
-          <ol className="context-ref-list">
-            {state[field].map((ref, index) => (
+          <PageList
+            label={field === "include" ? "注入する順序" : "除外する固定版"}
+            items={state[field]}
+            listClassName="context-ref-list"
+          >
+            {(ref, index) => (
               <li key={`${refKey(ref)}:${index}`}>
                 <span>{refLabel(ref)}</span>
                 <div className="context-actions">
@@ -272,8 +278,8 @@ export function ContextPreview({
                   </button>
                 </div>
               </li>
-            ))}
-          </ol>
+            )}
+          </PageList>
         </section>
       ))}
       <button onClick={() => ui.store.setState({ include: [], exclude: [] })}>
@@ -326,44 +332,58 @@ export function ContextPreview({
                 </button>
               )}
               <h4>構造・順序・抜粋</h4>
-              <ol>
-                {manifest.placements.map((placement, index) => (
+              <PageList
+                key={manifest.digest + ":placements"}
+                label="この入力の配置"
+                items={manifest.placements}
+              >
+                {(placement, index) => (
                   <li key={index}>
                     {placement.path.join(" / ")} · {refLabel(placement.ref)}{" "}
                     {placement.excerpt ? "（抜粋）" : "（元の構造）"}
                   </li>
-                ))}
-              </ol>
+                )}
+              </PageList>
               <h4>由来・固定参照・取得状態</h4>
               {result.data?.sources?.length ? (
-                <ul>
-                  {result.data.sources.map((source, index) => (
+                <PageList
+                  key={manifest.digest + ":sources"}
+                  label="この入力の由来"
+                  items={result.data.sources}
+                >
+                  {(source, index) => (
                     <li key={index}>
                       {refLabel(source.ref)}
-                      <pre>{JSON.stringify(source, null, 2)}</pre>
+                      <Disclosure title="由来と取得状態の詳細">
+                        {() => <pre>{JSON.stringify(source, null, 2)}</pre>}
+                      </Disclosure>
                     </li>
-                  ))}
-                </ul>
+                  )}
+                </PageList>
               ) : (
                 <p>外部参照・添付・由来の指定はありません。</p>
               )}
               <h4>まとめた重複</h4>
               {manifest.duplicates.length ? (
-                <ul>
-                  {manifest.duplicates.map((ref, index) => (
-                    <li key={index}>{refLabel(ref)}</li>
-                  ))}
-                </ul>
+                <PageList
+                  key={manifest.digest + ":duplicates"}
+                  label="まとめた重複"
+                  items={manifest.duplicates}
+                >
+                  {(ref, index) => <li key={index}>{refLabel(ref)}</li>}
+                </PageList>
               ) : (
                 <p>なし</p>
               )}
               <h4>除外した項目</h4>
               {manifest.excluded.length ? (
-                <ul>
-                  {manifest.excluded.map((ref, index) => (
-                    <li key={index}>{refLabel(ref)}</li>
-                  ))}
-                </ul>
+                <PageList
+                  key={manifest.digest + ":excluded"}
+                  label="除外した項目"
+                  items={manifest.excluded}
+                >
+                  {(ref, index) => <li key={index}>{refLabel(ref)}</li>}
+                </PageList>
               ) : (
                 <p>なし</p>
               )}
@@ -371,12 +391,13 @@ export function ContextPreview({
                 <summary>実入力・添付（固定した内容）</summary>
                 <pre>{manifest.input_utf8 ?? "入力なし"}</pre>
               </details>
-              <details>
-                <summary>版・由来の記録</summary>
-                <pre>
-                  {JSON.stringify(resultData(result).manifest, null, 2)}
-                </pre>
-              </details>
+              <Disclosure title="版・由来の記録">
+                {() => (
+                  <pre>
+                    {JSON.stringify(resultData(result).manifest, null, 2)}
+                  </pre>
+                )}
+              </Disclosure>
             </>
           )}
         </>

@@ -1,4 +1,5 @@
 import { Field } from "./field";
+import { PageList } from "./page-list";
 import { ScreenContent, useNavigation, useScreenActive } from "./navigation";
 import { useEffect, useRef, useState } from "react";
 import { syncRequest, workspaceAccessLost } from "./auth";
@@ -590,6 +591,23 @@ export function Publications({
               <p className="note">
                 本文末尾に通常表示では見えない照合用HTMLコメントを追加します。認証情報は入力しないでください。
               </p>
+              <PageList label="この下書きの参照元" items={editor.value.sources}>
+                {(ref, index) => (
+                  <li key={index}>
+                    {ref.id} · {ref.version}
+                  </li>
+                )}
+              </PageList>
+              {incoming &&
+                !editor.value.sources.some(
+                  (ref) =>
+                    ref.id === incoming.output.id &&
+                    ref.version === incoming.output.version,
+                ) && (
+                  <p className="context-warning">
+                    この下書きは、上に表示した出力とは別の参照元を持っています。出力の切替だけでは下書きの内容・参照元を変更しません。
+                  </p>
+                )}
               <details>
                 <summary>参照元の固定記録</summary>
                 <label>

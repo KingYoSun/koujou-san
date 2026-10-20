@@ -1,5 +1,10 @@
 import { Field } from "./field";
-import { ScreenContent, useNavigation, useScreenActive } from "./navigation";
+import {
+  ScreenContent,
+  NavigationLink,
+  useNavigation,
+  useScreenActive,
+} from "./navigation";
 import { useEffect, useRef, useState } from "react";
 import { RunUsage } from "./run-usage";
 import { syncRequest, workspaceAccessLost } from "./auth";
@@ -580,7 +585,6 @@ export function Workbench({
               className="workbench workflow-editor"
               aria-label="作業と判断"
             >
-              <h3>作業と判断</h3>
               <p>
                 目的と待機理由から、成果物・質問・証拠へ進めます。画面を読むだけでは実行を開始しません。
               </p>
@@ -675,20 +679,25 @@ export function Workbench({
                             {page.items.map((entry) => (
                               <tr key={entry.id}>
                                 <th scope="row">
-                                  <button
-                                    disabled={busy}
-                                    onClick={() =>
-                                      void act(() =>
-                                        open(
-                                          entry,
-                                          entry.kind,
-                                          entry.value.name,
-                                        ),
-                                      )
-                                    }
+                                  <NavigationLink
+                                    id={`work-row-${entry.id}`}
+                                    className="record-link"
+                                    related
+                                    to={{
+                                      workspace,
+                                      screen: "work",
+                                      query: navigation?.route.query,
+                                      cursor: navigation?.route.cursor,
+                                      target: {
+                                        id: entry.id,
+                                        version: entry.version,
+                                        kind: entry.kind,
+                                        name: entry.value.name,
+                                      },
+                                    }}
                                   >
                                     {entry.value.name ?? "作業"}
-                                  </button>
+                                  </NavigationLink>
                                   <small>
                                     {entry.kind} · {entry.version}
                                   </small>
@@ -716,27 +725,30 @@ export function Workbench({
                                   </p>
                                 </td>
                                 <td>
-                                  <button
-                                    data-variant="secondary"
-                                    disabled={busy}
-                                    onClick={() => {
-                                      void act(() =>
-                                        open(
-                                          entry,
-                                          entry.kind,
-                                          entry.value.name,
-                                          entry.value.observation === "unknown"
-                                            ? "overview"
-                                            : entry.value.state === "paused" ||
-                                                entry.value.state === "waiting"
-                                              ? "questions"
-                                              : "evidence",
-                                        ),
-                                      );
+                                  <NavigationLink
+                                    related
+                                    to={{
+                                      workspace,
+                                      screen: "work",
+                                      query: navigation?.route.query,
+                                      cursor: navigation?.route.cursor,
+                                      target: {
+                                        id: entry.id,
+                                        version: entry.version,
+                                        kind: entry.kind,
+                                        name: entry.value.name,
+                                      },
+                                      view:
+                                        entry.value.observation === "unknown"
+                                          ? "overview"
+                                          : entry.value.state === "paused" ||
+                                              entry.value.state === "waiting"
+                                            ? "questions"
+                                            : "evidence",
                                     }}
                                   >
                                     {nextAction(entry.value)}
-                                  </button>
+                                  </NavigationLink>
                                 </td>
                               </tr>
                             ))}
@@ -773,9 +785,9 @@ export function Workbench({
                     navigation.route.target.version === selected.version)) && (
                   <article aria-label="選択した作業">
                     <button onClick={returnList}>作業一覧へ戻る</button>
-                    <h4 ref={detailHeading} tabIndex={-1}>
+                    <h3 ref={detailHeading} tabIndex={-1}>
                       {selected.value.name ?? "作業の詳細"}
-                    </h4>
+                    </h3>
                     <WorkState value={selected.value} stale={detailStale} />
                     <p>
                       待機理由：

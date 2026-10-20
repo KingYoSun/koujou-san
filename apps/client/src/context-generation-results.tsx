@@ -5,6 +5,12 @@ import type { OperationAddress } from "./client-operation-port";
 import type { VersionRef } from "./model-connections";
 import type { Ref } from "./context-ui";
 import { allowAnswerScope, answerScopeEpoch } from "./sync-store";
+import { NavigationLink } from "./navigation";
+import {
+  sourceKey,
+  sourceRoute,
+  type GenerationSource,
+} from "./context-generation-source";
 
 type ResultPage = {
   items: {
@@ -23,10 +29,12 @@ export function ContextGenerationResults({
   ui,
   result,
   onOpen,
+  source,
 }: {
   ui: OperationAddress;
   result: VersionRef;
   onOpen: (ref: Ref) => void;
+  source?: GenerationSource;
 }) {
   const [page, setPage] = useState<ResultPage>(),
     [notice, setNotice] = useState("");
@@ -56,11 +64,20 @@ export function ContextGenerationResults({
       <p>
         新しい版は既存の全文書や開始済みRunへ伝播しません。後段では基準版への明示採用と選択で使います。
       </p>
-      {page && (
+      {page && source && sourceKey(page.source) !== sourceKey(source) && (
+        <p role="status">
+          この結果は別の固定出力から作られています。
+          <NavigationLink related to={sourceRoute(ui.workspace, page.source)}>
+            この結果の元出力を開く
+          </NavigationLink>
+        </p>
+      )}
+      {page && (!source || sourceKey(page.source) === sourceKey(source)) && (
         <>
           <p>
-            元Run: {page.source.run.id} · 出力版: {page.source.output.version} ·
-            箇所: /{page.source.path.join("/")}
+            元Run: {page.source.run.id} · {page.source.run.version} · 出力:{" "}
+            {page.source.output.id} · {page.source.output.version} · 箇所: /
+            {page.source.path.join("/")}
           </p>
           <ul>
             {page.items.map((item) => (

@@ -29,16 +29,18 @@ export function Field({
     ) => onChange(event.target.value),
   };
   return (
-    <label className="field" htmlFor={id}>
-      <span>
+    <div className="field">
+      <label htmlFor={id}>
         {label}
         {required && "（必須）"}
-      </span>
+      </label>
       {rows ? <textarea {...props} rows={rows} /> : <input {...props} />}
-      <small id={id + "-help"}>
-        {error ? <span role="alert">{error}</span> : hint}
-      </small>
-    </label>
+      {(hint || error) && (
+        <small id={id + "-help"}>
+          {error ? <span role="alert">{error}</span> : hint}
+        </small>
+      )}
+    </div>
   );
 }
 
