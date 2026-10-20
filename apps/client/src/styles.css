@@ -453,7 +453,7 @@ button:disabled {
 .context-preview {
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: 0;
   background: var(--card);
 }
 .context-explorer {
