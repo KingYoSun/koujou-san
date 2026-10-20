@@ -143,6 +143,12 @@
 
 [Issue #33](https://github.com/KingYoSun/koujou-san/issues/33)に、本人が承認した実接続の枠を記録した。Codex・Claude Code合計最大6回（各10分以内）、専用OpenAI APIをBifrost経由で最大20要求（各32 KiB・4096 token・90秒、fallback/自動retryなし）。選定する案件の必要なコードと合成データが対象で、現在の消費はCLI 0回・API 0要求。対象の指定後も同じ枠を使い、承認済みの枠を重複して取り直さない。
 
+同日、本人がkukuri #1887を指定したため、#33の対象未定による保留を解除した。上記の0回は保留時点の記録である。#34は保留を維持する。
+
+## Issue #33の判定
+
+受入判定: PASS。Scope revision 3。[計画](2026-10-19-issue-33-plan.md)に固定したkukuri #1887で、実装・修正前FAILからの独立再検品・全CI・条件付きmerge92299fbとtree一致を確認し、kukuri #1887をCloseした。LLM三機能と手動編集、費用比較、無クライアントのHopper/Triage、通信断と起票応答喪失、全体停止後の元ツールによる継続・export、本人の初見操作を確認済み。[実S3](2026-10-21-issue-33-sleep-evidence.md)も一回実施し、同じCLIの継続・原出力・追加起動なし・正常終了・共有画面を照合した。既存の[独立受入検品](2026-10-20-issue-33-acceptance-inspection.md)を再利用し、残っていた3条件も[補完検品](2026-10-21-issue-33-sleep-inspection.md)でPASSとなった。最新の必須CI・[PR #70](https://github.com/KingYoSun/koujou-san/pull/70)のmerge・tree照合・Issue Closeの状態と固定commitは、[統合・完了の記録](https://github.com/KingYoSun/koujou-san/issues/33#issuecomment-6294065860)へ集約する。実接続はCLI 5/6回・API 18/20要求のまま。#34は保留を維持する。[一巡の証跡](2026-10-19-issue-33-evidence.md)と[全68条件](2026-10-19-issue-33-ac-matrix.md)を参照する。
+
 ## Issue #47の判定
 
-状態: In progress。本人の指定で#33・#34を保留したまま着手した。DESIGN.mdと関連文書、原本、三つの参照見本を追加し、局所検証を終えた。本番UIの変更は含めない。[表示・操作・コントラスト・拡大・印刷の確認範囲](2026-10-19-issue-47-evidence.md)を記録し、PR CIとマージ後照合を残している。
+状態: Complete。[PR #68](https://github.com/KingYoSun/koujou-san/pull/68)を最終head `81372688549d5a7b95a87e637b9750ab0bbfedd9` の全CI成功後にマージした。merge `35995f473e58ee0d27399acaa60d1ebf9ae3cd79` と最終headのtreeは `3a5d6f9a8629cc6fa38b14cf30699b78691d2c69` で一致、差分0。AC-1〜7・INVAR-1〜4を照合し、#47をCloseした。DESIGN.mdと関連文書、原本、三つの参照見本を追加した。本番UIの変更は含めない。[検証記録](2026-10-19-issue-47-evidence.md)に初回CIのポート競合と再実行成功、表示・操作・拡大・印刷の確認範囲を保持する。この#47完了時点では#33・#34を保留とし、その後#33は上記の案件で再開した。

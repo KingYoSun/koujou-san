@@ -69,4 +69,16 @@ clientWidthとの差15pxは縦スクロールバー。DOM全体の、表示中�
 
 原本hash、Markdownリンク72件、HTMLの重複ID・内部リンク、両HTMLのinline JavaScriptの構文を一時スクリプトで確認した。見本のスクリプトに通信・保存・プロセス起動はない。`git diff --check` は成功。日本語はyomiyasuで推敲し、箇条書きや技術用語に対する機械的な候補は文書の用途に沿って判断する。
 
-PR CIとマージ後の照合は未実施。
+## CIとマージ後の照合
+
+[PR #68](https://github.com/KingYoSun/koujou-san/pull/68)の最終headは `81372688549d5a7b95a87e637b9750ab0bbfedd9`。[CI 39145167276](https://github.com/KingYoSun/koujou-san/actions/runs/39145167276)はattempt 2で成功した。
+
+初回の共有側は `TestOryIntegration` で `listen tcp 127.0.0.1:38341: bind: address already in use` となった。CodeGraphで `auth_test.go:74〜78` を確認し、検証APIのlisten時の失敗と特定した。Windows実行中は再実行を受け付けなかったため完了を待ち、失敗した共有側だけを同じheadで再実行した。ポート競合は再発せず、コードの変更や試験の省略は行っていない。
+
+| チェック | 結果 |
+| --- | --- |
+| [Shared UI and server](https://github.com/KingYoSun/koujou-san/actions/runs/39145167276/job/117730898248) | success / 10分43秒 |
+| [Windows native client](https://github.com/KingYoSun/koujou-san/actions/runs/39145167276/job/117730899755) | success / 15分18秒 |
+| GitGuardian Security Checks | success |
+
+全チェックとhead一致を確認してマージした。merge `35995f473e58ee0d27399acaa60d1ebf9ae3cd79` と最終headのtreeは `3a5d6f9a8629cc6fa38b14cf30699b78691d2c69` で一致し、`git diff --exit-code` は差分0。mainへfast-forward後も原本hash・リンク・構文を再照合し、#47をCloseした。現在の判定は[current-state](current-state.md#issue-47の判定)を参照する。

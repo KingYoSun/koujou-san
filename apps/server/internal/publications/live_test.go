@@ -3,11 +3,13 @@ package publications
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +17,10 @@ import (
 	"testing"
 	"time"
 )
+
+type lossTransport func(*http.Request) (*http.Response, error)
+
+func (f lossTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 // Explicit opt-in only. Uses the configured publisher App; no credential is
 // returned. The synthetic issue is edited/closed through the owner's existing
@@ -30,6 +36,7 @@ func TestPublicationsLive(t *testing.T) {
 		t.Fatal("one explicit publisher connection required")
 	}
 	connection := cfg.Connections[0]
+	lossReceipt := os.Getenv("KOUJOU_TEST_PUBLICATION_RESPONSE_LOSS_RECEIPT")
 	if connection.Repository != "KingYoSun/koujou-san" || connection.RepositoryID != 1418646340 {
 		t.Fatal("live fixture repository not approved")
 	}
@@ -44,6 +51,9 @@ func TestPublicationsLive(t *testing.T) {
 	defer store.Close()
 	w := connection.Workspace
 	user := "publication-live-user"
+	if lossReceipt != "" {
+		user += "-" + w
+	}
 	for _, statement := range []struct {
 		sql  string
 		args []any
@@ -59,10 +69,48 @@ func TestPublicationsLive(t *testing.T) {
 	a := access.New(store, []byte(strings.Repeat("l", 32)), nil)
 	c := contexts.New(store, a, contexts.DefaultLimits())
 	rs := runs.New(store, a, c)
-	s := New(store, a, rs, NewRemote(cfg))
+	remote := NewRemote(cfg)
+	posts := 0
+	if lossReceipt != "" {
+		remote.client.Transport = lossTransport(func(r *http.Request) (*http.Response, error) {
+			if r.Method != "POST" || r.URL.Path != "/repos/KingYoSun/koujou-san/issues" {
+				return http.DefaultTransport.RoundTrip(r)
+			}
+			// Reserve the one approved creation before sending, including failures.
+			guard, err := os.OpenFile(lossReceipt, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+			if err != nil {
+				return nil, err
+			}
+			defer guard.Close()
+			posts++
+			response, err := http.DefaultTransport.RoundTrip(r)
+			if err != nil {
+				return nil, err
+			}
+			defer response.Body.Close()
+			var issue Issue
+			if response.StatusCode != 201 || json.NewDecoder(response.Body).Decode(&issue) != nil || !validIssue(connection, issue) {
+				return nil, errors.New("owned response-loss fixture did not observe creation")
+			}
+			if err = json.NewEncoder(guard).Encode(map[string]any{"url": issue.URL, "id": issue.ID, "number": issue.Number}); err != nil {
+				return nil, err
+			}
+			t.Cleanup(func() {
+				if b, err := exec.Command("gh", "issue", "close", issue.URL, "--repo", connection.Repository).CombinedOutput(); err != nil {
+					t.Errorf("owned issue cleanup: %s %v", b, err)
+				}
+			})
+			return nil, errors.New("owned fixture dropped the actual GitHub creation response")
+		})
+	}
+	s := New(store, a, rs, remote)
 	p := access.Principal{UserID: user}
 	stamp := time.Now().UTC().Format("20060102T150405")
 	d := Draft{Name: "publisher live acceptance", Connection: connection.ID, Title: "[koujou-san #22 接続試験] " + stamp, Body: "koujou-san #22の所有する接続試験です。固定下書きの受付・GitHubでの作成確認・外部の編集観測だけを検証します。", Sources: []Ref{}}
+	if lossReceipt != "" {
+		d.Title = "[koujou-san #33 受入試験] 起票応答の喪失 " + stamp
+		d.Body = "kukuri #1887を使う一巡受入の合成Issueです。作成応答を試験用transportで一度破棄し、HTML照合キーから同じIssueを取得してCloseします。実際の不具合報告ではありません。"
+	}
 	ref, err := accepted(s.Put(ctx, p, w, "publication-draft:live-"+stamp, Write{Mutation: apicontract.Mutation{OperationID: "live-draft-" + stamp, ExpectedVersion: "0"}, Value: raw(d)}))
 	if err != nil {
 		t.Fatal(err)
@@ -73,6 +121,17 @@ func TestPublicationsLive(t *testing.T) {
 	}
 	if err = s.Process(ctx, w, requestRef.ID); err != nil {
 		t.Fatal(err)
+	}
+	if lossReceipt != "" {
+		unknown, err := s.Read(ctx, p, w, Ref{ID: requestRef.ID, Version: "head"})
+		var lost Request
+		if err != nil || json.Unmarshal(unknown.Value, &lost) != nil || lost.State != "unknown" || lost.Reason != "create_response_lost" || posts != 1 {
+			t.Fatal("actual response loss was not retained as Unknown")
+		}
+		// Processing an unresolved request may reconcile, but must not create again.
+		if err = s.Process(ctx, w, requestRef.ID); err != nil || posts != 1 {
+			t.Fatal("unresolved request repeated creation", err)
+		}
 	}
 	var request Request
 	var rec Record
@@ -106,6 +165,13 @@ func TestPublicationsLive(t *testing.T) {
 		t.Fatal("external result remains unconfirmed")
 	}
 	issue := request.External
+	if lossReceipt != "" {
+		if posts != 1 || issue.Body != d.Body+"\n\n"+request.Marker {
+			t.Fatal("marker reconciliation differs from the single creation")
+		}
+		t.Logf("actual GitHub creation response dropped: Unknown -> marker reconciliation -> same Issue; creates=%d; URL=%s; request=%s; Run=%s", posts, issue.URL, rec.ID, request.Run)
+		return
+	}
 	t.Cleanup(func() {
 		cmd := exec.Command("gh", "issue", "close", issue.URL, "--repo", connection.Repository)
 		if output, err := cmd.CombinedOutput(); err != nil {

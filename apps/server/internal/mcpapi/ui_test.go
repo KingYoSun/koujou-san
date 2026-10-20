@@ -312,11 +312,15 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 	}
 	t.Logf("Second User browser fixture: %s; native metadata saved privately to .cache", second.URL)
 
-	t.Logf("Computer Use fixture: %s (isolated identity, expires after thirty minutes); POST /__fixture/finish ends inspection", fixture.URL)
+	inspectionTimeout := 30 * time.Minute
+	if os.Getenv("KOUJOU_TEST_ACCEPTANCE") == "1" {
+		inspectionTimeout = 4 * time.Hour
+	}
+	t.Logf("Computer Use fixture: %s (isolated identity, inspection window %s); POST /__fixture/finish ends inspection", fixture.URL, inspectionTimeout)
 	select {
 	case <-done:
 		t.Log("Computer Use inspection finished")
-	case <-time.After(30 * time.Minute):
+	case <-time.After(inspectionTimeout):
 		t.Fatal("UI inspection timed out")
 	}
 }
