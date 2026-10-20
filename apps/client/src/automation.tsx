@@ -149,6 +149,25 @@ const reasons: Record<string, string> = {
   issue_closed: "このIssueは完了しています",
 };
 
+type Surface = "priorities" | "rules" | "operations";
+const surfaceModes: Record<Surface, string[]> = {
+  priorities: ["priorities", "evaluations", "attempts", "history"],
+  rules: ["heads", "records", "evaluations", "attempts", "history"],
+  operations: ["jobs", "history", "heads", "records"],
+};
+const surfaceRecordKinds: Record<Surface, string[]> = {
+  priorities: ["priority", "issue", "sync"],
+  rules: [
+    "policy",
+    "activation",
+    "model-input",
+    "model-attempt",
+    "sync",
+    "batch",
+  ],
+  operations: ["control"],
+};
+
 export function Automation({
   native,
   workspace,
@@ -158,7 +177,7 @@ export function Automation({
   native: boolean;
   workspace: string;
   role: string;
-  surface?: "priorities" | "rules" | "operations";
+  surface?: Surface;
 }) {
   const base = `/automation/workspaces/${encodeURIComponent(workspace)}`;
   const [busy, setBusy] = useState(false);
@@ -331,130 +350,25 @@ export function Automation({
                   setPage(null);
                 }}
               >
-                {{
-                  priorities: [
-                    "priorities",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  rules: [
-                    "heads",
-                    "records",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  operations: ["jobs", "history", "heads", "records"],
-                }[surface].includes("priorities") && (
+                {surfaceModes[surface].includes("priorities") && (
                   <option value="priorities">優先度順のIssue一覧</option>
                 )}
-                {{
-                  priorities: [
-                    "priorities",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  rules: [
-                    "heads",
-                    "records",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  operations: ["jobs", "history", "heads", "records"],
-                }[surface].includes("heads") && (
+                {surfaceModes[surface].includes("heads") && (
                   <option value="heads">現在の版</option>
                 )}
-                {{
-                  priorities: [
-                    "priorities",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  rules: [
-                    "heads",
-                    "records",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  operations: ["jobs", "history", "heads", "records"],
-                }[surface].includes("records") && (
+                {surfaceModes[surface].includes("records") && (
                   <option value="records">版履歴</option>
                 )}
-                {{
-                  priorities: [
-                    "priorities",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  rules: [
-                    "heads",
-                    "records",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  operations: ["jobs", "history", "heads", "records"],
-                }[surface].includes("evaluations") && (
+                {surfaceModes[surface].includes("evaluations") && (
                   <option value="evaluations">Triageの評価要求</option>
                 )}
-                {{
-                  priorities: [
-                    "priorities",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  rules: [
-                    "heads",
-                    "records",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  operations: ["jobs", "history", "heads", "records"],
-                }[surface].includes("attempts") && (
+                {surfaceModes[surface].includes("attempts") && (
                   <option value="attempts">Triageの根拠・不明点・消費</option>
                 )}
-                {{
-                  priorities: [
-                    "priorities",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  rules: [
-                    "heads",
-                    "records",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  operations: ["jobs", "history", "heads", "records"],
-                }[surface].includes("jobs") && (
+                {surfaceModes[surface].includes("jobs") && (
                   <option value="jobs">処理要求</option>
                 )}
-                {{
-                  priorities: [
-                    "priorities",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  rules: [
-                    "heads",
-                    "records",
-                    "evaluations",
-                    "attempts",
-                    "history",
-                  ],
-                  operations: ["jobs", "history", "heads", "records"],
-                }[surface].includes("history") && (
+                {surfaceModes[surface].includes("history") && (
                   <option value="history">処理履歴</option>
                 )}
               </select>
@@ -469,144 +383,36 @@ export function Automation({
                     setPage(null);
                   }}
                 >
-                  {{
-                    priorities: ["priority", "issue", "sync"],
-                    rules: [
-                      "policy",
-                      "activation",
-                      "model-input",
-                      "model-attempt",
-                      "sync",
-                      "batch",
-                    ],
-                    operations: ["control"],
-                  }[surface].includes("policy") && (
+                  {surfaceRecordKinds[surface].includes("policy") && (
                     <option value="policy">方針</option>
                   )}
-                  {{
-                    priorities: ["priority", "issue", "sync"],
-                    rules: [
-                      "policy",
-                      "activation",
-                      "model-input",
-                      "model-attempt",
-                      "sync",
-                      "batch",
-                    ],
-                    operations: ["control"],
-                  }[surface].includes("priority") && (
+                  {surfaceRecordKinds[surface].includes("priority") && (
                     <option value="priority">優先度</option>
                   )}
-                  {{
-                    priorities: ["priority", "issue", "sync"],
-                    rules: [
-                      "policy",
-                      "activation",
-                      "model-input",
-                      "model-attempt",
-                      "sync",
-                      "batch",
-                    ],
-                    operations: ["control"],
-                  }[surface].includes("activation") && (
+                  {surfaceRecordKinds[surface].includes("activation") && (
                     <option value="activation">有効化</option>
                   )}
-                  {{
-                    priorities: ["priority", "issue", "sync"],
-                    rules: [
-                      "policy",
-                      "activation",
-                      "model-input",
-                      "model-attempt",
-                      "sync",
-                      "batch",
-                    ],
-                    operations: ["control"],
-                  }[surface].includes("control") && (
+                  {surfaceRecordKinds[surface].includes("control") && (
                     <option value="control">自動化主体・処理枠</option>
                   )}
-                  {{
-                    priorities: ["priority", "issue", "sync"],
-                    rules: [
-                      "policy",
-                      "activation",
-                      "model-input",
-                      "model-attempt",
-                      "sync",
-                      "batch",
-                    ],
-                    operations: ["control"],
-                  }[surface].includes("issue") && (
+                  {surfaceRecordKinds[surface].includes("issue") && (
                     <option value="issue">Issue情報</option>
                   )}
-                  {{
-                    priorities: ["priority", "issue", "sync"],
-                    rules: [
-                      "policy",
-                      "activation",
-                      "model-input",
-                      "model-attempt",
-                      "sync",
-                      "batch",
-                    ],
-                    operations: ["control"],
-                  }[surface].includes("model-input") && (
+                  {surfaceRecordKinds[surface].includes("model-input") && (
                     <option value="model-input">固定した評価入力</option>
                   )}
-                  {{
-                    priorities: ["priority", "issue", "sync"],
-                    rules: [
-                      "policy",
-                      "activation",
-                      "model-input",
-                      "model-attempt",
-                      "sync",
-                      "batch",
-                    ],
-                    operations: ["control"],
-                  }[surface].includes("model-attempt") && (
+                  {surfaceRecordKinds[surface].includes("model-attempt") && (
                     <option value="model-attempt">原応答・根拠・利用量</option>
                   )}
-                  {{
-                    priorities: ["priority", "issue", "sync"],
-                    rules: [
-                      "policy",
-                      "activation",
-                      "model-input",
-                      "model-attempt",
-                      "sync",
-                      "batch",
-                    ],
-                    operations: ["control"],
-                  }[surface].includes("sync") && (
+                  {surfaceRecordKinds[surface].includes("sync") && (
                     <option value="sync">GitHub優先度の同期</option>
                   )}
-                  {{
-                    priorities: ["priority", "issue", "sync"],
-                    rules: [
-                      "policy",
-                      "activation",
-                      "model-input",
-                      "model-attempt",
-                      "sync",
-                      "batch",
-                    ],
-                    operations: ["control"],
-                  }[surface].includes("batch") && (
+                  {surfaceRecordKinds[surface].includes("batch") && (
                     <option value="batch">一括評価</option>
                   )}
-                  {{
-                    priorities: ["priority", "issue", "sync"],
-                    rules: [
-                      "policy",
-                      "activation",
-                      "model-input",
-                      "model-attempt",
-                      "sync",
-                      "batch",
-                    ],
-                    operations: ["control"],
-                  }[surface].includes("") && <option value="">すべて</option>}
+                  {surfaceRecordKinds[surface].includes("") && (
+                    <option value="">すべて</option>
+                  )}
                 </select>
               </label>
             )}
