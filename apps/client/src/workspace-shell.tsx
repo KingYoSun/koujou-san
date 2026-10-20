@@ -143,10 +143,13 @@ export function WorkspaceShell({
           {title}
         </h2>
         {route.target && (
-          <p className="target-reference">
-            対象: {route.target.name ?? route.target.id} / 種別:{" "}
-            {route.target.kind} / 版: {route.target.version}
-          </p>
+          <details className="target-reference">
+            <summary>対象の固定版を確認</summary>
+            <p>
+              {route.target.name ?? route.target.id} / {route.target.kind} /{" "}
+              {route.target.version}
+            </p>
+          </details>
         )}
         {navigation.returnTo && (
           <NavigationLink to={navigation.returnTo}>

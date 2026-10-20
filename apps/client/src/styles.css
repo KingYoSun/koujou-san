@@ -448,6 +448,19 @@ button:disabled {
 .context-layout > * {
   min-width: 0;
 }
+.workflow-progress ol {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+}
+.workflow-progress li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.workflow-progress h4 {
+  margin-block: 12px;
+}
 .context-explorer,
 .context-editor,
 .context-preview {

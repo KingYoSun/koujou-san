@@ -44,7 +44,11 @@ type Summary = {
   recipient_name?: string;
   updated_at?: string;
   active_pause?: Ref;
-  assessment?: { state: string; verdict?: string };
+  assessment?: {
+    state: string;
+    verdict?: string;
+    report?: { reason?: string; summary?: string };
+  };
 };
 type Entry<T = Summary> = Ref & { kind: string; value: T };
 type Page<T = Summary> = { items: Entry<T>[]; next: string; snapshot?: string };
@@ -325,7 +329,7 @@ export function Workbench({
       kind,
       value: {
         ...r.value,
-        name: r.value.name ?? name,
+        name: r.value.name || name,
         requested_by: r.value.requested_by ?? r.value.controller,
       },
     };
@@ -614,27 +618,33 @@ export function Workbench({
                   className="workbench workflow-editor"
                   aria-label="作業と判断"
                 >
-                  <p>
-                    目的と待機理由から、成果物・質問・証拠へ進めます。画面を読むだけでは実行を開始しません。
-                  </p>
                   {notice && <p role="status">{notice}</p>}
-                  <button
-                    disabled={!canEdit}
-                    onClick={() =>
-                      navigation?.navigate({
-                        ...navigation.route,
-                        target: {
-                          ...run.preparation,
-                          kind: "run-preparation",
-                          name: "新しいRunの下書き",
-                        },
-                        view: "prepare",
-                      })
-                    }
-                  >
-                    新しいRunを準備
-                  </button>
-                  {!canEdit && <p>Runの準備・保存には編集権限が必要です。</p>}
+                  {!navigation?.route.target && !prepare && (
+                    <>
+                      <p>
+                        目的と待機理由から、成果物・質問・証拠へ進めます。画面を読むだけでは実行を開始しません。
+                      </p>
+                      <button
+                        disabled={!canEdit}
+                        onClick={() =>
+                          navigation?.navigate({
+                            ...navigation.route,
+                            target: {
+                              ...run.preparation,
+                              kind: "run-preparation",
+                              name: "新しいRunの下書き",
+                            },
+                            view: "prepare",
+                          })
+                        }
+                      >
+                        新しいRunを準備
+                      </button>
+                      {!canEdit && (
+                        <p>Runの準備・保存には編集権限が必要です。</p>
+                      )}
+                    </>
+                  )}
                   {prepare && (
                     <section aria-label="Runの準備">
                       <button onClick={returnList}>作業一覧へ戻る</button>
@@ -859,34 +869,37 @@ export function Workbench({
                           {selected.value.name ?? "作業の詳細"}
                         </h3>
                         <WorkState value={selected.value} stale={detailStale} />
-                        <p>
-                          待機理由：
-                          {reasons[waitingReason ?? ""] ??
-                            waitingReason ??
-                            "報告なし"}{" "}
-                          / 担当：
-                          {summary?.recipient_name ??
-                            people.find((p) => p.id === summary?.requested_by)
-                              ?.name ??
-                            summary?.requested_by ??
-                            "未確認"}{" "}
-                          / 端末：{summary?.device ?? "割当情報なし"}
-                        </p>
-                        <p>次の操作：{nextAction(selected.value)}</p>
-                        <button
-                          disabled={busy}
-                          onClick={() =>
-                            void act(() =>
-                              readDetail(
-                                { ...selectedRef, version: "head" },
-                                selected.kind,
-                                selected.value.name,
-                              ),
-                            )
-                          }
-                        >
-                          この作業の状態・質問を更新
-                        </button>
+                        <details>
+                          <summary>担当・端末・状態を更新</summary>
+                          <p>
+                            待機理由：
+                            {reasons[waitingReason ?? ""] ??
+                              waitingReason ??
+                              "報告なし"}{" "}
+                            / 担当：
+                            {summary?.recipient_name ??
+                              people.find((p) => p.id === summary?.requested_by)
+                                ?.name ??
+                              summary?.requested_by ??
+                              "未確認"}{" "}
+                            / 端末：{summary?.device ?? "割当情報なし"}
+                          </p>
+                          <p>次の操作：{nextAction(selected.value)}</p>
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void act(() =>
+                                readDetail(
+                                  { ...selectedRef, version: "head" },
+                                  selected.kind,
+                                  selected.value.name,
+                                ),
+                              )
+                            }
+                          >
+                            この作業の状態・質問を更新
+                          </button>
+                        </details>
                         <Tabs
                           id="work-detail"
                           label="作業の詳細"
@@ -905,8 +918,7 @@ export function Workbench({
                           value="overview"
                           active={detailView}
                         >
-                          {run.overview}
-                          {selected.kind === "execution" && execution}
+                          {selected.kind === "run" ? run.overview : execution}
                         </TabPanel>
                         <TabPanel
                           id="work-detail"
@@ -993,18 +1005,35 @@ export function Workbench({
                           )}
                           {inspection && (
                             <section aria-label="検品条件と証拠">
-                              <h4>検品時の条件</h4>
-                              <ul>
-                                {inspectionCriteria.map((c) => (
-                                  <li key={c.id}>
-                                    {c.requirement}（{c.id}）
-                                  </li>
-                                ))}
-                              </ul>
                               <InspectionResult
                                 value={inspection}
+                                criteria={inspectionCriteria}
                                 title="検品結果・未確認事項・証拠"
                               />
+                            </section>
+                          )}
+                          {!inspection && selected.value.assessment && (
+                            <section aria-label="Runの報告">
+                              <h4>Runの報告</h4>
+                              <p>
+                                判定：
+                                {selected.value.assessment.verdict ?? "未確認"}
+                              </p>
+                              <p>
+                                {selected.value.assessment.report?.reason ||
+                                  selected.value.assessment.report?.summary ||
+                                  "判定の理由は報告されていません。下の原出力から確認できます。"}
+                              </p>
+                              <details>
+                                <summary>判定の原報告</summary>
+                                <pre>
+                                  {JSON.stringify(
+                                    selected.value.assessment,
+                                    null,
+                                    2,
+                                  )}
+                                </pre>
+                              </details>
                             </section>
                           )}
 
@@ -1120,7 +1149,6 @@ export function Workbench({
                             )}
                           {pauses?.items.map((r) => (
                             <section key={r.id} aria-label="質問と回答">
-                              <p>{r.value.reason}</p>
                               <QuestionView value={r.value.request} />
                               <p>
                                 質問の状態：
@@ -1149,11 +1177,13 @@ export function Workbench({
                                   />
                                 </>
                               )}
-                              <p>
-                                Runner配送：{r.value.delivered_at ?? "未確認"} /
-                                実際の継続：
-                                {r.value.resumed_at ?? "未確認"}
-                              </p>
+                              {r.value.response !== undefined && (
+                                <p>
+                                  Runner配送：{r.value.delivered_at ?? "未確認"}{" "}
+                                  / 実際の継続：
+                                  {r.value.resumed_at ?? "未確認"}
+                                </p>
+                              )}
                               {canEdit && answerable?.id === r.id && (
                                 <PauseAnswer
                                   native={native}

@@ -70,12 +70,15 @@ export function App({ apiBaseUrl, native }: AppProps) {
         />
       )}
       <footer>
-        <p>Contextの編集・所属変更・プレビューから実行は始まりません。</p>
-        <p>
-          {native
-            ? "画面を閉じても、独立Runnerの許可済みの実行は継続します。"
-            : "Web版はローカルのCLI実行機構を持ちません。"}
-        </p>
+        <details>
+          <summary>このクライアントでの実行について</summary>
+          <p>Contextの編集・所属変更・プレビューから実行は始まりません。</p>
+          <p>
+            {native
+              ? "画面を閉じても、独立Runnerの許可済みの実行は継続します。"
+              : "Web版はローカルのCLI実行機構を持ちません。"}
+          </p>
+        </details>
       </footer>
     </main>
   );

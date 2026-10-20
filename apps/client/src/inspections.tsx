@@ -93,16 +93,16 @@ const dimensions: Record<string, string> = {
 export function InspectionResult({
   value: v,
   title,
+  criteria = [],
 }: {
   value: View;
   title: string;
+  criteria?: { id: string; requirement: string }[];
 }) {
   const report = acceptedReport(v);
   return (
     <section aria-label={title}>
-      <h4>
-        {title}: {v.launch.value.run_id}
-      </h4>
+      <h4>{title}</h4>
       <p>
         過去の判定:{" "}
         <strong>{v.run.value.assessment?.verdict ?? "未判定"}</strong> / 形式:{" "}
@@ -113,26 +113,29 @@ export function InspectionResult({
             : "採用中の基準に一致"}
         </strong>
       </p>
-      <p>
-        実行: {v.run.value.state} / 終了コード:{" "}
-        {v.run.value.exit_code ?? "未観測"} / Context:{" "}
-        {v.launch.value.manifest.state === "none"
-          ? "明示的に無注入"
-          : v.launch.value.manifest.state}
-      </p>
-      <p className="note">
-        固定基準・Context注入の強制は、版と注入内容の固定です。CLIから読める全ファイル・記憶の分離を保証するものではありません。
-      </p>
-      <dl className="status-list">
-        {Object.entries(v.launch.value.separation).map(([name, s]) => (
-          <div key={name}>
-            <dt>{dimensions[name] ?? name}</dt>
-            <dd>
-              {levels[s.level] ?? s.level} · {s.method || "方法未確認"}
-            </dd>
-          </div>
-        ))}
-      </dl>
+      <details>
+        <summary>検品環境・固定入力の分離を確認</summary>
+        <p>
+          実行: {v.run.value.state} / 終了コード:{" "}
+          {v.run.value.exit_code ?? "未観測"} / Context:{" "}
+          {v.launch.value.manifest.state === "none"
+            ? "明示的に無注入"
+            : v.launch.value.manifest.state}
+        </p>
+        <p className="note">
+          固定基準・Context注入の強制は、版と注入内容の固定です。CLIから読める全ファイル・記憶の分離を保証するものではありません。
+        </p>
+        <dl className="status-list">
+          {Object.entries(v.launch.value.separation).map(([name, s]) => (
+            <div key={name}>
+              <dt>{dimensions[name] ?? name}</dt>
+              <dd>
+                {levels[s.level] ?? s.level} · {s.method || "方法未確認"}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </details>
       <div className="table-scroll">
         <table className="inspection-results">
           <thead>
@@ -147,13 +150,19 @@ export function InspectionResult({
           <tbody>
             {report?.criteria_results?.map((c) => (
               <tr key={c.criterion_id}>
-                <td>{c.criterion_id}</td>
+                <td>
+                  {criteria.find((item) => item.id === c.criterion_id)
+                    ?.requirement ?? c.criterion_id}
+                </td>
                 <td>{c.verdict}</td>
                 <td>{c.executed ? "実行済み" : "未実行"}</td>
                 <td>
-                  {c.evidence_refs
-                    ?.map((e) => `${e.id}@${e.version}`)
-                    .join(", ") || "なし"}
+                  <details>
+                    <summary>証拠 {c.evidence_refs?.length ?? 0}件</summary>
+                    {c.evidence_refs
+                      ?.map((e) => `${e.id}@${e.version}`)
+                      .join(", ") || "なし"}
+                  </details>
                 </td>
                 <td>{c.unverified?.join(" / ") || "記載なし"}</td>
               </tr>
@@ -174,9 +183,17 @@ export function InspectionResult({
             {key} · {sourceKinds[e.kind] ?? e.kind} · {e.state} ·{" "}
             {e.description}
             <br />
-            <code>
-              {e.artifact.uri} / {e.artifact.revision} / {e.artifact.digest}
-            </code>
+            {/^https?:\/\//.test(e.artifact.uri) && (
+              <a href={e.artifact.uri} target="_blank" rel="noreferrer">
+                この証拠を開く
+              </a>
+            )}
+            <details>
+              <summary>証拠の固定版・取得先</summary>
+              <code>
+                {e.artifact.uri} / {e.artifact.revision} / {e.artifact.digest}
+              </code>
+            </details>
           </li>
         ))}
       </ul>

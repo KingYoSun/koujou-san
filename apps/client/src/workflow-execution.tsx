@@ -7,6 +7,11 @@ import {
 } from "./workflow-map";
 import { StatusBadge } from "./status-badge";
 import { DefinitionPicker, type DefinitionPage } from "./definition-picker";
+import {
+  WorkflowProgress,
+  workflowFocus,
+  type WorkflowTask,
+} from "./workflow-progress";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { syncRequest, workspaceAccessLost } from "./auth";
@@ -27,15 +32,7 @@ type Execution = {
     guarantee: string;
   };
 };
-type Task = {
-  node: string;
-  attempt: number;
-  state: string;
-  outcome?: string;
-  run?: Ref;
-  definition?: Ref;
-  stale?: boolean;
-};
+type Task = WorkflowTask;
 type Graph = WorkflowGraph;
 type Page = { items: Record<Task>[]; next: string };
 type Impact = {
@@ -95,6 +92,7 @@ export function WorkflowExecution({
   visible?: boolean;
 }) {
   const active = useScreenActive();
+  const flowDetails = useRef<HTMLDetailsElement>(null);
   const owner = JSON.stringify([
     selected?.id,
     selected?.version,
@@ -222,14 +220,12 @@ export function WorkflowExecution({
     setRecord(value);
     setID(value.id);
     setGraph(def.value);
-    const waiting = tasks.data.items.find((t) => t.value.state === "decision");
-    if (waiting)
-      setNodeIndex(
-        Math.max(
-          0,
-          def.value.nodes.findIndex((n) => n.id === waiting.value.node),
-        ),
-      );
+    setNodeIndex(
+      workflowFocus(
+        def.value,
+        tasks.data.items.map((t) => t.value),
+      ),
+    );
     setPage(tasks.data);
     setCursor(tasks.data.next);
     setImpact(undefined);
@@ -264,10 +260,12 @@ export function WorkflowExecution({
     <ScreenContent>
       {
         <section aria-label="工程の実行と判断">
-          <h3>採用した工程の実行</h3>
-          <p>
-            実行開始は別の依頼です。工程の判断待ちと、Run途中の質問は別々に表示します。時間・費用の予算は追加開始を止める条件で、開始済みのCLIによる消費の上限は保証しません。
-          </p>
+          {!selected && <h3>工程の状況</h3>}
+          {!selected && (
+            <p>
+              実行開始は別の依頼です。工程の判断待ちと、Run途中の質問は別々に表示します。時間・費用の予算は追加開始を止める条件で、開始済みのCLIによる消費の上限は保証しません。
+            </p>
+          )}
           <fieldset disabled={busy}>
             {!selected && (
               <details>
@@ -362,360 +360,399 @@ export function WorkflowExecution({
               )}
             {record && (
               <>
-                <p>
-                  工程:{" "}
-                  {executionStates[record.value.state] ?? record.value.state} /
-                  準備したRun数: {record.value.count}（起動の確認とは別） /
-                  固定定義: {record.value.definition.id}@
-                  {record.value.definition.version}
-                </p>
+                {!selected && (
+                  <p>
+                    工程：
+                    {executionStates[record.value.state] ?? record.value.state}
+                  </p>
+                )}
                 {record.value.reason && (
                   <p>
                     待機・停止理由:{" "}
                     {waitReasons[record.value.reason] ?? record.value.reason}
                   </p>
                 )}
-                {record.value.cost && (
-                  <p>
-                    費用観測: {record.value.cost.state} /{" "}
-                    {record.value.cost.amount ?? "未観測"}{" "}
-                    {record.value.cost.currency} / 制御: 追加開始のみ
-                  </p>
-                )}
                 {graph && (
-                  <WorkflowMap
+                  <WorkflowProgress
                     graph={graph}
-                    selected={nodeIndex}
-                    onSelect={setNodeIndex}
-                    loadLabels={async (refs) =>
-                      (await request("/labels", refs)) as DefinitionLabel[]
-                    }
-                    status={(node) => {
-                      const tasks =
-                        page?.items.filter((t) => t.value.node === node.id) ??
-                        [];
-                      return tasks.length ? (
-                        tasks.map((t) => (
-                          <p key={t.id}>
-                            <StatusBadge
-                              label={`試行 ${t.value.attempt}`}
-                              value={taskStates[t.value.state] ?? t.value.state}
-                            />
-                            <StatusBadge
-                              label={
-                                node.choices?.length
-                                  ? "人の選択"
-                                  : [
-                                        "PASS",
-                                        "FAIL",
-                                        "INCONCLUSIVE",
-                                        "STALE",
-                                      ].includes(t.value.outcome ?? "")
-                                    ? "判定"
-                                    : "実行結果"
-                              }
-                              value={
-                                t.value.outcome
-                                  ? (runOutcomes[t.value.outcome] ??
-                                    t.value.outcome)
-                                  : "未確認"
-                              }
-                            />
-                            {t.value.stale && (
-                              <StatusBadge
-                                label="有効性"
-                                value="STALE（失効）"
-                                tone="warning"
-                              />
-                            )}
-                          </p>
-                        ))
-                      ) : (
-                        <p>
-                          試行はこのページに未取得。未実行・完了とは判定していません。
-                        </p>
+                    tasks={page?.items.map((t) => t.value) ?? []}
+                    workspace={workspace}
+                    onDetails={(index) => {
+                      setNodeIndex(index);
+                      if (flowDetails.current) flowDetails.current.open = true;
+                      requestAnimationFrame(() =>
+                        document
+                          .getElementById("workflow-node-settings")
+                          ?.focus(),
                       );
                     }}
-                  >
-                    {(node) => (
-                      <>
-                        <h5>入力の接続</h5>
-                        {node.bindings?.length ? (
-                          <ul>
-                            {node.bindings.map((b, i) => (
-                              <li key={i}>
-                                {b.from} の {b.kind} / {b.channel ?? "派生結果"}
-                                [{b.index ?? 0}] /{" "}
-                                {b.path?.join(" → ") || "全体"} → {node.id} の{" "}
-                                {b.to}
-                                {b.to === "command"
-                                  ? ` / ${b.parameter?.join(" → ") || "全体"}`
-                                  : ""}
-                              </li>
-                            ))}
-                          </ul>
+                  />
+                )}
+                {cursor && (
+                  <p role="status">
+                    未取得の試行があります。このページだけで全体の判定を確定していません。
+                  </p>
+                )}
+                <details ref={flowDetails}>
+                  <summary>工程図・全試行・入力の接続</summary>
+                  {record.value.cost && (
+                    <p>
+                      費用観測: {record.value.cost.state} /{" "}
+                      {record.value.cost.amount ?? "未観測"}{" "}
+                      {record.value.cost.currency} / 制御: 追加開始のみ
+                    </p>
+                  )}
+                  {graph && (
+                    <WorkflowMap
+                      graph={graph}
+                      selected={nodeIndex}
+                      onSelect={setNodeIndex}
+                      loadLabels={async (refs) =>
+                        (await request("/labels", refs)) as DefinitionLabel[]
+                      }
+                      status={(node) => {
+                        const tasks =
+                          page?.items.filter((t) => t.value.node === node.id) ??
+                          [];
+                        return tasks.length ? (
+                          tasks.map((t) => (
+                            <p key={t.id}>
+                              <StatusBadge
+                                label={`試行 ${t.value.attempt}`}
+                                value={
+                                  taskStates[t.value.state] ?? t.value.state
+                                }
+                              />
+                              <StatusBadge
+                                label={
+                                  node.choices?.length
+                                    ? "人の選択"
+                                    : [
+                                          "PASS",
+                                          "FAIL",
+                                          "INCONCLUSIVE",
+                                          "STALE",
+                                        ].includes(t.value.outcome ?? "")
+                                      ? "判定"
+                                      : "実行結果"
+                                }
+                                value={
+                                  t.value.outcome
+                                    ? (runOutcomes[t.value.outcome] ??
+                                      t.value.outcome)
+                                    : "未確認"
+                                }
+                              />
+                              {t.value.stale && (
+                                <StatusBadge
+                                  label="有効性"
+                                  value="STALE（失効）"
+                                  tone="warning"
+                                />
+                              )}
+                            </p>
+                          ))
                         ) : (
-                          <p>前段出力からの入力接続はありません。</p>
-                        )}
-                        {page?.items
-                          .filter(
-                            (r) => r.value.node === graph?.nodes[nodeIndex]?.id,
-                          )
-                          .map((r) => (
-                            <article key={r.id}>
-                              <p>
-                                {r.value.node}（{r.value.attempt}回目）:{" "}
-                                {taskStates[r.value.state] ?? r.value.state}{" "}
-                                {r.value.outcome ?? ""}
-                                {r.value.stale
-                                  ? "（採用変更により、この試行の判定は失効）"
-                                  : ""}
-                              </p>
-                              {r.value.definition && (
+                          <p>
+                            試行はこのページに未取得。未実行・完了とは判定していません。
+                          </p>
+                        );
+                      }}
+                    >
+                      {(node) => (
+                        <>
+                          <h5>入力の接続</h5>
+                          {node.bindings?.length ? (
+                            <ul>
+                              {node.bindings.map((b, i) => (
+                                <li key={i}>
+                                  {b.from} の {b.kind} /{" "}
+                                  {b.channel ?? "派生結果"}[{b.index ?? 0}] /{" "}
+                                  {b.path?.join(" → ") || "全体"} → {node.id} の{" "}
+                                  {b.to}
+                                  {b.to === "command"
+                                    ? ` / ${b.parameter?.join(" → ") || "全体"}`
+                                    : ""}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p>前段出力からの入力接続はありません。</p>
+                          )}
+                          {page?.items
+                            .filter(
+                              (r) =>
+                                r.value.node === graph?.nodes[nodeIndex]?.id,
+                            )
+                            .map((r) => (
+                              <article key={r.id}>
                                 <p>
-                                  この試行で使用したRun定義の固定版：
-                                  {r.value.definition.id}@
-                                  {r.value.definition.version}
+                                  {r.value.node}（{r.value.attempt}回目）:{" "}
+                                  {taskStates[r.value.state] ?? r.value.state}{" "}
+                                  {r.value.outcome ?? ""}
+                                  {r.value.stale
+                                    ? "（採用変更により、この試行の判定は失効）"
+                                    : ""}
                                 </p>
-                              )}
-                              {r.value.run && fixedWorkflowRef(r.value.run) && (
-                                <p>
-                                  <NavigationLink
-                                    to={{
-                                      workspace,
-                                      screen: "work",
-                                      target: { ...r.value.run, kind: "run" },
-                                      view: "questions",
-                                    }}
-                                    related
-                                  >
-                                    この試行の入力・質問・成果を確認
-                                  </NavigationLink>
-                                </p>
-                              )}
-                              {r.value.run &&
-                                !fixedWorkflowRef(r.value.run) && (
+                                {r.value.definition && (
                                   <p>
-                                    Runの固定版はまだ未確定です。共有記録・起動の確認後に詳細を開けます。
+                                    この試行で使用したRun定義の固定版：
+                                    {r.value.definition.id}@
+                                    {r.value.definition.version}
                                   </p>
                                 )}
-                              {r.value.definition && (
-                                <button
-                                  onClick={() =>
-                                    void act(async () => {
-                                      const p = (await request(
-                                        `/executions/${encodeURIComponent(record.id)}/preview`,
-                                        {
-                                          execution: ref(record),
-                                          node: r.value.node,
-                                          format: "source",
-                                        },
-                                      )) as {
-                                        input_utf8: string;
-                                        sources: Ref[];
-                                      };
-                                      setPreview(
-                                        p.input_utf8 +
-                                          "\n\n固定参照:\n" +
-                                          JSON.stringify(p.sources, null, 2),
-                                      );
-                                    })
-                                  }
-                                >
-                                  このRunの入力をプレビュー
-                                </button>
-                              )}
-                              {canEdit &&
-                                r.value.state === "decision" &&
-                                graph?.nodes
-                                  .find((n) => n.id === r.value.node)
-                                  ?.choices?.map((choice) => (
-                                    <button
-                                      key={choice}
-                                      onClick={() =>
-                                        void act(async () => {
-                                          await mutate(
-                                            `/executions/${encodeURIComponent(record.id)}/decide`,
-                                            record.version,
-                                            {
-                                              node: r.value.node,
-                                              attempt: r.value.attempt,
-                                              choice,
-                                            },
-                                          );
-                                          await load(record.id);
-                                          setNotice(
-                                            "判断を記録しました。回答だけでは実行権限を付与しません。",
-                                          );
-                                        })
-                                      }
-                                    >
-                                      {choice}を回答
-                                    </button>
-                                  ))}
-                            </article>
-                          ))}
-                      </>
-                    )}
-                  </WorkflowMap>
-                )}
-                <p>
-                  取得した試行：{page?.items.length ?? 0}件。固定実行版{" "}
-                  {record.version} を50件ずつ取得しています。
-                </p>
-                {cursor && (
-                  <button
-                    onClick={() =>
-                      void act(async () => {
-                        const epoch = loadEpoch.current;
-                        const p = (await request("/query", {
-                          kind: "tasks",
-                          id: record.id,
-                          version: record.version,
-                          after: cursor,
-                          limit: 50,
-                        })) as { data: Page };
-                        if (epoch === loadEpoch.current) {
-                          setPage(p.data);
-                          setCursor(p.data.next);
-                        }
-                      })
-                    }
-                  >
-                    工程内の次のページ
-                  </button>
-                )}
-                {canEdit && canExecute && (
-                  <section aria-label="採用版の適用">
-                    <DefinitionPicker
-                      label="適用候補の工程定義"
-                      hint="選択した定義の現在採用版を候補にします。影響確認と明示適用までは、この工程実行を変更しません。"
-                      load={async (after) =>
-                        (
-                          (await request("/query", {
-                            kind: "heads",
-                            type: "workflow-definition",
-                            after,
-                            limit: 50,
-                          })) as { data: DefinitionPage }
-                        ).data
-                      }
-                      onChoose={(ref, name) => {
-                        setCandidate({ owner: record.id, ref, name });
-                        setImpact(undefined);
-                        setImpactDefinition(undefined);
-                      }}
-                    />
-                    <p>
-                      候補の定義：
-                      {candidate?.owner === record.id
-                        ? candidate.name || candidate.ref.id
-                        : graph?.name || record.value.definition.id}
-                      。適用する固定版は影響確認で表示します。
-                    </p>
+                                {r.value.run &&
+                                  fixedWorkflowRef(r.value.run) && (
+                                    <p>
+                                      <NavigationLink
+                                        to={{
+                                          workspace,
+                                          screen: "work",
+                                          target: {
+                                            ...r.value.run,
+                                            kind: "run",
+                                            name: `${r.value.node}（${r.value.attempt}回目）`,
+                                          },
+                                          view: "evidence",
+                                        }}
+                                        related
+                                      >
+                                        この試行の結果・証拠を確認
+                                      </NavigationLink>
+                                    </p>
+                                  )}
+                                {r.value.run &&
+                                  !fixedWorkflowRef(r.value.run) && (
+                                    <p>
+                                      Runの固定版はまだ未確定です。共有記録・起動の確認後に詳細を開けます。
+                                    </p>
+                                  )}
+                                {r.value.definition && (
+                                  <button
+                                    onClick={() =>
+                                      void act(async () => {
+                                        const p = (await request(
+                                          `/executions/${encodeURIComponent(record.id)}/preview`,
+                                          {
+                                            execution: ref(record),
+                                            node: r.value.node,
+                                            format: "source",
+                                          },
+                                        )) as {
+                                          input_utf8: string;
+                                          sources: Ref[];
+                                        };
+                                        setPreview(
+                                          p.input_utf8 +
+                                            "\n\n固定参照:\n" +
+                                            JSON.stringify(p.sources, null, 2),
+                                        );
+                                      })
+                                    }
+                                  >
+                                    このRunの入力をプレビュー
+                                  </button>
+                                )}
+                                {canEdit &&
+                                  r.value.state === "decision" &&
+                                  graph?.nodes
+                                    .find((n) => n.id === r.value.node)
+                                    ?.choices?.map((choice) => (
+                                      <button
+                                        key={choice}
+                                        onClick={() =>
+                                          void act(async () => {
+                                            await mutate(
+                                              `/executions/${encodeURIComponent(record.id)}/decide`,
+                                              record.version,
+                                              {
+                                                node: r.value.node,
+                                                attempt: r.value.attempt,
+                                                choice,
+                                              },
+                                            );
+                                            await load(record.id);
+                                            setNotice(
+                                              "判断を記録しました。回答だけでは実行権限を付与しません。",
+                                            );
+                                          })
+                                        }
+                                      >
+                                        {choice}を回答
+                                      </button>
+                                    ))}
+                              </article>
+                            ))}
+                        </>
+                      )}
+                    </WorkflowMap>
+                  )}
+                  <p>
+                    取得した試行：{page?.items.length ?? 0}件。固定実行版{" "}
+                    {record.version} を50件ずつ取得しています。
+                  </p>
+                  {cursor && (
                     <button
                       onClick={() =>
                         void act(async () => {
                           const epoch = loadEpoch.current;
-                          const adoption = await adopted();
-                          const value = (await request(
-                            `/executions/${encodeURIComponent(record.id)}/impact`,
-                            {
-                              execution: ref(record),
-                              adoption: ref(adoption),
-                            },
-                          )) as Impact;
+                          const p = (await request("/query", {
+                            kind: "tasks",
+                            id: record.id,
+                            version: record.version,
+                            after: cursor,
+                            limit: 50,
+                          })) as { data: Page };
                           if (epoch === loadEpoch.current) {
-                            setImpact(value);
-                            setImpactDefinition(adoption.value.definition);
+                            setPage(p.data);
+                            setCursor(p.data.next);
                           }
                         })
                       }
                     >
-                      現在の採用版を適用した場合の影響を確認
+                      工程内の次のページ
                     </button>
-                  </section>
-                )}
-                {impact && (
-                  <div>
-                    {impactDefinition && (
+                  )}
+                </details>
+                <details>
+                  <summary>定義の変更・固定版・記録の保存</summary>
+                  <p>
+                    準備したRun数：{record.value.count}（起動確認とは別） /
+                    固定定義：{record.value.definition.id}@
+                    {record.value.definition.version}
+                  </p>
+                  {canEdit && canExecute && (
+                    <section aria-label="採用版の適用">
+                      <DefinitionPicker
+                        label="適用候補の工程定義"
+                        hint="選択した定義の現在採用版を候補にします。影響確認と明示適用までは、この工程実行を変更しません。"
+                        load={async (after) =>
+                          (
+                            (await request("/query", {
+                              kind: "heads",
+                              type: "workflow-definition",
+                              after,
+                              limit: 50,
+                            })) as { data: DefinitionPage }
+                          ).data
+                        }
+                        onChoose={(ref, name) => {
+                          setCandidate({ owner: record.id, ref, name });
+                          setImpact(undefined);
+                          setImpactDefinition(undefined);
+                        }}
+                      />
                       <p>
-                        適用する定義の固定版：
-                        <NavigationLink
-                          to={{
-                            workspace,
-                            screen: "workflows",
-                            target: {
-                              ...impactDefinition,
-                              kind: "workflow-definition",
-                            },
-                            view: "edit",
-                          }}
-                          related
-                        >
-                          {impactDefinition.id}@{impactDefinition.version}
-                        </NavigationLink>
+                        候補の定義：
+                        {candidate?.owner === record.id
+                          ? candidate.name || candidate.ref.id
+                          : graph?.name || record.value.definition.id}
+                        。適用する固定版は影響確認で表示します。
                       </p>
-                    )}
-                    <p>
-                      採用の固定参照：{impact.adoption.id}@
-                      {impact.adoption.version}
-                    </p>
-                    <p>
-                      影響する未開始ノード:{" "}
-                      {impact.affected_unstarted.join(", ") || "なし"}
-                    </p>
-                    <p>
-                      失効する判断:{" "}
-                      {impact.invalidated_decisions.join(", ") || "なし"}
-                    </p>
+                      <button
+                        onClick={() =>
+                          void act(async () => {
+                            const epoch = loadEpoch.current;
+                            const adoption = await adopted();
+                            const value = (await request(
+                              `/executions/${encodeURIComponent(record.id)}/impact`,
+                              {
+                                execution: ref(record),
+                                adoption: ref(adoption),
+                              },
+                            )) as Impact;
+                            if (epoch === loadEpoch.current) {
+                              setImpact(value);
+                              setImpactDefinition(adoption.value.definition);
+                            }
+                          })
+                        }
+                      >
+                        現在の採用版を適用した場合の影響を確認
+                      </button>
+                    </section>
+                  )}
+                  {impact && (
+                    <div>
+                      {impactDefinition && (
+                        <p>
+                          適用する定義の固定版：
+                          <NavigationLink
+                            to={{
+                              workspace,
+                              screen: "workflows",
+                              target: {
+                                ...impactDefinition,
+                                kind: "workflow-definition",
+                              },
+                              view: "edit",
+                            }}
+                            related
+                          >
+                            {impactDefinition.id}@{impactDefinition.version}
+                          </NavigationLink>
+                        </p>
+                      )}
+                      <p>
+                        採用の固定参照：{impact.adoption.id}@
+                        {impact.adoption.version}
+                      </p>
+                      <p>
+                        影響する未開始ノード:{" "}
+                        {impact.affected_unstarted.join(", ") || "なし"}
+                      </p>
+                      <p>
+                        失効する判断:{" "}
+                        {impact.invalidated_decisions.join(", ") || "なし"}
+                      </p>
+                      <button
+                        onClick={() =>
+                          void act(async () => {
+                            await mutate(
+                              `/executions/${encodeURIComponent(record.id)}/apply`,
+                              record.version,
+                              { impact },
+                            );
+                            await load(record.id);
+                            setNotice(
+                              "影響を確認した採用版を適用しました。開始済みの入力と過去の判断は履歴に残っています。",
+                            );
+                          })
+                        }
+                      >
+                        確認した採用版を明示適用
+                      </button>
+                    </div>
+                  )}
+                  {native ? (
                     <button
                       onClick={() =>
                         void act(async () => {
-                          await mutate(
-                            `/executions/${encodeURIComponent(record.id)}/apply`,
-                            record.version,
-                            { impact },
-                          );
-                          await load(record.id);
+                          const value = await invoke<{
+                            complete: boolean;
+                            path: string;
+                          }>("export_workflow", {
+                            workspace,
+                            id: record.id,
+                            version: record.version,
+                          });
                           setNotice(
-                            "影響を確認した採用版を適用しました。開始済みの入力と過去の判断は履歴に残っています。",
+                            `${value.complete ? "記録を保存しました" : "取得が完了していません"}: ${value.path}`,
                           );
                         })
                       }
                     >
-                      確認した採用版を明示適用
+                      この実行版の記録をファイルへ保存
                     </button>
-                  </div>
-                )}
-                {native ? (
-                  <button
-                    onClick={() =>
-                      void act(async () => {
-                        const value = await invoke<{
-                          complete: boolean;
-                          path: string;
-                        }>("export_workflow", {
-                          workspace,
-                          id: record.id,
-                          version: record.version,
-                        });
-                        setNotice(
-                          `${value.complete ? "記録を保存しました" : "取得が完了していません"}: ${value.path}`,
-                        );
-                      })
-                    }
-                  >
-                    この実行版の記録をファイルへ保存
-                  </button>
-                ) : (
-                  <a
-                    download
-                    href={`${base}/executions/${encodeURIComponent(record.id)}/export?version=${encodeURIComponent(record.version)}`}
-                  >
-                    この実行版の記録をファイルへ保存
-                  </a>
-                )}
+                  ) : (
+                    <a
+                      download
+                      href={`${base}/executions/${encodeURIComponent(record.id)}/export?version=${encodeURIComponent(record.version)}`}
+                    >
+                      この実行版の記録をファイルへ保存
+                    </a>
+                  )}
+                </details>
               </>
             )}
           </fieldset>
