@@ -92,3 +92,21 @@ test("a prepared Run without a fixed version is not offered as evidence", () => 
   expect(html).toContain("起動未確認");
   expect(html).not.toContain("<a ");
 });
+
+test("reinspection returning to the same node is shown once as the new result", () => {
+  const graph: WorkflowGraph = {
+    nodes: [{ id: "検品", retry: { STALE: "検品" } }],
+  };
+  const old = { ...task("検品", 1, "PASS"), stale: true };
+  const html = renderToStaticMarkup(
+    <WorkflowProgress
+      graph={graph}
+      tasks={[old, task("検品", 2, "PASS")]}
+      workspace="one"
+      onDetails={() => {}}
+    />,
+  );
+  expect(html).toContain("直近の再検品");
+  expect(html).not.toContain("戻り先の修正");
+  expect(html.match(/<a /g)).toHaveLength(2);
+});

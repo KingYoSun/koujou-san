@@ -607,10 +607,10 @@ export function UsagePricing({
                 </fieldset>
               )}
             </ScreenContent>
-            {message && <p role="status">{message}</p>}
           </details>
         }
       </ScreenContent>
+      <ScreenContent>{message && <p role="status">{message}</p>}</ScreenContent>
     </>
   );
 }

@@ -141,7 +141,9 @@ export function WorkflowProgress({
                 から{back}へ戻る条件です。
               </li>
             )}
-            {correction && result("戻り先の修正", correction)}
+            {correction &&
+              correction !== current &&
+              result("戻り先の修正", correction)}
             {current !== issue &&
               result(
                 issue &&
