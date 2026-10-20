@@ -100,6 +100,24 @@ export function InspectionResult({
   criteria?: { id: string; requirement: string }[];
 }) {
   const report = acceptedReport(v);
+  const results = report?.criteria_results ?? [];
+  const rows = [
+    ...criteria.map((criterion) => ({
+      id: criterion.id,
+      label: criterion.requirement,
+      result: results.find((item) => item.criterion_id === criterion.id),
+    })),
+    ...results
+      .filter(
+        (item) =>
+          !criteria.some((criterion) => criterion.id === item.criterion_id),
+      )
+      .map((result) => ({
+        id: result.criterion_id,
+        label: result.criterion_id,
+        result,
+      })),
+  ];
   return (
     <section aria-label={title}>
       <h4>{title}</h4>
@@ -148,23 +166,24 @@ export function InspectionResult({
             </tr>
           </thead>
           <tbody>
-            {report?.criteria_results?.map((c) => (
-              <tr key={c.criterion_id}>
+            {rows.map(({ id, label, result: c }) => (
+              <tr key={id}>
+                <td>{label}</td>
+                <td>{c?.verdict ?? "未判定"}</td>
                 <td>
-                  {criteria.find((item) => item.id === c.criterion_id)
-                    ?.requirement ?? c.criterion_id}
+                  {c ? (c.executed ? "実行済み" : "未実行") : "実行未確認"}
                 </td>
-                <td>{c.verdict}</td>
-                <td>{c.executed ? "実行済み" : "未実行"}</td>
                 <td>
                   <details>
-                    <summary>証拠 {c.evidence_refs?.length ?? 0}件</summary>
-                    {c.evidence_refs
+                    <summary>証拠 {c?.evidence_refs?.length ?? 0}件</summary>
+                    {c?.evidence_refs
                       ?.map((e) => `${e.id}@${e.version}`)
                       .join(", ") || "なし"}
                   </details>
                 </td>
-                <td>{c.unverified?.join(" / ") || "記載なし"}</td>
+                <td>
+                  {c ? c.unverified?.join(" / ") || "記載なし" : "報告待ち"}
+                </td>
               </tr>
             ))}
           </tbody>

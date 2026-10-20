@@ -144,7 +144,12 @@ export function WorkflowProgress({
             {correction && result("戻り先の修正", correction)}
             {current !== issue &&
               result(
-                issue && current.outcome ? "直近の再検品" : "現在の試行",
+                issue &&
+                  ["PASS", "FAIL", "INCONCLUSIVE", "STALE"].includes(
+                    current.outcome ?? "",
+                  )
+                  ? "直近の再検品"
+                  : "現在の試行",
                 current,
               )}
           </ol>

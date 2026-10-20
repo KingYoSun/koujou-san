@@ -64,3 +64,24 @@ test("a valid report shows the criterion verdict and its evidence", () => {
   expect(html).toContain("<td>FAIL</td>");
   expect(html).toContain("inspection-evidence:one@fixed");
 });
+
+test.each(["invalid", "valid"])(
+  "fixed review criteria stay readable before a usable %s report exists",
+  (state) => {
+    const html = renderToStaticMarkup(
+      <InspectionResult
+        value={view(state, { unverified: [] })}
+        title="検品"
+        criteria={[
+          {
+            id: "AC-1",
+            requirement: "同じ依頼を二度送っても一件だけ登録される",
+          },
+        ]}
+      />,
+    );
+    expect(html).toContain("同じ依頼を二度送っても一件だけ登録される");
+    expect(html).toContain("未判定");
+    expect(html).toContain("実行未確認");
+  },
+);

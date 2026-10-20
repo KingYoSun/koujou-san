@@ -1016,8 +1016,9 @@ export function Workbench({
                             <section aria-label="Runの報告">
                               <h4>Runの報告</h4>
                               <p>
-                                判定：
-                                {selected.value.assessment.verdict ?? "未確認"}
+                                {selected.value.assessment.state === "valid"
+                                  ? `判定：${selected.value.assessment.verdict ?? "未確認"}`
+                                  : "報告の形式を確認できないため、この判定は利用できません。"}
                               </p>
                               <p>
                                 {selected.value.assessment.report?.reason ||
