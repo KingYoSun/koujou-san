@@ -40,6 +40,8 @@ export type Route = {
   screen: Screen;
   workspace: string;
   target?: Target;
+  origin?: Target;
+  input?: Target;
   view?: string;
   query?: string;
   cursor?: string;
@@ -90,6 +92,24 @@ export function readRoute(search: string, workspace: string): Route {
     ...(p.has("view") ? { view: p.get("view")! } : {}),
     ...(p.has("q") ? { query: p.get("q")! } : {}),
     ...(p.has("cursor") ? { cursor: p.get("cursor")! } : {}),
+    ...Object.fromEntries(
+      ["origin", "input"].flatMap((prefix) =>
+        p.get(prefix + "Id") &&
+        p.get(prefix + "Kind") &&
+        p.get(prefix + "Version")
+          ? [
+              [
+                prefix,
+                {
+                  id: p.get(prefix + "Id")!,
+                  kind: p.get(prefix + "Kind")!,
+                  version: p.get(prefix + "Version")!,
+                },
+              ],
+            ]
+          : [],
+      ),
+    ),
   };
 }
 
@@ -105,6 +125,14 @@ export function routeHref(route: Route): string {
   if (route.view) p.set("view", route.view);
   if (route.query) p.set("q", route.query);
   if (route.cursor) p.set("cursor", route.cursor);
+  for (const field of ["origin", "input"] as const) {
+    const ref = route[field];
+    if (ref) {
+      p.set(field + "Kind", ref.kind);
+      p.set(field + "Id", ref.id);
+      p.set(field + "Version", ref.version);
+    }
+  }
   return `?${p}`;
 }
 
@@ -126,14 +154,19 @@ export const useScreenActive = () => useContext(ScreenVisibility);
 export function Screen({
   screens,
   background = false,
+  enabled = true,
   children,
 }: {
   screens: Screen[];
   background?: boolean;
+  enabled?: boolean;
   children: ReactNode;
 }) {
   const navigation = useNavigation();
-  const active = !navigation || screens.includes(navigation.route.screen);
+  const active =
+    useScreenActive() &&
+    enabled &&
+    (!navigation || screens.includes(navigation.route.screen));
   const visited = useRef(false);
   if (active) visited.current = true;
   if (!background && !visited.current) return null;

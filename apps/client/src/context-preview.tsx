@@ -1,10 +1,38 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useNavigation, useScreenActive } from "./navigation";
 import { useStore } from "zustand";
 import type { CandidateEvidence, ContextResolution } from "./context-contract";
+import type { UIState } from "./context-ui";
+type PreviewRequest = {
+  run_id: string;
+  selection: Pick<UIState, "mode" | "include" | "exclude">;
+  evidence: CandidateEvidence[];
+};
 import type { UI, Ref, Envelope, CandidatePage } from "./context-ui";
 import { refKey, refLabel, resultData } from "./context-ui";
 import { Completeness, reasonText } from "./context-status";
-export function ContextPreview({ ui }: { ui: UI }) {
+export function ContextPreview({
+  ui,
+  active = true,
+}: {
+  ui: UI;
+  active?: boolean;
+}) {
+  const visible = useScreenActive() && active;
+  const navigation = useNavigation();
+  const preparation =
+    navigation?.route.origin?.kind === "run-preparation"
+      ? navigation.route.origin
+      : undefined;
+  const [resolvedRequest, setResolvedRequest] = useState<PreviewRequest>();
+  const pending = useRef<
+    | {
+        signature: string;
+        id: string;
+        operation_id: string;
+      }
+    | undefined
+  >(undefined);
   const state = useStore(ui.store);
   const [result, setResult] = useState<Envelope<ContextResolution>>();
   const [basis, setBasis] = useState("");
@@ -93,17 +121,18 @@ export function ContextPreview({ ui }: { ui: UI }) {
           }
           evidence.push(found.data.evidence);
         }
+      const request: PreviewRequest = {
+        run_id: "",
+        selection: {
+          mode: state.mode,
+          include: state.include,
+          exclude: state.exclude,
+        },
+        evidence,
+      };
       const value = await ui.request<ContextResolution>(
         `/contexts/workspaces/${encodeURIComponent(ui.workspace)}/resolve`,
-        {
-          run_id: "",
-          selection: {
-            mode: state.mode,
-            include: state.include,
-            exclude: state.exclude,
-          },
-          evidence,
-        },
+        request,
       );
       if (
         value.data?.manifest?.state === "ready" &&
@@ -112,6 +141,7 @@ export function ContextPreview({ ui }: { ui: UI }) {
         value.data = { ready: false, missing: [{ code: "empty_selection" }] };
       if (ui.store.getState().permissionEpoch !== state.permissionEpoch) return;
       setResult(value);
+      setResolvedRequest(request);
     } catch (error) {
       setError(String(error));
       ui.fail(error);
@@ -121,6 +151,53 @@ export function ContextPreview({ ui }: { ui: UI }) {
   }
   const current = basis === signature;
   const manifest = current ? result?.data?.manifest : undefined;
+  async function useInput() {
+    if (
+      !preparation ||
+      !resolvedRequest ||
+      !manifest ||
+      !result?.data?.ready ||
+      !navigation?.returnTo
+    )
+      return;
+    setBusy(true);
+    setError("");
+    const value = { ...resolvedRequest, run_id: preparation.id };
+    const signature = JSON.stringify(value);
+    if (pending.current?.signature !== signature)
+      pending.current = {
+        signature,
+        id: crypto.randomUUID(),
+        operation_id: crypto.randomUUID(),
+      };
+    try {
+      const fixed = resultData(
+        await ui.request<{ id: string; version: string }>(
+          `/contexts/workspaces/${encodeURIComponent(ui.workspace)}/manifest/${pending.current.id}`,
+          {
+            operation_id: pending.current.operation_id,
+            expected_version: "0",
+            value,
+          },
+        ),
+      );
+      navigation.navigate({
+        ...navigation.returnTo,
+        origin: preparation,
+        input: {
+          kind: "manifest",
+          id: pending.current.id,
+          version: fixed.version,
+        },
+      });
+    } catch (error) {
+      setError(String(error));
+      ui.fail(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!visible) return null;
   return (
     <aside className="context-preview" aria-label="注入プレビュー">
       <h3>注入プレビュー</h3>
@@ -240,6 +317,14 @@ export function ContextPreview({ ui }: { ui: UI }) {
                   : "選択した固定版の入力を確認しました。"}{" "}
                 読取状態: {manifest.read_status}
               </p>
+              {preparation && navigation?.returnTo && (
+                <button
+                  disabled={busy || !result.data?.ready}
+                  onClick={() => void useInput()}
+                >
+                  この固定入力をRunの準備へ戻す（起動しない）
+                </button>
+              )}
               <h4>構造・順序・抜粋</h4>
               <ol>
                 {manifest.placements.map((placement, index) => (

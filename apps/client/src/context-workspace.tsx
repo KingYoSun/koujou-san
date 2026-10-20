@@ -1,4 +1,10 @@
-import { ScreenContent } from "./navigation";
+import {
+  Screen,
+  ScreenContent,
+  useNavigation,
+  useScreenActive,
+} from "./navigation";
+import { Tabs } from "./tabs";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
@@ -34,6 +40,13 @@ export function ContextWorkspace({
   source?: OutputContextSource;
   onStatus?: (status: string) => void;
 }) {
+  const navigation = useNavigation();
+  const visible = useScreenActive();
+  const mode = ["documents", "scopes", "input", "generation"].includes(
+    navigation?.route.view ?? "",
+  )
+    ? navigation!.route.view!
+    : "documents";
   const [, render] = useReducer((n) => n + 1, 0);
   const [engine, setEngine] = useState<SyncEngine>();
   const [error, setError] = useState("");
@@ -90,6 +103,103 @@ export function ContextWorkspace({
     };
   }, [api, native, user, workspace, client, prefix, store]);
   const record = selected && engine?.state.items[identityKey(selected)]?.record;
+  const navigationRef = useRef(navigation);
+  navigationRef.current = navigation;
+  const restoring = useRef(false);
+  useEffect(
+    () =>
+      store.subscribe((next, previous) => {
+        if (
+          restoring.current ||
+          (next.selected === previous.selected &&
+            next.historical === previous.historical)
+        )
+          return;
+        const nav = navigationRef.current;
+        if (
+          nav?.route.screen !== "context" ||
+          nav.route.view === "generation" ||
+          !next.selected
+        )
+          return;
+        const fixed =
+          next.historical ??
+          engine?.state.items[identityKey(next.selected)]?.record.ref;
+        nav.navigate({
+          ...nav.route,
+          target: {
+            kind: next.selected.kind,
+            id: next.selected.id,
+            version: fixed?.revision ?? "head",
+          },
+        });
+      }),
+    [store, engine],
+  );
+  useEffect(() => {
+    const target = navigation?.route.target;
+    if (
+      !visible ||
+      navigation?.route.screen !== "context" ||
+      !target ||
+      ![
+        "sentence",
+        "paragraph",
+        "section",
+        "document",
+        "scope",
+        "membership",
+      ].includes(target.kind)
+    )
+      return;
+    const selected = { kind: target.kind, id: target.id };
+    const fixed = engine?.state.items[identityKey(selected)]?.record.ref;
+    restoring.current = true;
+    store.setState({
+      selected,
+      historical:
+        target.version !== "head" && target.version !== fixed?.revision
+          ? { ...selected, revision: target.version }
+          : undefined,
+    });
+    restoring.current = false;
+  }, [
+    visible,
+    navigation?.route.target?.id,
+    navigation?.route.target?.kind,
+    navigation?.route.target?.version,
+    engine,
+    store,
+  ]);
+  useEffect(() => {
+    const nav = navigationRef.current;
+    const state = store.getState();
+    if (
+      !record ||
+      !visible ||
+      nav?.route.screen !== "context" ||
+      nav.route.view === "generation" ||
+      nav.route.target?.id !== record.ref.id
+    )
+      return;
+    if (state.historical?.revision === record.ref.revision) {
+      restoring.current = true;
+      store.setState({ historical: undefined });
+      restoring.current = false;
+    }
+    if (!state.historical)
+      nav.navigate(
+        {
+          ...nav.route,
+          target: {
+            kind: record.ref.kind,
+            id: record.ref.id,
+            version: record.ref.revision,
+          },
+        },
+        { replace: true },
+      );
+  }, [record?.ref.revision, visible, store]);
   useEffect(() => {
     if (record)
       client.setQueryData([...prefix, "body", record.ref], { data: record });
@@ -198,21 +308,73 @@ export function ContextWorkspace({
                 <button onClick={() => setError("")}>閉じる</button>
               </p>
             )}
-            <div className="context-layout">
-              <ContextExplorer ui={ui} />
-              <ContextEditor ui={ui} />
-              <ContextPreview ui={ui} />
-            </div>
+            <Tabs
+              id="context-mode"
+              label="Contextの作業"
+              items={[
+                { id: "documents", label: "文書を探す・編集" },
+                { id: "scopes", label: "Scopeで整理" },
+                { id: "input", label: "Run入力を選択" },
+                { id: "generation", label: "出力から反映" },
+              ]}
+              value={mode}
+              onChange={(view) =>
+                navigation?.navigate(
+                  { ...navigation.route, view },
+                  { replace: true },
+                )
+              }
+            />
+            {navigation?.route.origin && (
+              <p>
+                呼び出し元：{navigation.route.origin.kind} ·{" "}
+                {navigation.route.origin.id} · {navigation.route.origin.version}
+              </p>
+            )}
             <div id="cost-model-editor" tabIndex={-1}></div>
           </section>
         }
       </ScreenContent>
-      <ClientSelection key={`${api}/${user}/${workspace}`} ui={ui} />
-      <ContextGeneration
-        key={`generation:${api}/${user}/${workspace}`}
-        ui={ui}
-        source={source}
-      />
+      <section
+        hidden={!visible}
+        role="tabpanel"
+        id={`context-mode-panel-${mode}`}
+        aria-labelledby={`context-mode-tab-${mode}`}
+        tabIndex={0}
+      >
+        <div
+          className="context-layout"
+          hidden={!visible}
+          data-mode={mode}
+          role="region"
+          aria-label="Contextの作業領域"
+        >
+          <ContextExplorer ui={ui} active={mode !== "generation"} mode={mode} />
+          <ContextEditor
+            ui={ui}
+            active={
+              mode === "documents" ||
+              (mode === "scopes" &&
+                ["scope", "membership"].includes(selected?.kind ?? ""))
+            }
+          />
+          <ContextPreview ui={ui} active={mode === "input"} />
+        </div>
+        <Screen screens={["context"]} enabled={mode === "input"} background>
+          <ClientSelection key={api + user + workspace} ui={ui} />
+        </Screen>
+        <Screen
+          screens={["context"]}
+          enabled={mode === "generation"}
+          background
+        >
+          <ContextGeneration
+            key={`generation:${api}/${user}/${workspace}`}
+            ui={ui}
+            source={source}
+          />
+        </Screen>
+      </section>
     </>
   );
 }

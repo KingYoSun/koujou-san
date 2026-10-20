@@ -48,6 +48,12 @@ it("keeps fixed references, filters and page cursors in a shareable route", () =
     view: "evidence",
     query: "判断待ち",
     cursor: "page/2+3",
+    origin: { kind: "run", id: "origin/実行", version: "fixed-origin" },
+    input: {
+      kind: "manifest",
+      id: "fixed-input",
+      version: "fixed-input-version",
+    },
   };
   expect(readRoute(routeHref(route), route.workspace)).toEqual(route);
 });
@@ -106,7 +112,8 @@ it.each(["work", "workflows", "account"] as const)(
     expect(html).not.toContain("Contextの検索語");
     expect(html).not.toContain("参加者管理フォーム");
     expect(html.includes("アカウント設定フォーム")).toBe(screen === "account");
-    expect(html.includes("新しいRunを作成")).toBe(screen === "work");
+    expect(html.includes("新しいRunを準備")).toBe(screen === "work");
+    expect(html).not.toContain("command・接続先");
     expect(html.includes("新しい定義の下書き")).toBe(screen === "workflows");
   },
 );

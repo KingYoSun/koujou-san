@@ -1,4 +1,4 @@
-import { ScreenContent } from "./navigation";
+import { ScreenContent, useNavigation, useScreenActive } from "./navigation";
 import { useEffect, useRef, useState } from "react";
 import { syncRequest } from "./auth";
 import { editorStore, identityKey, contextPath, type UI } from "./context-ui";
@@ -33,6 +33,9 @@ export function ContextGeneration({
   ui: UI;
   source?: OutputContextSource;
 }) {
+  const navigation = useNavigation();
+  const active = useScreenActive();
+  const previewEpoch = useRef(0);
   const [store] = useState(() => editorStore());
   const [runID, setRunID] = useState(""),
     [outputID, setOutputID] = useState(""),
@@ -66,6 +69,7 @@ export function ContextGeneration({
           .split("/")
           .map((p) => p.replace(/~1/g, "/").replace(/~0/g, "~"));
   async function prepare(input?: OutputContextSource) {
+    const attempt = ++previewEpoch.current;
     setBusy(true);
     setNotice("");
     const epoch = answerScopeEpoch(namespace);
@@ -87,7 +91,11 @@ export function ContextGeneration({
         method: "POST",
         body: selected,
       })) as Preview;
-      if (!allowAnswerScope(namespace, epoch)) return;
+      if (
+        attempt !== previewEpoch.current ||
+        !allowAnswerScope(namespace, epoch)
+      )
+        return;
       setSource(selected);
       setPreview(data);
       setInitial(undefined);
@@ -102,19 +110,43 @@ export function ContextGeneration({
         setChannel(input.channel);
       }
     } catch {
+      if (attempt !== previewEpoch.current) return;
       setNotice("固定した出力・対象箇所・現在の閲覧権限を確認してください。");
     } finally {
-      setBusy(false);
+      if (attempt === previewEpoch.current) setBusy(false);
     }
   }
   useEffect(() => {
-    if (request?.workspace === ui.workspace) void prepare(request);
+    if (!active) return;
+    const route = navigation?.route;
+    if (
+      route?.screen === "context" &&
+      route.view === "generation" &&
+      route.target?.kind === "output" &&
+      route.origin?.kind === "run"
+    ) {
+      setPreview(undefined);
+      setSource(undefined);
+      void prepare({
+        workspace: ui.workspace,
+        run: route.origin,
+        output: route.target,
+        channel:
+          request?.output.id === route.target.id ? request.channel : "report",
+      });
+    } else if (!navigation && request?.workspace === ui.workspace)
+      void prepare(request);
   }, [
     request?.run.id,
     request?.run.version,
     request?.output.id,
     request?.output.version,
     request?.workspace,
+    active,
+    navigation?.route.target?.id,
+    navigation?.route.target?.version,
+    navigation?.route.origin?.id,
+    navigation?.route.origin?.version,
   ]);
   async function group() {
     try {

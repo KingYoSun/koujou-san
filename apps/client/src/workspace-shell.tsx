@@ -159,6 +159,7 @@ export function WorkspaceShell({
                 {
                   ...to("context"),
                   target: { ...next.output, kind: "output" },
+                  origin: { ...next.run, kind: "run" },
                   view: "generation",
                 },
                 { related: true },

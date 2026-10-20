@@ -1,4 +1,4 @@
-import { ScreenContent } from "./navigation";
+import { ScreenContent, NavigationLink } from "./navigation";
 import { useState } from "react";
 import { syncRequest } from "./auth";
 import { allowAnswerScope, answerScopeEpoch } from "./sync-store";
@@ -123,7 +123,16 @@ export function DefinitionRun({
           )}
           {created && (
             <p>
-              作成したRun: <code>{created.id}</code>
+              <NavigationLink
+                related
+                to={{
+                  workspace,
+                  screen: "work",
+                  target: { ...created, kind: "run" },
+                }}
+              >
+                作成したRunの入力・割当・開始を確認
+              </NavigationLink>
             </p>
           )}
           <p role="status">{notice}</p>

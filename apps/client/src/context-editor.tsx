@@ -14,7 +14,15 @@ import {
 } from "./context-ui";
 import { ContextGenerationOrigin } from "./context-generation-origin";
 import { EnvelopeStatus } from "./context-status";
-export function ContextEditor({ ui }: { ui: UI }) {
+import { useScreenActive } from "./navigation";
+export function ContextEditor({
+  ui,
+  active = true,
+}: {
+  ui: UI;
+  active?: boolean;
+}) {
+  const visible = useScreenActive() && active;
   const state = useStore(ui.store);
   const selected = state.selected;
   const key = selected ? identityKey(selected) : "";
@@ -24,15 +32,15 @@ export function ContextEditor({ ui }: { ui: UI }) {
   useEffect(() => {
     setHistoryAfter("");
     setHistoryBack([]);
-    if (selected) void ui.engine.open(selected).catch(ui.fail);
-  }, [key, ui.engine]);
+    if (visible && selected) void ui.engine.open(selected).catch(ui.fail);
+  }, [key, ui.engine, visible]);
   const current =
     ui.engine.state.items[key] ?? ui.engine.state.drafts[key]?.base;
   const draft = ui.engine.state.drafts[key];
   const historical = state.historical;
   const fixed = useQuery({
     queryKey: [...ui.prefix, "body", historical],
-    enabled: Boolean(historical),
+    enabled: visible && Boolean(historical),
     retry: false,
     queryFn: () =>
       ui.request<ContextRecord<Record<string, unknown>>>(
@@ -47,7 +55,8 @@ export function ContextEditor({ ui }: { ui: UI }) {
       historyAfter,
       current?.record.ref.revision,
     ],
-    enabled: Boolean(selected && current?.record.ref.revision !== "0"),
+    enabled:
+      visible && Boolean(selected && current?.record.ref.revision !== "0"),
     retry: false,
     queryFn: () =>
       ui.request<{ items: Candidate[] }>(
@@ -86,6 +95,7 @@ export function ContextEditor({ ui }: { ui: UI }) {
       ui.fail(error);
     }
   }
+  if (!visible) return null;
   if (!selected)
     return (
       <section className="context-editor">

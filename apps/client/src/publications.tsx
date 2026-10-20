@@ -1,4 +1,5 @@
-import { ScreenContent } from "./navigation";
+import { Field } from "./field";
+import { ScreenContent, useNavigation, useScreenActive } from "./navigation";
 import { useEffect, useRef, useState } from "react";
 import { syncRequest, workspaceAccessLost } from "./auth";
 import { SyncHTTPError } from "./sync-error";
@@ -95,6 +96,13 @@ export function Publications({
   role: string;
   canExecute: boolean;
 }) {
+  const navigation = useNavigation();
+  const active = useScreenActive();
+  const [incoming, setIncoming] = useState<{
+    run: Ref;
+    output: Ref;
+    value: unknown;
+  }>();
   const namespace = { api, user, workspace },
     base = `/publications/workspaces/${encodeURIComponent(workspace)}`,
     canEdit = role !== "viewer";
@@ -405,6 +413,44 @@ export function Publications({
     );
     setNotice("端末内の新しい下書きです。自動送信しません。");
   };
+  useEffect(() => {
+    const route = navigation?.route;
+    if (
+      !active ||
+      route?.screen !== "publications" ||
+      route.target?.kind !== "output" ||
+      route.origin?.kind !== "run"
+    )
+      return;
+    let current = true;
+    setIncoming(undefined);
+    const run = { id: route.origin.id, version: route.origin.version },
+      output = { id: route.target.id, version: route.target.version };
+    void act(async () => {
+      const record = (await syncRequest(
+        `/runs/workspaces/${encodeURIComponent(workspace)}/records/${encodeURIComponent(output.id)}?version=${encodeURIComponent(output.version)}`,
+        native,
+        { method: "GET" },
+      )) as { run_id: string; kind: string; value: unknown };
+      const owner = (await syncRequest(
+        `/runs/workspaces/${encodeURIComponent(workspace)}/records/${encodeURIComponent(run.id)}?version=${encodeURIComponent(run.version)}`,
+        native,
+        { method: "GET" },
+      )) as Ref;
+      if (record.kind !== "output" || record.run_id !== owner.id)
+        throw Error("output_source_mismatch");
+      if (current) setIncoming({ run, output, value: record.value });
+    });
+    return () => {
+      current = false;
+    };
+  }, [
+    active,
+    navigation?.route.target?.id,
+    navigation?.route.target?.version,
+    navigation?.route.origin?.id,
+    navigation?.route.origin?.version,
+  ]);
   const shared = entry?.kind === "draft" ? entry : undefined;
   const result = request?.value as Request | undefined;
   return (
@@ -415,6 +461,48 @@ export function Publications({
           <p>
             下書き、共有受付、GitHubでの作成確認を分けて記録します。応答を失った要求は再作成せず、本文末尾の照合コメントで探します。
           </p>
+          {incoming &&
+            navigation?.route.target?.id === incoming.output.id &&
+            navigation.route.target.version === incoming.output.version && (
+              <section aria-label="起票元の固定出力">
+                <h4>起票元の固定出力</h4>
+                <p>
+                  {incoming.run.id} · {incoming.run.version}
+                </p>
+                <p>
+                  {incoming.output.id} · {incoming.output.version}
+                </p>
+                <details>
+                  <summary>原出力を確認</summary>
+                  <pre>{format(incoming.value)}</pre>
+                </details>
+                <button
+                  disabled={!canEdit || busy}
+                  onClick={() => {
+                    forgetProposal();
+                    setRequest(undefined);
+                    setEntry(undefined);
+                    const id = `publication-draft:${crypto.randomUUID()}`;
+                    setID(id);
+                    persist({
+                      id,
+                      version: "0",
+                      value: {
+                        ...empty(),
+                        name: "固定出力からの起票",
+                        body: format(incoming.value),
+                        sources: [incoming.run, incoming.output],
+                      },
+                    });
+                    setNotice(
+                      "固定出力を含む端末の下書きを準備しました。共有保存・外部送信は行っていません。",
+                    );
+                  }}
+                >
+                  この固定出力を含む新規下書きを準備
+                </button>
+              </section>
+            )}
           <label>
             一覧の種類
             <select
@@ -452,17 +540,12 @@ export function Publications({
               次の起票一覧ページ
             </button>
           )}
-          <label>
-            共有下書き・要求ID
-            <input value={id} onChange={(e) => setID(e.target.value)} />
-          </label>
-          <label>
-            取得する起票記録の版
-            <input
-              value={version}
-              onChange={(e) => setVersion(e.target.value)}
-            />
-          </label>
+          <Field label="共有下書き・要求ID" value={id} onChange={setID} />
+          <Field
+            label="取得する起票記録の版"
+            value={version}
+            onChange={setVersion}
+          />
           <button disabled={busy || !id} onClick={() => void act(() => load())}>
             起票の固定記録を取得
           </button>
@@ -575,13 +658,11 @@ export function Publications({
               </button>
             </section>
           )}
-          <label>
-            確認する起票要求ID
-            <input
-              value={requestID}
-              onChange={(e) => setRequestID(e.target.value)}
-            />
-          </label>
+          <Field
+            label="確認する起票要求ID"
+            value={requestID}
+            onChange={setRequestID}
+          />
           <button
             disabled={busy || !requestID}
             onClick={() => void act(() => readRequest())}
