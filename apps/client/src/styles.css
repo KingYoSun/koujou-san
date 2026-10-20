@@ -4,7 +4,7 @@
   display: flex;
   align-items: baseline;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 8px;
   flex-wrap: wrap;
 }
 .brand h1 {
@@ -21,8 +21,8 @@
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 .workspace-shell .workspace-header label {
   display: flex;
@@ -34,7 +34,7 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin: 12px 0;
+  margin: 6px 0;
 }
 .primary-navigation {
   border-bottom: 2px solid var(--primary);
@@ -57,7 +57,7 @@
 }
 .screen {
   min-width: 0;
-  margin-top: 24px;
+  margin-top: 12px;
 }
 .screen > h2 {
   font-size: 28px;
@@ -97,6 +97,17 @@
   gap: 16px;
   align-items: end;
   flex-wrap: wrap;
+}
+@media (max-width: 1120px) {
+  .primary-navigation,
+  .section-navigation {
+    display: none;
+  }
+  .workspace-shell .compact-navigation {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
 }
 @media (max-width: 767px) {
   .shell {
@@ -460,6 +471,10 @@ button:disabled {
 }
 .workflow-progress h4 {
   margin-block: 12px;
+}
+.source-preview {
+  max-height: 10rem;
+  overflow: auto;
 }
 .context-explorer,
 .context-editor,

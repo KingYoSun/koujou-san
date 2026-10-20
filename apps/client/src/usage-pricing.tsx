@@ -73,6 +73,7 @@ export function UsagePricing({
   const navigationRef = useRef(navigation);
   navigationRef.current = navigation;
   const visible = useScreenActive();
+  const dataDetails = useRef<HTMLDetailsElement>(null);
   const readSerial = useRef(0);
   const [mode, setMode] = useState(settings ? "records" : "aggregate");
   const [kind, setKind] = useState(settings ? "price" : "usage");
@@ -94,6 +95,11 @@ export function UsagePricing({
   });
   const [page, setPage] = useState<Page | null>(null);
   const [detail, setDetail] = useState<RecordView | null>(null);
+  useEffect(() => {
+    if (!visible || settings || !detail) return;
+    dataDetails.current?.focus();
+    dataDetails.current?.scrollIntoView({ block: "start" });
+  }, [visible, settings, detail?.id, detail?.version]);
   const [price, setPrice] = useState(blank);
   const [priceID, setPriceID] = useState("");
   const [version, setVersion] = useState("0");
@@ -233,9 +239,29 @@ export function UsagePricing({
   ]);
   return (
     <>
+      {!settings && (
+        <UsageComparison
+          native={native}
+          workspace={workspace}
+          role={role}
+          api={api}
+          user={user}
+          onInspect={read}
+        />
+      )}
       <ScreenContent>
         {
-          <section className="team-details">
+          <details
+            className="team-details"
+            open={settings || !!detail}
+            ref={dataDetails}
+            tabIndex={-1}
+          >
+            <summary>
+              {settings
+                ? "料金の設定と版履歴"
+                : "利用量の個別集計・原記録を調べる"}
+            </summary>
             <h3>利用量・料金</h3>
             <p>
               個別契約単価を含め、既定ではWorkspace内で共有します。接続先・契約は識別名で登録し、APIキーは入力しないでください。履歴は無期限に保持します。
@@ -582,19 +608,9 @@ export function UsagePricing({
               )}
             </ScreenContent>
             {message && <p role="status">{message}</p>}
-          </section>
+          </details>
         }
       </ScreenContent>
-      {!settings && (
-        <UsageComparison
-          native={native}
-          workspace={workspace}
-          role={role}
-          api={api}
-          user={user}
-          onInspect={read}
-        />
-      )}
     </>
   );
 }

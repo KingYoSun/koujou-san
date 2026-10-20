@@ -274,13 +274,16 @@ export function ContextGeneration({
                 />
               </label>
             </details>
-            <label>
-              対象箇所（JSON pointer・空欄はこの出力全体）
-              <input
-                value={pointer}
-                onChange={(e) => setPointer(e.target.value)}
-              />
-            </label>
+            <details>
+              <summary>出力の一部分だけを対象にする</summary>
+              <label>
+                対象箇所（JSON pointer・空欄はこの出力全体）
+                <input
+                  value={pointer}
+                  onChange={(e) => setPointer(e.target.value)}
+                />
+              </label>
+            </details>
             <button
               disabled={busy || !runID || !outputID || !outputVersion}
               onClick={() => void prepare()}
@@ -288,49 +291,61 @@ export function ContextGeneration({
               固定した出力と対象箇所を確認
             </button>
             {preview && (
-              <details>
-                <summary>固定した元出力の箇所</summary>
-                <pre>{preview.output.selected_utf8}</pre>
-                <small>digest: {preview.output.digest}</small>
-              </details>
+              <section aria-label="再利用する出力">
+                <h4>再利用する出力</h4>
+                <pre className="source-preview" tabIndex={0}>
+                  {preview.output.selected_utf8}
+                </pre>
+                <details>
+                  <summary>出力の照合情報</summary>
+                  <small>digest: {preview.output.digest}</small>
+                </details>
+              </section>
             )}
-            <button disabled={!ui.canCreate} onClick={lockSelected}>
-              選択中Contextの本文・名称を固定
-            </button>
-            {fixed.map((lock) => (
-              <p key={lock.ref.id}>
-                {lock.ref.kind}:{lock.ref.id} · 固定:{" "}
-                {Object.keys(lock.fields).join("、")}
-                <button
-                  onClick={() => setFixed(fixed.filter((v) => v !== lock))}
-                >
-                  固定を外す
-                </button>
-              </p>
-            ))}
-            <label>
-              所属先Scope ID（文書構成と別）
-              <input
-                value={scopeID}
-                onChange={(e) => setScopeID(e.target.value)}
-              />
-            </label>
-            <button disabled={!scopeID} onClick={() => void group()}>
-              所属先を取得
-            </button>
-            {groupScopes.map((ref) => (
-              <p key={ref.id}>
-                {ref.id}
-                <button
-                  onClick={() =>
-                    setGroupScopes(groupScopes.filter((r) => r.id !== ref.id))
-                  }
-                >
-                  所属先から外す
-                </button>
-              </p>
-            ))}
-
+            <details>
+              <summary>
+                更新対象の固定・Scopeへの所属（任意）
+                {fixed.length || groupScopes.length
+                  ? ` · 固定${fixed.length}件・所属先${groupScopes.length}件`
+                  : ""}
+              </summary>
+              <button disabled={!ui.canCreate} onClick={lockSelected}>
+                選択中Contextの本文・名称を固定
+              </button>
+              {fixed.map((lock) => (
+                <p key={lock.ref.id}>
+                  {lock.ref.kind}:{lock.ref.id} · 固定:{" "}
+                  {Object.keys(lock.fields).join("、")}
+                  <button
+                    onClick={() => setFixed(fixed.filter((v) => v !== lock))}
+                  >
+                    固定を外す
+                  </button>
+                </p>
+              ))}
+              <label>
+                所属先Scope ID（文書構成と別）
+                <input
+                  value={scopeID}
+                  onChange={(e) => setScopeID(e.target.value)}
+                />
+              </label>
+              <button disabled={!scopeID} onClick={() => void group()}>
+                所属先を取得
+              </button>
+              {groupScopes.map((ref) => (
+                <p key={ref.id}>
+                  {ref.id}
+                  <button
+                    onClick={() =>
+                      setGroupScopes(groupScopes.filter((r) => r.id !== ref.id))
+                    }
+                  >
+                    所属先から外す
+                  </button>
+                </p>
+              ))}
+            </details>
             <ContextGenerationAutomation
               ui={ui}
               source={source}

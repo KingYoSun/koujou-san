@@ -274,38 +274,46 @@ export function ContextWorkspace({
             aria-label="コンテキスト管理"
           >
             <header className="context-heading">
-              <div>
-                <p className="eyebrow">CONTEXT LIBRARY</p>
-                <h2>コンテキスト</h2>
-                <p>
-                  文書を組み立て、Scopeで整理し、入力する固定版を確認します。
-                </p>
-              </div>
-              <div className="context-connection">
-                <strong>
+              <details>
+                <summary>
+                  Contextの同期・保存について（
                   {engine.status === "current"
-                    ? "接続確認済み"
-                    : engine.status === "checking"
-                      ? "接続確認中"
-                      : engine.status === "revoked"
-                        ? "権限失効"
-                        : "オフライン・保存済み表示"}
-                </strong>
-                <small>最終確認: {engine.state.confirmedAt ?? "未確認"}</small>
-                <button
-                  disabled={engine.busy}
-                  onClick={() => void engine.refresh()}
-                >
-                  接続を確認
-                </button>
-              </div>
+                    ? "同期確認済み"
+                    : engine.status === "revoked"
+                      ? "権限失効"
+                      : engine.status === "offline"
+                        ? "オフライン"
+                        : "接続確認中"}
+                  ）
+                </summary>
+                <div className="context-connection">
+                  <strong>
+                    {engine.status === "current"
+                      ? "接続確認済み"
+                      : engine.status === "checking"
+                        ? "接続確認中"
+                        : engine.status === "revoked"
+                          ? "権限失効"
+                          : "オフライン・保存済み表示"}
+                  </strong>
+                  <small>
+                    最終確認: {engine.state.confirmedAt ?? "未確認"}
+                  </small>
+                  <button
+                    disabled={engine.busy}
+                    onClick={() => void engine.refresh()}
+                  >
+                    接続を確認
+                  </button>
+                </div>
+                <p className="context-meta">
+                  {native
+                    ? "Windowsアプリ · OS連携はネイティブ側で扱います。"
+                    : "Web · ローカルCLIの実行能力はありません。"}{" "}
+                  既存下書きは対象単位の保存へ移行します。移行後は旧版アプリと混在させないでください。
+                </p>
+              </details>
             </header>
-            <p className="context-meta">
-              {native
-                ? "Windowsアプリ · OS連携はネイティブ側で扱います。"
-                : "Web · ローカルCLIの実行能力はありません。"}{" "}
-              既存下書きは対象単位の保存へ移行します。移行後は旧版アプリと混在させないでください。
-            </p>
             {engine.notice && (
               <p role="status" className="context-warning">
                 {engine.notice}
@@ -335,10 +343,14 @@ export function ContextWorkspace({
               }
             />
             {navigation?.route.origin && (
-              <p>
-                呼び出し元：{navigation.route.origin.kind} ·{" "}
-                {navigation.route.origin.id} · {navigation.route.origin.version}
-              </p>
+              <details>
+                <summary>呼び出し元の固定版</summary>
+                <p>
+                  呼び出し元：{navigation.route.origin.kind} ·{" "}
+                  {navigation.route.origin.id} ·{" "}
+                  {navigation.route.origin.version}
+                </p>
+              </details>
             )}
             <div id="cost-model-editor" tabIndex={-1}></div>
           </section>

@@ -137,39 +137,42 @@ export function ComparisonResults({
                     {r.records == null ? "" : `${r.records}計測範囲`}
                   </td>
                   <td>
-                    {r.quantities && Array.isArray(r.quantities) ? (
-                      r.quantities.map((q) => (
-                        <p key={q.category}>
-                          {costLabel(q.category)}: {q.value ?? "未取得"}{" "}
-                          {q.unit}（実測 {q.reported}、推定 {q.estimated}
-                          、確認対象 {q.uncertain ?? 0}、未取得 {q.missing}
-                          、非該当 {q.not_applicable}）
-                        </p>
-                      ))
-                    ) : (
-                      <p>元記録の数量と取得範囲を根拠から確認できます。</p>
-                    )}
-                    {costLabel(
-                      r.measurement ??
+                    <details>
+                      <summary>数量と計測範囲</summary>
+                      {r.quantities && Array.isArray(r.quantities) ? (
+                        r.quantities.map((q) => (
+                          <p key={q.category}>
+                            {costLabel(q.category)}: {q.value ?? "未取得"}{" "}
+                            {q.unit}（実測 {q.reported}、推定 {q.estimated}
+                            、確認対象 {q.uncertain ?? 0}、未取得 {q.missing}
+                            、非該当 {q.not_applicable}）
+                          </p>
+                        ))
+                      ) : (
+                        <p>元記録の数量と取得範囲を根拠から確認できます。</p>
+                      )}
+                      {costLabel(
+                        r.measurement ??
+                          (
+                            r.value?.measurement as
+                              Record<string, string> | undefined
+                          )?.state,
+                      )}
+                      <br />
+                      {r.measured_scope ??
                         (
                           r.value?.measurement as
                             Record<string, string> | undefined
-                        )?.state,
-                    )}
-                    <br />
-                    {r.measured_scope ??
-                      (
-                        r.value?.measurement as
-                          Record<string, string> | undefined
-                      )?.scope}
-                    <br />
-                    {costLabel(
-                      r.billing ??
-                        (
-                          r.value?.measurement as
-                            Record<string, string> | undefined
-                        )?.billing,
-                    )}
+                        )?.scope}
+                      <br />
+                      {costLabel(
+                        r.billing ??
+                          (
+                            r.value?.measurement as
+                              Record<string, string> | undefined
+                          )?.billing,
+                      )}
+                    </details>
                   </td>
                   <td>
                     {costLabel(condition.kind)}

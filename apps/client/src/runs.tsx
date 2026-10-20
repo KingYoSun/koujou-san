@@ -896,26 +896,29 @@ export function RunRecords({
   );
   const preparePanel = (
     <>
-      <NavigationLink to={{ workspace, screen: "execution" }} related>
-        実行先・Runnerを設定
-      </NavigationLink>
-      <NavigationLink
-        to={{
-          workspace,
-          screen: "context",
-          view: "input",
-          origin: { kind: "run-preparation", id: newID, version: "0" },
-        }}
-        related
-      >
-        Contextを選択・入力をプレビュー
-      </NavigationLink>
-      <NavigationLink
-        to={{ workspace, screen: "workflows", view: "run-definitions" }}
-        related
-      >
-        採用済みのRun定義から準備
-      </NavigationLink>
+      <details>
+        <summary>Context・定義・実行先を選ぶ（任意）</summary>
+        <NavigationLink to={{ workspace, screen: "execution" }} related>
+          実行先・Runnerを設定
+        </NavigationLink>
+        <NavigationLink
+          to={{
+            workspace,
+            screen: "context",
+            view: "input",
+            origin: { kind: "run-preparation", id: newID, version: "0" },
+          }}
+          related
+        >
+          Contextを選択・入力をプレビュー
+        </NavigationLink>
+        <NavigationLink
+          to={{ workspace, screen: "workflows", view: "run-definitions" }}
+          related
+        >
+          採用済みのRun定義から準備
+        </NavigationLink>
+      </details>
       {canEdit ? (
         <section aria-label="新しいRunを作成">
           <h3>新しいRunを作成</h3>
@@ -933,10 +936,10 @@ export function RunRecords({
               value={target}
               onChange={setTarget}
               required
-              hint="端末の接続設定にある論理名を指定します。実パスは端末で解決します。"
+              hint="Windowsアプリの「実行先・Runner」に登録した接続名を入力します。"
             />
             <Field
-              label="commandの引数・要求（JSON）"
+              label="commandの引数・要求（JSON・任意）"
               value={parameters}
               onChange={setParameters}
               rows={3}

@@ -304,7 +304,7 @@ export function Automation({
     (await query({ mode: "heads", kind, id, limit: 1 })).data.items[0] as
       Version | undefined;
   const loadPriority = async (requested = target, current = () => true) => {
-    const [p, s, e] = await Promise.all([
+    const [p, s, e, named] = await Promise.all([
       query({ mode: "priority", id: requested }),
       query({ mode: "selection", id: requested }),
       query({
@@ -313,6 +313,7 @@ export function Automation({
         id: "priority-sync:" + requested,
         limit: 1,
       }),
+      query({ mode: "priorities", id: requested, limit: 1 }),
     ]);
     const route = routeRef.current;
     if (
@@ -326,7 +327,13 @@ export function Automation({
       setPriorityValue("");
       setPriorityReason("");
     }
-    setPriority(p.data.items[0] as Version);
+    const title = (named.data.items as Version[]).find(
+      (item) =>
+        item.id === "priority:" + requested ||
+        item.id === requested ||
+        (item.value as Priority).target?.id === requested,
+    )?.title;
+    setPriority({ ...(p.data.items[0] as Version), title });
     const externalRecord = e.data.items[0] as Version | undefined;
     setExternalState(
       externalRecord
@@ -1355,6 +1362,7 @@ export function Automation({
                 </details>
                 {current && priorityMatches && (
                   <>
+                    <h4>{priority?.title || "Issue（名称は未取得）"}</h4>
                     <p>
                       採用値: {current.adopted ?? "未設定"} /{" "}
                       {current.fixed ? "手動固定" : "固定なし（方針に従う）"} /{" "}
@@ -1368,16 +1376,28 @@ export function Automation({
                       {reasons[current.recommendation_reason] ??
                         current.recommendation_reason}
                     </p>
-                    {current.recommendation && (
+                    <details>
+                      <summary>評価の方針・固定版を確認</summary>
+                      {current.recommendation && (
+                        <p>
+                          推奨の尺度の固定版：
+                          {current.recommendation_policy
+                            ? `${current.recommendation_policy.id}@${current.recommendation_policy.version}`
+                            : "未取得"}{" "}
+                          / 推奨の対象版：
+                          {current.recommendation_target?.version ?? "未取得"}
+                        </p>
+                      )}
                       <p>
-                        推奨の尺度の固定版：
-                        {current.recommendation_policy
-                          ? `${current.recommendation_policy.id}@${current.recommendation_policy.version}`
-                          : "未取得"}{" "}
-                        / 推奨の対象版：
-                        {current.recommendation_target?.version ?? "未取得"}
+                        採用尺度の固定版:{" "}
+                        {(current.adopted_policy ?? current.policy).id} ·{" "}
+                        {(current.adopted_policy ?? current.policy).version}
                       </p>
-                    )}
+                      <p>
+                        評価対象の固定版：{current.target.id}@
+                        {current.target.version}
+                      </p>
+                    </details>
                     <p>{reasons[current.reason] ?? current.reason}</p>
                     <p>採用理由: {current.adopted_reason || "未設定"}</p>
                     {externalState && (
@@ -1388,21 +1408,12 @@ export function Automation({
                             : undefined
                         }
                       >
-                        GitHub優先度の同期:{" "}
-                        {states[externalState.state] ?? externalState.state} /{" "}
-                        {reasons[externalState.reason] ?? externalState.reason}{" "}
-                        / 最終取得: {externalState.observed_at ?? "未取得"}
+                        GitHub優先度の同期：
+                        {states[externalState.state] ??
+                          externalState.state} /{" "}
+                        {reasons[externalState.reason] ?? externalState.reason}
                       </p>
                     )}
-                    <p>
-                      採用尺度の固定版:{" "}
-                      {(current.adopted_policy ?? current.policy).id} ·{" "}
-                      {(current.adopted_policy ?? current.policy).version}
-                    </p>
-                    <p>
-                      評価対象の固定版：{current.target.id}@
-                      {current.target.version}
-                    </p>
                     <button
                       onClick={() =>
                         navigation?.navigate({
@@ -1446,7 +1457,8 @@ export function Automation({
                   </>
                 )}
                 {canEdit && priority && selected && priorityMatches && (
-                  <>
+                  <details>
+                    <summary>優先度の変更・手動固定</summary>
                     <label>
                       手動で採用する優先度
                       <select
@@ -1528,7 +1540,7 @@ export function Automation({
                     >
                       固定を解除して自動反映へ戻す
                     </button>
-                  </>
+                  </details>
                 )}
               </fieldset>
             )}

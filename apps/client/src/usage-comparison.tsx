@@ -1,4 +1,9 @@
-import { ScreenContent, NavigationLink, useNavigation } from "./navigation";
+import {
+  ScreenContent,
+  NavigationLink,
+  useNavigation,
+  useScreenActive,
+} from "./navigation";
 import { useEffect, useRef, useState } from "react";
 import { syncRequest } from "./auth";
 import { allowAnswerScope, answerScopeEpoch } from "./sync-store";
@@ -33,6 +38,7 @@ export function UsageComparison({
   onInspect: (r: CostRef & { kind: string }) => Promise<void>;
 }) {
   const navigation = useNavigation();
+  const visible = useScreenActive();
   const [comparison, setComparison] = useState<CostComparison>(() => ({
     name: "費用・品質・時間の比較",
     left: newCondition(),
@@ -42,6 +48,42 @@ export function UsageComparison({
     [list, setList] = useState<Saved[]>([]),
     [listCursor, setListCursor] = useState(""),
     [views, setViews] = useState<Partial<Record<"left" | "right", View>>>({});
+  const [basisNames, setBasisNames] = useState<Record<string, string>>({});
+  const namedRefs = [comparison.left, comparison.right].flatMap((condition) =>
+    condition.basis.length === 1 &&
+    /^(run-definition|workflow-definition):/.test(condition.basis[0].id)
+      ? condition.basis
+      : [],
+  );
+  const nameKey = JSON.stringify(namedRefs);
+  useEffect(() => {
+    if (!visible) return;
+    let current = true;
+    setBasisNames({});
+    if (namedRefs.length)
+      void syncRequest(
+        `/workflows/workspaces/${encodeURIComponent(workspace)}/labels`,
+        native,
+        { method: "POST", body: namedRefs },
+      )
+        .then((value) => {
+          if (current)
+            setBasisNames(
+              Object.fromEntries(
+                (value as (CostRef & { name?: string })[]).map((label) => [
+                  label.id + "@" + label.version,
+                  label.name || "名称未設定",
+                ]),
+              ),
+            );
+        })
+        .catch(() => {
+          /* Fixed references remain available in the conditions. */
+        });
+    return () => {
+      current = false;
+    };
+  }, [visible, nameKey, native, api, user, workspace]);
   const [selected, setSelected] = useState<CostRow>(),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
@@ -162,6 +204,29 @@ export function UsageComparison({
       {
         <section className="team-details" aria-label="費用・品質・時間の比較">
           <h3>費用・品質・時間を比較</h3>
+          <button disabled={busy} onClick={() => void work(() => listSaved())}>
+            保存した比較条件を50件取得
+          </button>
+          <ul>
+            {list.map((r) => (
+              <li key={r.id + "@" + r.version}>
+                <button
+                  disabled={busy}
+                  onClick={() => void work(() => load(r))}
+                >
+                  {r.value.name}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {listCursor && (
+            <button
+              disabled={busy}
+              onClick={() => void work(() => listSaved(true))}
+            >
+              比較条件の次の50件
+            </button>
+          )}
           <p>
             同程度の作業を二つの条件で比較します。失敗・再試行・選択や生成・Hopper・Triageの消費も対象です。費用だけで品質やモデルの優劣を断定しません。
           </p>
@@ -177,14 +242,34 @@ export function UsageComparison({
           <div className="cost-comparison-grid">
             {(["left", "right"] as const).map((side, i) => (
               <section aria-label={"比較" + (i === 0 ? "A" : "B")} key={side}>
-                <ComparisonConditions
-                  name={"比較" + (i === 0 ? "A" : "B")}
-                  value={comparison[side]}
-                  onChange={(v) => condition(side, v)}
-                  call={call}
-                  workspace={workspace}
-                  disabled={busy}
-                />
+                <h4>比較{i === 0 ? "A" : "B"}</h4>
+                <p>
+                  {comparison[side].basis.length === 1 &&
+                  /^(run-definition|workflow-definition):/.test(
+                    comparison[side].basis[0].id,
+                  )
+                    ? (basisNames[
+                        comparison[side].basis[0].id +
+                          "@" +
+                          comparison[side].basis[0].version
+                      ] ?? "定義名は未取得（固定版は条件で確認）")
+                    : `固定条件 ${comparison[side].basis.length}件`}
+                </p>
+                <p>
+                  {comparison[side].model || "モデル指定なし"} /{" "}
+                  {comparison[side].from} ～ {comparison[side].until}
+                </p>
+                <details open={!saved}>
+                  <summary>比較{i === 0 ? "A" : "B"}の条件を確認・編集</summary>
+                  <ComparisonConditions
+                    name={"比較" + (i === 0 ? "A" : "B")}
+                    value={comparison[side]}
+                    onChange={(v) => condition(side, v)}
+                    call={call}
+                    workspace={workspace}
+                    disabled={busy}
+                  />
+                </details>
                 <button
                   disabled={busy}
                   onClick={() => void work(() => query(side))}
@@ -280,29 +365,6 @@ export function UsageComparison({
             <p>
               保存した条件版: {saved.id} @ {saved.version}
             </p>
-          )}
-          <button disabled={busy} onClick={() => void work(() => listSaved())}>
-            保存した比較条件を50件取得
-          </button>
-          <ul>
-            {list.map((r) => (
-              <li key={r.id + "@" + r.version}>
-                <button
-                  disabled={busy}
-                  onClick={() => void work(() => load(r))}
-                >
-                  {r.value.name} · {r.version}
-                </button>
-              </li>
-            ))}
-          </ul>
-          {listCursor && (
-            <button
-              disabled={busy}
-              onClick={() => void work(() => listSaved(true))}
-            >
-              比較条件の次の50件
-            </button>
           )}
           <a
             download="koujou-comparison-conditions.json"
