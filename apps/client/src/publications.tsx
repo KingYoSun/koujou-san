@@ -123,6 +123,8 @@ export function Publications({
   const navigationRef = useRef(navigation);
   navigationRef.current = navigation;
   const active = useScreenActive();
+  const targetOwner = useRef(JSON.stringify(navigation?.route.target));
+  if (active) targetOwner.current = JSON.stringify(navigation?.route.target);
   const [incoming, setIncoming] = useState<{
     run: Ref;
     output: Ref;
@@ -294,11 +296,7 @@ export function Publications({
   };
   const showRequest = (value: Entry, owner: string) => {
     const current = navigationRef.current;
-    if (
-      current?.route.screen === "publications" &&
-      JSON.stringify(current.route.target) !== owner
-    )
-      return;
+    if (targetOwner.current !== owner) return;
     setRequest(value);
     setRequestID(value.id);
     if (proposal?.id === value.id) forgetProposal();
@@ -312,7 +310,7 @@ export function Publications({
       );
   };
   const readRequest = async (target = requestID) => {
-    const owner = JSON.stringify(navigation?.route.target);
+    const owner = targetOwner.current;
     const value = (await call(
       `/records/${encodeURIComponent(target)}`,
     )) as Entry;
@@ -509,7 +507,16 @@ export function Publications({
     };
   }, [active, navigation?.route.target?.id, navigation?.route.target?.version]);
   const shared = entry?.kind === "draft" ? entry : undefined;
-  const result = request?.value as Request | undefined;
+  const selectedTarget = navigation?.route.target;
+  const requestMatches =
+    !selectedTarget ||
+    (selectedTarget.kind === "publication" &&
+      request?.id === selectedTarget.id &&
+      (selectedTarget.version === "head" ||
+        selectedTarget.version === request.version));
+  const result = requestMatches
+    ? (request?.value as Request | undefined)
+    : undefined;
   const issue =
     result && request ? publicationIssue(request.id, result) : undefined;
   return (
@@ -774,7 +781,7 @@ export function Publications({
                 disabled={busy}
                 onClick={() =>
                   void act(async () => {
-                    const owner = JSON.stringify(navigation?.route.target);
+                    const owner = targetOwner.current;
                     const updated = (await call(
                       `/refresh/${encodeURIComponent(request.id)}`,
                       { version: request.version },
