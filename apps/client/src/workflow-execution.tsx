@@ -133,7 +133,10 @@ export function WorkflowExecution({
   const setNotice = (text: string) => {
     if (ownerRef.current === owner) setNotification({ owner, text });
   };
-  const [requestedExecution, setRequestedExecution] = useState<Ref>();
+  const [requestedExecution, setRequestedExecution] = useState<{
+    owner: string;
+    ref: Ref;
+  }>();
   const [executions, setExecutions] = useState<{
     items: Record<{ state: string }>[];
     next: string;
@@ -347,7 +350,7 @@ export function WorkflowExecution({
                             repositories: JSON.parse(repositories),
                           },
                         );
-                        setRequestedExecution(ref(result.data));
+                        setRequestedExecution({ owner, ref: ref(result.data) });
                         await load(result.data.id);
                         setNotice("採用した固定版の実行開始を依頼しました。");
                       })
@@ -468,6 +471,13 @@ export function WorkflowExecution({
                                   ? "（採用変更により、この試行の判定は失効）"
                                   : ""}
                               </p>
+                              {r.value.definition && (
+                                <p>
+                                  この試行で使用したRun定義の固定版：
+                                  {r.value.definition.id}@
+                                  {r.value.definition.version}
+                                </p>
+                              )}
                               {r.value.run && fixedWorkflowRef(r.value.run) && (
                                 <p>
                                   <NavigationLink
@@ -716,12 +726,12 @@ export function WorkflowExecution({
             </details>
           )}
           {notice && <p role="status">{notice}</p>}
-          {requestedExecution && (
+          {requestedExecution?.owner === owner && (
             <NavigationLink
               to={{
                 workspace,
                 screen: "work",
-                target: { ...requestedExecution, kind: "execution" },
+                target: { ...requestedExecution.ref, kind: "execution" },
                 view: "overview",
               }}
               related
