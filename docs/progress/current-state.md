@@ -6,7 +6,7 @@
 
 ## 現在の作業: Issue #71〜#77
 
-状態: In progress。#72の用途別シェル・対象遷移、#77の共通部品、#73の作業詳細、#75のContextモードを実装中。[実装計画](2026-10-21-issue-71-plan.md)、[情報構造・移設表・六つの画面遷移](../design/information-architecture.md)、[途中経過](2026-10-21-uiux-foundation.md)を参照する。各子と統合シナリオの受入・検品・CIは作業中であり、完了扱いにしない。
+状態: In progress。[Draft PR #78](https://github.com/KingYoSun/koujou-san/pull/78)で、用途別シェル・共通部品、作業詳細、工程マップ、Contextモード、自動化と優先度、比較からの対象移動を改修している。[実装計画](2026-10-21-issue-71-plan.md)、[情報構造・移設表・六つの画面遷移](../design/information-architecture.md)、[途中経過](2026-10-21-uiux-foundation.md)を参照する。局所検証・差分検品と先行commitのCIは成功。最終成果物の統合比較、初見操作、200%拡大の確認と全条件の照合は継続中で、完了扱いにしない。
 
 ## 環境構築の受入条件
 

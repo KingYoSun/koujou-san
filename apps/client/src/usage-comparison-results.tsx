@@ -7,6 +7,7 @@ import {
   type CostRef,
   type CostRow,
 } from "./usage-comparison-model";
+import { NavigationLink, useNavigation } from "./navigation";
 export function ComparisonResults({
   page,
   condition,
@@ -28,6 +29,7 @@ export function ComparisonResults({
   busy: boolean;
   editable: boolean;
 }) {
+  const navigation = useNavigation();
   const summary = page.data.summary;
   return (
     <section aria-label="取得した比較結果">
@@ -180,6 +182,38 @@ export function ComparisonResults({
                     </p>
                   </td>
                   <td>
+                    {distinctCostRefs(r.refs).flatMap((ref) => {
+                      if (
+                        !ref.version ||
+                        ref.version === "0" ||
+                        ref.version === "head"
+                      )
+                        return [];
+                      const kind = ref.id.split(":")[0];
+                      if (
+                        kind !== "run" &&
+                        kind !== "run-definition" &&
+                        kind !== "workflow-definition"
+                      )
+                        return [];
+                      return [
+                        <p key={ref.id + "@" + ref.version}>
+                          <NavigationLink
+                            to={{
+                              workspace: navigation?.route.workspace ?? "",
+                              screen: kind === "run" ? "work" : "workflows",
+                              target: { ...ref, kind },
+                              view: kind === "run" ? "history" : "edit",
+                            }}
+                            related
+                          >
+                            {kind === "run"
+                              ? "この計測のRunを確認"
+                              : "使用した定義の固定版を確認"}
+                          </NavigationLink>
+                        </p>,
+                      ];
+                    })}
                     {distinctCostRefs(r.refs)
                       .filter((ref) =>
                         /^(usage|price|evaluation):/.test(ref.id),
