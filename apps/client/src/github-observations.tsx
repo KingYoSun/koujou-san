@@ -1,3 +1,4 @@
+import { ScreenContent, useScreenActive } from "./navigation";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
@@ -171,6 +172,7 @@ export function GithubObservations({
   api: string;
   user: string;
 }) {
+  const active = useScreenActive();
   const [after, setAfter] = useState("");
   const [error, setError] = useState("");
   const [history, setHistory] = useState<{
@@ -186,7 +188,8 @@ export function GithubObservations({
         method: "GET",
       })) as Page,
     retry: false,
-    refetchInterval: 15000,
+    enabled: active,
+    refetchInterval: active ? 15000 : false,
     gcTime: 0,
   });
   const denied =
@@ -217,112 +220,121 @@ export function GithubObservations({
     }
   }
   return (
-    <details className="workspace-management github-observations">
-      <summary>GitHubの共有観測</summary>
-      <p>サーバー側で観測します。CIの結論と工程の受入判定は別の事実です。</p>
-      <button
-        onClick={() => {
-          setHistory(undefined);
-          setError("");
-          void query.refetch();
-        }}
-      >
-        共有観測を再読込
-      </button>
-      {query.error && (
-        <p role="status">
-          {unavailable
-            ? "GitHubの観測接続は未設定です。"
-            : "共有観測を取得できません。表示中の結果は前回取得時点のものです。"}
-        </p>
-      )}
-      {error && <p role="status">{error}</p>}
-      {!error && page?.data.length === 0 && (
-        <p>
-          {after
-            ? "このページに閲覧可能な対象はありません。"
-            : "登録された観測対象はありません。"}
-        </p>
-      )}
-      {page?.data.map((item) => (
-        <article key={item.target.id} className="github-observation">
-          <h3>
-            {item.target.repository} / {item.target.kind}{" "}
-            {item.target.external_id}
-          </h3>
+    <ScreenContent>
+      {
+        <section className="workspace-management github-observations">
+          <h3>GitHubの共有観測</h3>
           <p>
-            観測:{" "}
-            {item.observation_state === "observed"
-              ? "取得済み"
-              : item.observation_state === "not_fetched"
-                ? "未取得"
-                : "Unknown（現在状態を確認できません）"}{" "}
-            {item.reason && (reasons[item.reason] ?? item.reason)}{" "}
-            {item.delayed && " / 定期照合が遅れています"}
+            サーバー側で観測します。CIの結論と工程の受入判定は別の事実です。
           </p>
-          <p>
-            最終確認: {at(item.checked_at)} / 最終成功取得:{" "}
-            {at(item.observed_at)} / 次回照合予定: {at(item.due_at)}
-          </p>
-          {item.snapshot && (
-            <>
-              <GithubSnapshot
-                value={item.snapshot}
-                expected={item.expected_commit}
-                required={item.required_jobs}
-              />
-              <SourceLink href={item.snapshot.url} native={native} />
-            </>
-          )}
-          <button onClick={() => void readHistory(item.target.id)}>
-            変更観測の履歴
+          <button
+            onClick={() => {
+              setHistory(undefined);
+              setError("");
+              void query.refetch();
+            }}
+          >
+            共有観測を再読込
           </button>
-          {history?.target === item.target.id && (
-            <div>
-              <button onClick={() => void readHistory(item.target.id)}>
-                最新の履歴
-              </button>
-              {history.page.items.map((entry) => (
-                <div key={entry.version}>
-                  <h4>
-                    観測版 {entry.version} / {at(entry.observed_at)}
-                  </h4>
-                  <GithubSnapshot value={entry.snapshot} />
-                </div>
-              ))}
-              {history.page.next_cursor && (
-                <button
-                  onClick={() =>
-                    void readHistory(item.target.id, history.page.next_cursor)
-                  }
-                >
-                  前の履歴
-                </button>
-              )}
-            </div>
+          {query.error && (
+            <p role="status">
+              {unavailable
+                ? "GitHubの観測接続は未設定です。"
+                : "共有観測を取得できません。表示中の結果は前回取得時点のものです。"}
+            </p>
           )}
-        </article>
-      ))}
-      {after && (
-        <button
-          onClick={() => {
-            setAfter("");
-            setHistory(undefined);
-          }}
-        >
-          最初のページ
-        </button>
-      )}
-      {page?.meta.next_cursor && (
-        <button
-          onClick={() => {
-            setAfter(page.meta.next_cursor!);
-            setHistory(undefined);
-          }}
-        >
-          次の観測対象
-        </button>
-      )}
-    </details>
+          {error && <p role="status">{error}</p>}
+          {!error && page?.data.length === 0 && (
+            <p>
+              {after
+                ? "このページに閲覧可能な対象はありません。"
+                : "登録された観測対象はありません。"}
+            </p>
+          )}
+          {page?.data.map((item) => (
+            <article key={item.target.id} className="github-observation">
+              <h3>
+                {item.target.repository} / {item.target.kind}{" "}
+                {item.target.external_id}
+              </h3>
+              <p>
+                観測:{" "}
+                {item.observation_state === "observed"
+                  ? "取得済み"
+                  : item.observation_state === "not_fetched"
+                    ? "未取得"
+                    : "Unknown（現在状態を確認できません）"}{" "}
+                {item.reason && (reasons[item.reason] ?? item.reason)}{" "}
+                {item.delayed && " / 定期照合が遅れています"}
+              </p>
+              <p>
+                最終確認: {at(item.checked_at)} / 最終成功取得:{" "}
+                {at(item.observed_at)} / 次回照合予定: {at(item.due_at)}
+              </p>
+              {item.snapshot && (
+                <>
+                  <GithubSnapshot
+                    value={item.snapshot}
+                    expected={item.expected_commit}
+                    required={item.required_jobs}
+                  />
+                  <SourceLink href={item.snapshot.url} native={native} />
+                </>
+              )}
+              <button onClick={() => void readHistory(item.target.id)}>
+                変更観測の履歴
+              </button>
+              {history?.target === item.target.id && (
+                <div>
+                  <button onClick={() => void readHistory(item.target.id)}>
+                    最新の履歴
+                  </button>
+                  {history.page.items.map((entry) => (
+                    <div key={entry.version}>
+                      <h4>
+                        観測版 {entry.version} / {at(entry.observed_at)}
+                      </h4>
+                      <GithubSnapshot value={entry.snapshot} />
+                    </div>
+                  ))}
+                  {history.page.next_cursor && (
+                    <button
+                      onClick={() =>
+                        void readHistory(
+                          item.target.id,
+                          history.page.next_cursor,
+                        )
+                      }
+                    >
+                      前の履歴
+                    </button>
+                  )}
+                </div>
+              )}
+            </article>
+          ))}
+          {after && (
+            <button
+              onClick={() => {
+                setAfter("");
+                setHistory(undefined);
+              }}
+            >
+              最初のページ
+            </button>
+          )}
+          {page?.meta.next_cursor && (
+            <button
+              onClick={() => {
+                setAfter(page.meta.next_cursor!);
+                setHistory(undefined);
+              }}
+            >
+              次の観測対象
+            </button>
+          )}
+        </section>
+      }
+    </ScreenContent>
   );
 }

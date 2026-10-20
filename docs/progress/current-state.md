@@ -1,8 +1,12 @@
 # 現在状態
 
-更新日: 2026-10-19（JST）
+更新日: 2026-10-21（JST）
 
-開発環境の構築を終え、[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の実装を#3から番号順に進めている。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
+開発環境と[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の#3〜#33を完了した。#34はユーザー判断による保留を維持し、現在は#71から続くUI/UX改修を進めている。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
+
+## 現在の作業: Issue #71〜#77
+
+状態: In progress。#72の用途別シェル・対象遷移と、#77の共通部品契約から実装している。[実装計画](2026-10-21-issue-71-plan.md)と[情報構造・移設表・六つの画面遷移](../design/information-architecture.md)を参照する。各子と統合シナリオの受入・検品・CIは作業中であり、完了扱いにしない。実画面では固定Runから設定への往復と、ブラウザ履歴・未送信回答案の保持を確認した。
 
 ## 環境構築の受入条件
 

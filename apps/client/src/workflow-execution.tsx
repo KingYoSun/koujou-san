@@ -1,3 +1,4 @@
+import { ScreenContent } from "./navigation";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { syncRequest, workspaceAccessLost } from "./auth";
@@ -153,295 +154,299 @@ export function WorkflowExecution({
     if (selected) void act(() => load(selected.id));
   }, [selected?.id, selected?.version]);
   return (
-    <section aria-label="工程の実行と判断">
-      <h3>採用した工程の実行</h3>
-      <p>
-        実行開始は別の依頼です。工程の判断待ちと、Run途中の質問は別々に表示します。時間・費用の予算は追加開始を止める条件で、開始済みのCLIによる消費の上限は保証しません。
-      </p>
-      <fieldset disabled={busy}>
-        <label>
-          工程実行ID
-          <input value={id} onChange={(e) => setID(e.target.value)} />
-        </label>
-        <button disabled={!id} onClick={() => void act(() => load(id))}>
-          工程実行を取得・更新
-        </button>
-        <button
-          onClick={() =>
-            void act(async () => {
-              const v = (await request("/query", {
-                kind: "heads",
-                type: "execution",
-                limit: 50,
-              })) as { data: typeof executions };
-              setExecutions(v.data);
-            })
-          }
-        >
-          工程実行の一覧
-        </button>
-        {executions?.items.map((r) => (
-          <button key={r.id} onClick={() => void act(() => load(r.id))}>
-            {r.id}: {r.value.state}
-          </button>
-        ))}
-        {executions?.next && (
-          <button
-            onClick={() =>
-              void act(async () => {
-                const v = (await request("/query", {
-                  kind: "heads",
-                  type: "execution",
-                  after: executions.next,
-                  limit: 50,
-                })) as { data: typeof executions };
-                setExecutions(v.data);
-              })
-            }
-          >
-            工程実行の次のページ
-          </button>
-        )}
-        {canExecute &&
-          definition &&
-          definition.id.startsWith("workflow-definition:") && (
-            <details>
-              <summary>この定義の採用版から新しく開始する</summary>
-              <label>
-                明示する開始入力（node → 入力名 → JSON値）
-                <textarea
-                  value={inputs}
-                  onChange={(e) => setInputs(e.target.value)}
-                />
-              </label>
-              <label>
-                Runごとのリポジトリと固定commit（node → id・commit）
-                <textarea
-                  value={repositories}
-                  onChange={(e) => setRepositories(e.target.value)}
-                />
-              </label>
+    <ScreenContent>
+      {
+        <section aria-label="工程の実行と判断">
+          <h3>採用した工程の実行</h3>
+          <p>
+            実行開始は別の依頼です。工程の判断待ちと、Run途中の質問は別々に表示します。時間・費用の予算は追加開始を止める条件で、開始済みのCLIによる消費の上限は保証しません。
+          </p>
+          <fieldset disabled={busy}>
+            <label>
+              工程実行ID
+              <input value={id} onChange={(e) => setID(e.target.value)} />
+            </label>
+            <button disabled={!id} onClick={() => void act(() => load(id))}>
+              工程実行を取得・更新
+            </button>
+            <button
+              onClick={() =>
+                void act(async () => {
+                  const v = (await request("/query", {
+                    kind: "heads",
+                    type: "execution",
+                    limit: 50,
+                  })) as { data: typeof executions };
+                  setExecutions(v.data);
+                })
+              }
+            >
+              工程実行の一覧
+            </button>
+            {executions?.items.map((r) => (
+              <button key={r.id} onClick={() => void act(() => load(r.id))}>
+                {r.id}: {r.value.state}
+              </button>
+            ))}
+            {executions?.next && (
               <button
                 onClick={() =>
                   void act(async () => {
-                    const adoption = await adopted();
-                    const target = `workflow-execution:${crypto.randomUUID()}`;
-                    const result = await mutate(
-                      `/executions/${encodeURIComponent(target)}/start`,
-                      "0",
-                      {
-                        adoption: ref(adoption),
-                        inputs_utf8: inputs,
-                        repositories: JSON.parse(repositories),
-                      },
-                    );
-                    await load(result.data.id);
-                    setNotice("採用した固定版の実行開始を依頼しました。");
+                    const v = (await request("/query", {
+                      kind: "heads",
+                      type: "execution",
+                      after: executions.next,
+                      limit: 50,
+                    })) as { data: typeof executions };
+                    setExecutions(v.data);
                   })
                 }
               >
-                採用版から新しい工程実行の開始を依頼
+                工程実行の次のページ
               </button>
-            </details>
-          )}
-        {record && (
-          <>
-            <p>
-              工程: {record.value.state} / 開始したRun: {record.value.count} /
-              固定定義: {record.value.definition.id}@
-              {record.value.definition.version}
-            </p>
-            {record.value.reason && (
-              <p>待機・停止理由: {record.value.reason}</p>
             )}
-            {record.value.cost && (
-              <p>
-                費用観測: {record.value.cost.state} /{" "}
-                {record.value.cost.amount ?? "未観測"}{" "}
-                {record.value.cost.currency} / 制御: 追加開始のみ
-              </p>
-            )}
-            {page?.items.map((r) => (
-              <article key={r.id}>
-                <p>
-                  {r.value.node}（{r.value.attempt}回目）: {r.value.state}{" "}
-                  {r.value.outcome ?? ""}
-                  {r.value.stale
-                    ? "（採用変更により、この試行の判定は失効）"
-                    : ""}
-                </p>
-                {r.value.run && (
-                  <p>
-                    {onOpenRun ? (
-                      <button onClick={() => onOpenRun(r.value.run!)}>
-                        この工程の入力・質問・結果を確認
-                      </button>
-                    ) : (
-                      <>
-                        Run: {r.value.run.id}@{r.value.run.version}
-                        （Run一覧から入力・Pause・原出力を確認できます）
-                      </>
-                    )}
-                  </p>
-                )}
-                {r.value.definition && (
+            {canExecute &&
+              definition &&
+              definition.id.startsWith("workflow-definition:") && (
+                <details>
+                  <summary>この定義の採用版から新しく開始する</summary>
+                  <label>
+                    明示する開始入力（node → 入力名 → JSON値）
+                    <textarea
+                      value={inputs}
+                      onChange={(e) => setInputs(e.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Runごとのリポジトリと固定commit（node → id・commit）
+                    <textarea
+                      value={repositories}
+                      onChange={(e) => setRepositories(e.target.value)}
+                    />
+                  </label>
                   <button
                     onClick={() =>
                       void act(async () => {
-                        const p = (await request(
-                          `/executions/${encodeURIComponent(record.id)}/preview`,
+                        const adoption = await adopted();
+                        const target = `workflow-execution:${crypto.randomUUID()}`;
+                        const result = await mutate(
+                          `/executions/${encodeURIComponent(target)}/start`,
+                          "0",
                           {
-                            execution: ref(record),
-                            node: r.value.node,
-                            format: "source",
+                            adoption: ref(adoption),
+                            inputs_utf8: inputs,
+                            repositories: JSON.parse(repositories),
                           },
-                        )) as { input_utf8: string; sources: Ref[] };
-                        setPreview(
-                          p.input_utf8 +
-                            "\n\n固定参照:\n" +
-                            JSON.stringify(p.sources, null, 2),
                         );
+                        await load(result.data.id);
+                        setNotice("採用した固定版の実行開始を依頼しました。");
                       })
                     }
                   >
-                    このRunの入力をプレビュー
+                    採用版から新しい工程実行の開始を依頼
                   </button>
+                </details>
+              )}
+            {record && (
+              <>
+                <p>
+                  工程: {record.value.state} / 開始したRun: {record.value.count}{" "}
+                  / 固定定義: {record.value.definition.id}@
+                  {record.value.definition.version}
+                </p>
+                {record.value.reason && (
+                  <p>待機・停止理由: {record.value.reason}</p>
                 )}
-                {canEdit &&
-                  r.value.state === "decision" &&
-                  graph?.nodes
-                    .find((n) => n.id === r.value.node)
-                    ?.choices?.map((choice) => (
+                {record.value.cost && (
+                  <p>
+                    費用観測: {record.value.cost.state} /{" "}
+                    {record.value.cost.amount ?? "未観測"}{" "}
+                    {record.value.cost.currency} / 制御: 追加開始のみ
+                  </p>
+                )}
+                {page?.items.map((r) => (
+                  <article key={r.id}>
+                    <p>
+                      {r.value.node}（{r.value.attempt}回目）: {r.value.state}{" "}
+                      {r.value.outcome ?? ""}
+                      {r.value.stale
+                        ? "（採用変更により、この試行の判定は失効）"
+                        : ""}
+                    </p>
+                    {r.value.run && (
+                      <p>
+                        {onOpenRun ? (
+                          <button onClick={() => onOpenRun(r.value.run!)}>
+                            この工程の入力・質問・結果を確認
+                          </button>
+                        ) : (
+                          <>
+                            Run: {r.value.run.id}@{r.value.run.version}
+                            （Run一覧から入力・Pause・原出力を確認できます）
+                          </>
+                        )}
+                      </p>
+                    )}
+                    {r.value.definition && (
                       <button
-                        key={choice}
                         onClick={() =>
                           void act(async () => {
-                            await mutate(
-                              `/executions/${encodeURIComponent(record.id)}/decide`,
-                              record.version,
+                            const p = (await request(
+                              `/executions/${encodeURIComponent(record.id)}/preview`,
                               {
+                                execution: ref(record),
                                 node: r.value.node,
-                                attempt: r.value.attempt,
-                                choice,
+                                format: "source",
                               },
-                            );
-                            await load(record.id);
-                            setNotice(
-                              "判断を記録しました。回答だけでは実行権限を付与しません。",
+                            )) as { input_utf8: string; sources: Ref[] };
+                            setPreview(
+                              p.input_utf8 +
+                                "\n\n固定参照:\n" +
+                                JSON.stringify(p.sources, null, 2),
                             );
                           })
                         }
                       >
-                        {choice}を回答
+                        このRunの入力をプレビュー
                       </button>
-                    ))}
-              </article>
-            ))}
-            {cursor && (
-              <button
-                onClick={() =>
-                  void act(async () => {
-                    const p = (await request("/query", {
-                      kind: "tasks",
-                      id: record.id,
-                      version: record.version,
-                      after: cursor,
-                      limit: 50,
-                    })) as { data: Page };
-                    setPage(p.data);
-                    setCursor(p.data.next);
-                  })
-                }
-              >
-                工程内の次のページ
-              </button>
+                    )}
+                    {canEdit &&
+                      r.value.state === "decision" &&
+                      graph?.nodes
+                        .find((n) => n.id === r.value.node)
+                        ?.choices?.map((choice) => (
+                          <button
+                            key={choice}
+                            onClick={() =>
+                              void act(async () => {
+                                await mutate(
+                                  `/executions/${encodeURIComponent(record.id)}/decide`,
+                                  record.version,
+                                  {
+                                    node: r.value.node,
+                                    attempt: r.value.attempt,
+                                    choice,
+                                  },
+                                );
+                                await load(record.id);
+                                setNotice(
+                                  "判断を記録しました。回答だけでは実行権限を付与しません。",
+                                );
+                              })
+                            }
+                          >
+                            {choice}を回答
+                          </button>
+                        ))}
+                  </article>
+                ))}
+                {cursor && (
+                  <button
+                    onClick={() =>
+                      void act(async () => {
+                        const p = (await request("/query", {
+                          kind: "tasks",
+                          id: record.id,
+                          version: record.version,
+                          after: cursor,
+                          limit: 50,
+                        })) as { data: Page };
+                        setPage(p.data);
+                        setCursor(p.data.next);
+                      })
+                    }
+                  >
+                    工程内の次のページ
+                  </button>
+                )}
+                {canEdit && canExecute && definition && (
+                  <button
+                    onClick={() =>
+                      void act(async () => {
+                        setImpact(
+                          (await request(
+                            `/executions/${encodeURIComponent(record.id)}/impact`,
+                            {
+                              execution: ref(record),
+                              adoption: ref(await adopted()),
+                            },
+                          )) as Impact,
+                        );
+                      })
+                    }
+                  >
+                    現在の採用版を適用した場合の影響を確認
+                  </button>
+                )}
+                {impact && (
+                  <div>
+                    <p>
+                      影響する未開始ノード:{" "}
+                      {impact.affected_unstarted.join(", ") || "なし"}
+                    </p>
+                    <p>
+                      失効する判断:{" "}
+                      {impact.invalidated_decisions.join(", ") || "なし"}
+                    </p>
+                    <button
+                      onClick={() =>
+                        void act(async () => {
+                          await mutate(
+                            `/executions/${encodeURIComponent(record.id)}/apply`,
+                            record.version,
+                            { impact },
+                          );
+                          await load(record.id);
+                          setNotice(
+                            "影響を確認した採用版を適用しました。開始済みの入力と過去の判断は履歴に残っています。",
+                          );
+                        })
+                      }
+                    >
+                      確認した採用版を明示適用
+                    </button>
+                  </div>
+                )}
+                {native ? (
+                  <button
+                    onClick={() =>
+                      void act(async () => {
+                        const value = await invoke<{
+                          complete: boolean;
+                          path: string;
+                        }>("export_workflow", {
+                          workspace,
+                          id: record.id,
+                          version: record.version,
+                        });
+                        setNotice(
+                          `${value.complete ? "記録を保存しました" : "取得が完了していません"}: ${value.path}`,
+                        );
+                      })
+                    }
+                  >
+                    この実行版の記録をファイルへ保存
+                  </button>
+                ) : (
+                  <a
+                    download
+                    href={`${base}/executions/${encodeURIComponent(record.id)}/export?version=${encodeURIComponent(record.version)}`}
+                  >
+                    この実行版の記録をファイルへ保存
+                  </a>
+                )}
+              </>
             )}
-            {canEdit && canExecute && definition && (
-              <button
-                onClick={() =>
-                  void act(async () => {
-                    setImpact(
-                      (await request(
-                        `/executions/${encodeURIComponent(record.id)}/impact`,
-                        {
-                          execution: ref(record),
-                          adoption: ref(await adopted()),
-                        },
-                      )) as Impact,
-                    );
-                  })
-                }
-              >
-                現在の採用版を適用した場合の影響を確認
-              </button>
-            )}
-            {impact && (
-              <div>
-                <p>
-                  影響する未開始ノード:{" "}
-                  {impact.affected_unstarted.join(", ") || "なし"}
-                </p>
-                <p>
-                  失効する判断:{" "}
-                  {impact.invalidated_decisions.join(", ") || "なし"}
-                </p>
-                <button
-                  onClick={() =>
-                    void act(async () => {
-                      await mutate(
-                        `/executions/${encodeURIComponent(record.id)}/apply`,
-                        record.version,
-                        { impact },
-                      );
-                      await load(record.id);
-                      setNotice(
-                        "影響を確認した採用版を適用しました。開始済みの入力と過去の判断は履歴に残っています。",
-                      );
-                    })
-                  }
-                >
-                  確認した採用版を明示適用
-                </button>
-              </div>
-            )}
-            {native ? (
-              <button
-                onClick={() =>
-                  void act(async () => {
-                    const value = await invoke<{
-                      complete: boolean;
-                      path: string;
-                    }>("export_workflow", {
-                      workspace,
-                      id: record.id,
-                      version: record.version,
-                    });
-                    setNotice(
-                      `${value.complete ? "記録を保存しました" : "取得が完了していません"}: ${value.path}`,
-                    );
-                  })
-                }
-              >
-                この実行版の記録をファイルへ保存
-              </button>
-            ) : (
-              <a
-                download
-                href={`${base}/executions/${encodeURIComponent(record.id)}/export?version=${encodeURIComponent(record.version)}`}
-              >
-                この実行版の記録をファイルへ保存
-              </a>
-            )}
-          </>
-        )}
-      </fieldset>
-      {preview && (
-        <details open>
-          <summary>選択したRunの入力</summary>
-          <pre>{preview}</pre>
-        </details>
-      )}
-      {notice && <p role="status">{notice}</p>}
-    </section>
+          </fieldset>
+          {preview && (
+            <details open>
+              <summary>選択したRunの入力</summary>
+              <pre>{preview}</pre>
+            </details>
+          )}
+          {notice && <p role="status">{notice}</p>}
+        </section>
+      }
+    </ScreenContent>
   );
 }

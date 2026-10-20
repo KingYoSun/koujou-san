@@ -1,9 +1,8 @@
+import { ScreenContent, NavigationLink } from "./navigation";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { syncRequest, workspaceAccessLost } from "./auth";
 import { SyncHTTPError } from "./sync-error";
-import { RunnerSettings } from "./runner-settings";
-import { ExecutionSettings } from "./execution-settings";
 import { allowAnswerScope, answerScopeEpoch, syncStorage } from "./sync-store";
 import { PauseAnswer, PauseResponse, QuestionView } from "./run-pause";
 import { RunOutputRecord, handoffOutput } from "./run-output-record";
@@ -379,705 +378,726 @@ export function RunRecords({
     }
   }, [selected?.id, selected?.version]);
   return (
-    <details className="team-details">
-      <summary>Run・入力・Pause・出力</summary>
-      <p>
-        入力・回答・割当と、準備完了・プロセス開始を分けて記録します。実CLIは有効な割当と端末内の接続設定を照合して起動します。
-      </p>
-      <div className="team-controls">
-        <button
-          disabled={busy}
-          onClick={() =>
-            void run(async () =>
-              setList(await query({ kind: "run", limit: 50 })),
-            )
-          }
-        >
-          Run一覧を取得
-        </button>
-        <label>
-          Run ID
-          <input
-            value={id}
-            onChange={(e) => {
-              setID(e.target.value);
-              setCurrent(null);
-              setPage(null);
-              setInput(null);
-              setContextText(undefined);
-            }}
-          />
-        </label>
-        <button disabled={busy || !id} onClick={() => void run(() => load(id))}>
-          Runを取得・更新
-        </button>
-      </div>
-      {list && (
-        <>
-          <ul>
-            {list.items.map((row) => (
-              <li key={row.id}>
-                <button
-                  disabled={busy}
-                  onClick={() => void run(() => load(row.id))}
-                >
-                  {(row.value as Run).name || row.id} ·{" "}
-                  {stateNames[(row.value as Run).state] ??
-                    (row.value as Run).state}
-                </button>
-              </li>
-            ))}
-          </ul>
-          {list.next && (
+    <ScreenContent>
+      {
+        <details className="team-details">
+          <summary>Run・入力・Pause・出力</summary>
+          <NavigationLink to={{ workspace, screen: "execution" }} related>
+            実行先・Runnerを設定
+          </NavigationLink>
+          <p>
+            入力・回答・割当と、準備完了・プロセス開始を分けて記録します。実CLIは有効な割当と端末内の接続設定を照合して起動します。
+          </p>
+          <div className="team-controls">
             <button
               disabled={busy}
               onClick={() =>
                 void run(async () =>
-                  setList(
-                    await query({ kind: "run", after: list.next, limit: 50 }),
-                  ),
+                  setList(await query({ kind: "run", limit: 50 })),
                 )
               }
             >
-              Run一覧の次のページ
+              Run一覧を取得
             </button>
-          )}
-        </>
-      )}
-      {current && runValue && (
-        <>
-          <h3>{runValue.name || current.id}</h3>
-          <p>
-            {current.id} · {current.version}
-          </p>
-          <RunStatus value={runValue} />
-          {runValue.handoff?.decision && (
-            <p>
-              引継ぎ判断:{" "}
-              {runValue.handoff.decision.judgment === "duplicate_possible"
-                ? "元実行との重複可能性を了承"
-                : "元実行の終了を確認"}{" "}
-              / {runValue.handoff.decision.by} / {runValue.handoff.decision.at}{" "}
-              / 元Run版: {runValue.handoff.decision.source.version}
-            </p>
-          )}
-          {runValue.preparation && (
-            <p role="status">
-              準備待ち・設定不足:{" "}
-              {(
-                {
-                  device_absent: "端末の接続未確認",
-                  connection_missing: "接続設定なし",
-                  capability_unconfirmed: "能力未確認",
-                  capability_missing: "必要能力が不足",
-                  binding_missing: "入力方式が未対応",
-                  local_configuration_missing:
-                    "端末内のprogram・接続版・作業場所を確認してください",
-                  input_binding_unsupported: "端末の接続が入力方式を扱えません",
-                  process_start_failed: "端末でプロセスを起動できませんでした",
-                } as Record<string, string>
-              )[runValue.preparation] ?? runValue.preparation}
-            </p>
-          )}
-          {runValue.assignment && (
-            <section aria-label="Runの割当">
-              <h4>実行担当</h4>
-              <p>
-                依頼者: {runValue.assignment.requested_by} / 端末:{" "}
-                {runValue.assignment.device_id} / Runner:{" "}
-                {runValue.assignment.runner_id}
-              </p>
-              <p>
-                接続: {runValue.assignment.connection.target} ·{" "}
-                {runValue.assignment.connection.version} / 環境:{" "}
-                {runValue.assignment.connection.environment} / CLI主体:{" "}
-                {runValue.assignment.connection.subject}
-              </p>
-              <p>
-                割当世代: {runValue.assignment.generation} / 有効期限:{" "}
-                {runValue.assignment.expires_at}
-                。期限切れはCLIの停止確認を意味しません。
-              </p>
-              <p>準備完了: {runValue.assignment.prepared_at ?? "未確認"}</p>
-              {runValue.assignment.area && (
-                <p>
-                  Run専用branch: {runValue.assignment.area.branch} / 領域:{" "}
-                  {runValue.assignment.area.id} / 固定commit:{" "}
-                  {runValue.assignment.area.commit}
-                </p>
-              )}
-              {native && (
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      const result = await invoke<{
-                        observation: { direct_process: string };
-                        queued_reconciliation: boolean;
-                      }>("reconcile_run", { workspace, id: current.id });
-                      await load(current.id);
-                      setNotice(
-                        `この端末の記録を照合しました。プロセス: ${result.observation.direct_process === "running" ? "同じ起動を観測" : "継続を確認できません"}。${result.queued_reconciliation ? "Runnerの報告照合を待ちます。" : ""}セッションの再接続は未確認です。新しいCLIは起動していません。`,
-                      );
-                    })
-                  }
-                >
-                  この端末の実行記録を照合
-                </button>
-              )}
-              {native && (
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      const result = await invoke<{ path?: string }>(
-                        "prepare_run",
-                        {
-                          workspace,
-                          id: current.id,
-                          generation: runValue.assignment!.generation,
-                        },
-                      );
-                      await load(current.id);
-                      setNotice(
-                        `この端末の準備を確認しました。プロセスは起動していません。${result.path ? ` worktree: ${result.path}` : ""}`,
-                      );
-                    })
-                  }
-                >
-                  この端末で割当を確認・準備
-                </button>
-              )}
-            </section>
-          )}
-          {canExecute &&
-            runValue.state === "queued" &&
-            !runValue.assignment && (
-              <details>
-                <summary>担当端末へ割り当てる</summary>
-                <label>
-                  担当端末ID
-                  <input
-                    value={deviceID}
-                    onChange={(e) => setDeviceID(e.target.value)}
-                  />
-                </label>
-                <label>
-                  repositoryの論理ID（任意）
-                  <input
-                    value={repoID}
-                    onChange={(e) => setRepoID(e.target.value)}
-                  />
-                </label>
-                {repoID && (
-                  <label>
-                    作成元の固定commit
-                    <input
-                      value={commit}
-                      onChange={(e) => setCommit(e.target.value)}
-                    />
-                  </label>
-                )}
-                <label>
-                  必要な接続能力（空白区切り、任意）
-                  <input
-                    value={required}
-                    onChange={(e) => setRequired(e.target.value)}
-                  />
-                </label>
-                <p>
-                  端末の現在の許可と確認済み能力を照合します。repositoryを使うRunには別worktree・branchを自動作成します。割当だけではCLIは起動しません。
-                </p>
-                {runValue.handoff && handoffSource && (
-                  <>
-                    <p>
-                      引継ぎ元の現在の状態:{" "}
-                      {stateNames[(handoffSource.value as Run).state]} /{" "}
-                      {(handoffSource.value as Run).observation === "unknown"
-                        ? "不明"
-                        : "確認済み"}{" "}
-                      · {handoffSource.version}
-                    </p>
-                    {(handoffSource.value as Run).observation === "unknown" && (
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={allowDuplicate}
-                          onChange={(e) => setAllowDuplicate(e.target.checked)}
-                        />
-                        元の実行が継続し、重複する可能性を認識して新Runの割当を依頼する
-                      </label>
-                    )}
-                  </>
-                )}
-                <button
-                  disabled={busy || !deviceID || (!!repoID && !commit)}
-                  onClick={() =>
-                    void run(async () => {
-                      await mutate(current.id, "assign", current.version, {
-                        ...(runValue.handoff && handoffSource
-                          ? {
-                              handoff_source: {
-                                id: handoffSource.id,
-                                version: handoffSource.version,
-                              },
-                              allow_duplicate: allowDuplicate,
-                            }
-                          : {}),
-                        device_id: deviceID,
-                        required: required.split(/\s+/).filter(Boolean),
-                        ...(repoID
-                          ? { repository: { id: repoID, commit } }
-                          : {}),
-                      });
-                      await load(current.id);
-                      setNotice(
-                        "割当要求を確認しました。準備状況と担当端末を確認してください。",
-                      );
-                    })
-                  }
-                >
-                  端末能力を確認して割当を依頼
-                </button>
-              </details>
-            )}
-          {runValue.previous && (
-            <p>
-              関連元: {runValue.previous.id} · {runValue.previous.version}
-            </p>
-          )}
-          <div className="team-controls">
-            <button
-              disabled={busy}
-              onClick={() => void run(() => loadInput(runValue.input))}
-            >
-              固定したinput・派生契約を取得
-            </button>
-            {canEdit && (
-              <button
-                disabled={busy}
-                onClick={() => {
-                  setPrevious({ id: current.id, version: current.version });
-                  setHandoff(false);
-                  setOutputs([]);
-                }}
-              >
-                現在のRunを新しいRunの関連元にする
-              </button>
-            )}
-            {canEdit && (
-              <button
-                disabled={busy}
-                onClick={() => {
-                  setPrevious({ id: current.id, version: current.version });
-                  setHandoff(true);
-                  setOutputs([]);
-                  setNotice(
-                    "別Runへの引継ぎを準備します。必要な固定出力を選び、新しい入力を指定してください。開始は依頼していません。",
-                  );
-                }}
-              >
-                別Runへの引継ぎを準備
-              </button>
-            )}
-            {canExecute &&
-              !runValue.handoff &&
-              !runValue.execution_requested_at && (
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      await mutate(
-                        current.id,
-                        "request-start",
-                        current.version,
-                      );
-                      await load(current.id);
-                      setNotice(
-                        "入力確定・開始依頼を保存しました。起動はまだ確認していません。",
-                      );
-                    })
-                  }
-                >
-                  入力確定・開始依頼
-                </button>
-              )}
-            {canExecute &&
-              !["succeeded", "failed", "cancelled"].includes(
-                runValue.state,
-              ) && (
-                <button
-                  disabled={busy || runValue.cancel_requested}
-                  onClick={() =>
-                    void run(async () => {
-                      await mutate(current.id, "cancel", current.version);
-                      await load(current.id);
-                      setNotice("取消を要求しました。完了の確認を待ちます。");
-                    })
-                  }
-                >
-                  取消を要求
-                </button>
-              )}
-            {native ? (
-              <button
-                disabled={busy}
-                onClick={() =>
-                  void run(async () => {
-                    const saved = await invoke<{
-                      complete: boolean;
-                      path: string;
-                      reason?: string;
-                    }>("export_run", {
-                      workspace,
-                      id: current.id,
-                      version: current.version,
-                    });
-                    if (
-                      !saved.complete &&
-                      /forbidden|authentication_required/.test(
-                        saved.reason ?? "",
-                      )
-                    )
-                      throw new Error(saved.reason);
-                    setNotice(
-                      saved.complete
-                        ? `実行記録をダウンロードフォルダーへ保存しました: ${saved.path}`
-                        : `書き出しは未完了です。部分ファイル: ${saved.path}`,
-                    );
-                  })
-                }
-              >
-                この固定版の実行記録を書き出す
-              </button>
-            ) : (
-              <a
-                href={`${base}/executions/${encodeURIComponent(current.id)}/export?version=${encodeURIComponent(current.version)}`}
-                download
-              >
-                この固定版の実行記録を書き出す
-              </a>
-            )}
-          </div>
-          {input && (
-            <section aria-label="確定したRun入力">
-              <h4>input</h4>
-              <pre>{show(input.input.command)}</pre>
-              {contextText !== undefined ? (
-                <details>
-                  <summary>注入したContext本文</summary>
-                  <textarea
-                    aria-label="注入したContext本文"
-                    readOnly
-                    value={contextText}
-                    rows={8}
-                  />
-                </details>
-              ) : (
-                <p>Contextなし</p>
-              )}
-              {input.input.prompt !== undefined ? (
-                <details>
-                  <summary>prompt</summary>
-                  <textarea
-                    aria-label="Runのprompt"
-                    readOnly
-                    value={
-                      typeof input.input.prompt === "string"
-                        ? input.input.prompt
-                        : show(input.input.prompt)
-                    }
-                    rows={5}
-                  />
-                </details>
-              ) : (
-                <p>promptなし</p>
-              )}
-              {input.manifest && (
-                <p>
-                  Manifest: {input.manifest.id} · {input.manifest.revision}
-                </p>
-              )}
-              <details>
-                <summary>派生契約・固定成果物・由来</summary>
-                <pre>
-                  {show({
-                    derivation: input.derivation,
-                    artifacts: input.artifacts,
-                    sources: input.sources,
-                  })}
-                </pre>
-              </details>
-            </section>
-          )}
-          <div className="team-controls">
             <label>
-              Runの記録
-              <select
-                value={kind}
+              Run ID
+              <input
+                value={id}
                 onChange={(e) => {
-                  setKind(e.target.value);
+                  setID(e.target.value);
+                  setCurrent(null);
                   setPage(null);
+                  setInput(null);
+                  setContextText(undefined);
                 }}
-              >
-                <option value="pause">質問と回答</option>
-                <option value="pause-history">質問・回答の版履歴</option>
-                <option value="output">原出力</option>
-                <option value="event">報告履歴</option>
-                <option value="result">確定結果</option>
-                <option value="related">後続Runとの関連</option>
-              </select>
+              />
             </label>
-            <button disabled={busy} onClick={() => void run(() => records())}>
-              Runの記録を取得
+            <button
+              disabled={busy || !id}
+              onClick={() => void run(() => load(id))}
+            >
+              Runを取得・更新
             </button>
           </div>
-          {page && (
+          {list && (
             <>
               <ul>
-                {page.items.map((record) => {
-                  const pause = record.value as Pause;
-                  return (
-                    <li key={`${record.id}:${record.version}`}>
-                      {record.kind === "pause" ? (
-                        <>
-                          <p>
-                            {pause.reason} /{" "}
-                            {pause.response_kind === "event" &&
-                            pause.state === "waiting"
-                              ? "外部イベント待ち"
-                              : (stateNames[pause.state] ?? pause.state)}
-                          </p>
-                          <QuestionView value={pause.request} />
-                          {pause.response !== undefined && (
-                            <>
-                              {pause.response_origin?.kind === "event" && (
-                                <p>
-                                  観測元: {pause.response_origin.source} /{" "}
-                                  {pause.response_origin.id}
-                                </p>
-                              )}
-                              <p>
-                                回答者: {pause.answered_by} /{" "}
-                                {pause.answered_at}
-                              </p>
-                              <PauseResponse
-                                value={pause.response}
-                                request={pause.request}
-                              />
-                              <p>
-                                配送確認: {pause.delivered_at ?? "未確認"} /
-                                再開確認: {pause.resumed_at ?? "未確認"}
-                              </p>
-                            </>
-                          )}
-                          {canEdit &&
-                            kind === "pause" &&
-                            pause.response_kind !== "event" && (
-                              <PauseAnswer
-                                key={record.id}
-                                native={native}
-                                namespace={namespace}
-                                record={record}
-                                busy={busy}
-                                runID={current.id}
-                                onAccepted={() =>
-                                  run(async () => {
-                                    await load(current.id);
-                                    setNotice(
-                                      "回答を受領しました。配送と実行再開はまだ確認していません。",
-                                    );
-                                  })
-                                }
-                                onDenied={(error) =>
-                                  run(async () => {
-                                    throw error;
-                                  })
-                                }
-                              />
-                            )}
-                        </>
-                      ) : (
-                        <RunOutputRecord
-                          record={record}
-                          current={current}
-                          workspace={workspace}
-                          editable={canEdit}
-                          busy={busy}
-                          onGenerate={onGenerate}
-                          onHandoff={() => {
-                            const next = handoffOutput(
-                              current,
-                              record,
-                              previous,
-                              handoff,
-                              outputs,
-                            );
-                            setPrevious(next.previous);
-                            setHandoff(true);
-                            setOutputs(next.outputs);
-                            setNotice(
-                              "この固定出力を引継ぎ入力へ追加しました。新Runの入力欄で確認してください。",
-                            );
-                          }}
-                        />
-                      )}
-                    </li>
-                  );
-                })}
+                {list.items.map((row) => (
+                  <li key={row.id}>
+                    <button
+                      disabled={busy}
+                      onClick={() => void run(() => load(row.id))}
+                    >
+                      {(row.value as Run).name || row.id} ·{" "}
+                      {stateNames[(row.value as Run).state] ??
+                        (row.value as Run).state}
+                    </button>
+                  </li>
+                ))}
               </ul>
-              {page.next && (
+              {list.next && (
                 <button
                   disabled={busy}
-                  onClick={() => void run(() => records(page.next))}
+                  onClick={() =>
+                    void run(async () =>
+                      setList(
+                        await query({
+                          kind: "run",
+                          after: list.next,
+                          limit: 50,
+                        }),
+                      ),
+                    )
+                  }
                 >
-                  Run記録の次のページ
+                  Run一覧の次のページ
                 </button>
               )}
             </>
           )}
-        </>
-      )}
-      {native && canEdit && (
-        <ExecutionSettings
-          key={`execution/${workspace}`}
-          workspace={workspace}
-        />
-      )}
-      {native && canEdit && (
-        <RunnerSettings key={workspace} workspace={workspace} user={user} />
-      )}
-      {canEdit && (
-        <details>
-          <summary>新しいRunを作成</summary>
-          <fieldset disabled={busy}>
-            <label>
-              名前（任意）
-              <input value={name} onChange={(e) => setName(e.target.value)} />
-            </label>
-            <label>
-              接続の種類
-              <input
-                value={commandKind}
-                onChange={(e) => setCommandKind(e.target.value)}
-              />
-            </label>
-            <label>
-              command・接続先
-              <input
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-              />
-            </label>
-            <label>
-              commandの引数・要求（JSON）
-              <textarea
-                value={parameters}
-                onChange={(e) => setParameters(e.target.value)}
-                rows={3}
-              />
-            </label>
-            <label>
-              prompt（任意）
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                rows={3}
-              />
-            </label>
-            {prompt && (
-              <label>
-                promptの受け渡し方法
-                <input
-                  value={promptBinding}
-                  onChange={(e) => setPromptBinding(e.target.value)}
-                />
-              </label>
-            )}
-            <label>
-              確定済みManifest ID（任意）
-              <input
-                value={manifestID}
-                onChange={(e) => setManifestID(e.target.value)}
-              />
-            </label>
-            {manifestID && (
-              <>
-                <label>
-                  Manifestの固定版
-                  <input
-                    value={manifestVersion}
-                    onChange={(e) => setManifestVersion(e.target.value)}
-                  />
-                </label>
-                <label>
-                  Contextの受け渡し方法
-                  <input
-                    value={contextBinding}
-                    onChange={(e) => setContextBinding(e.target.value)}
-                  />
-                </label>
-              </>
-            )}
-            {previous && (
+          {current && runValue && (
+            <>
+              <h3>{runValue.name || current.id}</h3>
               <p>
-                {handoff ? "引継ぎ元" : "関連元"}: {previous.id} ·{" "}
-                {previous.version}
-                <button
-                  onClick={() => {
-                    setPrevious(null);
-                    setHandoff(false);
-                    setOutputs([]);
-                  }}
-                >
-                  関連元を外す
-                </button>
+                {current.id} · {current.version}
               </p>
-            )}
-            {handoff && (
-              <>
+              <RunStatus value={runValue} />
+              {runValue.handoff?.decision && (
                 <p>
-                  選択した固定出力: {outputs.length}
-                  件。元Runの全履歴や作業領域は取り込みません。開始時に元実行の終了・重複可能性を確認します。
+                  引継ぎ判断:{" "}
+                  {runValue.handoff.decision.judgment === "duplicate_possible"
+                    ? "元実行との重複可能性を了承"
+                    : "元実行の終了を確認"}{" "}
+                  / {runValue.handoff.decision.by} /{" "}
+                  {runValue.handoff.decision.at} / 元Run版:{" "}
+                  {runValue.handoff.decision.source.version}
                 </p>
-                <ul>
-                  {outputs.map((r) => (
-                    <li key={`${r.id}:${r.version}`}>
-                      {r.id} · {r.version}
-                      <button
-                        onClick={() =>
-                          setOutputs((old) => old.filter((v) => v !== r))
+              )}
+              {runValue.preparation && (
+                <p role="status">
+                  準備待ち・設定不足:{" "}
+                  {(
+                    {
+                      device_absent: "端末の接続未確認",
+                      connection_missing: "接続設定なし",
+                      capability_unconfirmed: "能力未確認",
+                      capability_missing: "必要能力が不足",
+                      binding_missing: "入力方式が未対応",
+                      local_configuration_missing:
+                        "端末内のprogram・接続版・作業場所を確認してください",
+                      input_binding_unsupported:
+                        "端末の接続が入力方式を扱えません",
+                      process_start_failed:
+                        "端末でプロセスを起動できませんでした",
+                    } as Record<string, string>
+                  )[runValue.preparation] ?? runValue.preparation}
+                </p>
+              )}
+              {runValue.assignment && (
+                <section aria-label="Runの割当">
+                  <h4>実行担当</h4>
+                  <p>
+                    依頼者: {runValue.assignment.requested_by} / 端末:{" "}
+                    {runValue.assignment.device_id} / Runner:{" "}
+                    {runValue.assignment.runner_id}
+                  </p>
+                  <p>
+                    接続: {runValue.assignment.connection.target} ·{" "}
+                    {runValue.assignment.connection.version} / 環境:{" "}
+                    {runValue.assignment.connection.environment} / CLI主体:{" "}
+                    {runValue.assignment.connection.subject}
+                  </p>
+                  <p>
+                    割当世代: {runValue.assignment.generation} / 有効期限:{" "}
+                    {runValue.assignment.expires_at}
+                    。期限切れはCLIの停止確認を意味しません。
+                  </p>
+                  <p>準備完了: {runValue.assignment.prepared_at ?? "未確認"}</p>
+                  {runValue.assignment.area && (
+                    <p>
+                      Run専用branch: {runValue.assignment.area.branch} / 領域:{" "}
+                      {runValue.assignment.area.id} / 固定commit:{" "}
+                      {runValue.assignment.area.commit}
+                    </p>
+                  )}
+                  {native && (
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          const result = await invoke<{
+                            observation: { direct_process: string };
+                            queued_reconciliation: boolean;
+                          }>("reconcile_run", { workspace, id: current.id });
+                          await load(current.id);
+                          setNotice(
+                            `この端末の記録を照合しました。プロセス: ${result.observation.direct_process === "running" ? "同じ起動を観測" : "継続を確認できません"}。${result.queued_reconciliation ? "Runnerの報告照合を待ちます。" : ""}セッションの再接続は未確認です。新しいCLIは起動していません。`,
+                          );
+                        })
+                      }
+                    >
+                      この端末の実行記録を照合
+                    </button>
+                  )}
+                  {native && (
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          const result = await invoke<{ path?: string }>(
+                            "prepare_run",
+                            {
+                              workspace,
+                              id: current.id,
+                              generation: runValue.assignment!.generation,
+                            },
+                          );
+                          await load(current.id);
+                          setNotice(
+                            `この端末の準備を確認しました。プロセスは起動していません。${result.path ? ` worktree: ${result.path}` : ""}`,
+                          );
+                        })
+                      }
+                    >
+                      この端末で割当を確認・準備
+                    </button>
+                  )}
+                </section>
+              )}
+              {canExecute &&
+                runValue.state === "queued" &&
+                !runValue.assignment && (
+                  <details>
+                    <summary>担当端末へ割り当てる</summary>
+                    <label>
+                      担当端末ID
+                      <input
+                        value={deviceID}
+                        onChange={(e) => setDeviceID(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      repositoryの論理ID（任意）
+                      <input
+                        value={repoID}
+                        onChange={(e) => setRepoID(e.target.value)}
+                      />
+                    </label>
+                    {repoID && (
+                      <label>
+                        作成元の固定commit
+                        <input
+                          value={commit}
+                          onChange={(e) => setCommit(e.target.value)}
+                        />
+                      </label>
+                    )}
+                    <label>
+                      必要な接続能力（空白区切り、任意）
+                      <input
+                        value={required}
+                        onChange={(e) => setRequired(e.target.value)}
+                      />
+                    </label>
+                    <p>
+                      端末の現在の許可と確認済み能力を照合します。repositoryを使うRunには別worktree・branchを自動作成します。割当だけではCLIは起動しません。
+                    </p>
+                    {runValue.handoff && handoffSource && (
+                      <>
+                        <p>
+                          引継ぎ元の現在の状態:{" "}
+                          {stateNames[(handoffSource.value as Run).state]} /{" "}
+                          {(handoffSource.value as Run).observation ===
+                          "unknown"
+                            ? "不明"
+                            : "確認済み"}{" "}
+                          · {handoffSource.version}
+                        </p>
+                        {(handoffSource.value as Run).observation ===
+                          "unknown" && (
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={allowDuplicate}
+                              onChange={(e) =>
+                                setAllowDuplicate(e.target.checked)
+                              }
+                            />
+                            元の実行が継続し、重複する可能性を認識して新Runの割当を依頼する
+                          </label>
+                        )}
+                      </>
+                    )}
+                    <button
+                      disabled={busy || !deviceID || (!!repoID && !commit)}
+                      onClick={() =>
+                        void run(async () => {
+                          await mutate(current.id, "assign", current.version, {
+                            ...(runValue.handoff && handoffSource
+                              ? {
+                                  handoff_source: {
+                                    id: handoffSource.id,
+                                    version: handoffSource.version,
+                                  },
+                                  allow_duplicate: allowDuplicate,
+                                }
+                              : {}),
+                            device_id: deviceID,
+                            required: required.split(/\s+/).filter(Boolean),
+                            ...(repoID
+                              ? { repository: { id: repoID, commit } }
+                              : {}),
+                          });
+                          await load(current.id);
+                          setNotice(
+                            "割当要求を確認しました。準備状況と担当端末を確認してください。",
+                          );
+                        })
+                      }
+                    >
+                      端末能力を確認して割当を依頼
+                    </button>
+                  </details>
+                )}
+              {runValue.previous && (
+                <p>
+                  関連元: {runValue.previous.id} · {runValue.previous.version}
+                </p>
+              )}
+              <div className="team-controls">
+                <button
+                  disabled={busy}
+                  onClick={() => void run(() => loadInput(runValue.input))}
+                >
+                  固定したinput・派生契約を取得
+                </button>
+                {canEdit && (
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      setPrevious({ id: current.id, version: current.version });
+                      setHandoff(false);
+                      setOutputs([]);
+                    }}
+                  >
+                    現在のRunを新しいRunの関連元にする
+                  </button>
+                )}
+                {canEdit && (
+                  <button
+                    disabled={busy}
+                    onClick={() => {
+                      setPrevious({ id: current.id, version: current.version });
+                      setHandoff(true);
+                      setOutputs([]);
+                      setNotice(
+                        "別Runへの引継ぎを準備します。必要な固定出力を選び、新しい入力を指定してください。開始は依頼していません。",
+                      );
+                    }}
+                  >
+                    別Runへの引継ぎを準備
+                  </button>
+                )}
+                {canExecute &&
+                  !runValue.handoff &&
+                  !runValue.execution_requested_at && (
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        void run(async () => {
+                          await mutate(
+                            current.id,
+                            "request-start",
+                            current.version,
+                          );
+                          await load(current.id);
+                          setNotice(
+                            "入力確定・開始依頼を保存しました。起動はまだ確認していません。",
+                          );
+                        })
+                      }
+                    >
+                      入力確定・開始依頼
+                    </button>
+                  )}
+                {canExecute &&
+                  !["succeeded", "failed", "cancelled"].includes(
+                    runValue.state,
+                  ) && (
+                    <button
+                      disabled={busy || runValue.cancel_requested}
+                      onClick={() =>
+                        void run(async () => {
+                          await mutate(current.id, "cancel", current.version);
+                          await load(current.id);
+                          setNotice(
+                            "取消を要求しました。完了の確認を待ちます。",
+                          );
+                        })
+                      }
+                    >
+                      取消を要求
+                    </button>
+                  )}
+                {native ? (
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      void run(async () => {
+                        const saved = await invoke<{
+                          complete: boolean;
+                          path: string;
+                          reason?: string;
+                        }>("export_run", {
+                          workspace,
+                          id: current.id,
+                          version: current.version,
+                        });
+                        if (
+                          !saved.complete &&
+                          /forbidden|authentication_required/.test(
+                            saved.reason ?? "",
+                          )
+                        )
+                          throw new Error(saved.reason);
+                        setNotice(
+                          saved.complete
+                            ? `実行記録をダウンロードフォルダーへ保存しました: ${saved.path}`
+                            : `書き出しは未完了です。部分ファイル: ${saved.path}`,
+                        );
+                      })
+                    }
+                  >
+                    この固定版の実行記録を書き出す
+                  </button>
+                ) : (
+                  <a
+                    href={`${base}/executions/${encodeURIComponent(current.id)}/export?version=${encodeURIComponent(current.version)}`}
+                    download
+                  >
+                    この固定版の実行記録を書き出す
+                  </a>
+                )}
+              </div>
+              {input && (
+                <section aria-label="確定したRun入力">
+                  <h4>input</h4>
+                  <pre>{show(input.input.command)}</pre>
+                  {contextText !== undefined ? (
+                    <details>
+                      <summary>注入したContext本文</summary>
+                      <textarea
+                        aria-label="注入したContext本文"
+                        readOnly
+                        value={contextText}
+                        rows={8}
+                      />
+                    </details>
+                  ) : (
+                    <p>Contextなし</p>
+                  )}
+                  {input.input.prompt !== undefined ? (
+                    <details>
+                      <summary>prompt</summary>
+                      <textarea
+                        aria-label="Runのprompt"
+                        readOnly
+                        value={
+                          typeof input.input.prompt === "string"
+                            ? input.input.prompt
+                            : show(input.input.prompt)
                         }
-                      >
-                        引継ぎから外す
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                {!!outputs.length && !manifestID && (
+                        rows={5}
+                      />
+                    </details>
+                  ) : (
+                    <p>promptなし</p>
+                  )}
+                  {input.manifest && (
+                    <p>
+                      Manifest: {input.manifest.id} · {input.manifest.revision}
+                    </p>
+                  )}
+                  <details>
+                    <summary>派生契約・固定成果物・由来</summary>
+                    <pre>
+                      {show({
+                        derivation: input.derivation,
+                        artifacts: input.artifacts,
+                        sources: input.sources,
+                      })}
+                    </pre>
+                  </details>
+                </section>
+              )}
+              <div className="team-controls">
+                <label>
+                  Runの記録
+                  <select
+                    value={kind}
+                    onChange={(e) => {
+                      setKind(e.target.value);
+                      setPage(null);
+                    }}
+                  >
+                    <option value="pause">質問と回答</option>
+                    <option value="pause-history">質問・回答の版履歴</option>
+                    <option value="output">原出力</option>
+                    <option value="event">報告履歴</option>
+                    <option value="result">確定結果</option>
+                    <option value="related">後続Runとの関連</option>
+                  </select>
+                </label>
+                <button
+                  disabled={busy}
+                  onClick={() => void run(() => records())}
+                >
+                  Runの記録を取得
+                </button>
+              </div>
+              {page && (
+                <>
+                  <ul>
+                    {page.items.map((record) => {
+                      const pause = record.value as Pause;
+                      return (
+                        <li key={`${record.id}:${record.version}`}>
+                          {record.kind === "pause" ? (
+                            <>
+                              <p>
+                                {pause.reason} /{" "}
+                                {pause.response_kind === "event" &&
+                                pause.state === "waiting"
+                                  ? "外部イベント待ち"
+                                  : (stateNames[pause.state] ?? pause.state)}
+                              </p>
+                              <QuestionView value={pause.request} />
+                              {pause.response !== undefined && (
+                                <>
+                                  {pause.response_origin?.kind === "event" && (
+                                    <p>
+                                      観測元: {pause.response_origin.source} /{" "}
+                                      {pause.response_origin.id}
+                                    </p>
+                                  )}
+                                  <p>
+                                    回答者: {pause.answered_by} /{" "}
+                                    {pause.answered_at}
+                                  </p>
+                                  <PauseResponse
+                                    value={pause.response}
+                                    request={pause.request}
+                                  />
+                                  <p>
+                                    配送確認: {pause.delivered_at ?? "未確認"} /
+                                    再開確認: {pause.resumed_at ?? "未確認"}
+                                  </p>
+                                </>
+                              )}
+                              {canEdit &&
+                                kind === "pause" &&
+                                pause.response_kind !== "event" && (
+                                  <PauseAnswer
+                                    key={record.id}
+                                    native={native}
+                                    namespace={namespace}
+                                    record={record}
+                                    busy={busy}
+                                    runID={current.id}
+                                    onAccepted={() =>
+                                      run(async () => {
+                                        await load(current.id);
+                                        setNotice(
+                                          "回答を受領しました。配送と実行再開はまだ確認していません。",
+                                        );
+                                      })
+                                    }
+                                    onDenied={(error) =>
+                                      run(async () => {
+                                        throw error;
+                                      })
+                                    }
+                                  />
+                                )}
+                            </>
+                          ) : (
+                            <RunOutputRecord
+                              record={record}
+                              current={current}
+                              workspace={workspace}
+                              editable={canEdit}
+                              busy={busy}
+                              onGenerate={onGenerate}
+                              onHandoff={() => {
+                                const next = handoffOutput(
+                                  current,
+                                  record,
+                                  previous,
+                                  handoff,
+                                  outputs,
+                                );
+                                setPrevious(next.previous);
+                                setHandoff(true);
+                                setOutputs(next.outputs);
+                                setNotice(
+                                  "この固定出力を引継ぎ入力へ追加しました。新Runの入力欄で確認してください。",
+                                );
+                              }}
+                            />
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {page.next && (
+                    <button
+                      disabled={busy}
+                      onClick={() => void run(() => records(page.next))}
+                    >
+                      Run記録の次のページ
+                    </button>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          {canEdit && (
+            <details>
+              <summary>新しいRunを作成</summary>
+              <fieldset disabled={busy}>
+                <label>
+                  名前（任意）
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </label>
+                <label>
+                  接続の種類
+                  <input
+                    value={commandKind}
+                    onChange={(e) => setCommandKind(e.target.value)}
+                  />
+                </label>
+                <label>
+                  command・接続先
+                  <input
+                    value={target}
+                    onChange={(e) => setTarget(e.target.value)}
+                  />
+                </label>
+                <label>
+                  commandの引数・要求（JSON）
+                  <textarea
+                    value={parameters}
+                    onChange={(e) => setParameters(e.target.value)}
+                    rows={3}
+                  />
+                </label>
+                <label>
+                  prompt（任意）
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    rows={3}
+                  />
+                </label>
+                {prompt && (
                   <label>
-                    Contextの受け渡し方法
+                    promptの受け渡し方法
                     <input
-                      value={contextBinding}
-                      onChange={(e) => setContextBinding(e.target.value)}
+                      value={promptBinding}
+                      onChange={(e) => setPromptBinding(e.target.value)}
                     />
                   </label>
                 )}
-              </>
-            )}
-            <p>
-              元Runの会話・履歴は自動で取り込みません。Context・promptを省略し、commandだけでも作成できます。
-            </p>
-            <button
-              disabled={!target.trim() || !commandKind.trim()}
-              onClick={() => void run(create)}
-            >
-              Runを作成（起動しない）
-            </button>
-          </fieldset>
+                <label>
+                  確定済みManifest ID（任意）
+                  <input
+                    value={manifestID}
+                    onChange={(e) => setManifestID(e.target.value)}
+                  />
+                </label>
+                {manifestID && (
+                  <>
+                    <label>
+                      Manifestの固定版
+                      <input
+                        value={manifestVersion}
+                        onChange={(e) => setManifestVersion(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Contextの受け渡し方法
+                      <input
+                        value={contextBinding}
+                        onChange={(e) => setContextBinding(e.target.value)}
+                      />
+                    </label>
+                  </>
+                )}
+                {previous && (
+                  <p>
+                    {handoff ? "引継ぎ元" : "関連元"}: {previous.id} ·{" "}
+                    {previous.version}
+                    <button
+                      onClick={() => {
+                        setPrevious(null);
+                        setHandoff(false);
+                        setOutputs([]);
+                      }}
+                    >
+                      関連元を外す
+                    </button>
+                  </p>
+                )}
+                {handoff && (
+                  <>
+                    <p>
+                      選択した固定出力: {outputs.length}
+                      件。元Runの全履歴や作業領域は取り込みません。開始時に元実行の終了・重複可能性を確認します。
+                    </p>
+                    <ul>
+                      {outputs.map((r) => (
+                        <li key={`${r.id}:${r.version}`}>
+                          {r.id} · {r.version}
+                          <button
+                            onClick={() =>
+                              setOutputs((old) => old.filter((v) => v !== r))
+                            }
+                          >
+                            引継ぎから外す
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    {!!outputs.length && !manifestID && (
+                      <label>
+                        Contextの受け渡し方法
+                        <input
+                          value={contextBinding}
+                          onChange={(e) => setContextBinding(e.target.value)}
+                        />
+                      </label>
+                    )}
+                  </>
+                )}
+                <p>
+                  元Runの会話・履歴は自動で取り込みません。Context・promptを省略し、commandだけでも作成できます。
+                </p>
+                <button
+                  disabled={!target.trim() || !commandKind.trim()}
+                  onClick={() => void run(create)}
+                >
+                  Runを作成（起動しない）
+                </button>
+              </fieldset>
+            </details>
+          )}
+          {notice && <p role="status">{notice}</p>}
         </details>
-      )}
-      {notice && <p role="status">{notice}</p>}
-    </details>
+      }
+    </ScreenContent>
   );
 }

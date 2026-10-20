@@ -1,3 +1,4 @@
+import { ScreenContent } from "./navigation";
 import { useState } from "react";
 import { syncRequest } from "./auth";
 import { allowAnswerScope, answerScopeEpoch } from "./sync-store";
@@ -89,41 +90,45 @@ export function DefinitionRun({
     fieldSource(definition.value_utf8, ["ci"]) ||
     fieldSource(definition.value_utf8, ["write"]);
   return (
-    <section aria-label="採用した定義からRunを作成">
-      <h3>採用した定義からRunを作成</h3>
-      {guarded ? (
-        <p>CI観測・条件付き書込みの定義は工程に組み込んで実行します。</p>
-      ) : (
-        <>
-          <p>
-            宣言された入力:{" "}
-            {fieldSource(definition.value_utf8, ["inputs"]) || "なし"}
-            。リポジトリ・commitはRun割当時に指定します。
-          </p>
-          <label>
-            今回の入力（名前をキーにしたJSON）
-            <textarea
-              value={pending?.inputs_utf8 ?? inputs}
-              disabled={busy || !!pending || !!created}
-              onChange={(e) => setInputs(e.target.value)}
-            />
-          </label>
-          <button
-            disabled={!canEdit || busy || !!created}
-            onClick={() => void create()}
-          >
-            {pending
-              ? "同じRun作成要求を確認"
-              : "未割当のRunを作成（開始しない）"}
-          </button>
-        </>
-      )}
-      {created && (
-        <p>
-          作成したRun: <code>{created.id}</code>
-        </p>
-      )}
-      <p role="status">{notice}</p>
-    </section>
+    <ScreenContent>
+      {
+        <section aria-label="採用した定義からRunを作成">
+          <h3>採用した定義からRunを作成</h3>
+          {guarded ? (
+            <p>CI観測・条件付き書込みの定義は工程に組み込んで実行します。</p>
+          ) : (
+            <>
+              <p>
+                宣言された入力:{" "}
+                {fieldSource(definition.value_utf8, ["inputs"]) || "なし"}
+                。リポジトリ・commitはRun割当時に指定します。
+              </p>
+              <label>
+                今回の入力（名前をキーにしたJSON）
+                <textarea
+                  value={pending?.inputs_utf8 ?? inputs}
+                  disabled={busy || !!pending || !!created}
+                  onChange={(e) => setInputs(e.target.value)}
+                />
+              </label>
+              <button
+                disabled={!canEdit || busy || !!created}
+                onClick={() => void create()}
+              >
+                {pending
+                  ? "同じRun作成要求を確認"
+                  : "未割当のRunを作成（開始しない）"}
+              </button>
+            </>
+          )}
+          {created && (
+            <p>
+              作成したRun: <code>{created.id}</code>
+            </p>
+          )}
+          <p role="status">{notice}</p>
+        </section>
+      }
+    </ScreenContent>
   );
 }

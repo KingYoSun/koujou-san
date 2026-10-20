@@ -142,18 +142,6 @@ export function newCondition(): CostCondition {
     limit: 50,
   };
 }
-export function openCostEditor(id: string) {
-  const element = document.getElementById(id);
-  if (!element) return;
-  let parent: HTMLElement | null = element;
-  while (parent) {
-    if (parent instanceof HTMLDetailsElement) parent.open = true;
-    parent = parent.parentElement;
-  }
-  element.scrollIntoView({ block: "start", behavior: "smooth" });
-  element.focus({ preventScroll: true });
-}
-
 export function storedCondition(value: Partial<CostCondition>): CostCondition {
   return {
     ...newCondition(),

@@ -1,3 +1,4 @@
+import { ScreenContent } from "./navigation";
 import { useState } from "react";
 import { editorStore } from "./context-ui";
 import { syncRequest } from "./auth";
@@ -92,59 +93,65 @@ export function DefinitionGeneration({
     }
   }
   return (
-    <section className="team" aria-label="Run定義の生成設定">
-      <h3>利用する端末・接続（未設定でも質問として残せます）</h3>
-      <button disabled={busy} onClick={() => void devicesPage()}>
-        端末を50件取得
-      </button>
-      <select
-        aria-label="生成で参照する端末"
-        disabled={busy}
-        value={capabilities?.id.replace(/^runner:/, "") ?? ""}
-        onChange={(e) => void chooseDevice(e.target.value)}
-      >
-        <option value="">未指定</option>
-        {capabilities &&
-          !devices.some(
-            (d) => d.id === capabilities.id.replace(/^runner:/, ""),
-          ) && (
-            <option value={capabilities.id.replace(/^runner:/, "")}>
-              {deviceName}
-            </option>
-          )}
-        {devices.map((d) => (
-          <option key={d.id} value={d.id}>
-            {d.name}
-          </option>
-        ))}
-      </select>
-      {next && (
-        <button disabled={busy} onClick={() => void devicesPage(next)}>
-          端末の次の50件
-        </button>
-      )}
-      {capabilities && (
-        <label>
-          利用する接続
-          <select
-            value={connection}
-            onChange={(e) => setConnection(e.target.value)}
-          >
-            <option value="">依頼に応じて選ぶ・不足時は質問</option>
-            {capabilities.connections.map((c) => (
-              <option
-                key={c.kind + ":" + c.target}
-                disabled={!c.confirmed}
-                value={c.kind + ":" + c.target}
-              >
-                {c.target}・{c.version}
-                {c.confirmed ? "" : "（未確認）"}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      <p role="status">{notice}</p>
+    <>
+      <ScreenContent>
+        {
+          <section className="team" aria-label="Run定義の生成設定">
+            <h3>利用する端末・接続（未設定でも質問として残せます）</h3>
+            <button disabled={busy} onClick={() => void devicesPage()}>
+              端末を50件取得
+            </button>
+            <select
+              aria-label="生成で参照する端末"
+              disabled={busy}
+              value={capabilities?.id.replace(/^runner:/, "") ?? ""}
+              onChange={(e) => void chooseDevice(e.target.value)}
+            >
+              <option value="">未指定</option>
+              {capabilities &&
+                !devices.some(
+                  (d) => d.id === capabilities.id.replace(/^runner:/, ""),
+                ) && (
+                  <option value={capabilities.id.replace(/^runner:/, "")}>
+                    {deviceName}
+                  </option>
+                )}
+              {devices.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            {next && (
+              <button disabled={busy} onClick={() => void devicesPage(next)}>
+                端末の次の50件
+              </button>
+            )}
+            {capabilities && (
+              <label>
+                利用する接続
+                <select
+                  value={connection}
+                  onChange={(e) => setConnection(e.target.value)}
+                >
+                  <option value="">依頼に応じて選ぶ・不足時は質問</option>
+                  {capabilities.connections.map((c) => (
+                    <option
+                      key={c.kind + ":" + c.target}
+                      disabled={!c.confirmed}
+                      value={c.kind + ":" + c.target}
+                    >
+                      {c.target}・{c.version}
+                      {c.confirmed ? "" : "（未確認）"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <p role="status">{notice}</p>
+          </section>
+        }
+      </ScreenContent>
       <ClientSelection
         ui={{ native, api, user, workspace, canCreate: canEdit, store }}
         definition={{
@@ -157,6 +164,6 @@ export function DefinitionGeneration({
           request: connection ? `利用者が指定した接続: ${connection}` : "",
         }}
       />
-    </section>
+    </>
   );
 }
