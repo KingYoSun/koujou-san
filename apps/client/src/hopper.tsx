@@ -304,7 +304,10 @@ export function Hopper({
             : "chain"
           : "definition";
     let requestedRoot = route?.query ?? "",
-      nextMode = "heads";
+      nextMode =
+        view === "evaluations" || (view === "chains" && route?.query)
+          ? "history"
+          : "heads";
     try {
       const filter = JSON.parse(requestedRoot) as {
         kind: string;
@@ -1164,6 +1167,30 @@ export function Hopper({
                         ? "サーバーで処理します。「評価と発行」の一覧から結果を確認してください。"
                         : "発行しない評価結果を保存しました。"}
                     </p>
+                    <ol>
+                      {(trial.value as { items: Ref[] }).items.map((ref, i) => (
+                        <li key={ref.id + ref.version}>
+                          {ref.version ? (
+                            <NavigationLink
+                              to={{
+                                workspace,
+                                screen: "hopper",
+                                view: "evaluations",
+                                target: {
+                                  ...hopperRef(ref),
+                                  kind: "hopper-evaluation",
+                                },
+                              }}
+                              related
+                            >
+                              試行結果 {i + 1} を確認
+                            </NavigationLink>
+                          ) : (
+                            <span>評価 {i + 1} はサーバーで処理待ちです。</span>
+                          )}
+                        </li>
+                      ))}
+                    </ol>
                     <details>
                       <summary>受付範囲と参照の詳細</summary>
                       <pre>{JSON.stringify(trial.value, null, 2)}</pre>

@@ -358,7 +358,12 @@ export function NavigationLink({
     navigation.navigate(to, { related });
   };
   return (
-    <a {...props} href={routeHref(to)} onClick={click}>
+    <a
+      {...props}
+      className={["target-link", props.className].filter(Boolean).join(" ")}
+      href={routeHref(to)}
+      onClick={click}
+    >
       {children}
     </a>
   );

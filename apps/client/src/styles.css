@@ -686,8 +686,10 @@ button:disabled {
 .work-list tbody th {
   min-width: 180px;
 }
-.work-list tbody th a {
+.target-link {
   display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .record-link {
   color: var(--primary);
