@@ -6,7 +6,7 @@
 
 ## 現在の作業: Issue #71〜#77
 
-状態: In progress。[Draft PR #78](https://github.com/KingYoSun/koujou-san/pull/78)で、用途別シェル・共通部品、作業詳細、工程マップ、Contextモード、自動化と優先度、比較からの対象移動を改修している。[実装計画](2026-10-21-issue-71-plan.md)、[情報構造・移設表・六つの画面遷移](../design/information-architecture.md)、[途中経過](2026-10-21-uiux-foundation.md)を参照する。局所検証・差分検品と先行commitのCIは成功。最終成果物の統合比較、初見操作、200%拡大の確認と全条件の照合は継続中で、完了扱いにしない。
+状態: In progress。[Draft PR #78](https://github.com/KingYoSun/koujou-san/pull/78)で、用途別シェル・共通部品、作業詳細、工程マップ、Contextモード、自動化と優先度、比較からの対象移動を改修している。[実装計画](2026-10-21-issue-71-plan.md)、[情報構造・移設表・六つの画面遷移](../design/information-architecture.md)、[検証記録](2026-10-21-uiux-foundation.md)を参照する。最終ソース検品の3未達と、比較で見つけた取得待ち復帰の回帰を修正し、差分検品はPASS。旧新6経路の操作・ID転記・未完了を記録し、1万Context・3万版のページ取得、95クライアントテスト、root test、build、整形、Go vetも成功した。初見S1/S3・200%と最終CIは確認中で、完了扱いにしない。
 
 ## 環境構築の受入条件
 
