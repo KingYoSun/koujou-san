@@ -426,10 +426,10 @@ export function Workbench({
     else await readDetail(ref, kind, name);
   };
   useEffect(() => {
+    detailEpoch.current++;
     if (!visible || !navigation || navigation.route.screen !== "work") return;
     const target = navigation.route.target;
     if (!target) {
-      detailEpoch.current++;
       clearDetail();
       return;
     }
