@@ -74,6 +74,7 @@ export function UsagePricing({
   navigationRef.current = navigation;
   const visible = useScreenActive();
   const dataDetails = useRef<HTMLDetailsElement>(null);
+  const messageRef = useRef<HTMLParagraphElement>(null);
   const readSerial = useRef(0);
   const [mode, setMode] = useState(settings ? "records" : "aggregate");
   const [kind, setKind] = useState(settings ? "price" : "usage");
@@ -105,6 +106,11 @@ export function UsagePricing({
   const [version, setVersion] = useState("0");
   const [category, setCategory] = useState("");
   const [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!visible || !message) return;
+    messageRef.current?.focus();
+    messageRef.current?.scrollIntoView({ block: "nearest" });
+  }, [message]);
   const [busy, setBusy] = useState(false);
   const pending = useRef<{ key: string; operation: string } | null>(null);
   const base = `/usage/workspaces/${encodeURIComponent(workspace)}`;
@@ -610,7 +616,13 @@ export function UsagePricing({
           </details>
         }
       </ScreenContent>
-      <ScreenContent>{message && <p role="status">{message}</p>}</ScreenContent>
+      <ScreenContent>
+        {message && (
+          <p role="status" ref={messageRef} tabIndex={-1}>
+            {message}
+          </p>
+        )}
+      </ScreenContent>
     </>
   );
 }
