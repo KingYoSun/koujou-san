@@ -3,6 +3,7 @@ import {
   NavigationProvider,
   ScreenContent,
   routeHref,
+  historyActorMatches,
   type Screen,
 } from "./navigation";
 import { WorkspaceShell } from "./workspace-shell";
@@ -120,12 +121,21 @@ export function Team({
   }
   useEffect(() => {
     const restore = () => {
+      const scope = history.state?.koujou?.scope as string | undefined;
+      if (scope && me && !historyActorMatches(scope, apiIdentity, me.id)) {
+        history.replaceState(
+          null,
+          "",
+          routeHref({ workspace: selected, screen: "work" }) + location.hash,
+        );
+        return;
+      }
       const id = new URLSearchParams(location.search).get("workspace");
       if (id && workspaces.items.some((w) => w.id === id)) setSelected(id);
     };
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
-  }, [workspaces]);
+  }, [workspaces, me, apiIdentity, selected]);
   const current = workspaces.items.find((w) => w.id === selected);
   const admin = current?.role === "admin";
   const mine = devices.items.find(
@@ -228,12 +238,18 @@ export function Team({
       window.removeEventListener("koujou-auth-changed", load);
     };
   }, [native]);
-  async function page<T>(kind: string, after = ""): Promise<Page<T>> {
+  async function page<T>(
+    kind: string,
+    after = "",
+  ): Promise<Page<T> | undefined> {
+    const epoch = authEpoch.current;
+    const owner = selected;
     const response = (await apiRequest(
       `/access/workspaces/${encodeURIComponent(selected)}/${kind}${after ? `?after=${encodeURIComponent(after)}` : ""}`,
       native,
     )) as Envelope<Page<T>>;
-    return response.data;
+    if (epoch === authEpoch.current && owner === selectedRef.current)
+      return response.data;
   }
   useEffect(() => {
     setMembers(empty());
@@ -254,7 +270,7 @@ export function Team({
         : Promise.resolve(empty<Invite>()),
     ])
       .then(([m, d, i]) => {
-        if (active && epoch === authEpoch.current) {
+        if (active && epoch === authEpoch.current && m && d && i) {
           setMembers(m);
           setDevices(d);
           setInvites(i);
@@ -269,6 +285,9 @@ export function Team({
     };
   }, [selected, admin, revision, screen]);
   useEffect(() => {
+    setName("");
+    setInviteRole("viewer");
+    setDeviceName("Windowsの端末");
     setLink("");
     setBusy(false);
   }, [selected, admin]);
@@ -593,6 +612,7 @@ export function Team({
                               "members",
                               members.next_cursor,
                             );
+                            if (!value) return;
                             setMembers({
                               ...value,
                               items: [...members.items, ...value.items],
@@ -660,6 +680,7 @@ export function Team({
                                   "invites",
                                   invites.next_cursor,
                                 );
+                                if (!value) return;
                                 setInvites({
                                   ...value,
                                   items: [...invites.items, ...value.items],
@@ -794,6 +815,7 @@ export function Team({
                               "devices",
                               devices.next_cursor,
                             );
+                            if (!value) return;
                             setDevices({
                               ...value,
                               items: [...devices.items, ...value.items],

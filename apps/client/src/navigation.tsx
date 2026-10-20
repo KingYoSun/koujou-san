@@ -52,6 +52,25 @@ type Entry = {
   returnScroll?: number;
 };
 
+export function historyActorMatches(scope: string, api: string, user: string) {
+  const actor = JSON.parse(scope) as string[];
+  return actor[0] === api && actor[1] === user;
+}
+
+export function restoreEntry(
+  saved: Entry | undefined,
+  scope: string,
+  search: string,
+  workspace: string,
+): Entry {
+  if (saved?.scope === scope) return saved;
+  return {
+    scope,
+    route: saved ? { workspace, screen: "work" } : readRoute(search, workspace),
+    scroll: 0,
+  };
+}
+
 export function readRoute(search: string, workspace: string): Route {
   const p = new URLSearchParams(search);
   if (p.get("workspace") !== workspace) return { workspace, screen: "work" };
@@ -157,16 +176,12 @@ export function NavigationProvider({
       typeof history === "undefined"
         ? undefined
         : (history.state?.koujou as Entry | undefined);
-    return saved?.scope === scope
-      ? saved
-      : {
-          scope,
-          route: readRoute(
-            typeof location === "undefined" ? "" : location.search,
-            workspace,
-          ),
-          scroll: 0,
-        };
+    return restoreEntry(
+      saved,
+      scope,
+      typeof location === "undefined" ? "" : location.search,
+      workspace,
+    );
   };
   const [entry, setEntry] = useState(initial);
   const current = useRef(entry);
@@ -178,7 +193,19 @@ export function NavigationProvider({
     history.scrollRestoration = "manual";
     const restore = () => {
       const stored = history.state?.koujou as Entry | undefined;
+      // Team switches Workspace first; its new provider owns this entry.
+      if (
+        stored &&
+        stored.scope !== scope &&
+        historyActorMatches(stored.scope, api, user)
+      )
+        return;
       const next = stored?.scope === scope ? stored : initial();
+      history.replaceState(
+        { ...history.state, koujou: next },
+        "",
+        routeHref(next.route) + location.hash,
+      );
       setEntry(next);
       requestAnimationFrame(() => window.scrollTo(0, next.scroll));
     };

@@ -5,11 +5,40 @@ import {
   NavigationProvider,
   readRoute,
   routeHref,
+  restoreEntry,
+  historyActorMatches,
   type Screen,
 } from "./navigation";
 import { WorkspaceShell } from "./workspace-shell";
 
 afterEach(() => vi.unstubAllGlobals());
+
+it("restores a bookmark or the same owner's history without adopting a foreign actor's target", () => {
+  const route = {
+    workspace: "w",
+    screen: "work" as const,
+    target: { kind: "run", id: "private-run", version: "v1" },
+  };
+  const scope = JSON.stringify(["api", "alice", "w"]);
+  const saved = { scope, route, scroll: 400 };
+  expect(restoreEntry(saved, scope, routeHref(route), "w")).toEqual(saved);
+  expect(restoreEntry(undefined, scope, routeHref(route), "w").route).toEqual(
+    route,
+  );
+  for (const next of [
+    ["api", "bob", "w"],
+    ["other-api", "alice", "w"],
+    ["api", "alice", "other-workspace"],
+  ]) {
+    expect(
+      restoreEntry(saved, JSON.stringify(next), routeHref(route), next[2])
+        .route,
+    ).toEqual({ workspace: next[2], screen: "work" });
+  }
+  expect(historyActorMatches(scope, "api", "alice")).toBe(true);
+  expect(historyActorMatches(scope, "api", "bob")).toBe(false);
+  expect(historyActorMatches(scope, "other-api", "alice")).toBe(false);
+});
 
 it("keeps fixed references, filters and page cursors in a shareable route", () => {
   const route = {
