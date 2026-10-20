@@ -157,7 +157,7 @@ func (s *Service) Priority(ctx context.Context, p access.Principal, w, target st
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return Record{}, err
 	}
-	j, err := scanJob(s.Store.Database().QueryRow(ctx, "SELECT "+jobColumns+" FROM automation_jobs WHERE workspace_id=$1 AND kind='triage' AND target_id=$2 ORDER BY created_at DESC,id DESC LIMIT 1", w, target))
+	j, err := scanJob(s.Store.Database().QueryRow(ctx, "SELECT "+jobColumns+" FROM automation_jobs WHERE workspace_id=$1 AND id=(SELECT latest_job FROM triage_targets WHERE workspace_id=$1 AND scope_id=$2)", w, target))
 	if err == nil {
 		refs = append(refs, j.Refs...)
 		if j.Result != nil {

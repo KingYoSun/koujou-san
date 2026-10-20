@@ -227,6 +227,21 @@ func TestTriagePostgres(t *testing.T) {
 			if value.Recommendation == nil || *value.Recommendation != "P1" || (value.Adopted != nil) != auto || value.State != "evaluated" || calls.Load() != before+1 {
 				t.Fatalf("origin %s auto %v: %+v calls %d", origin, auto, value, calls.Load()-before)
 			}
+			if auto && origin == "human" {
+				// The target owns its latest request. A superseded historical
+				// request must not mask it when timestamps order differently.
+				var oldID string
+				var created time.Time
+				if err := store.Database().QueryRow(ctx, `SELECT id,created_at FROM automation_jobs WHERE workspace_id='one' AND target_id=$1 AND state='superseded' LIMIT 1`, scope.ID).Scan(&oldID, &created); err != nil {
+					t.Fatal(err)
+				}
+				sql(`UPDATE automation_jobs SET created_at=now()+interval '1 second' WHERE workspace_id='one' AND id=$1`, oldID)
+				_, current := priority(scope)
+				sql(`UPDATE automation_jobs SET created_at=$2 WHERE workspace_id='one' AND id=$1`, oldID, created)
+				if current.State != "evaluated" || current.Job != value.Job {
+					t.Fatalf("historical request replaced current evaluation: %+v", current)
+				}
+			}
 		}
 	}
 	activation = put(activation.ID, activation.Version, Activation{Policy: pol, Enabled: true, AutoApply: true})
