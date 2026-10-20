@@ -1,5 +1,11 @@
-import { ScreenContent } from "./navigation";
-import { useEffect, useRef, useState } from "react";
+import { ScreenContent, NavigationLink, useScreenActive } from "./navigation";
+import {
+  WorkflowMap,
+  type WorkflowGraph,
+  type DefinitionLabel,
+} from "./workflow-map";
+import { StatusBadge } from "./status-badge";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { syncRequest, workspaceAccessLost } from "./auth";
 import { syncStorage, answerScopeEpoch, allowAnswerScope } from "./sync-store";
@@ -28,7 +34,7 @@ type Task = {
   definition?: Ref;
   stale?: boolean;
 };
-type Graph = { nodes: { id: string; choices?: string[] }[] };
+type Graph = WorkflowGraph;
 type Page = { items: Record<Task>[]; next: string };
 type Impact = {
   execution: Ref;
@@ -46,7 +52,9 @@ export function WorkflowExecution({
   canEdit,
   canExecute,
   selected,
-  onOpenRun,
+  onSelect,
+  render,
+  visible = true,
 }: {
   native: boolean;
   api: string;
@@ -56,8 +64,13 @@ export function WorkflowExecution({
   canEdit: boolean;
   canExecute: boolean;
   selected?: Ref;
-  onOpenRun?: (ref: Ref) => void;
+  onSelect?: (ref: Ref) => void;
+  render?: (content: ReactNode) => ReactNode;
+  visible?: boolean;
 }) {
+  const active = useScreenActive();
+  const loadEpoch = useRef(0);
+  const [nodeIndex, setNodeIndex] = useState(0);
   const base = `/workflows/workspaces/${encodeURIComponent(workspace)}`;
   const [id, setID] = useState("");
   const [record, setRecord] = useState<Record<Execution>>();
@@ -123,10 +136,15 @@ export function WorkflowExecution({
       expected_version: version,
     })) as { data: Ref };
   };
-  const load = async (target: string) => {
+  const load = async (target: string, version = "head") => {
+    const epoch = ++loadEpoch.current;
     const value = (await request(
-      `/records/${encodeURIComponent(target)}?version=head`,
+      `/records/${encodeURIComponent(target)}?version=${encodeURIComponent(version)}`,
     )) as Record<Execution>;
+    if (onSelect && !selected) {
+      if (epoch === loadEpoch.current) onSelect(ref(value));
+      return;
+    }
     const def = (await request(
       `/records/${encodeURIComponent(value.value.definition.id)}?version=${encodeURIComponent(value.value.definition.version)}`,
     )) as Record<Graph>;
@@ -136,6 +154,7 @@ export function WorkflowExecution({
       version: value.version,
       limit: 50,
     })) as { data: Page };
+    if (epoch !== loadEpoch.current) return;
     setRecord(value);
     setID(value.id);
     setGraph(def.value);
@@ -143,17 +162,29 @@ export function WorkflowExecution({
     setCursor(tasks.data.next);
     setImpact(undefined);
     setPreview("");
+    if (version === "head") onSelect?.(ref(value));
   };
   const adopted = async () => {
-    if (!definition) throw new Error("definition_required");
+    const target = definition ?? record?.value.definition;
+    if (!target) throw new Error("definition_required");
     return (await request(
-      `/records/${encodeURIComponent("adoption:" + definition.id)}?version=head`,
+      `/records/${encodeURIComponent("adoption:" + target.id)}?version=head`,
     )) as Ref;
   };
   useEffect(() => {
-    if (selected) void act(() => load(selected.id));
-  }, [selected?.id, selected?.version]);
-  return (
+    if (
+      active &&
+      visible &&
+      selected &&
+      (record?.id !== selected.id || record?.version !== selected.version)
+    ) {
+      setRecord(undefined);
+      setPage(undefined);
+      setGraph(undefined);
+      void act(() => load(selected.id, selected.version));
+    }
+  }, [active, visible, selected?.id, selected?.version]);
+  const content = (
     <ScreenContent>
       {
         <section aria-label="工程の実行と判断">
@@ -162,48 +193,53 @@ export function WorkflowExecution({
             実行開始は別の依頼です。工程の判断待ちと、Run途中の質問は別々に表示します。時間・費用の予算は追加開始を止める条件で、開始済みのCLIによる消費の上限は保証しません。
           </p>
           <fieldset disabled={busy}>
-            <label>
-              工程実行ID
-              <input value={id} onChange={(e) => setID(e.target.value)} />
-            </label>
-            <button disabled={!id} onClick={() => void act(() => load(id))}>
-              工程実行を取得・更新
-            </button>
-            <button
-              onClick={() =>
-                void act(async () => {
-                  const v = (await request("/query", {
-                    kind: "heads",
-                    type: "execution",
-                    limit: 50,
-                  })) as { data: typeof executions };
-                  setExecutions(v.data);
-                })
-              }
-            >
-              工程実行の一覧
-            </button>
-            {executions?.items.map((r) => (
-              <button key={r.id} onClick={() => void act(() => load(r.id))}>
-                {r.id}: {r.value.state}
-              </button>
-            ))}
-            {executions?.next && (
-              <button
-                onClick={() =>
-                  void act(async () => {
-                    const v = (await request("/query", {
-                      kind: "heads",
-                      type: "execution",
-                      after: executions.next,
-                      limit: 50,
-                    })) as { data: typeof executions };
-                    setExecutions(v.data);
-                  })
-                }
-              >
-                工程実行の次のページ
-              </button>
+            {!selected && (
+              <details>
+                <summary>工程実行を探す・IDで開く</summary>
+                <label>
+                  工程実行ID
+                  <input value={id} onChange={(e) => setID(e.target.value)} />
+                </label>
+                <button disabled={!id} onClick={() => void act(() => load(id))}>
+                  工程実行を取得・更新
+                </button>
+                <button
+                  onClick={() =>
+                    void act(async () => {
+                      const v = (await request("/query", {
+                        kind: "heads",
+                        type: "execution",
+                        limit: 50,
+                      })) as { data: typeof executions };
+                      setExecutions(v.data);
+                    })
+                  }
+                >
+                  工程実行の一覧
+                </button>
+                {executions?.items.map((r) => (
+                  <button key={r.id} onClick={() => void act(() => load(r.id))}>
+                    {r.id}: {r.value.state}
+                  </button>
+                ))}
+                {executions?.next && (
+                  <button
+                    onClick={() =>
+                      void act(async () => {
+                        const v = (await request("/query", {
+                          kind: "heads",
+                          type: "execution",
+                          after: executions.next,
+                          limit: 50,
+                        })) as { data: typeof executions };
+                        setExecutions(v.data);
+                      })
+                    }
+                  >
+                    工程実行の次のページ
+                  </button>
+                )}
+              </details>
             )}
             {canExecute &&
               definition &&
@@ -264,86 +300,162 @@ export function WorkflowExecution({
                     {record.value.cost.currency} / 制御: 追加開始のみ
                   </p>
                 )}
-                {page?.items.map((r) => (
-                  <article key={r.id}>
-                    <p>
-                      {r.value.node}（{r.value.attempt}回目）: {r.value.state}{" "}
-                      {r.value.outcome ?? ""}
-                      {r.value.stale
-                        ? "（採用変更により、この試行の判定は失効）"
-                        : ""}
-                    </p>
-                    {r.value.run && (
-                      <p>
-                        {onOpenRun ? (
-                          <button onClick={() => onOpenRun(r.value.run!)}>
-                            この工程の入力・質問・結果を確認
-                          </button>
+                {graph && (
+                  <WorkflowMap
+                    graph={graph}
+                    selected={nodeIndex}
+                    onSelect={setNodeIndex}
+                    loadLabels={async (refs) =>
+                      (await request("/labels", refs)) as DefinitionLabel[]
+                    }
+                    status={(node) => {
+                      const tasks =
+                        page?.items.filter((t) => t.value.node === node.id) ??
+                        [];
+                      return tasks.length ? (
+                        tasks.map((t) => (
+                          <p key={t.id}>
+                            <StatusBadge
+                              label={`試行 ${t.value.attempt}`}
+                              value={t.value.state}
+                            />
+                            <StatusBadge
+                              label="判定"
+                              value={t.value.outcome ?? "未確認"}
+                            />
+                            {t.value.stale && (
+                              <StatusBadge
+                                label="有効性"
+                                value="STALE（失効）"
+                                tone="warning"
+                              />
+                            )}
+                          </p>
+                        ))
+                      ) : (
+                        <p>
+                          試行はこのページに未取得。未実行・完了とは判定していません。
+                        </p>
+                      );
+                    }}
+                  >
+                    {(node) => (
+                      <>
+                        <h5>入力の接続</h5>
+                        {node.bindings?.length ? (
+                          <ul>
+                            {node.bindings.map((b, i) => (
+                              <li key={i}>
+                                {b.from} の {b.kind} / {b.channel ?? "派生結果"}
+                                [{b.index ?? 0}] /{" "}
+                                {b.path?.join(" → ") || "全体"} → {node.id} の{" "}
+                                {b.to}
+                                {b.to === "command"
+                                  ? ` / ${b.parameter?.join(" → ") || "全体"}`
+                                  : ""}
+                              </li>
+                            ))}
+                          </ul>
                         ) : (
-                          <>
-                            Run: {r.value.run.id}@{r.value.run.version}
-                            （Run一覧から入力・Pause・原出力を確認できます）
-                          </>
+                          <p>前段出力からの入力接続はありません。</p>
                         )}
-                      </p>
+                        {page?.items
+                          .filter(
+                            (r) => r.value.node === graph?.nodes[nodeIndex]?.id,
+                          )
+                          .map((r) => (
+                            <article key={r.id}>
+                              <p>
+                                {r.value.node}（{r.value.attempt}回目）:{" "}
+                                {r.value.state} {r.value.outcome ?? ""}
+                                {r.value.stale
+                                  ? "（採用変更により、この試行の判定は失効）"
+                                  : ""}
+                              </p>
+                              {r.value.run && (
+                                <p>
+                                  <NavigationLink
+                                    to={{
+                                      workspace,
+                                      screen: "work",
+                                      target: { ...r.value.run, kind: "run" },
+                                      view: "questions",
+                                    }}
+                                    related
+                                  >
+                                    この試行の入力・質問・成果を確認
+                                  </NavigationLink>
+                                </p>
+                              )}
+                              {r.value.definition && (
+                                <button
+                                  onClick={() =>
+                                    void act(async () => {
+                                      const p = (await request(
+                                        `/executions/${encodeURIComponent(record.id)}/preview`,
+                                        {
+                                          execution: ref(record),
+                                          node: r.value.node,
+                                          format: "source",
+                                        },
+                                      )) as {
+                                        input_utf8: string;
+                                        sources: Ref[];
+                                      };
+                                      setPreview(
+                                        p.input_utf8 +
+                                          "\n\n固定参照:\n" +
+                                          JSON.stringify(p.sources, null, 2),
+                                      );
+                                    })
+                                  }
+                                >
+                                  このRunの入力をプレビュー
+                                </button>
+                              )}
+                              {canEdit &&
+                                r.value.state === "decision" &&
+                                graph?.nodes
+                                  .find((n) => n.id === r.value.node)
+                                  ?.choices?.map((choice) => (
+                                    <button
+                                      key={choice}
+                                      onClick={() =>
+                                        void act(async () => {
+                                          await mutate(
+                                            `/executions/${encodeURIComponent(record.id)}/decide`,
+                                            record.version,
+                                            {
+                                              node: r.value.node,
+                                              attempt: r.value.attempt,
+                                              choice,
+                                            },
+                                          );
+                                          await load(record.id);
+                                          setNotice(
+                                            "判断を記録しました。回答だけでは実行権限を付与しません。",
+                                          );
+                                        })
+                                      }
+                                    >
+                                      {choice}を回答
+                                    </button>
+                                  ))}
+                            </article>
+                          ))}
+                      </>
                     )}
-                    {r.value.definition && (
-                      <button
-                        onClick={() =>
-                          void act(async () => {
-                            const p = (await request(
-                              `/executions/${encodeURIComponent(record.id)}/preview`,
-                              {
-                                execution: ref(record),
-                                node: r.value.node,
-                                format: "source",
-                              },
-                            )) as { input_utf8: string; sources: Ref[] };
-                            setPreview(
-                              p.input_utf8 +
-                                "\n\n固定参照:\n" +
-                                JSON.stringify(p.sources, null, 2),
-                            );
-                          })
-                        }
-                      >
-                        このRunの入力をプレビュー
-                      </button>
-                    )}
-                    {canEdit &&
-                      r.value.state === "decision" &&
-                      graph?.nodes
-                        .find((n) => n.id === r.value.node)
-                        ?.choices?.map((choice) => (
-                          <button
-                            key={choice}
-                            onClick={() =>
-                              void act(async () => {
-                                await mutate(
-                                  `/executions/${encodeURIComponent(record.id)}/decide`,
-                                  record.version,
-                                  {
-                                    node: r.value.node,
-                                    attempt: r.value.attempt,
-                                    choice,
-                                  },
-                                );
-                                await load(record.id);
-                                setNotice(
-                                  "判断を記録しました。回答だけでは実行権限を付与しません。",
-                                );
-                              })
-                            }
-                          >
-                            {choice}を回答
-                          </button>
-                        ))}
-                  </article>
-                ))}
+                  </WorkflowMap>
+                )}
+                <p>
+                  取得した試行：{page?.items.length ?? 0}件。固定実行版{" "}
+                  {record.version} を50件ずつ取得しています。
+                </p>
                 {cursor && (
                   <button
                     onClick={() =>
                       void act(async () => {
+                        const epoch = loadEpoch.current;
                         const p = (await request("/query", {
                           kind: "tasks",
                           id: record.id,
@@ -351,15 +463,17 @@ export function WorkflowExecution({
                           after: cursor,
                           limit: 50,
                         })) as { data: Page };
-                        setPage(p.data);
-                        setCursor(p.data.next);
+                        if (epoch === loadEpoch.current) {
+                          setPage(p.data);
+                          setCursor(p.data.next);
+                        }
                       })
                     }
                   >
                     工程内の次のページ
                   </button>
                 )}
-                {canEdit && canExecute && definition && (
+                {canEdit && canExecute && (
                   <button
                     onClick={() =>
                       void act(async () => {
@@ -449,4 +563,5 @@ export function WorkflowExecution({
       }
     </ScreenContent>
   );
+  return render ? render(content) : content;
 }

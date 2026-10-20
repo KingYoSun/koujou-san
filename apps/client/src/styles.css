@@ -812,6 +812,55 @@ button[data-variant="secondary"]:hover {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px;
 }
+
+.workflow-node-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: 16px;
+  padding: 0;
+  list-style: none;
+}
+.workflow-node-list > li {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.workflow-node-list > li[data-selected="true"] {
+  border: 2px solid var(--primary);
+  background: var(--muted);
+}
+.workflow-edges {
+  border-top: 1px solid var(--border);
+  margin-top: 12px;
+}
+.workflow-return {
+  border-inline-start: 3px dashed var(--destructive);
+  padding-inline-start: 8px;
+}
+.workflow-map #workflow-node-settings {
+  border-top: 2px solid var(--primary);
+  padding-top: 16px;
+  scroll-margin-top: 24px;
+}
+.reference-dialog {
+  width: min(720px, calc(100% - 32px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  color: var(--foreground);
+  background: var(--background);
+  border: 2px solid var(--primary);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+.reference-dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+.reference-dialog :is(input, button) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .cost-comparison-grid > section {
   min-width: 0;
   overflow-wrap: anywhere;

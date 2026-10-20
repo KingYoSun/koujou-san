@@ -10,15 +10,13 @@ import {
   saveLocalDraft,
   syncStorage,
 } from "./sync-store";
-import {
-  editField,
-  fieldSource,
-  mergeFields,
-  nodeCount,
-} from "./workflow-json";
+import { editField, fieldSource, mergeFields } from "./workflow-json";
 import type { JSONPath } from "jsonc-parser";
 import { WorkflowExecution } from "./workflow-execution";
 import { DefinitionRun } from "./definition-run";
+import { WorkflowNodeEditor } from "./workflow-node-editor";
+import type { DefinitionLabel } from "./workflow-map";
+import type { DefinitionPage } from "./definition-picker";
 import { DefinitionGeneration } from "./definition-generation";
 import { definitionFields } from "./definition-proposal";
 
@@ -56,6 +54,15 @@ const problems: Record<string, string> = {
   capability_unconfirmed: "接続の能力が未確認です",
   explicit_budget_required: "並列数などの実行予算を確認してください",
   none_context_binding: "無注入のContextへ出力を接続できません",
+  run_or_decision_required: "Run定義か判断の選択肢のいずれかを指定してください",
+  result_condition_required: "先行結果・差し戻しの条件を指定してください",
+  fixed_definition_required: "Run定義の固定版を指定してください",
+  input_dependency_required: "入力元を先行工程にも指定してください",
+  output_selection_invalid:
+    "出力の種類・チャンネル・位置・キーを確認してください",
+  input_target_invalid: "入力先はcontext・prompt・commandから指定してください",
+  join_policy_required: "先行工程の合流条件を指定してください",
+  return_run_required: "差し戻す先にはRunノードを指定してください",
 };
 const compose = (draft: Draft) =>
   Object.entries(draft.fields).reduce(
@@ -415,12 +422,6 @@ export function Workflows({
     await load(value.data.id, value.data.version);
     setNotice("定義の下書きを共有へ保存しました。採用・実行はしていません。");
   };
-  let count = 0;
-  try {
-    if (draft) count = nodeCount(compose(draft));
-  } catch {
-    /* The raw editor retains invalid input until corrected. */
-  }
   return (
     <>
       <ScreenContent>
@@ -578,246 +579,201 @@ export function Workflows({
               </p>
             )}
             {draft && (
-              <fieldset disabled={busy || !canEdit}>
-                <p>
-                  項目の入力はこの端末の下書きへ保存し、JSON反映または共有保存時に同じ定義へ反映します。
-                </p>
-                {field("定義の名前", ["name"])}
-                {kind === "run-definition" ? (
-                  <>
-                    {field("commandの種類", [
-                      "spec",
-                      "input",
-                      "command",
-                      "kind",
-                    ])}
-                    {field("commandの接続先", [
-                      "spec",
-                      "input",
-                      "command",
-                      "target",
-                    ])}
-                    {field(
-                      "commandの引数・要求（JSON）",
-                      ["spec", "input", "command", "parameters"],
-                      "json",
-                    )}
-                    {field(
-                      "入力の受渡し（JSON）",
-                      ["spec", "input", "command", "binding"],
-                      "json",
-                    )}
-                    {field(
-                      "固定Contextの選択（JSON・省略可）",
-                      ["selection"],
-                      "json",
-                    )}
-                    {field(
-                      "prompt（JSON・省略可）",
-                      ["spec", "input", "prompt"],
-                      "json",
-                    )}
-                    {field(
-                      "検品などの派生契約（JSON・省略可）",
-                      ["spec", "derivation"],
-                      "json",
-                    )}
-                    {field(
-                      "前段から受ける必須入力（JSON・省略可）",
-                      ["inputs"],
-                      "json",
-                    )}
-                    {field(
-                      "必要な接続能力（JSON・省略可）",
-                      ["required"],
-                      "json",
-                    )}
-                    {field("担当端末ID（省略可）", ["device_id"])}
-                  </>
-                ) : (
-                  <>
-                    <p>
-                      工程ごとにRun定義の固定版、結果条件、入力接続と戻り先を指定します。実行予算の数値は自動で設定しません。
-                    </p>
-                    {field(
-                      "同時に実行する上限",
-                      ["budget", "parallel"],
-                      "number",
-                    )}
-                    {field(
-                      "生成するRun数の上限（循環時は必須）",
-                      ["budget", "max_runs"],
-                      "number",
-                    )}
-                    {field(
-                      "工程の制御時間（秒・省略可）",
-                      ["budget", "seconds"],
-                      "number",
-                    )}
-                    {field(
-                      "費用予算（JSON・省略可）",
-                      ["budget", "cost"],
-                      "json",
-                    )}
-                    {field(
-                      "Context基準の固定参照（JSON・省略可）",
-                      ["baseline"],
-                      "json",
-                    )}
-                    <label>
-                      編集する工程
-                      <select
-                        value={selected}
-                        onChange={(e) => setSelected(Number(e.target.value))}
-                      >
-                        {Array.from({ length: count }, (_, i) => (
-                          <option key={i} value={i}>
-                            {i + 1}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <button
-                      onClick={() => {
-                        try {
-                          const text = editField(
-                            compose(draft),
-                            ["nodes", count],
-                            JSON.stringify({
-                              id: `node-${count + 1}`,
-                              join: "all",
-                            }),
-                          );
-                          persist({
-                            ...draft,
-                            text,
-                            fields: {},
-                            pending: undefined,
-                          });
-                          setSelected(count);
-                        } catch {
-                          setNotice(
-                            "JSONの構文と項目の入力を確認してください。",
-                          );
-                        }
-                      }}
-                    >
-                      工程を追加
-                    </button>
-                    {count > 0 && (
-                      <>
-                        {field("工程の識別名", ["nodes", selected, "id"])}
-                        {field("Run定義ID", [
-                          "nodes",
-                          selected,
-                          "definition",
-                          "id",
-                        ])}
-                        {field("Run定義の固定版", [
-                          "nodes",
-                          selected,
-                          "definition",
-                          "version",
-                        ])}
-                        {field(
-                          "判断待ちの選択肢（JSON・Run定義と択一）",
-                          ["nodes", selected, "choices"],
-                          "json",
-                        )}
-                        {field(
-                          "依存する工程と結果（JSON）",
-                          ["nodes", selected, "depends"],
-                          "json",
-                        )}
-                        {field("合流の条件（all / any）", [
-                          "nodes",
-                          selected,
-                          "join",
-                        ])}
-                        {field(
-                          "前段出力の選択と入力接続（JSON）",
-                          ["nodes", selected, "bindings"],
-                          "json",
-                        )}
-                        {field(
-                          "開始時に明示する入力（JSON・省略可）",
-                          ["nodes", selected, "inputs"],
-                          "json",
-                        )}
-                        {field(
-                          "戻り先（結果名から工程ID、JSON・省略可）",
-                          ["nodes", selected, "retry"],
-                          "json",
-                        )}
-                      </>
-                    )}
-                  </>
-                )}
-                <button
-                  onClick={() => {
-                    try {
-                      persist({
-                        ...draft,
-                        text: compose(draft),
-                        fields: {},
-                        pending: undefined,
-                      });
-                    } catch {
-                      setNotice("項目のJSON構文を確認してください。");
-                    }
-                  }}
-                >
-                  項目をJSONへ反映
-                </button>
-                <details>
-                  <summary>定義のJSON原文を編集</summary>
+              <section>
+                <fieldset disabled={busy || !canEdit}>
                   <p>
-                    原文を直接編集すると、上の未反映の項目入力を置き換えます。
+                    項目の入力はこの端末の下書きへ保存し、JSON反映または共有保存時に同じ定義へ反映します。
                   </p>
-                  <textarea
-                    aria-label="定義のJSON原文"
-                    rows={15}
-                    value={draft.text}
-                    onChange={(e) =>
+                  {field("定義の名前", ["name"])}
+                  {kind === "run-definition" ? (
+                    <>
+                      {field("commandの種類", [
+                        "spec",
+                        "input",
+                        "command",
+                        "kind",
+                      ])}
+                      {field("commandの接続先", [
+                        "spec",
+                        "input",
+                        "command",
+                        "target",
+                      ])}
+                      {field(
+                        "commandの引数・要求（JSON）",
+                        ["spec", "input", "command", "parameters"],
+                        "json",
+                      )}
+                      {field(
+                        "入力の受渡し（JSON）",
+                        ["spec", "input", "command", "binding"],
+                        "json",
+                      )}
+                      {field(
+                        "固定Contextの選択（JSON・省略可）",
+                        ["selection"],
+                        "json",
+                      )}
+                      {field(
+                        "prompt（JSON・省略可）",
+                        ["spec", "input", "prompt"],
+                        "json",
+                      )}
+                      {field(
+                        "検品などの派生契約（JSON・省略可）",
+                        ["spec", "derivation"],
+                        "json",
+                      )}
+                      {field(
+                        "前段から受ける必須入力（JSON・省略可）",
+                        ["inputs"],
+                        "json",
+                      )}
+                      {field(
+                        "必要な接続能力（JSON・省略可）",
+                        ["required"],
+                        "json",
+                      )}
+                      {field("担当端末ID（省略可）", ["device_id"])}
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        工程ごとにRun定義の固定版、結果条件、入力接続と戻り先を指定します。実行予算の数値は自動で設定しません。
+                      </p>
+                      <details>
+                        <summary>実行予算とContext基準を確認・編集</summary>
+                        {field(
+                          "同時に実行する上限",
+                          ["budget", "parallel"],
+                          "number",
+                        )}
+                        {field(
+                          "生成するRun数の上限（循環時は必須）",
+                          ["budget", "max_runs"],
+                          "number",
+                        )}
+                        {field(
+                          "工程の制御時間（秒・省略可）",
+                          ["budget", "seconds"],
+                          "number",
+                        )}
+                        {field(
+                          "費用予算（JSON・省略可）",
+                          ["budget", "cost"],
+                          "json",
+                        )}
+                        {field(
+                          "Context基準の固定参照（JSON・省略可）",
+                          ["baseline"],
+                          "json",
+                        )}
+                      </details>
+                    </>
+                  )}
+                </fieldset>
+                {kind === "workflow-definition" && (
+                  <WorkflowNodeEditor
+                    disabled={busy || !canEdit}
+                    text={(() => {
+                      try {
+                        return compose(draft);
+                      } catch {
+                        return undefined;
+                      }
+                    })()}
+                    selected={selected}
+                    onSelect={setSelected}
+                    loadLabels={async (refs) =>
+                      (await call("/labels", refs)) as DefinitionLabel[]
+                    }
+                    loadDefinitions={async (after) =>
+                      (
+                        (await call("/query", {
+                          kind: "heads",
+                          type: "run-definition",
+                          after,
+                          limit: 50,
+                        })) as { data: DefinitionPage }
+                      ).data
+                    }
+                    onChange={(text) =>
                       persist({
                         ...draft,
-                        text: e.target.value,
+                        text,
                         fields: {},
-                        manual_paths: definitionFields.map(([path]) => path),
                         pending: undefined,
                       })
                     }
                   />
-                </details>
-                {record && draft.version !== record.version && (
-                  <>
-                    <p>
-                      下書きの前提版: {draft.version}
-                      。共有の現在版と比較してから適用してください。
-                    </p>
-                    <textarea
-                      aria-label="共有側の定義"
-                      readOnly
-                      rows={8}
-                      value={record.value_utf8}
-                    />
-                    <button
-                      onClick={() =>
+                )}
+                <fieldset disabled={busy || !canEdit}>
+                  <button
+                    onClick={() => {
+                      try {
                         persist({
                           ...draft,
-                          version: record.version,
+                          text: compose(draft),
+                          fields: {},
+                          pending: undefined,
+                        });
+                      } catch {
+                        setNotice("項目のJSON構文を確認してください。");
+                      }
+                    }}
+                  >
+                    項目をJSONへ反映
+                  </button>
+                  <details>
+                    <summary>定義のJSON原文を編集</summary>
+                    <p>
+                      原文を直接編集すると、上の未反映の項目入力を置き換えます。
+                    </p>
+                    <textarea
+                      aria-label="定義のJSON原文"
+                      rows={15}
+                      value={draft.text}
+                      onChange={(e) =>
+                        persist({
+                          ...draft,
+                          text: e.target.value,
+                          fields: {},
+                          manual_paths: definitionFields.map(([path]) => path),
                           pending: undefined,
                         })
                       }
-                    >
-                      比較した下書きを現在版へ手動適用
-                    </button>
-                  </>
-                )}
-                <button disabled={!id} onClick={() => void act(save)}>
-                  定義の下書きを共有へ保存（実行しない）
-                </button>
-              </fieldset>
+                    />
+                  </details>
+                  {record && draft.version !== record.version && (
+                    <>
+                      <p>
+                        下書きの前提版: {draft.version}
+                        。共有の現在版と比較してから適用してください。
+                      </p>
+                      <textarea
+                        aria-label="共有側の定義"
+                        readOnly
+                        rows={8}
+                        value={record.value_utf8}
+                      />
+                      <button
+                        onClick={() =>
+                          persist({
+                            ...draft,
+                            version: record.version,
+                            pending: undefined,
+                          })
+                        }
+                      >
+                        比較した下書きを現在版へ手動適用
+                      </button>
+                    </>
+                  )}
+                  <button disabled={!id} onClick={() => void act(save)}>
+                    定義の下書きを共有へ保存（実行しない）
+                  </button>
+                </fieldset>
+              </section>
             )}
             {record && (
               <div className="team-controls">
@@ -942,7 +898,25 @@ export function Workflows({
                 <ul>
                   {validation.problems.map((p, i) => (
                     <li key={i}>
-                      {p.path}: {problems[p.code] ?? p.code}
+                      <button
+                        data-variant="secondary"
+                        onClick={() => {
+                          const index = /^\/nodes\/(\d+)(?:\/|$)/.exec(p.path);
+                          if (index) {
+                            setSelected(Number(index[1]));
+                            requestAnimationFrame(() =>
+                              document
+                                .getElementById("workflow-node-settings")
+                                ?.focus(),
+                            );
+                          } else
+                            document
+                              .getElementById("cost-definition-editor")
+                              ?.focus();
+                        }}
+                      >
+                        {p.path}: {problems[p.code] ?? p.code} — 該当箇所を開く
+                      </button>
                     </li>
                   ))}
                 </ul>
@@ -1061,6 +1035,14 @@ export function Workflows({
         definition={record}
         canEdit={canEdit}
         canExecute={canExecute}
+        onSelect={(ref) =>
+          navigation?.navigate({
+            workspace,
+            screen: "work",
+            target: { ...ref, kind: "execution" },
+            view: "overview",
+          })
+        }
       />
     </>
   );

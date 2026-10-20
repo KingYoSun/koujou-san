@@ -556,778 +556,803 @@ export function Workbench({
       cursor: navigation.route.cursor,
     });
   return (
-    <RunRecords
+    <WorkflowExecution
       native={native}
       api={api}
-      workspace={workspace}
       user={user}
-      role={role}
-      canExecute={canExecute}
-      selected={selected?.kind === "run" ? selected : undefined}
-      onGenerate={onGenerate}
-      view={visible ? detailView : undefined}
-      onSelect={(ref) => open(ref)}
-      onPrepare={(id) =>
-        navigation?.navigate({
-          ...navigation.route,
-          target: {
-            id,
-            version: "0",
-            kind: "run-preparation",
-            name: "新しいRunの下書き",
-          },
-          view: "prepare",
-        })
+      workspace={workspace}
+      selected={selected?.kind === "execution" ? selectedRef : undefined}
+      visible={
+        visible && detailView === "overview" && selected?.kind === "execution"
       }
-    >
-      {(run) => (
-        <ScreenContent>
-          {
-            <section
-              className="workbench workflow-editor"
-              aria-label="作業と判断"
-            >
-              <p>
-                目的と待機理由から、成果物・質問・証拠へ進めます。画面を読むだけでは実行を開始しません。
-              </p>
-              {notice && <p role="status">{notice}</p>}
-              <button
-                disabled={!canEdit}
-                onClick={() =>
-                  navigation?.navigate({
-                    ...navigation.route,
-                    target: {
-                      ...run.preparation,
-                      kind: "run-preparation",
-                      name: "新しいRunの下書き",
-                    },
-                    view: "prepare",
-                  })
-                }
-              >
-                新しいRunを準備
-              </button>
-              {!canEdit && <p>Runの準備・保存には編集権限が必要です。</p>}
-              {prepare && (
-                <section aria-label="Runの準備">
-                  <button onClick={returnList}>作業一覧へ戻る</button>
-                  {run.prepare}
-                </section>
-              )}
-              {!prepare && !navigation?.route.target && (
-                <>
-                  <details>
-                    <summary>RunをIDで開く（詳細操作）</summary>
-                    <Field
-                      label="Run ID"
-                      value={directID}
-                      onChange={setDirectID}
-                    />
-                    <Field
-                      label="Runの版"
-                      value={directVersion}
-                      onChange={setDirectVersion}
-                      hint="headは最新を確認してから、その固定版を開きます。"
-                    />
-                    <button
-                      disabled={!directID.trim() || !directVersion.trim()}
-                      onClick={() =>
-                        void act(() =>
-                          open({
-                            id: directID.startsWith("run:")
-                              ? directID
-                              : "run:" + directID,
-                            version: directVersion,
-                          }),
-                        )
-                      }
-                    >
-                      指定したRunを開く
-                    </button>
-                  </details>
-                  <div className="team-controls">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={mine}
-                        disabled={busy}
-                        onChange={(e) => {
-                          if (navigation)
-                            navigation.navigate(
-                              {
-                                ...navigation.route,
-                                query: e.target.checked ? "mine" : undefined,
-                                cursor: undefined,
-                              },
-                              { replace: true },
-                            );
-                          else {
-                            setMine(e.target.checked);
-                            void act(() => list("", e.target.checked));
-                          }
-                        }}
-                      />
-                      自分に回された判断依頼
-                    </label>
-                    <button
-                      disabled={busy}
-                      onClick={() =>
-                        void act(() => list(navigation?.route.cursor ?? ""))
-                      }
-                    >
-                      作業一覧を更新
-                    </button>
-                  </div>
+      canEdit={canEdit}
+      canExecute={canExecute}
+      onSelect={(ref) => void act(() => open(ref, "execution"))}
+      render={(execution) => (
+        <RunRecords
+          native={native}
+          api={api}
+          workspace={workspace}
+          user={user}
+          role={role}
+          canExecute={canExecute}
+          selected={selected?.kind === "run" ? selected : undefined}
+          onGenerate={onGenerate}
+          view={visible ? detailView : undefined}
+          onSelect={(ref) => open(ref)}
+          onPrepare={(id) =>
+            navigation?.navigate({
+              ...navigation.route,
+              target: {
+                id,
+                version: "0",
+                kind: "run-preparation",
+                name: "新しいRunの下書き",
+              },
+              view: "prepare",
+            })
+          }
+        >
+          {(run) => (
+            <ScreenContent>
+              {
+                <section
+                  className="workbench workflow-editor"
+                  aria-label="作業と判断"
+                >
                   <p>
-                    最終同期：
-                    {syncedAt
-                      ? new Date(syncedAt).toLocaleString()
-                      : "未取得"}{" "}
-                    /{" "}
-                    {stale
-                      ? "古い可能性あり・現在は未確認"
-                      : "一覧のAPI取得を確認"}
+                    目的と待機理由から、成果物・質問・証拠へ進めます。画面を読むだけでは実行を開始しません。
                   </p>
-                  {page && (
+                  {notice && <p role="status">{notice}</p>}
+                  <button
+                    disabled={!canEdit}
+                    onClick={() =>
+                      navigation?.navigate({
+                        ...navigation.route,
+                        target: {
+                          ...run.preparation,
+                          kind: "run-preparation",
+                          name: "新しいRunの下書き",
+                        },
+                        view: "prepare",
+                      })
+                    }
+                  >
+                    新しいRunを準備
+                  </button>
+                  {!canEdit && <p>Runの準備・保存には編集権限が必要です。</p>}
+                  {prepare && (
+                    <section aria-label="Runの準備">
+                      <button onClick={returnList}>作業一覧へ戻る</button>
+                      {run.prepare}
+                    </section>
+                  )}
+                  {!prepare && !navigation?.route.target && (
                     <>
-                      <div
-                        className="table-scroll"
-                        role="region"
-                        aria-label="作業一覧"
-                        tabIndex={0}
-                      >
-                        <table className="work-list">
-                          <thead>
-                            <tr>
-                              <th scope="col">作業・固定版</th>
-                              <th scope="col">実行・検品・観測</th>
-                              <th scope="col">工程・待機理由</th>
-                              <th scope="col">担当・端末</th>
-                              <th scope="col">次の操作</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {page.items.map((entry) => (
-                              <tr key={entry.id}>
-                                <th scope="row">
-                                  <NavigationLink
-                                    id={`work-row-${entry.id}`}
-                                    className="record-link"
-                                    related
-                                    to={{
-                                      workspace,
-                                      screen: "work",
-                                      query: navigation?.route.query,
-                                      cursor: navigation?.route.cursor,
-                                      target: {
-                                        id: entry.id,
-                                        version: entry.version,
-                                        kind: entry.kind,
-                                        name: entry.value.name,
-                                      },
-                                    }}
-                                  >
-                                    {entry.value.name ?? "作業"}
-                                  </NavigationLink>
-                                  <small>
-                                    {entry.kind} · {entry.version}
-                                  </small>
-                                </th>
-                                <td>
-                                  <WorkState
-                                    value={entry.value}
-                                    stale={stale}
-                                  />
-                                </td>
-                                <td>
-                                  {entry.value.stage ?? "Run"}
-                                  <p>
-                                    {reasons[entry.value.reason ?? ""] ??
-                                      entry.value.reason ??
-                                      "待機理由の報告なし"}
-                                  </p>
-                                </td>
-                                <td>
-                                  {entry.value.recipient_name ??
-                                    entry.value.requested_by ??
-                                    "担当未確認"}
-                                  <p>
-                                    {entry.value.device ?? "端末の割当情報なし"}
-                                  </p>
-                                </td>
-                                <td>
-                                  <NavigationLink
-                                    related
-                                    to={{
-                                      workspace,
-                                      screen: "work",
-                                      query: navigation?.route.query,
-                                      cursor: navigation?.route.cursor,
-                                      target: {
-                                        id: entry.id,
-                                        version: entry.version,
-                                        kind: entry.kind,
-                                        name: entry.value.name,
-                                      },
-                                      view:
-                                        entry.value.observation === "unknown"
-                                          ? "overview"
-                                          : entry.value.state === "paused" ||
-                                              entry.value.state === "waiting"
-                                            ? "questions"
-                                            : "evidence",
-                                    }}
-                                  >
-                                    {nextAction(entry.value)}
-                                  </NavigationLink>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      {!page.items.length && (
-                        <p>このページに表示できる作業はありません。</p>
-                      )}
-                      {page.next && (
+                      <details>
+                        <summary>RunをIDで開く（詳細操作）</summary>
+                        <Field
+                          label="Run ID"
+                          value={directID}
+                          onChange={setDirectID}
+                        />
+                        <Field
+                          label="Runの版"
+                          value={directVersion}
+                          onChange={setDirectVersion}
+                          hint="headは最新を確認してから、その固定版を開きます。"
+                        />
+                        <button
+                          disabled={!directID.trim() || !directVersion.trim()}
+                          onClick={() =>
+                            void act(() =>
+                              open({
+                                id: directID.startsWith("run:")
+                                  ? directID
+                                  : "run:" + directID,
+                                version: directVersion,
+                              }),
+                            )
+                          }
+                        >
+                          指定したRunを開く
+                        </button>
+                      </details>
+                      <div className="team-controls">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={mine}
+                            disabled={busy}
+                            onChange={(e) => {
+                              if (navigation)
+                                navigation.navigate(
+                                  {
+                                    ...navigation.route,
+                                    query: e.target.checked
+                                      ? "mine"
+                                      : undefined,
+                                    cursor: undefined,
+                                  },
+                                  { replace: true },
+                                );
+                              else {
+                                setMine(e.target.checked);
+                                void act(() => list("", e.target.checked));
+                              }
+                            }}
+                          />
+                          自分に回された判断依頼
+                        </label>
                         <button
                           disabled={busy}
                           onClick={() =>
-                            navigation
-                              ? navigation.navigate(
-                                  { ...navigation.route, cursor: page.next },
-                                  { replace: true },
-                                )
-                              : void act(() => list(page.next))
+                            void act(() => list(navigation?.route.cursor ?? ""))
                           }
                         >
-                          作業の次のページ
+                          作業一覧を更新
                         </button>
+                      </div>
+                      <p>
+                        最終同期：
+                        {syncedAt
+                          ? new Date(syncedAt).toLocaleString()
+                          : "未取得"}{" "}
+                        /{" "}
+                        {stale
+                          ? "古い可能性あり・現在は未確認"
+                          : "一覧のAPI取得を確認"}
+                      </p>
+                      {page && (
+                        <>
+                          <div
+                            className="table-scroll"
+                            role="region"
+                            aria-label="作業一覧"
+                            tabIndex={0}
+                          >
+                            <table className="work-list">
+                              <thead>
+                                <tr>
+                                  <th scope="col">作業・固定版</th>
+                                  <th scope="col">実行・検品・観測</th>
+                                  <th scope="col">工程・待機理由</th>
+                                  <th scope="col">担当・端末</th>
+                                  <th scope="col">次の操作</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {page.items.map((entry) => (
+                                  <tr key={entry.id}>
+                                    <th scope="row">
+                                      <NavigationLink
+                                        id={`work-row-${entry.id}`}
+                                        className="record-link"
+                                        related
+                                        to={{
+                                          workspace,
+                                          screen: "work",
+                                          query: navigation?.route.query,
+                                          cursor: navigation?.route.cursor,
+                                          target: {
+                                            id: entry.id,
+                                            version: entry.version,
+                                            kind: entry.kind,
+                                            name: entry.value.name,
+                                          },
+                                        }}
+                                      >
+                                        {entry.value.name ?? "作業"}
+                                      </NavigationLink>
+                                      <small>
+                                        {entry.kind} · {entry.version}
+                                      </small>
+                                    </th>
+                                    <td>
+                                      <WorkState
+                                        value={entry.value}
+                                        stale={stale}
+                                      />
+                                    </td>
+                                    <td>
+                                      {entry.value.stage ?? "Run"}
+                                      <p>
+                                        {reasons[entry.value.reason ?? ""] ??
+                                          entry.value.reason ??
+                                          "待機理由の報告なし"}
+                                      </p>
+                                    </td>
+                                    <td>
+                                      {entry.value.recipient_name ??
+                                        entry.value.requested_by ??
+                                        "担当未確認"}
+                                      <p>
+                                        {entry.value.device ??
+                                          "端末の割当情報なし"}
+                                      </p>
+                                    </td>
+                                    <td>
+                                      <NavigationLink
+                                        related
+                                        to={{
+                                          workspace,
+                                          screen: "work",
+                                          query: navigation?.route.query,
+                                          cursor: navigation?.route.cursor,
+                                          target: {
+                                            id: entry.id,
+                                            version: entry.version,
+                                            kind: entry.kind,
+                                            name: entry.value.name,
+                                          },
+                                          view:
+                                            entry.value.observation ===
+                                            "unknown"
+                                              ? "overview"
+                                              : entry.value.state ===
+                                                    "paused" ||
+                                                  entry.value.state ===
+                                                    "waiting"
+                                                ? "questions"
+                                                : "evidence",
+                                        }}
+                                      >
+                                        {nextAction(entry.value)}
+                                      </NavigationLink>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {!page.items.length && (
+                            <p>このページに表示できる作業はありません。</p>
+                          )}
+                          {page.next && (
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                navigation
+                                  ? navigation.navigate(
+                                      {
+                                        ...navigation.route,
+                                        cursor: page.next,
+                                      },
+                                      { replace: true },
+                                    )
+                                  : void act(() => list(page.next))
+                              }
+                            >
+                              作業の次のページ
+                            </button>
+                          )}
+                        </>
                       )}
                     </>
                   )}
-                </>
-              )}
-              {!prepare &&
-                selected &&
-                selectedRef &&
-                (!navigation ||
-                  (navigation.route.target?.id === selected.id &&
-                    navigation.route.target.version === selected.version)) && (
-                  <article aria-label="選択した作業">
-                    <button onClick={returnList}>作業一覧へ戻る</button>
-                    <h3 ref={detailHeading} tabIndex={-1}>
-                      {selected.value.name ?? "作業の詳細"}
-                    </h3>
-                    <WorkState value={selected.value} stale={detailStale} />
-                    <p>
-                      待機理由：
-                      {reasons[waitingReason ?? ""] ??
-                        waitingReason ??
-                        "報告なし"}{" "}
-                      / 担当：
-                      {summary?.recipient_name ??
-                        people.find((p) => p.id === summary?.requested_by)
-                          ?.name ??
-                        summary?.requested_by ??
-                        "未確認"}{" "}
-                      / 端末：{summary?.device ?? "割当情報なし"}
-                    </p>
-                    <p>次の操作：{nextAction(selected.value)}</p>
-                    <button
-                      disabled={busy}
-                      onClick={() =>
-                        void act(() =>
-                          readDetail(
-                            { ...selectedRef, version: "head" },
-                            selected.kind,
-                            selected.value.name,
-                          ),
-                        )
-                      }
-                    >
-                      この作業の状態・質問を更新
-                    </button>
-                    <Tabs
-                      id="work-detail"
-                      label="作業の詳細"
-                      items={[
-                        { id: "overview", label: "概要" },
-                        { id: "input", label: "入力" },
-                        { id: "questions", label: "質問・判断" },
-                        { id: "evidence", label: "成果・検品" },
-                        { id: "history", label: "履歴・利用量" },
-                      ]}
-                      value={detailView}
-                      onChange={changeView}
-                    />
-                    <TabPanel
-                      id="work-detail"
-                      value="overview"
-                      active={detailView}
-                    >
-                      {run.overview}
-                      {selected.kind === "execution" && (
-                        <WorkflowExecution
-                          native={native}
-                          api={api}
-                          user={user}
-                          workspace={workspace}
-                          selected={selectedRef}
-                          canEdit={canEdit}
-                          canExecute={canExecute}
-                          onOpenRun={(ref) => void act(() => open(ref))}
-                        />
-                      )}
-                    </TabPanel>
-                    <TabPanel
-                      id="work-detail"
-                      value="input"
-                      active={detailView}
-                    >
-                      {run.input}
-                    </TabPanel>
-                    <TabPanel
-                      id="work-detail"
-                      value="evidence"
-                      active={detailView}
-                    >
-                      {input && (
-                        <section aria-label="対象と由来">
-                          <h4>今回の対象・固定成果物</h4>
-                          {input.artifacts?.length ? (
-                            <ul>
-                              {input.artifacts.map((a) => (
-                                <li key={a.uri + a.revision}>
-                                  {a.uri} / 版：{a.revision} /{" "}
-                                  {a.state === "unfetched"
-                                    ? "未取得"
-                                    : (a.state ?? "状態未確認")}
-                                  {/^https?:\/\//.test(a.uri) && (
-                                    <a
-                                      href={a.uri}
-                                      target="_blank"
-                                      rel="noreferrer"
-                                    >
-                                      成果物を開く
-                                    </a>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : (
-                            <p>
-                              入力に指定された固定成果物はありません。質問と原出力の証拠も確認してください。
-                            </p>
-                          )}
-                          {input.previous && (
-                            <button
-                              onClick={() =>
-                                void act(() => open(input.previous!))
-                              }
-                            >
-                              関連元のRun・判断を確認
-                            </button>
-                          )}
-                          {related?.items.map((r) => (
-                            <button
-                              key={r.id}
-                              onClick={() => void act(() => open(r.value.next))}
-                            >
-                              関連する修正・再検品Runを確認
-                            </button>
-                          ))}
-                          {related?.next && (
-                            <button
-                              onClick={() =>
-                                void act(async () => {
-                                  const v = (await request(runBase + "/query", {
-                                    kind: "related",
-                                    run_id: selected.id,
-                                    version: selected.version,
-                                    after: related.next,
-                                    snapshot: related.snapshot,
-                                    limit: 50,
-                                  })) as { data: typeof related };
-                                  setRelated(v.data);
-                                })
-                              }
-                            >
-                              関連Runの次のページ
-                            </button>
-                          )}
-                        </section>
-                      )}
-                      {inspection && (
-                        <section aria-label="検品条件と証拠">
-                          <h4>検品時の条件</h4>
-                          <ul>
-                            {inspectionCriteria.map((c) => (
-                              <li key={c.id}>
-                                {c.requirement}（{c.id}）
-                              </li>
-                            ))}
-                          </ul>
-                          <InspectionResult
-                            value={inspection}
-                            title="検品結果・未確認事項・証拠"
-                          />
-                        </section>
-                      )}
-
-                      {canEdit && selected.kind === "run" && (
-                        <details>
-                          <summary>理由付き差し戻しを記録</summary>
-                          <fieldset disabled={busy || detailStale}>
-                            <p>
-                              この版の成果物と問題を記録します。記録だけでは修正commandを起動しません。
-                            </p>
-                            <Field
-                              label="対象成果物のURL・識別子"
-                              value={targetURI}
-                              onChange={setTargetURI}
-                            />
-                            <label>
-                              対象成果物の固定版
-                              <input
-                                value={targetVersion}
-                                onChange={(e) =>
-                                  setTargetVersion(e.target.value)
-                                }
-                              />
-                            </label>
-                            <label>
-                              該当する条件
-                              <textarea
-                                value={criteria}
-                                onChange={(e) => setCriteria(e.target.value)}
-                                placeholder={pauses?.items
-                                  .flatMap(
-                                    (p) =>
-                                      question(p.value.request)?.criteria?.map(
-                                        (c) => c.id,
-                                      ) ?? [],
-                                  )
-                                  .join(", ")}
-                                rows={2}
-                              />
-                            </label>
-                            <Field
-                              label="観測した問題"
-                              value={problem}
-                              onChange={setProblem}
-                              rows={3}
-                            />
-                            <Field
-                              label="期待する結果"
-                              value={expected}
-                              onChange={setExpected}
-                              rows={3}
-                            />
-                            <button
-                              disabled={
-                                !criteria ||
-                                !problem ||
-                                !expected ||
-                                !targetURI ||
-                                !targetVersion
-                              }
-                              onClick={() =>
-                                void act(() =>
-                                  saveNote({
-                                    kind: "return",
-                                    subject: selectedRef,
-                                    reason: "修正と再検品を依頼",
-                                    targets: [
-                                      input?.artifacts?.find(
-                                        (a) =>
-                                          a.uri === targetURI &&
-                                          a.revision === targetVersion,
-                                      ) ?? {
-                                        uri: targetURI,
-                                        revision: targetVersion,
-                                        delivery: "reference",
-                                        state: "unfetched",
-                                      },
-                                    ],
-                                    criteria: criteria
-                                      .split(/[,\n]/)
-                                      .map((s) => s.trim())
-                                      .filter(Boolean),
-                                    problem,
-                                    expected,
-                                  }),
-                                )
-                              }
-                            >
-                              この版への差し戻しを保存
-                            </button>
-                          </fieldset>
-                        </details>
-                      )}
-                      {run.records}
-                    </TabPanel>
-                    <TabPanel
-                      id="work-detail"
-                      value="questions"
-                      active={detailView}
-                    >
-                      {!canEdit && (
+                  {!prepare &&
+                    selected &&
+                    selectedRef &&
+                    (!navigation ||
+                      (navigation.route.target?.id === selected.id &&
+                        navigation.route.target.version ===
+                          selected.version)) && (
+                      <article aria-label="選択した作業">
+                        <button onClick={returnList}>作業一覧へ戻る</button>
+                        <h3 ref={detailHeading} tabIndex={-1}>
+                          {selected.value.name ?? "作業の詳細"}
+                        </h3>
+                        <WorkState value={selected.value} stale={detailStale} />
                         <p>
-                          閲覧権限では回答・回付・差し戻しを保存できません。
+                          待機理由：
+                          {reasons[waitingReason ?? ""] ??
+                            waitingReason ??
+                            "報告なし"}{" "}
+                          / 担当：
+                          {summary?.recipient_name ??
+                            people.find((p) => p.id === summary?.requested_by)
+                              ?.name ??
+                            summary?.requested_by ??
+                            "未確認"}{" "}
+                          / 端末：{summary?.device ?? "割当情報なし"}
                         </p>
-                      )}
-                      {pauses?.items.map((r) => (
-                        <section key={r.id} aria-label="質問と回答">
-                          <p>{r.value.reason}</p>
-                          <QuestionView value={r.value.request} />
-                          <p>
-                            質問の状態：
-                            {(
-                              {
-                                waiting: "未回答",
-                                received: "API受付済み",
-                                delivered: "Runner配送確認済み",
-                                resolved: "継続確認済み",
-                                cancelled: "終了により回答待ちを解除",
-                              } as Record<string, string>
-                            )[r.value.state] ?? r.value.state}
-                          </p>
-                          {r.value.response !== undefined && (
-                            <>
-                              <p>
-                                API回答受付：{r.value.answered_at ?? "未確認"} /
-                                回答者：
-                                {people.find(
-                                  (m) => m.id === r.value.answered_by,
-                                )?.name ?? "履歴で確認"}
-                              </p>
-                              <PauseResponse
-                                value={r.value.response}
-                                request={r.value.request}
-                              />
-                            </>
-                          )}
-                          <p>
-                            Runner配送：{r.value.delivered_at ?? "未確認"} /
-                            実際の継続：
-                            {r.value.resumed_at ?? "未確認"}
-                          </p>
-                          {canEdit && answerable?.id === r.id && (
-                            <PauseAnswer
-                              native={native}
-                              namespace={namespace}
-                              runID={selected.id}
-                              record={r}
-                              busy={busy || detailStale}
-                              onAccepted={() =>
-                                act(() =>
-                                  readDetail(
-                                    { ...selectedRef, version: "head" },
-                                    selected.kind,
-                                    selected.value.name,
-                                  ),
-                                )
-                              }
-                              onDenied={(error) =>
-                                act(async () => {
-                                  throw error;
-                                })
-                              }
-                            />
-                          )}
-                        </section>
-                      ))}
-                      {pauses?.next && (
-                        <button
-                          onClick={() =>
-                            void act(async () => {
-                              const v = (await request(runBase + "/query", {
-                                kind: "pause",
-                                run_id: selected.id,
-                                version: selected.version,
-                                after: pauses.next,
-                                limit: 50,
-                              })) as { data: typeof pauses };
-                              setPauses(v.data);
-                            })
-                          }
-                        >
-                          質問の次のページ
-                        </button>
-                      )}
-                      {canEdit && (
-                        <details>
-                          <summary>判断依頼を担当者へ回す</summary>
-                          <fieldset disabled={busy || detailStale}>
-                            <label>
-                              担当者
-                              <select
-                                value={recipient}
-                                onChange={(e) => setRecipient(e.target.value)}
-                              >
-                                <option value="">担当者を選択</option>
-                                {people
-                                  .filter(
-                                    (m) => m.active && m.role !== "viewer",
-                                  )
-                                  .map((m) => (
-                                    <option key={m.id} value={m.id}>
-                                      {m.name}
-                                    </option>
-                                  ))}
-                              </select>
-                            </label>
-                            {memberMore && (
-                              <button
-                                onClick={() =>
-                                  void act(() => morePeople(memberCursor))
-                                }
-                              >
-                                担当者候補の次のページ
-                              </button>
-                            )}
-                            <Field
-                              label="回す理由"
-                              value={routeReason}
-                              onChange={setRouteReason}
-                              rows={2}
-                            />
-                            <button
-                              disabled={!recipient || !routeReason}
-                              onClick={() =>
-                                void act(() =>
-                                  saveNote({
-                                    kind: "route",
-                                    subject: selectedRef,
-                                    ...(answerable
-                                      ? {
-                                          pause: {
-                                            id: answerable.id,
-                                            version: answerable.version,
-                                          },
-                                        }
-                                      : {}),
-                                    recipient,
-                                    reason: routeReason,
-                                  }),
-                                )
-                              }
-                            >
-                              この判断依頼を回す
-                            </button>
-                          </fieldset>
-                        </details>
-                      )}
-                    </TabPanel>
-
-                    <TabPanel
-                      id="work-detail"
-                      value="history"
-                      active={detailView}
-                    >
-                      {selected.kind === "run" && (
-                        <RunUsage
-                          key={workspace + selected.id}
-                          native={native}
-                          workspace={workspace}
-                          runID={selected.id}
-                          onDenied={(e) => {
-                            void act(async () => {
-                              throw e;
-                            });
-                          }}
-                        />
-                      )}
-                      {run.records}
-                      <section aria-label="回付と差し戻しの記録">
-                        <h4>判断依頼・差し戻し</h4>
-                        {notes?.items.map((n) => (
-                          <div key={n.id}>
-                            <p>
-                              {n.value.kind === "route"
-                                ? "担当者への回付"
-                                : "理由付き差し戻し"}
-                              ：{n.value.reason}
-                            </p>
-                            {n.value.problem && (
-                              <p>
-                                問題：{n.value.problem} / 期待結果：
-                                {n.value.expected}
-                              </p>
-                            )}
-                            {n.value.criteria && (
-                              <p>条件：{n.value.criteria.join(", ")}</p>
-                            )}
-                            <details>
-                              <summary>対象版・記録の詳細</summary>
-                              <pre>{JSON.stringify(n.value, null, 2)}</pre>
-                            </details>
-                          </div>
-                        ))}
-                        {notes?.next && (
-                          <button
-                            onClick={() =>
-                              void act(async () =>
-                                setNotes(
-                                  await notePage(
-                                    selectedRef,
-                                    "notes",
-                                    notes.next,
-                                  ),
-                                ),
-                              )
-                            }
-                          >
-                            補足記録の次のページ
-                          </button>
-                        )}
+                        <p>次の操作：{nextAction(selected.value)}</p>
                         <button
                           disabled={busy}
                           onClick={() =>
-                            void act(async () =>
-                              setHistory(
-                                await notePage(selectedRef, "history"),
+                            void act(() =>
+                              readDetail(
+                                { ...selectedRef, version: "head" },
+                                selected.kind,
+                                selected.value.name,
                               ),
                             )
                           }
                         >
-                          回付・差し戻しの履歴を確認
+                          この作業の状態・質問を更新
                         </button>
-                        {history?.items.map((r) => (
-                          <details key={r.id + r.version}>
-                            <summary>
-                              {r.value.kind === "route" ? "回付" : "差し戻し"} /{" "}
-                              {r.value.at}
-                            </summary>
-                            <pre>{JSON.stringify(r.value, null, 2)}</pre>
-                          </details>
-                        ))}
-                        {history?.next && (
-                          <button
-                            onClick={() =>
-                              void act(async () =>
-                                setHistory(
-                                  await notePage(
-                                    selectedRef,
-                                    "history",
-                                    history.next,
+                        <Tabs
+                          id="work-detail"
+                          label="作業の詳細"
+                          items={[
+                            { id: "overview", label: "概要" },
+                            { id: "input", label: "入力" },
+                            { id: "questions", label: "質問・判断" },
+                            { id: "evidence", label: "成果・検品" },
+                            { id: "history", label: "履歴・利用量" },
+                          ]}
+                          value={detailView}
+                          onChange={changeView}
+                        />
+                        <TabPanel
+                          id="work-detail"
+                          value="overview"
+                          active={detailView}
+                        >
+                          {run.overview}
+                          {selected.kind === "execution" && execution}
+                        </TabPanel>
+                        <TabPanel
+                          id="work-detail"
+                          value="input"
+                          active={detailView}
+                        >
+                          {run.input}
+                        </TabPanel>
+                        <TabPanel
+                          id="work-detail"
+                          value="evidence"
+                          active={detailView}
+                        >
+                          {input && (
+                            <section aria-label="対象と由来">
+                              <h4>今回の対象・固定成果物</h4>
+                              {input.artifacts?.length ? (
+                                <ul>
+                                  {input.artifacts.map((a) => (
+                                    <li key={a.uri + a.revision}>
+                                      {a.uri} / 版：{a.revision} /{" "}
+                                      {a.state === "unfetched"
+                                        ? "未取得"
+                                        : (a.state ?? "状態未確認")}
+                                      {/^https?:\/\//.test(a.uri) && (
+                                        <a
+                                          href={a.uri}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                        >
+                                          成果物を開く
+                                        </a>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <p>
+                                  入力に指定された固定成果物はありません。質問と原出力の証拠も確認してください。
+                                </p>
+                              )}
+                              {input.previous && (
+                                <button
+                                  onClick={() =>
+                                    void act(() => open(input.previous!))
+                                  }
+                                >
+                                  関連元のRun・判断を確認
+                                </button>
+                              )}
+                              {related?.items.map((r) => (
+                                <button
+                                  key={r.id}
+                                  onClick={() =>
+                                    void act(() => open(r.value.next))
+                                  }
+                                >
+                                  関連する修正・再検品Runを確認
+                                </button>
+                              ))}
+                              {related?.next && (
+                                <button
+                                  onClick={() =>
+                                    void act(async () => {
+                                      const v = (await request(
+                                        runBase + "/query",
+                                        {
+                                          kind: "related",
+                                          run_id: selected.id,
+                                          version: selected.version,
+                                          after: related.next,
+                                          snapshot: related.snapshot,
+                                          limit: 50,
+                                        },
+                                      )) as { data: typeof related };
+                                      setRelated(v.data);
+                                    })
+                                  }
+                                >
+                                  関連Runの次のページ
+                                </button>
+                              )}
+                            </section>
+                          )}
+                          {inspection && (
+                            <section aria-label="検品条件と証拠">
+                              <h4>検品時の条件</h4>
+                              <ul>
+                                {inspectionCriteria.map((c) => (
+                                  <li key={c.id}>
+                                    {c.requirement}（{c.id}）
+                                  </li>
+                                ))}
+                              </ul>
+                              <InspectionResult
+                                value={inspection}
+                                title="検品結果・未確認事項・証拠"
+                              />
+                            </section>
+                          )}
+
+                          {canEdit && selected.kind === "run" && (
+                            <details>
+                              <summary>理由付き差し戻しを記録</summary>
+                              <fieldset disabled={busy || detailStale}>
+                                <p>
+                                  この版の成果物と問題を記録します。記録だけでは修正commandを起動しません。
+                                </p>
+                                <Field
+                                  label="対象成果物のURL・識別子"
+                                  value={targetURI}
+                                  onChange={setTargetURI}
+                                />
+                                <label>
+                                  対象成果物の固定版
+                                  <input
+                                    value={targetVersion}
+                                    onChange={(e) =>
+                                      setTargetVersion(e.target.value)
+                                    }
+                                  />
+                                </label>
+                                <label>
+                                  該当する条件
+                                  <textarea
+                                    value={criteria}
+                                    onChange={(e) =>
+                                      setCriteria(e.target.value)
+                                    }
+                                    placeholder={pauses?.items
+                                      .flatMap(
+                                        (p) =>
+                                          question(
+                                            p.value.request,
+                                          )?.criteria?.map((c) => c.id) ?? [],
+                                      )
+                                      .join(", ")}
+                                    rows={2}
+                                  />
+                                </label>
+                                <Field
+                                  label="観測した問題"
+                                  value={problem}
+                                  onChange={setProblem}
+                                  rows={3}
+                                />
+                                <Field
+                                  label="期待する結果"
+                                  value={expected}
+                                  onChange={setExpected}
+                                  rows={3}
+                                />
+                                <button
+                                  disabled={
+                                    !criteria ||
+                                    !problem ||
+                                    !expected ||
+                                    !targetURI ||
+                                    !targetVersion
+                                  }
+                                  onClick={() =>
+                                    void act(() =>
+                                      saveNote({
+                                        kind: "return",
+                                        subject: selectedRef,
+                                        reason: "修正と再検品を依頼",
+                                        targets: [
+                                          input?.artifacts?.find(
+                                            (a) =>
+                                              a.uri === targetURI &&
+                                              a.revision === targetVersion,
+                                          ) ?? {
+                                            uri: targetURI,
+                                            revision: targetVersion,
+                                            delivery: "reference",
+                                            state: "unfetched",
+                                          },
+                                        ],
+                                        criteria: criteria
+                                          .split(/[,\n]/)
+                                          .map((s) => s.trim())
+                                          .filter(Boolean),
+                                        problem,
+                                        expected,
+                                      }),
+                                    )
+                                  }
+                                >
+                                  この版への差し戻しを保存
+                                </button>
+                              </fieldset>
+                            </details>
+                          )}
+                          {run.records}
+                        </TabPanel>
+                        <TabPanel
+                          id="work-detail"
+                          value="questions"
+                          active={detailView}
+                        >
+                          {!canEdit && (
+                            <p>
+                              閲覧権限では回答・回付・差し戻しを保存できません。
+                            </p>
+                          )}
+                          {pauses?.items.map((r) => (
+                            <section key={r.id} aria-label="質問と回答">
+                              <p>{r.value.reason}</p>
+                              <QuestionView value={r.value.request} />
+                              <p>
+                                質問の状態：
+                                {(
+                                  {
+                                    waiting: "未回答",
+                                    received: "API受付済み",
+                                    delivered: "Runner配送確認済み",
+                                    resolved: "継続確認済み",
+                                    cancelled: "終了により回答待ちを解除",
+                                  } as Record<string, string>
+                                )[r.value.state] ?? r.value.state}
+                              </p>
+                              {r.value.response !== undefined && (
+                                <>
+                                  <p>
+                                    API回答受付：
+                                    {r.value.answered_at ?? "未確認"} / 回答者：
+                                    {people.find(
+                                      (m) => m.id === r.value.answered_by,
+                                    )?.name ?? "履歴で確認"}
+                                  </p>
+                                  <PauseResponse
+                                    value={r.value.response}
+                                    request={r.value.request}
+                                  />
+                                </>
+                              )}
+                              <p>
+                                Runner配送：{r.value.delivered_at ?? "未確認"} /
+                                実際の継続：
+                                {r.value.resumed_at ?? "未確認"}
+                              </p>
+                              {canEdit && answerable?.id === r.id && (
+                                <PauseAnswer
+                                  native={native}
+                                  namespace={namespace}
+                                  runID={selected.id}
+                                  record={r}
+                                  busy={busy || detailStale}
+                                  onAccepted={() =>
+                                    act(() =>
+                                      readDetail(
+                                        { ...selectedRef, version: "head" },
+                                        selected.kind,
+                                        selected.value.name,
+                                      ),
+                                    )
+                                  }
+                                  onDenied={(error) =>
+                                    act(async () => {
+                                      throw error;
+                                    })
+                                  }
+                                />
+                              )}
+                            </section>
+                          ))}
+                          {pauses?.next && (
+                            <button
+                              onClick={() =>
+                                void act(async () => {
+                                  const v = (await request(runBase + "/query", {
+                                    kind: "pause",
+                                    run_id: selected.id,
+                                    version: selected.version,
+                                    after: pauses.next,
+                                    limit: 50,
+                                  })) as { data: typeof pauses };
+                                  setPauses(v.data);
+                                })
+                              }
+                            >
+                              質問の次のページ
+                            </button>
+                          )}
+                          {canEdit && (
+                            <details>
+                              <summary>判断依頼を担当者へ回す</summary>
+                              <fieldset disabled={busy || detailStale}>
+                                <label>
+                                  担当者
+                                  <select
+                                    value={recipient}
+                                    onChange={(e) =>
+                                      setRecipient(e.target.value)
+                                    }
+                                  >
+                                    <option value="">担当者を選択</option>
+                                    {people
+                                      .filter(
+                                        (m) => m.active && m.role !== "viewer",
+                                      )
+                                      .map((m) => (
+                                        <option key={m.id} value={m.id}>
+                                          {m.name}
+                                        </option>
+                                      ))}
+                                  </select>
+                                </label>
+                                {memberMore && (
+                                  <button
+                                    onClick={() =>
+                                      void act(() => morePeople(memberCursor))
+                                    }
+                                  >
+                                    担当者候補の次のページ
+                                  </button>
+                                )}
+                                <Field
+                                  label="回す理由"
+                                  value={routeReason}
+                                  onChange={setRouteReason}
+                                  rows={2}
+                                />
+                                <button
+                                  disabled={!recipient || !routeReason}
+                                  onClick={() =>
+                                    void act(() =>
+                                      saveNote({
+                                        kind: "route",
+                                        subject: selectedRef,
+                                        ...(answerable
+                                          ? {
+                                              pause: {
+                                                id: answerable.id,
+                                                version: answerable.version,
+                                              },
+                                            }
+                                          : {}),
+                                        recipient,
+                                        reason: routeReason,
+                                      }),
+                                    )
+                                  }
+                                >
+                                  この判断依頼を回す
+                                </button>
+                              </fieldset>
+                            </details>
+                          )}
+                        </TabPanel>
+
+                        <TabPanel
+                          id="work-detail"
+                          value="history"
+                          active={detailView}
+                        >
+                          {selected.kind === "run" && (
+                            <RunUsage
+                              key={workspace + selected.id}
+                              native={native}
+                              workspace={workspace}
+                              runID={selected.id}
+                              onDenied={(e) => {
+                                void act(async () => {
+                                  throw e;
+                                });
+                              }}
+                            />
+                          )}
+                          {run.records}
+                          <section aria-label="回付と差し戻しの記録">
+                            <h4>判断依頼・差し戻し</h4>
+                            {notes?.items.map((n) => (
+                              <div key={n.id}>
+                                <p>
+                                  {n.value.kind === "route"
+                                    ? "担当者への回付"
+                                    : "理由付き差し戻し"}
+                                  ：{n.value.reason}
+                                </p>
+                                {n.value.problem && (
+                                  <p>
+                                    問題：{n.value.problem} / 期待結果：
+                                    {n.value.expected}
+                                  </p>
+                                )}
+                                {n.value.criteria && (
+                                  <p>条件：{n.value.criteria.join(", ")}</p>
+                                )}
+                                <details>
+                                  <summary>対象版・記録の詳細</summary>
+                                  <pre>{JSON.stringify(n.value, null, 2)}</pre>
+                                </details>
+                              </div>
+                            ))}
+                            {notes?.next && (
+                              <button
+                                onClick={() =>
+                                  void act(async () =>
+                                    setNotes(
+                                      await notePage(
+                                        selectedRef,
+                                        "notes",
+                                        notes.next,
+                                      ),
+                                    ),
+                                  )
+                                }
+                              >
+                                補足記録の次のページ
+                              </button>
+                            )}
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                void act(async () =>
+                                  setHistory(
+                                    await notePage(selectedRef, "history"),
                                   ),
-                                ),
-                              )
-                            }
-                          >
-                            履歴の次のページ
-                          </button>
-                        )}
-                      </section>
-                    </TabPanel>
-                  </article>
-                )}
-            </section>
-          }
-        </ScreenContent>
+                                )
+                              }
+                            >
+                              回付・差し戻しの履歴を確認
+                            </button>
+                            {history?.items.map((r) => (
+                              <details key={r.id + r.version}>
+                                <summary>
+                                  {r.value.kind === "route"
+                                    ? "回付"
+                                    : "差し戻し"}{" "}
+                                  / {r.value.at}
+                                </summary>
+                                <pre>{JSON.stringify(r.value, null, 2)}</pre>
+                              </details>
+                            ))}
+                            {history?.next && (
+                              <button
+                                onClick={() =>
+                                  void act(async () =>
+                                    setHistory(
+                                      await notePage(
+                                        selectedRef,
+                                        "history",
+                                        history.next,
+                                      ),
+                                    ),
+                                  )
+                                }
+                              >
+                                履歴の次のページ
+                              </button>
+                            )}
+                          </section>
+                        </TabPanel>
+                      </article>
+                    )}
+                </section>
+              }
+            </ScreenContent>
+          )}
+        </RunRecords>
       )}
-    </RunRecords>
+    />
   );
 }

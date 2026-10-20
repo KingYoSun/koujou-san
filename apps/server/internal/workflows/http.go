@@ -205,6 +205,41 @@ func (s *Service) Register(mux *http.ServeMux) {
 		}
 		reply(w, r.PathValue("workspace"), v, err)
 	})
+	mux.HandleFunc("POST "+base+"/labels", func(w http.ResponseWriter, r *http.Request) {
+		p, ok := principal(w, r)
+		if !ok {
+			return
+		}
+		var refs []Ref
+		workspace := r.PathValue("workspace")
+		if !body(r, &refs) || len(refs) > 100 {
+			reply(w, workspace, nil, ErrInvalid)
+			return
+		}
+		if err := s.Access.Check(r.Context(), p, workspace, "", "read"); err != nil {
+			reply(w, workspace, nil, err)
+			return
+		}
+		labels := make([]definitionLabel, 0, len(refs))
+		for _, ref := range refs {
+			if !fixed(ref) {
+				reply(w, workspace, nil, ErrInvalid)
+				return
+			}
+			record, err := s.Read(r.Context(), p, workspace, ref)
+			if err != nil {
+				// Missing and unreadable records have the same representation.
+				if errors.Is(err, access.ErrForbidden) || notFound(err) {
+					labels = append(labels, definitionLabel{Ref: ref})
+					continue
+				}
+				reply(w, workspace, nil, err)
+				return
+			}
+			labels = append(labels, labelOf(record))
+		}
+		reply(w, workspace, labels, nil)
+	})
 	mux.HandleFunc("POST "+base+"/records/{id}", func(w http.ResponseWriter, r *http.Request) {
 		p, ok := principal(w, r)
 		if !ok {

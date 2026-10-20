@@ -96,6 +96,20 @@ func TestWorkflowsPostgres(t *testing.T) {
 	if replay := accept("editor", "/records/run-definition:plain", request); replay != first {
 		t.Fatal("definition receipt changed")
 	}
+	codeLabels, labelsBody := call("viewer", "POST", base+"/labels", []Ref{first, {ID: "run-definition:missing", Version: "fixed"}})
+	var labels []definitionLabel
+	if codeLabels != 200 || json.Unmarshal(labelsBody, &labels) != nil || len(labels) != 2 || labels[0].Name != definition.Name || labels[1].Name != "" || bytes.Contains(labelsBody, []byte("parameters")) {
+		t.Fatal("bounded fixed labels leaked bodies or omitted refs", codeLabels, string(labelsBody))
+	}
+	if code, _ := call("outsider", "POST", base+"/labels", []Ref{first}); code != 403 {
+		t.Fatal("foreign labels granted", code)
+	}
+	if code, _ := call("viewer", "POST", base+"/labels", []Ref{{ID: first.ID, Version: "head"}}); code != 400 {
+		t.Fatal("mutable label reference accepted", code)
+	}
+	if code, _ := call("viewer", "POST", base+"/labels", make([]Ref, 101)); code != 400 {
+		t.Fatal("unbounded labels accepted", code)
+	}
 	for _, user := range []string{"viewer", "outsider"} {
 		if code, _ := call(user, "POST", base+"/records/run-definition:denied", Write{Mutation: mutation("0"), Value: raw(definition)}); code != 403 {
 			t.Fatal("definition write granted", user, code)
@@ -202,6 +216,9 @@ func TestWorkflowsPostgres(t *testing.T) {
 	t.Run("durable progression", func(t *testing.T) { executionScenario(t, s, device, mutation) })
 	t.Run("external conditions", func(t *testing.T) { externalScenario(t, s, device, mutation) })
 	exec(`UPDATE access_resources SET restricted=true WHERE workspace_id='one' AND id=$1`, first.ID)
+	if code, data := call("viewer", "POST", base+"/labels", []Ref{first}); code != 200 || bytes.Contains(data, []byte(`"name"`)) || bytes.Contains(data, []byte(`"kind"`)) {
+		t.Fatal("restricted label exposed metadata", code, string(data))
+	}
 	if _, err = s.Read(ctx, access.Principal{UserID: "viewer"}, "one", graphRef); err == nil {
 		t.Fatal("reference granted private definition")
 	}
