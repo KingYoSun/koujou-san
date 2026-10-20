@@ -147,7 +147,7 @@
 
 ## Issue #33の判定
 
-状態: In progress。[計画](2026-10-19-issue-33-plan.md)に固定したkukuri #1887で再開した。Windowsの長いパスによるworktree作成失敗を修正前後の試験で確認し、別メンバーによる2回のPause回答から同じRunを継続した。Claudeの修正前FAILとCodexによる修正案を記録し、同じ回帰試験で固定基準commitは5件FAIL、修正案は13件PASSとなった。実接続消費はCLI 5/6回、API 18/20要求。固定commitの独立検品PASS、LLM三機能からの手動編集・採用、実通信断、合成Issue一件の作成応答喪失と照合・Close、Hopper/Triageの実モデル評価を記録した。最終候補82ff9f5の再検品・全CIと、工程による条件付きmerge92299fb・tree一致を確認し、kukuri #1887をCloseした。費用比較・固定版exportも確認済み。本人による理由・証拠付きの初見操作と同じRunの継続、全体停止中の元CLI・Git・GitHub・通常テスト9件、exportのオフライン照合と復帰も確認済み。[独立受入検品](2026-10-20-issue-33-acceptance-inspection.md)はAC-1〜9・INVARとAC-10の対応表の完全性がPASS。実S3以外のblockerは0件。本人の指示で実S3を後に残すため総合判定はINCONCLUSIVEであり、#33をCloseせずPR #70はDraftを維持する。無クライアントでの固定CI受信・Hopper発行・P2・Runner待機と、再接続後の同じRunの継続を確認した。[証跡](2026-10-19-issue-33-evidence.md)を参照する。
+受入判定: PASS。Scope revision 3。[計画](2026-10-19-issue-33-plan.md)に固定したkukuri #1887で、実装・修正前FAILからの独立再検品・全CI・条件付きmerge92299fbとtree一致を確認し、kukuri #1887をCloseした。LLM三機能と手動編集、費用比較、無クライアントのHopper/Triage、通信断と起票応答喪失、全体停止後の元ツールによる継続・export、本人の初見操作を確認済み。[実S3](2026-10-21-issue-33-sleep-evidence.md)も一回実施し、同じCLIの継続・原出力・追加起動なし・正常終了・共有画面を照合した。既存の[独立受入検品](2026-10-20-issue-33-acceptance-inspection.md)を再利用し、残っていた3条件も[補完検品](2026-10-21-issue-33-sleep-inspection.md)でPASSとなった。最新の必須CI・[PR #70](https://github.com/KingYoSun/koujou-san/pull/70)のmerge・tree照合・Issue Closeの状態と固定commitは、[統合・完了の記録](https://github.com/KingYoSun/koujou-san/issues/33#issuecomment-6294065860)へ集約する。実接続はCLI 5/6回・API 18/20要求のまま。#34は保留を維持する。[一巡の証跡](2026-10-19-issue-33-evidence.md)と[全68条件](2026-10-19-issue-33-ac-matrix.md)を参照する。
 
 ## Issue #47の判定
 

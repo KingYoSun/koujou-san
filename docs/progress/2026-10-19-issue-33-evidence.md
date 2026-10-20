@@ -151,3 +151,8 @@ HumanReviewの終了後、共通Webタブ、Web配信、APIと全Worker、Window
 検証後は、CI成功済みcommit `b43f77e2f8d49e1952a56b3b6ce250509945272b` からbuildしたAPI、同じrelease RunnerとWebを起動した。元のWeb認証・編集権限と本人の回答・継続・FAIL表示が保持された。完了したmerge工程の固定版/count 5と、sleep工程の固定版/count 0も変わっていない。Runnerはactive 0・未送信frame/usageなしで再接続した。最初の未開始Runに関する未確認記録はそのまま残し、全実行の所在が確認済みとはしていない。復帰結果は `whole-stop-restored.json` と `whole-stop-restored-ui.txt` に保持した。
 
 kukuriの作業用worktreeではCodeGraph CLIが有効な索引なしを返したため、通常の検索へ切り替えた。索引は作成していない。実接続の消費はCLI 5/6回・API 18/20要求のまま。残るリリース前観測は実S3一回であり、#33の完了条件を緩和しない。
+
+
+## 実S3の追加観測
+
+本人が指定した時刻に実S3を一回行い、前後のRunner/CLIのPIDと開始時刻、同じRunと割当世代、連続した原出力313件、未送信記録の解消、追加起動なし、正常終了と共有画面を照合した。[スリープ記録](2026-10-21-issue-33-sleep-evidence.md)を参照する。以前の記録にある実S3の未確認は、その時点の状態として保持する。残る独立検品はAC-11・AC-24・AC-10の最終判定へ限定し、他の既存確認や本人操作を繰り返さない。
