@@ -185,6 +185,8 @@ export function Workbench({
   const runBase = `/runs/workspaces/${encodeURIComponent(workspace)}`;
   const [page, setPage] = useState<Page>();
   const [mine, setMine] = useState(false);
+  const [directID, setDirectID] = useState("");
+  const [directVersion, setDirectVersion] = useState("head");
   const [stale, setStale] = useState(true);
   const [detailStale, setDetailStale] = useState(true);
   const [syncedAt, setSyncedAt] = useState("");
@@ -614,6 +616,35 @@ export function Workbench({
               )}
               {!prepare && !navigation?.route.target && (
                 <>
+                  <details>
+                    <summary>RunをIDで開く（詳細操作）</summary>
+                    <Field
+                      label="Run ID"
+                      value={directID}
+                      onChange={setDirectID}
+                    />
+                    <Field
+                      label="Runの版"
+                      value={directVersion}
+                      onChange={setDirectVersion}
+                      hint="headは最新を確認してから、その固定版を開きます。"
+                    />
+                    <button
+                      disabled={!directID.trim() || !directVersion.trim()}
+                      onClick={() =>
+                        void act(() =>
+                          open({
+                            id: directID.startsWith("run:")
+                              ? directID
+                              : "run:" + directID,
+                            version: directVersion,
+                          }),
+                        )
+                      }
+                    >
+                      指定したRunを開く
+                    </button>
+                  </details>
                   <div className="team-controls">
                     <label>
                       <input
