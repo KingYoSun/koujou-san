@@ -1,6 +1,11 @@
 import { Field } from "./field";
 import { PageList } from "./page-list";
-import { ScreenContent, useNavigation, useScreenActive } from "./navigation";
+import {
+  NavigationLink,
+  ScreenContent,
+  useNavigation,
+  useScreenActive,
+} from "./navigation";
 import { useEffect, useRef, useState } from "react";
 import { syncRequest, workspaceAccessLost } from "./auth";
 import { SyncHTTPError } from "./sync-error";
@@ -29,7 +34,7 @@ type Request = {
   external_body: string;
   run_id: string;
   connection: { repository: string };
-  actor: { kind: string; user_id: string };
+  actor: { kind: string; user_id: string; control?: Ref };
   observed_at?: string;
   external?: {
     number: number;
@@ -72,6 +77,23 @@ const sameDraft = (a: Draft, b: Draft) =>
   a.title === b.title &&
   a.body === b.body &&
   format(a.sources) === format(b.sources);
+// Hopper creates the Issue and publication with the same suffix. Only link
+// the fixed Issue actually recorded in the accepted publication's sources.
+export function publicationIssue(id: string, value: Request): Ref | undefined {
+  if (
+    value.actor.kind !== "automation" ||
+    value.actor.control?.id !== "control:hopper" ||
+    !id.startsWith("publication:hopper-")
+  )
+    return;
+  return value.input.sources.find(
+    (ref) =>
+      ref.id === id.replace(/^publication:/, "scope:") &&
+      !!ref.version &&
+      ref.version !== "0" &&
+      ref.version !== "head",
+  );
+}
 const states: Record<string, string> = {
   preview: "送信前プレビュー",
   accepted: "共有受付・外部未確認",
@@ -98,6 +120,8 @@ export function Publications({
   canExecute: boolean;
 }) {
   const navigation = useNavigation();
+  const navigationRef = useRef(navigation);
+  navigationRef.current = navigation;
   const active = useScreenActive();
   const [incoming, setIncoming] = useState<{
     run: Ref;
@@ -268,14 +292,32 @@ export function Publications({
       if (proposal?.id === value.id) forgetProposal();
     }
   };
+  const showRequest = (value: Entry, owner: string) => {
+    const current = navigationRef.current;
+    if (
+      current?.route.screen === "publications" &&
+      JSON.stringify(current.route.target) !== owner
+    )
+      return;
+    setRequest(value);
+    setRequestID(value.id);
+    if (proposal?.id === value.id) forgetProposal();
+    if (current?.route.screen === "publications")
+      current.navigate(
+        {
+          ...current.route,
+          target: { id: value.id, version: value.version, kind: "publication" },
+        },
+        { replace: true },
+      );
+  };
   const readRequest = async (target = requestID) => {
+    const owner = JSON.stringify(navigation?.route.target);
     const value = (await call(
       `/records/${encodeURIComponent(target)}`,
     )) as Entry;
     if (value.kind !== "request") throw new Error("not_request");
-    setRequest(value);
-    setRequestID(value.id);
-    if (proposal?.id === value.id) forgetProposal();
+    showRequest(value, owner);
   };
   const list = async (after = "") => {
     const value = (await call("/query", {
@@ -468,6 +510,8 @@ export function Publications({
   }, [active, navigation?.route.target?.id, navigation?.route.target?.version]);
   const shared = entry?.kind === "draft" ? entry : undefined;
   const result = request?.value as Request | undefined;
+  const issue =
+    result && request ? publicationIssue(request.id, result) : undefined;
   return (
     <ScreenContent>
       {
@@ -714,15 +758,28 @@ export function Publications({
                 確認時刻: {result.observed_at ?? "未確認"} / 理由:{" "}
                 {result.reason || "なし"}
               </p>
+              {issue && (
+                <NavigationLink
+                  to={{
+                    workspace,
+                    screen: "priority",
+                    target: { ...issue, kind: "scope" },
+                  }}
+                  related
+                >
+                  この起票で作成したIssueの優先度を確認
+                </NavigationLink>
+              )}
               <button
                 disabled={busy}
                 onClick={() =>
                   void act(async () => {
+                    const owner = JSON.stringify(navigation?.route.target);
                     const updated = (await call(
                       `/refresh/${encodeURIComponent(request.id)}`,
                       { version: request.version },
                     )) as Entry;
-                    setRequest(updated);
+                    showRequest(updated, owner);
                   })
                 }
               >
