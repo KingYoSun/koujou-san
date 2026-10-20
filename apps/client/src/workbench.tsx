@@ -33,6 +33,8 @@ import { InspectionResult } from "./inspections";
 type Ref = { id: string; version: string };
 type Summary = {
   name?: string;
+  definition?: Ref;
+  controller?: string;
   state: string;
   observation?: string;
   stage?: string;
@@ -312,10 +314,20 @@ export function Workbench({
     const r = (await request(
       `${prefix}/records/${encodeURIComponent(ref.id)}?version=${encodeURIComponent(ref.version)}`,
     )) as Entry;
+    if (kind === "execution" && !r.value.name && !name && r.value.definition) {
+      const labels = (await request(`${prefix}/labels`, [
+        r.value.definition,
+      ])) as { name?: string }[];
+      name = labels[0]?.name;
+    }
     const entry = {
       ...r,
       kind,
-      value: { ...r.value, name: r.value.name ?? name },
+      value: {
+        ...r.value,
+        name: r.value.name ?? name,
+        requested_by: r.value.requested_by ?? r.value.controller,
+      },
     };
     const noteItems = await notePage(entry);
     let meta: InputMeta | undefined;
@@ -563,7 +575,9 @@ export function Workbench({
       workspace={workspace}
       selected={selected?.kind === "execution" ? selectedRef : undefined}
       visible={
-        visible && detailView === "overview" && selected?.kind === "execution"
+        visible &&
+        ["overview", "questions"].includes(detailView) &&
+        selected?.kind === "execution"
       }
       canEdit={canEdit}
       canExecute={canExecute}
@@ -1091,11 +1105,17 @@ export function Workbench({
                           value="questions"
                           active={detailView}
                         >
+                          {selected.kind === "execution" && execution}
                           {!canEdit && (
                             <p>
                               閲覧権限では回答・回付・差し戻しを保存できません。
                             </p>
                           )}
+                          {selected.kind === "run" &&
+                            pauses &&
+                            !pauses.items.length && (
+                              <p>このページには質問がありません。</p>
+                            )}
                           {pauses?.items.map((r) => (
                             <section key={r.id} aria-label="質問と回答">
                               <p>{r.value.reason}</p>

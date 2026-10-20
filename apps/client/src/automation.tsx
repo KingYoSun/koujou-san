@@ -62,6 +62,8 @@ type Priority = {
   fixed: boolean;
   recommendation: string | null;
   recommendation_reason: string;
+  recommendation_policy?: Ref;
+  recommendation_target?: Ref;
   state: string;
   reason: string;
 };
@@ -316,7 +318,8 @@ export function Automation({
     if (
       !current() ||
       route?.screen !== "priority" ||
-      (route.target?.kind === "scope" && route.target.id !== requested)
+      route.target?.kind !== "scope" ||
+      route.target.id !== requested
     )
       return;
     if (scopeTarget?.id !== requested) {
@@ -772,6 +775,14 @@ export function Automation({
                                     {reasons[p.recommendation_reason] ??
                                       p.recommendation_reason}
                                   </p>
+                                  {p.recommendation && (
+                                    <small>
+                                      推奨の尺度：
+                                      {p.recommendation_policy
+                                        ? `${p.recommendation_policy.id}@${p.recommendation_policy.version}`
+                                        : "未取得"}
+                                    </small>
+                                  )}
                                 </td>
                                 <td>
                                   <StatusBadge
@@ -974,12 +985,18 @@ export function Automation({
                               <button
                                 disabled={busy}
                                 onClick={() =>
-                                  void run(async () => {
-                                    const issue = (r.value as Priority).target
-                                      .id;
-                                    setIssueID(issue);
-                                    await loadPriority(issue);
-                                  })
+                                  navigation?.navigate(
+                                    {
+                                      workspace,
+                                      screen: "priority",
+                                      view: "queue",
+                                      target: {
+                                        ...(r.value as Priority).target,
+                                        kind: "scope",
+                                      },
+                                    },
+                                    { related: true },
+                                  )
                                 }
                               >
                                 このIssueの優先度・根拠を確認
@@ -1351,6 +1368,16 @@ export function Automation({
                       {reasons[current.recommendation_reason] ??
                         current.recommendation_reason}
                     </p>
+                    {current.recommendation && (
+                      <p>
+                        推奨の尺度の固定版：
+                        {current.recommendation_policy
+                          ? `${current.recommendation_policy.id}@${current.recommendation_policy.version}`
+                          : "未取得"}{" "}
+                        / 推奨の対象版：
+                        {current.recommendation_target?.version ?? "未取得"}
+                      </p>
+                    )}
                     <p>{reasons[current.reason] ?? current.reason}</p>
                     <p>採用理由: {current.adopted_reason || "未設定"}</p>
                     {externalState && (
@@ -1437,6 +1464,12 @@ export function Automation({
                     {current?.recommendation && (
                       <button
                         data-variant="secondary"
+                        disabled={
+                          current.recommendation_policy?.id !== selected.id ||
+                          current.recommendation_policy?.version !==
+                            selected.version
+                        }
+                        title="現在の操作方針と推奨の尺度が一致する場合に選べます。異なる尺度は手動で確認してください。"
                         onClick={() =>
                           setPriorityValue(current.recommendation!)
                         }

@@ -33,6 +33,8 @@ export type DefinitionLabel = WorkflowRef & {
 };
 export const referenceKey = (ref: WorkflowRef) =>
   JSON.stringify([ref.id, ref.version]);
+export const fixedWorkflowRef = (ref: WorkflowRef) =>
+  !!ref.id && !!ref.version && ref.version !== "0" && ref.version !== "head";
 
 export function WorkflowMap({
   graph,
@@ -50,7 +52,7 @@ export function WorkflowMap({
   status?: (node: WorkflowNode) => ReactNode;
 }) {
   const active = useScreenActive();
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(() => Math.floor(selected / 50));
   const [labels, setLabels] = useState<Record<string, DefinitionLabel>>({});
   const [notice, setNotice] = useState("");
   useEffect(() => {
@@ -62,7 +64,7 @@ export function WorkflowMap({
   const refs = Array.from(
     new Map(
       nodes.flatMap((n) =>
-        n.definition
+        n.definition && fixedWorkflowRef(n.definition)
           ? [[referenceKey(n.definition), n.definition] as const]
           : [],
       ),
@@ -90,12 +92,18 @@ export function WorkflowMap({
       current = false;
     };
   }, [active, signature]);
+  const choose = (index: number) => {
+    onSelect(index);
+    requestAnimationFrame(() =>
+      document.getElementById("workflow-node-settings")?.focus(),
+    );
+  };
   const link = (id: string) => {
     const index = graph.nodes.findIndex((n) => n.id === id);
     return index < 0 ? (
       <span>{id || "接続先未指定"}（定義内に存在しません）</span>
     ) : (
-      <button data-variant="secondary" onClick={() => onSelect(index)}>
+      <button data-variant="secondary" onClick={() => choose(index)}>
         {id}
         {index < start || index >= start + 50 ? "（別ページ）" : ""}
       </button>
@@ -133,15 +141,22 @@ export function WorkflowMap({
         {nodes.map((n, offset) => (
           <li key={start + offset} data-selected={selected === start + offset}>
             <button
+              id={`workflow-node-${start + offset}`}
               aria-pressed={selected === start + offset}
-              onClick={() => onSelect(start + offset)}
+              onClick={() => choose(start + offset)}
             >
               {n.id || `識別名未設定（${start + offset + 1}）`}
             </button>
             <p>
               {n.definition
-                ? labels[referenceKey(n.definition)]?.name ||
-                  "Run定義名は未取得・閲覧不可"
+                ? !fixedWorkflowRef(n.definition)
+                  ? "Run定義の固定版は未指定"
+                  : labels[referenceKey(n.definition)]?.kind
+                    ? labels[referenceKey(n.definition)]?.name ||
+                      "定義名は未設定"
+                    : labels[referenceKey(n.definition)]
+                      ? "定義名を取得できません"
+                      : "定義名は未取得"
                 : n.choices?.length
                   ? "人の判断"
                   : "実行内容未設定"}
@@ -182,6 +197,17 @@ export function WorkflowMap({
           aria-label="選択した工程の設定"
         >
           <h4>{node.id || "識別名未設定"}の詳細</h4>
+          <button
+            data-variant="secondary"
+            onClick={() => {
+              setPage(Math.floor(selected / 50));
+              requestAnimationFrame(() =>
+                document.getElementById(`workflow-node-${selected}`)?.focus(),
+              );
+            }}
+          >
+            選択したノードをマップで確認
+          </button>
           <StatusBadge
             label="種類"
             value={node.definition ? "Runノード" : "判断ノード"}

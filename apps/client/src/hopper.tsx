@@ -129,6 +129,11 @@ export function Hopper({
   const [id, setID] = useState("");
   const [version, setVersion] = useState("0");
   const [draft, setDraft] = useState("");
+  const draftOwner = JSON.stringify([id, version, navigation?.route.target]);
+  const draftOwnerRef = useRef(draftOwner);
+  draftOwnerRef.current = draftOwner;
+  const activeRef = useRef(active);
+  activeRef.current = active;
   const [saved, setSaved] = useState<Ref | null>(null);
   const [selected, setSelected] = useState<Version | null>(null);
   const [pastKind, setPastKind] = useState("github");
@@ -1059,19 +1064,21 @@ export function Hopper({
                         version,
                         { value: JSON.parse(applyFields(draft, fields)) },
                       );
+                      if (draftOwnerRef.current !== draftOwner) return;
                       setSaved(pin);
                       setVersion(pin.version);
                       setDraft(applyFields(draft, fields));
                       setFields({});
-                      navigation?.navigate(
-                        {
-                          workspace,
-                          screen: "hopper",
-                          view: "rules",
-                          target: { ...pin, kind: "hopper-definition" },
-                        },
-                        { replace: true },
-                      );
+                      if (activeRef.current)
+                        navigation?.navigate(
+                          {
+                            workspace,
+                            screen: "hopper",
+                            view: "rules",
+                            target: { ...pin, kind: "hopper-definition" },
+                          },
+                          { replace: true },
+                        );
                       setNotice(
                         "新しい版を保存しました。有効な版はまだ切り替わっていません。",
                       );

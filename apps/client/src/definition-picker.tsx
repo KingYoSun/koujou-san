@@ -9,9 +9,13 @@ export type DefinitionPage = {
 export function DefinitionPicker({
   load,
   onChoose,
+  label = "Run定義",
+  hint = "選択では工程の端末内下書きだけを更新し、保存・採用・実行はしません。",
 }: {
   load: (after: string) => Promise<DefinitionPage>;
-  onChoose: (ref: { id: string; version: string }) => void;
+  onChoose: (ref: { id: string; version: string }, name?: string) => void;
+  label?: string;
+  hint?: string;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [page, setPage] = useState<DefinitionPage>();
@@ -41,17 +45,15 @@ export function DefinitionPicker({
           void read("");
         }}
       >
-        Run定義を名前で選ぶ
+        {label}を名前で選ぶ
       </button>
       <dialog
         ref={dialog}
-        aria-label="Run定義の固定版を選ぶ"
+        aria-label={`${label}の固定版を選ぶ`}
         className="reference-dialog"
       >
-        <h4>Run定義の固定版を選ぶ</h4>
-        <p>
-          50件ずつ取得します。選択では工程の端末内下書きだけを更新し、保存・採用・実行はしません。
-        </p>
+        <h4>{label}の固定版を選ぶ</h4>
+        <p>50件ずつ取得します。{hint}</p>
         <label>
           このページの名前を絞る
           <input value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -66,7 +68,7 @@ export function DefinitionPicker({
                 <li key={r.id}>
                   <button
                     onClick={() => {
-                      onChoose({ id: r.id, version: r.version });
+                      onChoose({ id: r.id, version: r.version }, r.value.name);
                       dialog.current?.close();
                     }}
                   >
