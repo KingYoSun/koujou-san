@@ -6,7 +6,9 @@
 
 ## 現在の作業: Issue #71〜#77
 
-状態: In progress。[Draft PR #78](https://github.com/KingYoSun/koujou-san/pull/78)で、用途別シェル・共通部品、作業詳細、工程マップ、Contextモード、自動化と優先度、比較からの対象移動を改修している。[実装計画](2026-10-21-issue-71-plan.md)、[情報構造・移設表・六つの画面遷移](../design/information-architecture.md)、[検証記録](2026-10-21-uiux-foundation.md)を参照する。最終ソース検品の3未達と、比較で見つけた取得待ち復帰の回帰を修正し、差分検品はPASS。旧新6経路の操作・ID転記・未完了を記録し、1万Context・3万版のページ取得、95クライアントテスト、root test、build、整形、Go vetも成功した。初見S1/S3・200%と最終CIは確認中で、完了扱いにしない。
+状態: 最終CI待ち。[PR #78](https://github.com/KingYoSun/koujou-san/pull/78)で用途別シェル、作業詳細、工程、Context、自動化と優先度、比較を改修した。本人の初見では情報過多・判断材料不足が未達となったため、判断に必要な内容を先に表示し、固定版・内部ID・原記録・別操作を詳細へ移した。本人の指示に従い、背景を渡さない独立AIのS1/S3と、画面観測・差分検品で修正を確認した。本人の再確認は実施していない。
+
+[最終判定と証拠](2026-10-21-uiux-first-view-revision.md)、[実装計画](2026-10-21-issue-71-plan.md)、[情報構造](../design/information-architecture.md)、[実装・検証履歴](2026-10-21-uiux-foundation.md)を参照する。クライアント105テスト、型検査・build、200%の三幅×六経路、キーボード・固定対象への往復を確認済み。受入条件と独立検品を満たし、最終headのCIとマージ後照合が残る。#34の保留を維持する。
 
 ## 環境構築の受入条件
 
