@@ -428,9 +428,10 @@ export function Account({ native }: { native: boolean }) {
       }
       setUser(undefined);
       setStatus("signed_out");
-      window.dispatchEvent(new Event("koujou-auth-changed"));
-      setNotice(
-        `この端末のアプリからログアウトしました。OAuth: ${result.oauth_tokens} / ブラウザSSO: ${result.kratos_session}`,
+      const message = `この端末のアプリからログアウトしました。OAuth: ${result.oauth_tokens} / ブラウザSSO: ${result.kratos_session}`;
+      setNotice(message);
+      window.dispatchEvent(
+        new CustomEvent("koujou-auth-changed", { detail: { notice: message } }),
       );
     } catch {
       setNotice("ログアウトの結果を確認できませんでした。");

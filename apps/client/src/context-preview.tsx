@@ -1,10 +1,68 @@
-import { useEffect, useState } from "react";
+import { PageList } from "./page-list";
+import { Disclosure } from "./disclosure";
+import { useEffect, useRef, useState } from "react";
+import { useNavigation, useScreenActive } from "./navigation";
 import { useStore } from "zustand";
 import type { CandidateEvidence, ContextResolution } from "./context-contract";
+import type { UIState } from "./context-ui";
+type PreviewRequest = {
+  run_id: string;
+  selection: Pick<UIState, "mode" | "include" | "exclude">;
+  evidence: CandidateEvidence[];
+};
 import type { UI, Ref, Envelope, CandidatePage } from "./context-ui";
 import { refKey, refLabel, resultData } from "./context-ui";
 import { Completeness, reasonText } from "./context-status";
-export function ContextPreview({ ui }: { ui: UI }) {
+export type DefinitionContextInput = {
+  definition: { id: string; version: string };
+  selection: Pick<UIState, "mode" | "include" | "exclude">;
+};
+export function ContextPreview({
+  ui,
+  active = true,
+  definitionInput,
+  onDefinitionInput,
+}: {
+  ui: UI;
+  active?: boolean;
+  definitionInput?: DefinitionContextInput;
+  onDefinitionInput?: (value: DefinitionContextInput) => void;
+}) {
+  const visible = useScreenActive() && active;
+  const navigation = useNavigation();
+  const preparation =
+    navigation?.route.origin?.kind === "run-preparation"
+      ? navigation.route.origin
+      : undefined;
+  const definition =
+    navigation?.route.origin?.kind === "run-definition"
+      ? navigation.route.origin
+      : undefined;
+  const initialized = useRef<DefinitionContextInput | undefined>(undefined);
+  useEffect(() => {
+    if (
+      visible &&
+      definition &&
+      definitionInput &&
+      initialized.current !== definitionInput &&
+      definition.id === definitionInput.definition.id &&
+      definition.version === definitionInput.definition.version
+    ) {
+      ui.store.setState(definitionInput.selection);
+      setResult(undefined);
+      setError("");
+      initialized.current = definitionInput;
+    }
+  }, [visible, definitionInput, definition?.id, definition?.version]);
+  const [resolvedRequest, setResolvedRequest] = useState<PreviewRequest>();
+  const pending = useRef<
+    | {
+        signature: string;
+        id: string;
+        operation_id: string;
+      }
+    | undefined
+  >(undefined);
   const state = useStore(ui.store);
   const [result, setResult] = useState<Envelope<ContextResolution>>();
   const [basis, setBasis] = useState("");
@@ -93,17 +151,18 @@ export function ContextPreview({ ui }: { ui: UI }) {
           }
           evidence.push(found.data.evidence);
         }
+      const request: PreviewRequest = {
+        run_id: "",
+        selection: {
+          mode: state.mode,
+          include: state.include,
+          exclude: state.exclude,
+        },
+        evidence,
+      };
       const value = await ui.request<ContextResolution>(
         `/contexts/workspaces/${encodeURIComponent(ui.workspace)}/resolve`,
-        {
-          run_id: "",
-          selection: {
-            mode: state.mode,
-            include: state.include,
-            exclude: state.exclude,
-          },
-          evidence,
-        },
+        request,
       );
       if (
         value.data?.manifest?.state === "ready" &&
@@ -112,6 +171,7 @@ export function ContextPreview({ ui }: { ui: UI }) {
         value.data = { ready: false, missing: [{ code: "empty_selection" }] };
       if (ui.store.getState().permissionEpoch !== state.permissionEpoch) return;
       setResult(value);
+      setResolvedRequest(request);
     } catch (error) {
       setError(String(error));
       ui.fail(error);
@@ -121,6 +181,53 @@ export function ContextPreview({ ui }: { ui: UI }) {
   }
   const current = basis === signature;
   const manifest = current ? result?.data?.manifest : undefined;
+  async function useInput() {
+    if (
+      !preparation ||
+      !resolvedRequest ||
+      !manifest ||
+      !result?.data?.ready ||
+      !navigation?.returnTo
+    )
+      return;
+    setBusy(true);
+    setError("");
+    const value = { ...resolvedRequest, run_id: preparation.id };
+    const signature = JSON.stringify(value);
+    if (pending.current?.signature !== signature)
+      pending.current = {
+        signature,
+        id: crypto.randomUUID(),
+        operation_id: crypto.randomUUID(),
+      };
+    try {
+      const fixed = resultData(
+        await ui.request<{ id: string; version: string }>(
+          `/contexts/workspaces/${encodeURIComponent(ui.workspace)}/manifest/${pending.current.id}`,
+          {
+            operation_id: pending.current.operation_id,
+            expected_version: "0",
+            value,
+          },
+        ),
+      );
+      navigation.navigate({
+        ...navigation.returnTo,
+        origin: preparation,
+        input: {
+          kind: "manifest",
+          id: pending.current.id,
+          version: fixed.version,
+        },
+      });
+    } catch (error) {
+      setError(String(error));
+      ui.fail(error);
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (!visible) return null;
   return (
     <aside className="context-preview" aria-label="注入プレビュー">
       <h3>注入プレビュー</h3>
@@ -150,8 +257,12 @@ export function ContextPreview({ ui }: { ui: UI }) {
             {state[field].length})
           </h4>
           {!state[field].length && <p className="context-meta">未選択</p>}
-          <ol className="context-ref-list">
-            {state[field].map((ref, index) => (
+          <PageList
+            label={field === "include" ? "注入する順序" : "除外する固定版"}
+            items={state[field]}
+            listClassName="context-ref-list"
+          >
+            {(ref, index) => (
               <li key={`${refKey(ref)}:${index}`}>
                 <span>{refLabel(ref)}</span>
                 <div className="context-actions">
@@ -195,8 +306,8 @@ export function ContextPreview({ ui }: { ui: UI }) {
                   </button>
                 </div>
               </li>
-            ))}
-          </ol>
+            )}
+          </PageList>
         </section>
       ))}
       <button onClick={() => ui.store.setState({ include: [], exclude: [] })}>
@@ -240,45 +351,89 @@ export function ContextPreview({ ui }: { ui: UI }) {
                   : "選択した固定版の入力を確認しました。"}{" "}
                 読取状態: {manifest.read_status}
               </p>
+              {preparation && navigation?.returnTo && (
+                <button
+                  disabled={busy || !result.data?.ready}
+                  onClick={() => void useInput()}
+                >
+                  この固定入力をRunの準備へ戻す（起動しない）
+                </button>
+              )}
+              {definition && onDefinitionInput && ui.canCreate && (
+                <>
+                  <p>
+                    定義の根参照を選択します。直接入力・外部添付はJSONの指定を引き継ぎ、注入なしを選ぶとContext指定を空にします。
+                  </p>
+                  <button
+                    disabled={busy || !result.data?.ready || !resolvedRequest}
+                    onClick={() =>
+                      resolvedRequest &&
+                      onDefinitionInput({
+                        definition: {
+                          id: definition.id,
+                          version: definition.version,
+                        },
+                        selection: resolvedRequest.selection,
+                      })
+                    }
+                  >
+                    この選択を定義の下書きへ戻す（共有保存しない）
+                  </button>
+                </>
+              )}
               <h4>構造・順序・抜粋</h4>
-              <ol>
-                {manifest.placements.map((placement, index) => (
+              <PageList
+                key={manifest.digest + ":placements"}
+                label="この入力の配置"
+                items={manifest.placements}
+              >
+                {(placement, index) => (
                   <li key={index}>
                     {placement.path.join(" / ")} · {refLabel(placement.ref)}{" "}
                     {placement.excerpt ? "（抜粋）" : "（元の構造）"}
                   </li>
-                ))}
-              </ol>
+                )}
+              </PageList>
               <h4>由来・固定参照・取得状態</h4>
               {result.data?.sources?.length ? (
-                <ul>
-                  {result.data.sources.map((source, index) => (
+                <PageList
+                  key={manifest.digest + ":sources"}
+                  label="この入力の由来"
+                  items={result.data.sources}
+                >
+                  {(source, index) => (
                     <li key={index}>
                       {refLabel(source.ref)}
-                      <pre>{JSON.stringify(source, null, 2)}</pre>
+                      <Disclosure title="由来と取得状態の詳細">
+                        {() => <pre>{JSON.stringify(source, null, 2)}</pre>}
+                      </Disclosure>
                     </li>
-                  ))}
-                </ul>
+                  )}
+                </PageList>
               ) : (
                 <p>外部参照・添付・由来の指定はありません。</p>
               )}
               <h4>まとめた重複</h4>
               {manifest.duplicates.length ? (
-                <ul>
-                  {manifest.duplicates.map((ref, index) => (
-                    <li key={index}>{refLabel(ref)}</li>
-                  ))}
-                </ul>
+                <PageList
+                  key={manifest.digest + ":duplicates"}
+                  label="まとめた重複"
+                  items={manifest.duplicates}
+                >
+                  {(ref, index) => <li key={index}>{refLabel(ref)}</li>}
+                </PageList>
               ) : (
                 <p>なし</p>
               )}
               <h4>除外した項目</h4>
               {manifest.excluded.length ? (
-                <ul>
-                  {manifest.excluded.map((ref, index) => (
-                    <li key={index}>{refLabel(ref)}</li>
-                  ))}
-                </ul>
+                <PageList
+                  key={manifest.digest + ":excluded"}
+                  label="除外した項目"
+                  items={manifest.excluded}
+                >
+                  {(ref, index) => <li key={index}>{refLabel(ref)}</li>}
+                </PageList>
               ) : (
                 <p>なし</p>
               )}
@@ -286,12 +441,13 @@ export function ContextPreview({ ui }: { ui: UI }) {
                 <summary>実入力・添付（固定した内容）</summary>
                 <pre>{manifest.input_utf8 ?? "入力なし"}</pre>
               </details>
-              <details>
-                <summary>版・由来の記録</summary>
-                <pre>
-                  {JSON.stringify(resultData(result).manifest, null, 2)}
-                </pre>
-              </details>
+              <Disclosure title="版・由来の記録">
+                {() => (
+                  <pre>
+                    {JSON.stringify(resultData(result).manifest, null, 2)}
+                  </pre>
+                )}
+              </Disclosure>
             </>
           )}
         </>

@@ -1,3 +1,4 @@
+import { ScreenContent } from "./navigation";
 import { useRef, useState } from "react";
 import { syncRequest, workspaceAccessLost } from "./auth";
 import { SyncHTTPError } from "./sync-error";
@@ -92,16 +93,34 @@ const dimensions: Record<string, string> = {
 export function InspectionResult({
   value: v,
   title,
+  criteria = [],
 }: {
   value: View;
   title: string;
+  criteria?: { id: string; requirement: string }[];
 }) {
   const report = acceptedReport(v);
+  const results = report?.criteria_results ?? [];
+  const rows = [
+    ...criteria.map((criterion) => ({
+      id: criterion.id,
+      label: criterion.requirement,
+      result: results.find((item) => item.criterion_id === criterion.id),
+    })),
+    ...results
+      .filter(
+        (item) =>
+          !criteria.some((criterion) => criterion.id === item.criterion_id),
+      )
+      .map((result) => ({
+        id: result.criterion_id,
+        label: result.criterion_id,
+        result,
+      })),
+  ];
   return (
     <section aria-label={title}>
-      <h4>
-        {title}: {v.launch.value.run_id}
-      </h4>
+      <h4>{title}</h4>
       <p>
         過去の判定:{" "}
         <strong>{v.run.value.assessment?.verdict ?? "未判定"}</strong> / 形式:{" "}
@@ -112,26 +131,29 @@ export function InspectionResult({
             : "採用中の基準に一致"}
         </strong>
       </p>
-      <p>
-        実行: {v.run.value.state} / 終了コード:{" "}
-        {v.run.value.exit_code ?? "未観測"} / Context:{" "}
-        {v.launch.value.manifest.state === "none"
-          ? "明示的に無注入"
-          : v.launch.value.manifest.state}
-      </p>
-      <p className="note">
-        固定基準・Context注入の強制は、版と注入内容の固定です。CLIから読める全ファイル・記憶の分離を保証するものではありません。
-      </p>
-      <dl className="status-list">
-        {Object.entries(v.launch.value.separation).map(([name, s]) => (
-          <div key={name}>
-            <dt>{dimensions[name] ?? name}</dt>
-            <dd>
-              {levels[s.level] ?? s.level} · {s.method || "方法未確認"}
-            </dd>
-          </div>
-        ))}
-      </dl>
+      <details>
+        <summary>検品環境・固定入力の分離を確認</summary>
+        <p>
+          実行: {v.run.value.state} / 終了コード:{" "}
+          {v.run.value.exit_code ?? "未観測"} / Context:{" "}
+          {v.launch.value.manifest.state === "none"
+            ? "明示的に無注入"
+            : v.launch.value.manifest.state}
+        </p>
+        <p className="note">
+          固定基準・Context注入の強制は、版と注入内容の固定です。CLIから読める全ファイル・記憶の分離を保証するものではありません。
+        </p>
+        <dl className="status-list">
+          {Object.entries(v.launch.value.separation).map(([name, s]) => (
+            <div key={name}>
+              <dt>{dimensions[name] ?? name}</dt>
+              <dd>
+                {levels[s.level] ?? s.level} · {s.method || "方法未確認"}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </details>
       <div className="table-scroll">
         <table className="inspection-results">
           <thead>
@@ -144,17 +166,24 @@ export function InspectionResult({
             </tr>
           </thead>
           <tbody>
-            {report?.criteria_results?.map((c) => (
-              <tr key={c.criterion_id}>
-                <td>{c.criterion_id}</td>
-                <td>{c.verdict}</td>
-                <td>{c.executed ? "実行済み" : "未実行"}</td>
+            {rows.map(({ id, label, result: c }) => (
+              <tr key={id}>
+                <td>{label}</td>
+                <td>{c?.verdict ?? "未判定"}</td>
                 <td>
-                  {c.evidence_refs
-                    ?.map((e) => `${e.id}@${e.version}`)
-                    .join(", ") || "なし"}
+                  {c ? (c.executed ? "実行済み" : "未実行") : "実行未確認"}
                 </td>
-                <td>{c.unverified?.join(" / ") || "記載なし"}</td>
+                <td>
+                  <details>
+                    <summary>証拠 {c?.evidence_refs?.length ?? 0}件</summary>
+                    {c?.evidence_refs
+                      ?.map((e) => `${e.id}@${e.version}`)
+                      .join(", ") || "なし"}
+                  </details>
+                </td>
+                <td>
+                  {c ? c.unverified?.join(" / ") || "記載なし" : "報告待ち"}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -173,9 +202,17 @@ export function InspectionResult({
             {key} · {sourceKinds[e.kind] ?? e.kind} · {e.state} ·{" "}
             {e.description}
             <br />
-            <code>
-              {e.artifact.uri} / {e.artifact.revision} / {e.artifact.digest}
-            </code>
+            {/^https?:\/\//.test(e.artifact.uri) && (
+              <a href={e.artifact.uri} target="_blank" rel="noreferrer">
+                この証拠を開く
+              </a>
+            )}
+            <details>
+              <summary>証拠の固定版・取得先</summary>
+              <code>
+                {e.artifact.uri} / {e.artifact.revision} / {e.artifact.digest}
+              </code>
+            </details>
           </li>
         ))}
       </ul>
@@ -409,272 +446,295 @@ export function Inspections({
     setNotice("端末内の下書きです。共有への保存・採用・実行は別の操作です。");
   };
   return (
-    <details className="panel workflow-editor" aria-label="独立検品・証拠">
-      <summary>独立検品・証拠</summary>
-      <p>
-        固定成果物と選んだ条件・入力で検品します。初見検品はContextを無注入にします。実装の会話や自己評価は自動で継承しません。
-      </p>
-      <label>
-        一覧の種類
-        <select
-          value={type}
-          onChange={(e) => {
-            setType(e.target.value);
-            setPage(undefined);
-          }}
-        >
-          <option value="definition">検品の定義</option>
-          <option value="evidence">証拠</option>
-        </select>
-      </label>
-      <button disabled={busy} onClick={() => void act(() => list())}>
-        一覧を取得
-      </button>
-      <ul>
-        {page?.items.map((e) => (
-          <li key={e.id}>
-            <button
-              disabled={busy}
-              onClick={() => void act(() => load(e.id, "head"))}
+    <ScreenContent>
+      {
+        <section className="panel workflow-editor" aria-label="独立検品・証拠">
+          <h3>独立検品・証拠</h3>
+          <p>
+            固定成果物と選んだ条件・入力で検品します。初見検品はContextを無注入にします。実装の会話や自己評価は自動で継承しません。
+          </p>
+          <label>
+            一覧の種類
+            <select
+              value={type}
+              onChange={(e) => {
+                setType(e.target.value);
+                setPage(undefined);
+              }}
             >
-              {String(e.value.name ?? e.id)} · {e.version}
-            </button>
-          </li>
-        ))}
-      </ul>
-      {page?.next && (
-        <button disabled={busy} onClick={() => void act(() => list(page.next))}>
-          次の一覧ページ
-        </button>
-      )}
-      <label>
-        検品・証拠ID
-        <input
-          value={id}
-          onChange={(e) => {
-            setID(e.target.value);
-            clear();
-          }}
-        />
-      </label>
-      <label>
-        取得する版
-        <input value={version} onChange={(e) => setVersion(e.target.value)} />
-      </label>
-      <button disabled={busy || !id} onClick={() => void act(() => load())}>
-        固定版を取得
-      </button>
-      {canEdit && (
-        <>
-          <button disabled={busy} onClick={() => fresh(false)}>
-            検品定義を新規作成
-          </button>
-          <button disabled={busy} onClick={() => fresh(true)}>
-            証拠を新規登録
-          </button>
-        </>
-      )}
-      {draft && (
-        <>
-          <p>
-            共有版: {record?.version ?? "未保存"} / 下書きの前提版:{" "}
-            {draft.version}
-          </p>
-          <label>
-            検品・証拠のJSON
-            <textarea
-              className="workflow-editor"
-              readOnly={!canEdit}
-              value={draft.text}
-              onChange={(e) => persist({ ...draft, text: e.target.value })}
-            />
+              <option value="definition">検品の定義</option>
+              <option value="evidence">証拠</option>
+            </select>
           </label>
-          <button
-            disabled={busy || !canEdit}
-            onClick={() =>
-              void act(async () => {
-                const r = await mutate(
-                  `/records/${encodeURIComponent(id)}`,
-                  draft.version,
-                  { value_utf8: draft.text },
-                );
-                await saveLocalDraft<Draft>(
-                  native,
-                  namespace,
-                  id,
-                  undefined,
-                  "inspection",
-                );
-                await load(r.data.id, r.data.version);
-                setNotice("共有へ保存しました。採用・開始はしていません。");
-              })
-            }
-          >
-            内容を確認して共有へ保存
-          </button>
-          {record && (
-            <details>
-              <summary>取得した共有の内容</summary>
-              <pre>{format(record.value)}</pre>
-            </details>
-          )}
-        </>
-      )}
-      {record?.kind === "definition" && (
-        <>
-          <button
-            disabled={busy || !canEdit}
-            onClick={() =>
-              void act(async () => {
-                const r = await mutate("/adopt", adoption?.version ?? "0", {
-                  definition: { id: record.id, version: record.version },
-                });
-                setAdoption(r.data);
-                setNotice("この固定版を採用しました。実行は始まっていません。");
-              })
-            }
-          >
-            取得した固定版を採用
-          </button>
-          <p>
-            採用記録:{" "}
-            {adoption ? `${adoption.id}@${adoption.version}` : "未取得・未採用"}
-          </p>
-          <label>
-            接続端末ID
-            <input value={device} onChange={(e) => setDevice(e.target.value)} />
-          </label>
-          <label>
-            固定リポジトリ指定（不要ならnull）
-            <textarea
-              value={repository}
-              onChange={(e) => setRepository(e.target.value)}
-            />
-          </label>
-          <button
-            disabled={busy || !canExecute || !adoption || !device}
-            onClick={() =>
-              void act(async () => {
-                const target = `run:${crypto.randomUUID()}`;
-                await mutate(`/start/${encodeURIComponent(target)}`, "0", {
-                  adoption,
-                  device_id: device,
-                  repository: JSON.parse(repository) as unknown,
-                });
-                setRun(target);
-                await showRun(target);
-                setNotice(
-                  "許可と必須分離能力を照合し、共通Runへ実行を依頼しました。",
-                );
-              })
-            }
-          >
-            採用版で新しい検品を依頼
-          </button>
-          <button disabled={busy} onClick={() => void act(() => showHistory())}>
-            検品・判断の履歴を取得
+          <button disabled={busy} onClick={() => void act(() => list())}>
+            一覧を取得
           </button>
           <ul>
-            {history?.items.map((e) => (
-              <li key={`${e.id}@${e.version}`}>
-                {e.kind} · {e.id}@{e.version}
-                {e.kind === "launch" ? (
-                  <button
-                    disabled={busy}
-                    onClick={() =>
-                      void act(() => showRun(String(e.value.run_id)))
-                    }
-                  >
-                    この検品の判定を表示
-                  </button>
-                ) : (
-                  <details>
-                    <summary>記録の内容</summary>
-                    <pre>{format(e.value)}</pre>
-                  </details>
-                )}
+            {page?.items.map((e) => (
+              <li key={e.id}>
+                <button
+                  disabled={busy}
+                  onClick={() => void act(() => load(e.id, "head"))}
+                >
+                  {String(e.value.name ?? e.id)} · {e.version}
+                </button>
               </li>
             ))}
           </ul>
-          {history?.next && (
+          {page?.next && (
             <button
               disabled={busy}
-              onClick={() => void act(() => showHistory(history.next))}
+              onClick={() => void act(() => list(page.next))}
             >
-              次の履歴ページ
+              次の一覧ページ
             </button>
           )}
-        </>
-      )}
-      <label>
-        検品Run ID
-        <input value={run} onChange={(e) => setRun(e.target.value)} />
-      </label>
-      <button disabled={busy || !run} onClick={() => void act(() => showRun())}>
-        判定と現在の証拠を取得
-      </button>
-      {view && (
-        <>
-          <InspectionResult value={view} title="選択した判定" />
           <label>
-            比較する検品Run ID
+            検品・証拠ID
             <input
-              value={compare}
-              onChange={(e) => setCompare(e.target.value)}
+              value={id}
+              onChange={(e) => {
+                setID(e.target.value);
+                clear();
+              }}
             />
           </label>
-          <button
-            disabled={busy || !compare}
-            onClick={() =>
-              void act(async () =>
-                setOther(
-                  (await call(
-                    `/current/${encodeURIComponent(compare)}`,
-                  )) as View,
-                ),
-              )
-            }
-          >
-            別の判定を並べて表示
+          <label>
+            取得する版
+            <input
+              value={version}
+              onChange={(e) => setVersion(e.target.value)}
+            />
+          </label>
+          <button disabled={busy || !id} onClick={() => void act(() => load())}>
+            固定版を取得
           </button>
-          {other && <InspectionResult value={other} title="比較する判定" />}
           {canEdit && (
             <>
+              <button disabled={busy} onClick={() => fresh(false)}>
+                検品定義を新規作成
+              </button>
+              <button disabled={busy} onClick={() => fresh(true)}>
+                証拠を新規登録
+              </button>
+            </>
+          )}
+          {draft && (
+            <>
               <p>
-                人の例外判断は別の記録として保存します。元のFAIL・INCONCLUSIVEや実行権限は変わりません。
+                共有版: {record?.version ?? "未保存"} / 下書きの前提版:{" "}
+                {draft.version}
               </p>
               <label>
-                人の判断JSON
+                検品・証拠のJSON
                 <textarea
                   className="workflow-editor"
-                  value={decision}
-                  onChange={(e) => setDecision(e.target.value)}
+                  readOnly={!canEdit}
+                  value={draft.text}
+                  onChange={(e) => persist({ ...draft, text: e.target.value })}
                 />
               </label>
               <button
-                disabled={busy}
+                disabled={busy || !canEdit}
                 onClick={() =>
                   void act(async () => {
-                    await mutate(
-                      `/judgments/inspection-judgment:${crypto.randomUUID()}`,
-                      "0",
-                      JSON.parse(decision) as object,
+                    const r = await mutate(
+                      `/records/${encodeURIComponent(id)}`,
+                      draft.version,
+                      { value_utf8: draft.text },
                     );
+                    await saveLocalDraft<Draft>(
+                      native,
+                      namespace,
+                      id,
+                      undefined,
+                      "inspection",
+                    );
+                    await load(r.data.id, r.data.version);
+                    setNotice("共有へ保存しました。採用・開始はしていません。");
+                  })
+                }
+              >
+                内容を確認して共有へ保存
+              </button>
+              {record && (
+                <details>
+                  <summary>取得した共有の内容</summary>
+                  <pre>{format(record.value)}</pre>
+                </details>
+              )}
+            </>
+          )}
+          {record?.kind === "definition" && (
+            <>
+              <button
+                disabled={busy || !canEdit}
+                onClick={() =>
+                  void act(async () => {
+                    const r = await mutate("/adopt", adoption?.version ?? "0", {
+                      definition: { id: record.id, version: record.version },
+                    });
+                    setAdoption(r.data);
                     setNotice(
-                      "人の判断を保存しました。元の判定と実行権限は保持されています。",
+                      "この固定版を採用しました。実行は始まっていません。",
                     );
                   })
                 }
               >
-                内容を確認して人の判断を保存
+                取得した固定版を採用
               </button>
+              <p>
+                採用記録:{" "}
+                {adoption
+                  ? `${adoption.id}@${adoption.version}`
+                  : "未取得・未採用"}
+              </p>
+              <label>
+                接続端末ID
+                <input
+                  value={device}
+                  onChange={(e) => setDevice(e.target.value)}
+                />
+              </label>
+              <label>
+                固定リポジトリ指定（不要ならnull）
+                <textarea
+                  value={repository}
+                  onChange={(e) => setRepository(e.target.value)}
+                />
+              </label>
+              <button
+                disabled={busy || !canExecute || !adoption || !device}
+                onClick={() =>
+                  void act(async () => {
+                    const target = `run:${crypto.randomUUID()}`;
+                    await mutate(`/start/${encodeURIComponent(target)}`, "0", {
+                      adoption,
+                      device_id: device,
+                      repository: JSON.parse(repository) as unknown,
+                    });
+                    setRun(target);
+                    await showRun(target);
+                    setNotice(
+                      "許可と必須分離能力を照合し、共通Runへ実行を依頼しました。",
+                    );
+                  })
+                }
+              >
+                採用版で新しい検品を依頼
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => void act(() => showHistory())}
+              >
+                検品・判断の履歴を取得
+              </button>
+              <ul>
+                {history?.items.map((e) => (
+                  <li key={`${e.id}@${e.version}`}>
+                    {e.kind} · {e.id}@{e.version}
+                    {e.kind === "launch" ? (
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          void act(() => showRun(String(e.value.run_id)))
+                        }
+                      >
+                        この検品の判定を表示
+                      </button>
+                    ) : (
+                      <details>
+                        <summary>記録の内容</summary>
+                        <pre>{format(e.value)}</pre>
+                      </details>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {history?.next && (
+                <button
+                  disabled={busy}
+                  onClick={() => void act(() => showHistory(history.next))}
+                >
+                  次の履歴ページ
+                </button>
+              )}
             </>
           )}
-        </>
-      )}
-      <p role="status" aria-live="polite">
-        {notice}
-      </p>
-    </details>
+          <label>
+            検品Run ID
+            <input value={run} onChange={(e) => setRun(e.target.value)} />
+          </label>
+          <button
+            disabled={busy || !run}
+            onClick={() => void act(() => showRun())}
+          >
+            判定と現在の証拠を取得
+          </button>
+          {view && (
+            <>
+              <InspectionResult value={view} title="選択した判定" />
+              <label>
+                比較する検品Run ID
+                <input
+                  value={compare}
+                  onChange={(e) => setCompare(e.target.value)}
+                />
+              </label>
+              <button
+                disabled={busy || !compare}
+                onClick={() =>
+                  void act(async () =>
+                    setOther(
+                      (await call(
+                        `/current/${encodeURIComponent(compare)}`,
+                      )) as View,
+                    ),
+                  )
+                }
+              >
+                別の判定を並べて表示
+              </button>
+              {other && <InspectionResult value={other} title="比較する判定" />}
+              {canEdit && (
+                <>
+                  <p>
+                    人の例外判断は別の記録として保存します。元のFAIL・INCONCLUSIVEや実行権限は変わりません。
+                  </p>
+                  <label>
+                    人の判断JSON
+                    <textarea
+                      className="workflow-editor"
+                      value={decision}
+                      onChange={(e) => setDecision(e.target.value)}
+                    />
+                  </label>
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(async () => {
+                        await mutate(
+                          `/judgments/inspection-judgment:${crypto.randomUUID()}`,
+                          "0",
+                          JSON.parse(decision) as object,
+                        );
+                        setNotice(
+                          "人の判断を保存しました。元の判定と実行権限は保持されています。",
+                        );
+                      })
+                    }
+                  >
+                    内容を確認して人の判断を保存
+                  </button>
+                </>
+              )}
+            </>
+          )}
+          <p role="status" aria-live="polite">
+            {notice}
+          </p>
+        </section>
+      }
+    </ScreenContent>
   );
 }

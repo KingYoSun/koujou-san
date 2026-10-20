@@ -1,11 +1,7 @@
+import { NavigationLink, useNavigation } from "./navigation";
 import { useEffect, useRef } from "react";
 import { UsageEntryView, type UsageEntry } from "./run-usage";
-import {
-  amountLabel,
-  costLabel,
-  openCostEditor,
-  type CostRef,
-} from "./usage-comparison-model";
+import { amountLabel, costLabel, type CostRef } from "./usage-comparison-model";
 export function UsageRecordDetails({
   record,
   onRead,
@@ -13,6 +9,7 @@ export function UsageRecordDetails({
   record: CostRef & { kind: string; value: unknown };
   onRead: (ref: CostRef) => void;
 }) {
+  const navigation = useNavigation();
   const target = useRef<HTMLElement>(null),
     value = record.value as Record<string, unknown>;
   useEffect(() => {
@@ -94,15 +91,27 @@ export function UsageRecordDetails({
           </dl>
         </>
       )}
-      <button onClick={() => openCostEditor("cost-model-editor")}>
+      <NavigationLink
+        to={{ workspace: navigation?.route.workspace ?? "", screen: "models" }}
+        related
+      >
         この根拠からモデル接続の編集へ
-      </button>
-      <button onClick={() => openCostEditor("cost-context-editor")}>
+      </NavigationLink>
+      <NavigationLink
+        to={{ workspace: navigation?.route.workspace ?? "", screen: "context" }}
+        related
+      >
         この根拠からContextの編集へ
-      </button>
-      <button onClick={() => openCostEditor("cost-definition-editor")}>
+      </NavigationLink>
+      <NavigationLink
+        to={{
+          workspace: navigation?.route.workspace ?? "",
+          screen: "workflows",
+        }}
+        related
+      >
         この根拠から工程定義の編集へ
-      </button>
+      </NavigationLink>
       <details>
         <summary>記録の技術情報と全項目</summary>
         <pre>{JSON.stringify(record, null, 2)}</pre>

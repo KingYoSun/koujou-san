@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useScreenActive } from "./navigation";
+import { Tabs } from "./tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
 import type {
@@ -31,9 +33,22 @@ type Search = {
   limit: number;
   cursor?: string;
 };
-export function ContextExplorer({ ui }: { ui: UI }) {
+export function ContextExplorer({
+  ui,
+  active = true,
+  mode = "documents",
+}: {
+  ui: UI;
+  active?: boolean;
+  mode?: string;
+}) {
+  const visible = useScreenActive() && active;
   const state = useStore(ui.store);
   const [tab, setTab] = useState("search");
+  useEffect(() => {
+    if (mode === "scopes") setTab("scopes");
+    else if (mode === "input") setTab("search");
+  }, [mode]);
   const [text, setText] = useState("");
   const [kind, setKind] = useState("");
   const [tag, setTag] = useState("");
@@ -59,7 +74,7 @@ export function ContextExplorer({ ui }: { ui: UI }) {
   const client = useQueryClient();
   const search = useQuery({
     queryKey: [...ui.prefix, "candidates", query],
-    enabled: tab === "search",
+    enabled: visible && tab === "search",
     retry: false,
     queryFn: () =>
       ui.request<CandidatePage>(
@@ -69,7 +84,7 @@ export function ContextExplorer({ ui }: { ui: UI }) {
   });
   const scopes = useQuery({
     queryKey: [...ui.prefix, "scopes", scopeAfter],
-    enabled: tab === "scopes",
+    enabled: visible && tab === "scopes",
     retry: false,
     queryFn: () =>
       ui.request<{ items: Candidate[] }>(
@@ -79,7 +94,7 @@ export function ContextExplorer({ ui }: { ui: UI }) {
   });
   const related = useQuery({
     queryKey: [...ui.prefix, "graph", graph],
-    enabled: tab === "graph" && Boolean(graph),
+    enabled: visible && tab === "graph" && Boolean(graph),
     retry: false,
     queryFn: () =>
       ui.request<GraphPage>(
@@ -112,7 +127,12 @@ export function ContextExplorer({ ui }: { ui: UI }) {
         <button
           className="link-button"
           onClick={() => {
-            state.choose(candidate.ref);
+            if (kinds.includes(candidate.ref.kind))
+              lastContext.current = candidate.ref;
+            ui.store.setState({
+              selected: { kind: candidate.ref.kind, id: candidate.ref.id },
+              historical: fixedRef(candidate.ref),
+            });
             if (candidate.ref.kind === "scope") setScope(candidate);
           }}
         >
@@ -192,6 +212,10 @@ export function ContextExplorer({ ui }: { ui: UI }) {
   const current = selected
     ? ui.engine.state.items[identityKey(selected)]?.record
     : undefined;
+  const lastContext = useRef<Ref | undefined>(undefined);
+  if (current && kinds.includes(current.ref.kind))
+    lastContext.current = current.ref;
+  const groupingContext = lastContext.current;
   function explore() {
     if (!current) return;
     setGraphSource("");
@@ -218,87 +242,39 @@ export function ContextExplorer({ ui }: { ui: UI }) {
       ui.fail(error);
     }
   }
+  if (!visible) return null;
   return (
     <section className="context-explorer" aria-label="Contextを探す">
       <h3>Contextを探す</h3>
-      <nav className="context-tabs" aria-label="Contextの操作">
-        {[
-          ["search", "検索"],
-          ["scopes", "Scope"],
-          ["graph", "関係・利用先"],
-          ["drafts", "下書き"],
-        ].map(([value, label]) => (
-          <button
-            key={value}
-            aria-pressed={tab === value}
-            onClick={() => {
-              setTab(value!);
-              if (value === "drafts") void draftPage();
-            }}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-      <div className="context-create">
-        <label>
-          作成する粒度
-          <select
-            value={newKind}
-            onChange={(event) => setNewKind(event.target.value)}
-          >
-            {kinds.map((kind) => (
-              <option key={kind} value={kind}>
-                {labels[kind]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          disabled={!ui.canCreate || ui.engine.status !== "current"}
-          onClick={() => void create(newKind)}
-        >
-          Contextを新規作成
-        </button>
-      </div>
-      {tab === "search" && (
-        <>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              setBack([]);
-              const request: Search = {
-                limit: 100,
-                text,
-                kinds: kind ? [kind] : undefined,
-                tags: tag ? [tag] : undefined,
-                scopes: scope
-                  ? [{ kind: scope.scope_kind!, id: scope.ref.id }]
-                  : undefined,
-                ids: id ? [id] : undefined,
-                revisions: revision ? [revision] : undefined,
-              };
-              if (JSON.stringify(request) === JSON.stringify(query))
-                void search.refetch();
-              else setQuery(request);
-            }}
-          >
+      <Tabs
+        id="context-explorer"
+        label="Contextの探索方法"
+        items={[
+          { id: "search", label: "検索" },
+          { id: "scopes", label: "Scope" },
+          { id: "graph", label: "関係・利用先" },
+          { id: "drafts", label: "下書き" },
+        ]}
+        value={tab}
+        onChange={(value) => {
+          setTab(value);
+          if (value === "drafts") void draftPage();
+        }}
+      />
+      <div
+        role="tabpanel"
+        id={"context-explorer-panel-" + tab}
+        aria-labelledby={"context-explorer-tab-" + tab}
+        tabIndex={0}
+      >
+        {mode === "documents" && (
+          <div className="context-create">
             <label>
-              検索語
-              <input
-                aria-label="Contextの検索語"
-                value={text}
-                onChange={(event) => setText(event.target.value)}
-              />
-            </label>
-            <label>
-              粒度
+              作成する粒度
               <select
-                aria-label="検索する粒度"
-                value={kind}
-                onChange={(event) => setKind(event.target.value)}
+                value={newKind}
+                onChange={(event) => setNewKind(event.target.value)}
               >
-                <option value="">すべて</option>
                 {kinds.map((kind) => (
                   <option key={kind} value={kind}>
                     {labels[kind]}
@@ -306,299 +282,362 @@ export function ContextExplorer({ ui }: { ui: UI }) {
                 ))}
               </select>
             </label>
-            <details>
-              <summary>分類・ID・版で絞る</summary>
-              <label>
-                分類タグ
-                <input
-                  value={tag}
-                  onChange={(event) => setTag(event.target.value)}
-                />
-              </label>
-              <label>
-                Context ID
-                <input
-                  value={id}
-                  onChange={(event) => setID(event.target.value)}
-                />
-              </label>
-              <label>
-                固定版
-                <input
-                  value={revision}
-                  onChange={(event) => setRevision(event.target.value)}
-                />
-              </label>
-            </details>
-            {scope && (
-              <p>
-                直接所属するScope: {scope.name}{" "}
-                <button type="button" onClick={() => setScope(undefined)}>
-                  範囲を外す
-                </button>
-              </p>
-            )}
-            <button>検索する</button>
-          </form>
-          <EnvelopeStatus value={search.data} error={search.error} />
-          {search.data?.data?.items.length === 0 && (
-            <p>
-              {search.data.meta.completeness.state === "complete"
-                ? "指定した範囲に候補はありません。"
-                : "候補はまだ確認できていません。"}
-            </p>
-          )}
-          <ul className="context-candidates">
-            {search.data?.data?.items.map(candidate)}
-          </ul>
-          <div className="context-actions">
             <button
-              disabled={!back.length}
-              onClick={() => {
-                setQuery(back.at(-1)!);
-                setBack(back.slice(0, -1));
-              }}
+              disabled={!ui.canCreate || ui.engine.status !== "current"}
+              onClick={() => void create(newKind)}
             >
-              前のページ
-            </button>
-            <button
-              disabled={!search.data?.meta.next_cursor}
-              onClick={() => {
-                setBack([...back, query]);
-                setQuery({ ...query, cursor: search.data!.meta.next_cursor! });
-              }}
-            >
-              次の候補
-            </button>
-            <button onClick={() => void search.refetch()}>
-              検索結果を更新
+              Contextを新規作成
             </button>
           </div>
-        </>
-      )}
-      {tab === "scopes" && (
-        <>
-          <p className="context-meta">
-            本文の構造とは別のGroupingです。Scopeの選択だけでは入力へ注入しません。
-          </p>
-          <label>
-            Scopeの種類
-            <select
-              value={newScopeKind}
-              onChange={(event) => setNewScopeKind(event.target.value)}
+        )}
+        {tab === "search" && (
+          <>
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                setBack([]);
+                const request: Search = {
+                  limit: 100,
+                  text,
+                  kinds: kind ? [kind] : undefined,
+                  tags: tag ? [tag] : undefined,
+                  scopes: scope
+                    ? [{ kind: scope.scope_kind!, id: scope.ref.id }]
+                    : undefined,
+                  ids: id ? [id] : undefined,
+                  revisions: revision ? [revision] : undefined,
+                };
+                if (JSON.stringify(request) === JSON.stringify(query))
+                  void search.refetch();
+                else setQuery(request);
+              }}
             >
-              {scopeKinds.map((kind) => (
-                <option value={kind} key={kind}>
-                  {labels[kind]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            disabled={!ui.canCreate || ui.engine.status !== "current"}
-            onClick={() => void create("scope")}
-          >
-            Scopeを新規作成
-          </button>
-          <EnvelopeStatus value={scopes.data} error={scopes.error} />
-          <ul className="context-candidates">
-            {scopes.data?.data?.items.map(candidate)}
-          </ul>
-          <button
-            disabled={!scopeBack.length}
-            onClick={() => {
-              setScopeAfter(scopeBack.at(-1)!);
-              setScopeBack(scopeBack.slice(0, -1));
-            }}
-          >
-            前のScope
-          </button>
-          <button
-            disabled={!scopes.data?.meta.next_cursor}
-            onClick={() => {
-              setScopeBack([...scopeBack, scopeAfter]);
-              setScopeAfter(scopes.data!.meta.next_cursor!);
-            }}
-          >
-            次のScope
-          </button>
-        </>
-      )}
-      {tab === "graph" && (
-        <>
-          <p className="context-meta">
-            開いたContextまたはScopeを起点に、範囲を指定して探索します。
-          </p>
-          <label>
-            方向
-            <select
-              value={direction}
-              onChange={(event) => setDirection(event.target.value)}
-            >
-              <option value="in">利用先・親（入力方向）</option>
-              <option value="out">参照先・子（出力方向）</option>
-              <option value="both">両方向</option>
-            </select>
-          </label>
-          <label>
-            関係
-            <select
-              value={relation}
-              onChange={(event) => setRelation(event.target.value)}
-            >
-              {[
-                ["contains", "文書の包含"],
-                ["membership", "直接所属"],
-                ["scope_parent", "Scopeの親子"],
-                ["uses", "Runでの利用"],
-                ["reference", "参照"],
-                ["generated", "生成の由来"],
-                ["version", "版"],
-                ["", "すべての関係"],
-              ].map(([value, label]) => (
-                <option value={value} key={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            深さ
-            <input
-              type="number"
-              min={1}
-              value={depth}
-              onChange={(event) => setDepth(Number(event.target.value))}
-            />
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={history}
-              onChange={(event) => setHistory(event.target.checked)}
-            />
-            固定した旧版も辿る（文書が参照する版の確認）
-          </label>
-          <button disabled={!current} onClick={explore}>
-            この範囲を探索
-          </button>
-          {graph && (
-            <>
-              <p className="context-meta">起点: {refLabel(graph.root)}</p>
-              {graphSource && <p className="context-meta">{graphSource}</p>}
-              <EnvelopeStatus value={related.data} error={related.error} />
-              <ul className="context-candidates">
-                {related.data?.data?.items.map((item, index) =>
-                  item.node ? (
-                    <li key={index}>
-                      <button
-                        className="link-button"
-                        onClick={() => {
-                          state.choose(item.node!);
-                          if (item.node!.revision)
-                            ui.store.setState({
-                              historical: fixedRef(item.node!),
-                            });
-                        }}
-                      >
-                        {refLabel(item.node)}
-                      </button>
-                      {item.node.revision && kinds.includes(item.node.kind) && (
-                        <div className="context-actions">
-                          <button onClick={() => state.add(item.node!)}>
-                            入力へ追加
-                          </button>
-                          <button onClick={() => state.add(item.node!, true)}>
-                            入力から除外
-                          </button>
-                        </div>
-                      )}
-                    </li>
-                  ) : (
-                    <li key={index}>
-                      {item.edge?.kind}: {item.edge && refLabel(item.edge.from)}{" "}
-                      → {item.edge && refLabel(item.edge.to)}
-                      <small>
-                        由来の版: {item.edge && refLabel(item.edge.source)}
-                      </small>
-                    </li>
-                  ),
-                )}
-              </ul>
-              {!!related.data?.data?.unexplored.length && (
-                <div className="context-warning">
-                  未探索の範囲
-                  <ul>
-                    {related.data.data.unexplored.map((reason) => (
-                      <li key={reason}>{reason}</li>
-                    ))}
-                  </ul>
-                </div>
+              <label>
+                検索語
+                <input
+                  aria-label="Contextの検索語"
+                  value={text}
+                  onChange={(event) => setText(event.target.value)}
+                />
+              </label>
+              <label>
+                粒度
+                <select
+                  aria-label="検索する粒度"
+                  value={kind}
+                  onChange={(event) => setKind(event.target.value)}
+                >
+                  <option value="">すべて</option>
+                  {kinds.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {labels[kind]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <details>
+                <summary>分類・ID・版で絞る</summary>
+                <label>
+                  分類タグ
+                  <input
+                    value={tag}
+                    onChange={(event) => setTag(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Context ID
+                  <input
+                    value={id}
+                    onChange={(event) => setID(event.target.value)}
+                  />
+                </label>
+                <label>
+                  固定版
+                  <input
+                    value={revision}
+                    onChange={(event) => setRevision(event.target.value)}
+                  />
+                </label>
+              </details>
+              {scope && (
+                <p>
+                  直接所属するScope: {scope.name}{" "}
+                  <button type="button" onClick={() => setScope(undefined)}>
+                    範囲を外す
+                  </button>
+                </p>
               )}
+              <button>検索する</button>
+            </form>
+            <EnvelopeStatus value={search.data} error={search.error} />
+            {search.data?.data?.items.length === 0 && (
+              <p>
+                {search.data.meta.completeness.state === "complete"
+                  ? "指定した範囲に候補はありません。"
+                  : "候補はまだ確認できていません。"}
+              </p>
+            )}
+            <ul className="context-candidates">
+              {search.data?.data?.items.map(candidate)}
+            </ul>
+            <div className="context-actions">
               <button
-                disabled={!graphBack.length}
+                disabled={!back.length}
                 onClick={() => {
-                  setGraph(graphBack.at(-1));
-                  setGraphBack(graphBack.slice(0, -1));
+                  setQuery(back.at(-1)!);
+                  setBack(back.slice(0, -1));
                 }}
               >
-                前の探索ページ
+                前のページ
               </button>
               <button
-                disabled={!related.data?.meta.next_cursor}
+                disabled={!search.data?.meta.next_cursor}
                 onClick={() => {
-                  setGraphBack([...graphBack, graph]);
-                  setGraph({
-                    ...graph,
-                    cursor: related.data!.meta.next_cursor!,
+                  setBack([...back, query]);
+                  setQuery({
+                    ...query,
+                    cursor: search.data!.meta.next_cursor!,
                   });
                 }}
               >
-                次の探索ページ
+                次の候補
               </button>
-            </>
-          )}
-        </>
-      )}
-      {tab === "drafts" && (
-        <>
-          <p>端末内に保存した下書きです。再接続しても自動送信しません。</p>
-          <ul>
-            {draftKeys.map((key) => {
-              const draft = ui.engine.state.drafts[key];
-              return draft ? (
-                <li key={key}>
-                  <button onClick={() => state.choose(draft.base.record.ref)}>
-                    {recordName(draft.base.record)} ·{" "}
-                    {draft.latest
-                      ? "競合"
-                      : draft.pending
-                        ? "保存結果未確認"
-                        : "未送信"}
-                  </button>
-                </li>
-              ) : null;
-            })}
-          </ul>
-          <button disabled={!draftAfter} onClick={() => void draftPage()}>
-            先頭の下書き
-          </button>
-          <button
-            disabled={!draftNext}
-            onClick={() => void draftPage(draftNext!)}
-          >
-            次の下書き
-          </button>
-        </>
-      )}
-      {scope && current && kinds.includes(current.ref.kind) && (
-        <Grouping
-          ui={ui}
-          scope={scope}
-          context={current.ref}
-          changed={() => void client.invalidateQueries({ queryKey: ui.prefix })}
-        />
-      )}
+              <button onClick={() => void search.refetch()}>
+                検索結果を更新
+              </button>
+            </div>
+          </>
+        )}
+        {tab === "scopes" && (
+          <>
+            <p className="context-meta">
+              本文の構造とは別のGroupingです。Scopeの選択だけでは入力へ注入しません。
+            </p>
+            <label>
+              Scopeの種類
+              <select
+                value={newScopeKind}
+                onChange={(event) => setNewScopeKind(event.target.value)}
+              >
+                {scopeKinds.map((kind) => (
+                  <option value={kind} key={kind}>
+                    {labels[kind]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              disabled={!ui.canCreate || ui.engine.status !== "current"}
+              onClick={() => void create("scope")}
+            >
+              Scopeを新規作成
+            </button>
+            <EnvelopeStatus value={scopes.data} error={scopes.error} />
+            <ul className="context-candidates">
+              {scopes.data?.data?.items.map(candidate)}
+            </ul>
+            <button
+              disabled={!scopeBack.length}
+              onClick={() => {
+                setScopeAfter(scopeBack.at(-1)!);
+                setScopeBack(scopeBack.slice(0, -1));
+              }}
+            >
+              前のScope
+            </button>
+            <button
+              disabled={!scopes.data?.meta.next_cursor}
+              onClick={() => {
+                setScopeBack([...scopeBack, scopeAfter]);
+                setScopeAfter(scopes.data!.meta.next_cursor!);
+              }}
+            >
+              次のScope
+            </button>
+          </>
+        )}
+        {tab === "graph" && (
+          <>
+            <p className="context-meta">
+              開いたContextまたはScopeを起点に、範囲を指定して探索します。
+            </p>
+            <label>
+              方向
+              <select
+                value={direction}
+                onChange={(event) => setDirection(event.target.value)}
+              >
+                <option value="in">利用先・親（入力方向）</option>
+                <option value="out">参照先・子（出力方向）</option>
+                <option value="both">両方向</option>
+              </select>
+            </label>
+            <label>
+              関係
+              <select
+                value={relation}
+                onChange={(event) => setRelation(event.target.value)}
+              >
+                {[
+                  ["contains", "文書の包含"],
+                  ["membership", "直接所属"],
+                  ["scope_parent", "Scopeの親子"],
+                  ["uses", "Runでの利用"],
+                  ["reference", "参照"],
+                  ["generated", "生成の由来"],
+                  ["version", "版"],
+                  ["", "すべての関係"],
+                ].map(([value, label]) => (
+                  <option value={value} key={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              深さ
+              <input
+                type="number"
+                min={1}
+                value={depth}
+                onChange={(event) => setDepth(Number(event.target.value))}
+              />
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={history}
+                onChange={(event) => setHistory(event.target.checked)}
+              />
+              固定した旧版も辿る（文書が参照する版の確認）
+            </label>
+            <button disabled={!current} onClick={explore}>
+              この範囲を探索
+            </button>
+            {graph && (
+              <>
+                <p className="context-meta">起点: {refLabel(graph.root)}</p>
+                {graphSource && <p className="context-meta">{graphSource}</p>}
+                <EnvelopeStatus value={related.data} error={related.error} />
+                <ul className="context-candidates">
+                  {related.data?.data?.items.map((item, index) =>
+                    item.node ? (
+                      <li key={index}>
+                        <button
+                          className="link-button"
+                          onClick={() => {
+                            state.choose(item.node!);
+                            if (item.node!.revision)
+                              ui.store.setState({
+                                historical: fixedRef(item.node!),
+                              });
+                          }}
+                        >
+                          {refLabel(item.node)}
+                        </button>
+                        {item.node.revision &&
+                          kinds.includes(item.node.kind) && (
+                            <div className="context-actions">
+                              <button onClick={() => state.add(item.node!)}>
+                                入力へ追加
+                              </button>
+                              <button
+                                onClick={() => state.add(item.node!, true)}
+                              >
+                                入力から除外
+                              </button>
+                            </div>
+                          )}
+                      </li>
+                    ) : (
+                      <li key={index}>
+                        {item.edge?.kind}:{" "}
+                        {item.edge && refLabel(item.edge.from)} →{" "}
+                        {item.edge && refLabel(item.edge.to)}
+                        <small>
+                          由来の版: {item.edge && refLabel(item.edge.source)}
+                        </small>
+                      </li>
+                    ),
+                  )}
+                </ul>
+                {!!related.data?.data?.unexplored.length && (
+                  <div className="context-warning">
+                    未探索の範囲
+                    <ul>
+                      {related.data.data.unexplored.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                <button
+                  disabled={!graphBack.length}
+                  onClick={() => {
+                    setGraph(graphBack.at(-1));
+                    setGraphBack(graphBack.slice(0, -1));
+                  }}
+                >
+                  前の探索ページ
+                </button>
+                <button
+                  disabled={!related.data?.meta.next_cursor}
+                  onClick={() => {
+                    setGraphBack([...graphBack, graph]);
+                    setGraph({
+                      ...graph,
+                      cursor: related.data!.meta.next_cursor!,
+                    });
+                  }}
+                >
+                  次の探索ページ
+                </button>
+              </>
+            )}
+          </>
+        )}
+        {tab === "drafts" && (
+          <>
+            <p>端末内に保存した下書きです。再接続しても自動送信しません。</p>
+            <ul>
+              {draftKeys.map((key) => {
+                const draft = ui.engine.state.drafts[key];
+                return draft ? (
+                  <li key={key}>
+                    <button onClick={() => state.choose(draft.base.record.ref)}>
+                      {recordName(draft.base.record)} ·{" "}
+                      {draft.latest
+                        ? "競合"
+                        : draft.pending
+                          ? "保存結果未確認"
+                          : "未送信"}
+                    </button>
+                  </li>
+                ) : null;
+              })}
+            </ul>
+            <button disabled={!draftAfter} onClick={() => void draftPage()}>
+              先頭の下書き
+            </button>
+            <button
+              disabled={!draftNext}
+              onClick={() => void draftPage(draftNext!)}
+            >
+              次の下書き
+            </button>
+          </>
+        )}
+        {mode === "scopes" && scope && groupingContext && (
+          <Grouping
+            ui={ui}
+            scope={scope}
+            context={groupingContext}
+            changed={() =>
+              void client.invalidateQueries({ queryKey: ui.prefix })
+            }
+          />
+        )}
+      </div>
     </section>
   );
 }

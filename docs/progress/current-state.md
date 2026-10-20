@@ -1,8 +1,14 @@
 # 現在状態
 
-更新日: 2026-10-19（JST）
+更新日: 2026-10-21（JST）
 
-開発環境の構築を終え、[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の実装を#3から番号順に進めている。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
+開発環境と[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の#3〜#33を完了した。#34はユーザー判断による保留を維持し、現在は#71から続くUI/UX改修を進めている。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
+
+## 現在の作業: Issue #71〜#77
+
+状態: 最終CI待ち。[PR #78](https://github.com/KingYoSun/koujou-san/pull/78)で用途別シェル、作業詳細、工程、Context、自動化と優先度、比較を改修した。本人の初見では情報過多・判断材料不足が未達となったため、判断に必要な内容を先に表示し、固定版・内部ID・原記録・別操作を詳細へ移した。本人の指示に従い、背景を渡さない独立AIのS1/S3と、画面観測・差分検品で修正を確認した。本人の再確認は実施していない。
+
+[最終判定と証拠](2026-10-21-uiux-first-view-revision.md)、[実装計画](2026-10-21-issue-71-plan.md)、[情報構造](../design/information-architecture.md)、[実装・検証履歴](2026-10-21-uiux-foundation.md)を参照する。クライアント105テスト、型検査・build、200%の三幅×六経路、キーボード・固定対象への往復を確認済み。受入条件と独立検品を満たし、最終headのCIとマージ後照合が残る。#34の保留を維持する。
 
 ## 環境構築の受入条件
 

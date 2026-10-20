@@ -1,3 +1,4 @@
+import { ScreenContent } from "./navigation";
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
@@ -58,95 +59,111 @@ export function RunnerSettings({
     }
   }
   return (
-    <details className="team-details">
-      <summary>この端末のRunner設定</summary>
-      <p>
-        接続ごとに確認した版・環境・CLIの認証主体への参照と、依頼を許可するメンバーを登録します。秘密値は入力しないでください。実行ファイルと入力方式は、この端末のCLI実行設定で対応付けます。
-      </p>
-      <fieldset disabled={busy}>
-        <label>
-          接続の種類
-          <input value={kind} onChange={(e) => setKind(e.target.value)} />
-        </label>
-        <label>
-          接続先の論理名
-          <input value={target} onChange={(e) => setTarget(e.target.value)} />
-        </label>
-        <label>
-          確認したCLI・接続の版
-          <input value={version} onChange={(e) => setVersion(e.target.value)} />
-        </label>
-        <label>
-          実行環境
-          <input
-            value={environment}
-            onChange={(e) => setEnvironment(e.target.value)}
-          />
-        </label>
-        <label>
-          CLI認証主体への参照
-          <input value={subject} onChange={(e) => setSubject(e.target.value)} />
-        </label>
-        <label>
-          依頼を許可するメンバーID（空白区切り）
-          <textarea value={users} onChange={(e) => setUsers(e.target.value)} />
-        </label>
-        <label>
-          確認した入力方式（stdin、file等、空白区切り）
-          <input
-            value={bindings}
-            onChange={(e) => setBindings(e.target.value)}
-          />
-        </label>
-        <label>
-          確認した能力（pause、stop等、空白区切り）
-          <input
-            value={capabilities}
-            onChange={(e) => setCapabilities(e.target.value)}
-          />
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={confirmed}
-            onChange={(e) => setConfirmed(e.target.checked)}
-          />
-          この版・環境で接続能力を確認済み
-        </label>
-        <label>
-          repositoryの論理ID（使う場合）
-          <input
-            value={repository}
-            onChange={(e) => setRepository(e.target.value)}
-          />
-        </label>
-        {repository && (
-          <label>
-            この端末内のrepositoryのpath
-            <input value={path} onChange={(e) => setPath(e.target.value)} />
-          </label>
-        )}
-        <p>
-          pathはこの端末だけに保存します。Runごとに別worktree・branchを作成し、元のcheckoutを動かしません。終了後も成果を残します。
-        </p>
-        <button
-          disabled={
-            !kind ||
-            !target ||
-            !version ||
-            !environment ||
-            !subject ||
-            (!!repository && !path)
-          }
-          onClick={() => void apply(true)}
-        >
-          接続設定を保存・更新
-        </button>
-        <button onClick={() => void apply(false)}>
-          保存済みのRunner接続を更新
-        </button>
-      </fieldset>
-      {notice && <p role="status">{notice}</p>}
-    </details>
+    <ScreenContent>
+      {
+        <details className="team-details">
+          <summary>この端末のRunner設定</summary>
+          <p>
+            接続ごとに確認した版・環境・CLIの認証主体への参照と、依頼を許可するメンバーを登録します。秘密値は入力しないでください。実行ファイルと入力方式は、この端末のCLI実行設定で対応付けます。
+          </p>
+          <fieldset disabled={busy}>
+            <label>
+              接続の種類
+              <input value={kind} onChange={(e) => setKind(e.target.value)} />
+            </label>
+            <label>
+              接続先の論理名
+              <input
+                value={target}
+                onChange={(e) => setTarget(e.target.value)}
+              />
+            </label>
+            <label>
+              確認したCLI・接続の版
+              <input
+                value={version}
+                onChange={(e) => setVersion(e.target.value)}
+              />
+            </label>
+            <label>
+              実行環境
+              <input
+                value={environment}
+                onChange={(e) => setEnvironment(e.target.value)}
+              />
+            </label>
+            <label>
+              CLI認証主体への参照
+              <input
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+              />
+            </label>
+            <label>
+              依頼を許可するメンバーID（空白区切り）
+              <textarea
+                value={users}
+                onChange={(e) => setUsers(e.target.value)}
+              />
+            </label>
+            <label>
+              確認した入力方式（stdin、file等、空白区切り）
+              <input
+                value={bindings}
+                onChange={(e) => setBindings(e.target.value)}
+              />
+            </label>
+            <label>
+              確認した能力（pause、stop等、空白区切り）
+              <input
+                value={capabilities}
+                onChange={(e) => setCapabilities(e.target.value)}
+              />
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={confirmed}
+                onChange={(e) => setConfirmed(e.target.checked)}
+              />
+              この版・環境で接続能力を確認済み
+            </label>
+            <label>
+              repositoryの論理ID（使う場合）
+              <input
+                value={repository}
+                onChange={(e) => setRepository(e.target.value)}
+              />
+            </label>
+            {repository && (
+              <label>
+                この端末内のrepositoryのpath
+                <input value={path} onChange={(e) => setPath(e.target.value)} />
+              </label>
+            )}
+            <p>
+              pathはこの端末だけに保存します。Runごとに別worktree・branchを作成し、元のcheckoutを動かしません。終了後も成果を残します。
+            </p>
+            <button
+              disabled={
+                !kind ||
+                !target ||
+                !version ||
+                !environment ||
+                !subject ||
+                (!!repository && !path)
+              }
+              onClick={() => void apply(true)}
+            >
+              接続設定を保存・更新
+            </button>
+            <button onClick={() => void apply(false)}>
+              保存済みのRunner接続を更新
+            </button>
+          </fieldset>
+          {notice && <p role="status">{notice}</p>}
+        </details>
+      }
+    </ScreenContent>
   );
 }

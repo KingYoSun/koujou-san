@@ -1,9 +1,87 @@
+import { useState } from "react";
+import { syncRequest } from "./auth";
+import { NavigationLink, ScreenContent } from "./navigation";
+
 export type ModelConnection = {
   id: string;
   name: string;
   revision: string;
   models: { requested: string; allowed_actual: string[] }[];
 };
+
+export function ServerModelConnections({
+  native,
+  workspace,
+}: {
+  native: boolean;
+  workspace: string;
+}) {
+  const [connections, setConnections] = useState<ModelConnection[]>();
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  return (
+    <ScreenContent>
+      <section aria-label="サーバーLLM接続">
+        <p>
+          サーバーLLMはHopper・Triageの評価に使います。接続と認証はサーバー構成で管理し、各方針で利用モデル・上限・送信禁止分類を確認します。
+        </p>
+        <button
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            setNotice("");
+            try {
+              setConnections(
+                (await syncRequest(
+                  `/hopper/workspaces/${encodeURIComponent(workspace)}/model-connections`,
+                  native,
+                  { method: "GET" },
+                )) as ModelConnection[],
+              );
+            } catch {
+              setNotice("サーバー接続と現在の閲覧権限を確認してください。");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          設定済みの接続を確認（モデル要求なし）
+        </button>
+        {connections &&
+          (connections.length ? (
+            <ul>
+              {connections.map((c) => (
+                <li key={c.id}>
+                  {c.name} / 接続: {c.id} / 版: {c.revision}
+                  <ul>
+                    {c.models.map((m) => (
+                      <li key={m.requested}>
+                        要求モデル: {m.requested} / 許可された実モデル:{" "}
+                        {m.allowed_actual.join("、")}
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p>このWorkspaceで利用できるサーバーLLM接続はありません。</p>
+          ))}
+        {notice && <p role="status">{notice}</p>}
+        <p>
+          <NavigationLink to={{ workspace, screen: "hopper" }} related>
+            Hopperの評価方針へ
+          </NavigationLink>
+        </p>
+        <p>
+          <NavigationLink to={{ workspace, screen: "triage" }} related>
+            Triageの評価方針へ
+          </NavigationLink>
+        </p>
+      </section>
+    </ScreenContent>
+  );
+}
 export type SemanticSettings = {
   connection: string;
   revision: string;

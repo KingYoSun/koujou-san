@@ -50,6 +50,16 @@ export function nodeCount(text: string): number {
   return findNodeAtLocation(tree(text), ["nodes"])?.children?.length ?? 0;
 }
 
+export const applyFields = (
+  text: string,
+  fields: Record<string, string | null>,
+) =>
+  Object.entries(fields).reduce(
+    (source, [path, value]) =>
+      editField(source, JSON.parse(path) as JSONPath, value ?? undefined),
+    text,
+  );
+
 export function mergeFields(base: string, changes: string): string {
   const source = tree(changes);
   if (source.type !== "object" || tree(base).type !== "object")
@@ -74,4 +84,18 @@ export function mergeFields(base: string, changes: string): string {
   };
   visit(source, []);
   return merged;
+}
+export function selectDefinitionContext(
+  text: string,
+  selection: {
+    mode: "none" | "select";
+    include: unknown[];
+    exclude: unknown[];
+  },
+): string {
+  if (selection.mode === "none")
+    return editField(text, ["selection"], '{"mode":"none"}');
+  for (const key of ["mode", "include", "exclude"] as const)
+    text = editField(text, ["selection", key], JSON.stringify(selection[key]));
+  return text;
 }

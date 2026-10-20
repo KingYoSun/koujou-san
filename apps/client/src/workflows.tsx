@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { ScreenContent, useNavigation, useScreenActive } from "./navigation";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { syncRequest, workspaceAccessLost } from "./auth";
 import { SyncHTTPError } from "./sync-error";
@@ -10,14 +11,19 @@ import {
   syncStorage,
 } from "./sync-store";
 import {
-  editField,
+  applyFields,
   fieldSource,
   mergeFields,
-  nodeCount,
+  selectDefinitionContext,
 } from "./workflow-json";
+import type { DefinitionContextInput } from "./context-preview";
+import { JSONField } from "./json-field";
 import type { JSONPath } from "jsonc-parser";
 import { WorkflowExecution } from "./workflow-execution";
 import { DefinitionRun } from "./definition-run";
+import { WorkflowNodeEditor } from "./workflow-node-editor";
+import type { DefinitionLabel } from "./workflow-map";
+import type { DefinitionPage } from "./definition-picker";
 import { DefinitionGeneration } from "./definition-generation";
 import { definitionFields } from "./definition-proposal";
 
@@ -55,13 +61,17 @@ const problems: Record<string, string> = {
   capability_unconfirmed: "接続の能力が未確認です",
   explicit_budget_required: "並列数などの実行予算を確認してください",
   none_context_binding: "無注入のContextへ出力を接続できません",
+  run_or_decision_required: "Run定義か判断の選択肢のいずれかを指定してください",
+  result_condition_required: "先行結果・差し戻しの条件を指定してください",
+  fixed_definition_required: "Run定義の固定版を指定してください",
+  input_dependency_required: "入力元を先行工程にも指定してください",
+  output_selection_invalid:
+    "出力の種類・チャンネル・位置・キーを確認してください",
+  input_target_invalid: "入力先はcontext・prompt・commandから指定してください",
+  join_policy_required: "先行工程の合流条件を指定してください",
+  return_run_required: "差し戻す先にはRunノードを指定してください",
 };
-const compose = (draft: Draft) =>
-  Object.entries(draft.fields).reduce(
-    (text, [path, value]) =>
-      editField(text, JSON.parse(path) as JSONPath, value ?? undefined),
-    draft.text,
-  );
+const compose = (draft: Draft) => applyFields(draft.text, draft.fields);
 
 export function Workflows({
   native,
@@ -70,6 +80,9 @@ export function Workflows({
   user,
   role,
   canExecute,
+  definitionInput,
+  onDefinitionInputUsed,
+  onContextSelection,
 }: {
   native: boolean;
   api: string;
@@ -77,8 +90,16 @@ export function Workflows({
   user: string;
   role: string;
   canExecute: boolean;
+  definitionInput?: DefinitionContextInput;
+  onDefinitionInputUsed?: () => void;
+  onContextSelection?: (value: DefinitionContextInput) => void;
 }) {
   const namespace = { api, user, workspace };
+  const navigation = useNavigation();
+  const navigationRef = useRef(navigation);
+  navigationRef.current = navigation;
+  const visible = useScreenActive();
+  const loadSerial = useRef(0);
   const base = `/workflows/workspaces/${encodeURIComponent(workspace)}`;
   const canEdit = role !== "viewer";
   const [kind, setKind] = useState("run-definition");
@@ -176,7 +197,35 @@ export function Workflows({
       );
   };
   const load = async (target: string, version = "head") => {
+    const serial = ++loadSerial.current;
     const epoch = answerScopeEpoch(namespace);
+    if (version === "0") {
+      const saved = await readLocalDraft<Draft>(
+        native,
+        namespace,
+        target,
+        "workflow-definition",
+      );
+      if (serial !== loadSerial.current || !allowAnswerScope(namespace, epoch))
+        return;
+      if (!saved) {
+        setNotice("この端末には指定された定義の下書きがありません。");
+        return;
+      }
+      setID(target);
+      setKind(
+        target.startsWith("run-definition:")
+          ? "run-definition"
+          : "workflow-definition",
+      );
+      setDraft(saved);
+      setRecord(undefined);
+      setAdoption(undefined);
+      setValidation(undefined);
+      setVerified(undefined);
+      setSelected(0);
+      return;
+    }
     const value = (await call(
       `/records/${encodeURIComponent(target)}?version=${encodeURIComponent(version)}&format=source`,
     )) as DefinitionRecord;
@@ -193,7 +242,8 @@ export function Workflows({
       if (e instanceof SyncHTTPError && e.status === 403) return undefined;
       throw e;
     })) as (Ref & { value: { definition: Ref } }) | undefined;
-    if (answerScopeEpoch(namespace) !== epoch) return;
+    if (answerScopeEpoch(namespace) !== epoch || serial !== loadSerial.current)
+      return;
     setID(value.id);
     setKind(value.kind);
     setRecord(value);
@@ -210,7 +260,40 @@ export function Workflows({
           ? "端末内の未送信下書きを復元しました。"
           : "下書きの前提版が古くなっています。現在の内容と比較してください。",
       );
+    const currentNavigation = navigationRef.current;
+    if (
+      currentNavigation?.route.screen === "workflows" &&
+      (currentNavigation.route.target?.id !== value.id ||
+        currentNavigation.route.target.version !== value.version)
+    )
+      currentNavigation.navigate(
+        {
+          ...currentNavigation.route,
+          target: { id: value.id, version: value.version, kind: value.kind },
+        },
+        { replace: currentNavigation.route.target?.id === value.id },
+      );
   };
+  useEffect(() => {
+    const target = navigation?.route.target;
+    if (
+      !visible ||
+      navigation?.route.screen !== "workflows" ||
+      !target ||
+      !["run-definition", "workflow-definition"].includes(target.kind)
+    )
+      return;
+    if (
+      id === target.id &&
+      (record?.version === target.version || draft?.version === target.version)
+    )
+      return;
+    void act(() => load(target.id, target.version));
+  }, [
+    visible,
+    navigation?.route.target?.id,
+    navigation?.route.target?.version,
+  ]);
   const fresh = (type: string, text?: string) => {
     const target = `${type}:${crypto.randomUUID()}`;
     setID(target);
@@ -251,6 +334,12 @@ export function Workflows({
       fields: {},
     };
     setDraft(value);
+    navigation?.navigate({
+      workspace,
+      screen: "workflows",
+      view: "edit",
+      target: { kind: type, id: target, version: "0" },
+    });
     void saveLocalDraft(
       native,
       namespace,
@@ -259,55 +348,57 @@ export function Workflows({
       "workflow-definition",
     ).catch(() => setNotice("下書きの保存を確認できません。"));
   };
+  useEffect(() => {
+    if (
+      !visible ||
+      !canEdit ||
+      !definitionInput ||
+      !draft ||
+      id !== definitionInput.definition.id
+    )
+      return;
+    if (draft.version !== definitionInput.definition.version) {
+      setNotice(
+        "定義の前提版が変わりました。現在の定義からContextを選び直してください。",
+      );
+      return;
+    }
+    try {
+      persist({
+        ...draft,
+        text: selectDefinitionContext(
+          compose(draft),
+          definitionInput.selection,
+        ),
+        fields: {},
+        pending: undefined,
+      });
+      onDefinitionInputUsed?.();
+    } catch {
+      setNotice("定義の未保存JSONを確認してからContextを反映してください。");
+    }
+  }, [visible, canEdit, definitionInput, id, draft?.version]);
   const field = (
     label: string,
     path: JSONPath,
     format: "text" | "json" | "number" = "text",
-  ) => {
-    if (!draft) return null;
-    const key = JSON.stringify(path);
-    let source = key in draft.fields ? (draft.fields[key] ?? "") : undefined;
-    try {
-      source ??= fieldSource(draft.text, path);
-    } catch {
-      source ??= "";
-    }
-    let value = source ?? "";
-    if (format === "text") {
-      try {
-        value = JSON.parse(value) as string;
-      } catch {
-        value = "";
-      }
-    }
-    const change = (next: string) =>
-      persist({
-        ...draft,
-        pending: undefined,
-        fields: {
-          ...draft.fields,
-          [key]: format === "text" ? JSON.stringify(next) : next || null,
-        },
-      });
-    return (
-      <label>
-        {label}
-        {format === "json" ? (
-          <textarea
-            rows={3}
-            value={value}
-            onChange={(e) => change(e.target.value)}
-          />
-        ) : (
-          <input
-            type={format === "number" ? "number" : "text"}
-            value={value}
-            onChange={(e) => change(e.target.value)}
-          />
-        )}
-      </label>
+  ) =>
+    draft && (
+      <JSONField
+        label={label}
+        path={path}
+        format={format}
+        text={draft.text}
+        fields={draft.fields}
+        onChange={(key, raw) =>
+          persist({
+            ...draft,
+            pending: undefined,
+            fields: { ...draft.fields, [key]: raw },
+          })
+        }
+      />
     );
-  };
   const save = async () => {
     if (!draft) return;
     const text = compose(draft);
@@ -341,521 +432,573 @@ export function Workflows({
     await load(value.data.id, value.data.version);
     setNotice("定義の下書きを共有へ保存しました。採用・実行はしていません。");
   };
-  let count = 0;
-  try {
-    if (draft) count = nodeCount(compose(draft));
-  } catch {
-    /* The raw editor retains invalid input until corrected. */
-  }
   return (
-    <details
-      id="cost-definition-editor"
-      tabIndex={-1}
-      className="team-details workflow-editor"
-    >
-      <summary>工程定義・検証・採用と実行</summary>
-      <p>
-        定義の保存・検証・採用と、実行開始を分けます。必要な固定入力と接続だけを指定します。
-      </p>
-      <div className="team-controls">
-        <label>
-          定義の種類
-          <select
-            disabled={busy}
-            value={kind}
-            onChange={(e) => {
-              setKind(e.target.value);
-              setPage(undefined);
-              setID("");
-              setRecord(undefined);
-              setDraft(undefined);
-              setValidation(undefined);
-              setVerified(undefined);
-              setAdoption(undefined);
-            }}
+    <>
+      <ScreenContent>
+        {
+          <section
+            id="cost-definition-editor"
+            tabIndex={-1}
+            className="team-details workflow-editor"
           >
-            <option value="run-definition">Run定義</option>
-            <option value="workflow-definition">工程定義</option>
-          </select>
-        </label>
-        <button
-          disabled={busy}
-          onClick={() =>
-            void act(async () =>
-              setPage(
-                (
-                  (await call("/query", {
-                    kind: "heads",
-                    type: kind,
-                    limit: 50,
-                  })) as { data: Page }
-                ).data,
-              ),
-            )
-          }
-        >
-          定義一覧を取得
-        </button>
-        <label>
-          定義ID
-          <input
-            disabled={busy}
-            value={id}
-            onChange={(e) => {
-              setID(e.target.value);
-              setRecord(undefined);
-              setDraft(undefined);
-            }}
-          />
-        </label>
-        <label>
-          定義の版（headは現在版）
-          <input
-            disabled={busy}
-            value={requestedVersion}
-            onChange={(e) => setRequestedVersion(e.target.value)}
-          />
-        </label>
-        <button
-          disabled={busy || !id}
-          onClick={() => void act(() => load(id, requestedVersion))}
-        >
-          定義を取得・更新
-        </button>
-        {canEdit && (
-          <button disabled={busy} onClick={() => fresh(kind)}>
-            新しい定義の下書き
-          </button>
-        )}
-      </div>
-      {page && (
-        <>
-          <ul>
-            {page.items.map((r) => (
-              <li key={r.id}>
-                <button
-                  disabled={busy}
-                  onClick={() => void act(() => load(r.id, r.version))}
-                >
-                  {r.value.name || r.id} · {r.version}
-                </button>
-              </li>
-            ))}
-          </ul>
-          {page.next && (
-            <button
-              disabled={busy}
-              onClick={() =>
-                void act(async () =>
-                  setPage(
-                    (
-                      (await call("/query", {
-                        kind: "heads",
-                        type: kind,
-                        after: page.next,
-                        limit: 50,
-                      })) as { data: Page }
-                    ).data,
-                  ),
-                )
-              }
-            >
-              定義一覧の次のページ
-            </button>
-          )}
-        </>
-      )}
-      {canEdit && (
-        <label>
-          定義ファイルを新しい下書きとして読み込む
-          <input
-            type="file"
-            accept="application/json,.json"
-            disabled={busy}
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file)
-                void act(async () => {
-                  const text = await file.text();
-                  const schema = JSON.parse(
-                    fieldSource(text, ["schema"]),
-                  ) as string;
-                  if (
-                    schema !== "run-definition-v1" &&
-                    schema !== "workflow-definition-v1"
-                  )
-                    throw Error("schema");
-                  fresh(schema.slice(0, -3), text);
-                  setNotice(
-                    "ファイルを端末内の新しい下書きへ読み込みました。共有への保存・実行はしていません。",
-                  );
-                });
-            }}
-          />
-        </label>
-      )}
-      {record && (
-        <p>
-          {record.id} · {record.version} / 共有下書き。採用版:{" "}
-          {adoption?.version ?? "未採用"}
-        </p>
-      )}
-      {draft && (
-        <fieldset disabled={busy || !canEdit}>
-          <p>
-            項目の入力はこの端末の下書きへ保存し、JSON反映または共有保存時に同じ定義へ反映します。
-          </p>
-          {field("定義の名前", ["name"])}
-          {kind === "run-definition" ? (
-            <>
-              {field("commandの種類", ["spec", "input", "command", "kind"])}
-              {field("commandの接続先", ["spec", "input", "command", "target"])}
-              {field(
-                "commandの引数・要求（JSON）",
-                ["spec", "input", "command", "parameters"],
-                "json",
-              )}
-              {field(
-                "入力の受渡し（JSON）",
-                ["spec", "input", "command", "binding"],
-                "json",
-              )}
-              {field(
-                "固定Contextの選択（JSON・省略可）",
-                ["selection"],
-                "json",
-              )}
-              {field(
-                "prompt（JSON・省略可）",
-                ["spec", "input", "prompt"],
-                "json",
-              )}
-              {field(
-                "検品などの派生契約（JSON・省略可）",
-                ["spec", "derivation"],
-                "json",
-              )}
-              {field(
-                "前段から受ける必須入力（JSON・省略可）",
-                ["inputs"],
-                "json",
-              )}
-              {field("必要な接続能力（JSON・省略可）", ["required"], "json")}
-              {field("担当端末ID（省略可）", ["device_id"])}
-            </>
-          ) : (
-            <>
-              <p>
-                工程ごとにRun定義の固定版、結果条件、入力接続と戻り先を指定します。実行予算の数値は自動で設定しません。
-              </p>
-              {field("同時に実行する上限", ["budget", "parallel"], "number")}
-              {field(
-                "生成するRun数の上限（循環時は必須）",
-                ["budget", "max_runs"],
-                "number",
-              )}
-              {field(
-                "工程の制御時間（秒・省略可）",
-                ["budget", "seconds"],
-                "number",
-              )}
-              {field("費用予算（JSON・省略可）", ["budget", "cost"], "json")}
-              {field(
-                "Context基準の固定参照（JSON・省略可）",
-                ["baseline"],
-                "json",
-              )}
+            <h3>工程定義・検証・採用と実行</h3>
+            <p>
+              定義の保存・検証・採用と、実行開始を分けます。必要な固定入力と接続だけを指定します。
+            </p>
+            <div className="team-controls">
               <label>
-                編集する工程
+                定義の種類
                 <select
-                  value={selected}
-                  onChange={(e) => setSelected(Number(e.target.value))}
+                  disabled={busy}
+                  value={kind}
+                  onChange={(e) => {
+                    setKind(e.target.value);
+                    setPage(undefined);
+                    setID("");
+                    setRecord(undefined);
+                    setDraft(undefined);
+                    setValidation(undefined);
+                    setVerified(undefined);
+                    setAdoption(undefined);
+                  }}
                 >
-                  {Array.from({ length: count }, (_, i) => (
-                    <option key={i} value={i}>
-                      {i + 1}
-                    </option>
-                  ))}
+                  <option value="run-definition">Run定義</option>
+                  <option value="workflow-definition">工程定義</option>
                 </select>
               </label>
               <button
-                onClick={() => {
-                  try {
-                    const text = editField(
-                      compose(draft),
-                      ["nodes", count],
-                      JSON.stringify({ id: `node-${count + 1}`, join: "all" }),
-                    );
-                    persist({ ...draft, text, fields: {}, pending: undefined });
-                    setSelected(count);
-                  } catch {
-                    setNotice("JSONの構文と項目の入力を確認してください。");
-                  }
-                }}
-              >
-                工程を追加
-              </button>
-              {count > 0 && (
-                <>
-                  {field("工程の識別名", ["nodes", selected, "id"])}
-                  {field("Run定義ID", ["nodes", selected, "definition", "id"])}
-                  {field("Run定義の固定版", [
-                    "nodes",
-                    selected,
-                    "definition",
-                    "version",
-                  ])}
-                  {field(
-                    "判断待ちの選択肢（JSON・Run定義と択一）",
-                    ["nodes", selected, "choices"],
-                    "json",
-                  )}
-                  {field(
-                    "依存する工程と結果（JSON）",
-                    ["nodes", selected, "depends"],
-                    "json",
-                  )}
-                  {field("合流の条件（all / any）", [
-                    "nodes",
-                    selected,
-                    "join",
-                  ])}
-                  {field(
-                    "前段出力の選択と入力接続（JSON）",
-                    ["nodes", selected, "bindings"],
-                    "json",
-                  )}
-                  {field(
-                    "開始時に明示する入力（JSON・省略可）",
-                    ["nodes", selected, "inputs"],
-                    "json",
-                  )}
-                  {field(
-                    "戻り先（結果名から工程ID、JSON・省略可）",
-                    ["nodes", selected, "retry"],
-                    "json",
-                  )}
-                </>
-              )}
-            </>
-          )}
-          <button
-            onClick={() => {
-              try {
-                persist({
-                  ...draft,
-                  text: compose(draft),
-                  fields: {},
-                  pending: undefined,
-                });
-              } catch {
-                setNotice("項目のJSON構文を確認してください。");
-              }
-            }}
-          >
-            項目をJSONへ反映
-          </button>
-          <details>
-            <summary>定義のJSON原文を編集</summary>
-            <p>原文を直接編集すると、上の未反映の項目入力を置き換えます。</p>
-            <textarea
-              aria-label="定義のJSON原文"
-              rows={15}
-              value={draft.text}
-              onChange={(e) =>
-                persist({
-                  ...draft,
-                  text: e.target.value,
-                  fields: {},
-                  manual_paths: definitionFields.map(([path]) => path),
-                  pending: undefined,
-                })
-              }
-            />
-          </details>
-          {record && draft.version !== record.version && (
-            <>
-              <p>
-                下書きの前提版: {draft.version}
-                。共有の現在版と比較してから適用してください。
-              </p>
-              <textarea
-                aria-label="共有側の定義"
-                readOnly
-                rows={8}
-                value={record.value_utf8}
-              />
-              <button
+                disabled={busy}
                 onClick={() =>
-                  persist({
-                    ...draft,
-                    version: record.version,
-                    pending: undefined,
+                  void act(async () =>
+                    setPage(
+                      (
+                        (await call("/query", {
+                          kind: "heads",
+                          type: kind,
+                          limit: 50,
+                        })) as { data: Page }
+                      ).data,
+                    ),
+                  )
+                }
+              >
+                定義一覧を取得
+              </button>
+              <label>
+                定義ID
+                <input
+                  disabled={busy}
+                  value={id}
+                  onChange={(e) => {
+                    setID(e.target.value);
+                    setRecord(undefined);
+                    setDraft(undefined);
+                  }}
+                />
+              </label>
+              <label>
+                定義の版（headは現在版）
+                <input
+                  disabled={busy}
+                  value={requestedVersion}
+                  onChange={(e) => setRequestedVersion(e.target.value)}
+                />
+              </label>
+              <button
+                disabled={busy || !id}
+                onClick={() => void act(() => load(id, requestedVersion))}
+              >
+                定義を取得・更新
+              </button>
+              {canEdit && (
+                <button disabled={busy} onClick={() => fresh(kind)}>
+                  新しい定義の下書き
+                </button>
+              )}
+            </div>
+            {page && (
+              <>
+                <ul>
+                  {page.items.map((r) => (
+                    <li key={r.id}>
+                      <button
+                        disabled={busy}
+                        onClick={() => void act(() => load(r.id, r.version))}
+                      >
+                        {r.value.name || r.id} · {r.version}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {page.next && (
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(async () =>
+                        setPage(
+                          (
+                            (await call("/query", {
+                              kind: "heads",
+                              type: kind,
+                              after: page.next,
+                              limit: 50,
+                            })) as { data: Page }
+                          ).data,
+                        ),
+                      )
+                    }
+                  >
+                    定義一覧の次のページ
+                  </button>
+                )}
+              </>
+            )}
+            {canEdit && (
+              <label>
+                定義ファイルを新しい下書きとして読み込む
+                <input
+                  type="file"
+                  accept="application/json,.json"
+                  disabled={busy}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file)
+                      void act(async () => {
+                        const text = await file.text();
+                        const schema = JSON.parse(
+                          fieldSource(text, ["schema"]),
+                        ) as string;
+                        if (
+                          schema !== "run-definition-v1" &&
+                          schema !== "workflow-definition-v1"
+                        )
+                          throw Error("schema");
+                        fresh(schema.slice(0, -3), text);
+                        setNotice(
+                          "ファイルを端末内の新しい下書きへ読み込みました。共有への保存・実行はしていません。",
+                        );
+                      });
+                  }}
+                />
+              </label>
+            )}
+            {record && (
+              <p>
+                {record.id} · {record.version} / 共有下書き。採用版:{" "}
+                {adoption?.version ?? "未採用"}
+              </p>
+            )}
+            {draft && (
+              <section>
+                <fieldset disabled={busy || !canEdit}>
+                  <p>
+                    項目の入力はこの端末の下書きへ保存し、JSON反映または共有保存時に同じ定義へ反映します。
+                  </p>
+                  {field("定義の名前", ["name"])}
+                  {kind === "run-definition" ? (
+                    <>
+                      {field("commandの種類", [
+                        "spec",
+                        "input",
+                        "command",
+                        "kind",
+                      ])}
+                      {field("commandの接続先", [
+                        "spec",
+                        "input",
+                        "command",
+                        "target",
+                      ])}
+                      {field(
+                        "commandの引数・要求（JSON）",
+                        ["spec", "input", "command", "parameters"],
+                        "json",
+                      )}
+                      {field(
+                        "入力の受渡し（JSON）",
+                        ["spec", "input", "command", "binding"],
+                        "json",
+                      )}
+                      {field(
+                        "固定Contextの選択（JSON・省略可）",
+                        ["selection"],
+                        "json",
+                      )}
+                      {onContextSelection && (
+                        <button
+                          disabled={busy || !canEdit}
+                          onClick={() =>
+                            void act(async () => {
+                              const value =
+                                JSON.parse(
+                                  fieldSource(compose(draft), ["selection"]) ||
+                                    "{}",
+                                ) ?? {};
+                              const mode = value.mode ?? "select";
+                              if (
+                                !["none", "select"].includes(mode) ||
+                                (value.include &&
+                                  !Array.isArray(value.include)) ||
+                                (value.exclude && !Array.isArray(value.exclude))
+                              )
+                                throw new Error("invalid_selection");
+                              onContextSelection({
+                                definition: { id, version: draft.version },
+                                selection: {
+                                  mode,
+                                  include: value.include ?? [],
+                                  exclude: value.exclude ?? [],
+                                },
+                              });
+                            })
+                          }
+                        >
+                          Contextを選択・定義の入力をプレビュー
+                        </button>
+                      )}
+                      {field(
+                        "prompt（JSON・省略可）",
+                        ["spec", "input", "prompt"],
+                        "json",
+                      )}
+                      {field(
+                        "検品などの派生契約（JSON・省略可）",
+                        ["spec", "derivation"],
+                        "json",
+                      )}
+                      {field(
+                        "前段から受ける必須入力（JSON・省略可）",
+                        ["inputs"],
+                        "json",
+                      )}
+                      {field(
+                        "必要な接続能力（JSON・省略可）",
+                        ["required"],
+                        "json",
+                      )}
+                      {field("担当端末ID（省略可）", ["device_id"])}
+                    </>
+                  ) : (
+                    <>
+                      <p>
+                        工程ごとにRun定義の固定版、結果条件、入力接続と戻り先を指定します。実行予算の数値は自動で設定しません。
+                      </p>
+                      <details>
+                        <summary>実行予算とContext基準を確認・編集</summary>
+                        {field(
+                          "同時に実行する上限",
+                          ["budget", "parallel"],
+                          "number",
+                        )}
+                        {field(
+                          "生成するRun数の上限（循環時は必須）",
+                          ["budget", "max_runs"],
+                          "number",
+                        )}
+                        {field(
+                          "工程の制御時間（秒・省略可）",
+                          ["budget", "seconds"],
+                          "number",
+                        )}
+                        {field(
+                          "費用予算（JSON・省略可）",
+                          ["budget", "cost"],
+                          "json",
+                        )}
+                        {field(
+                          "Context基準の固定参照（JSON・省略可）",
+                          ["baseline"],
+                          "json",
+                        )}
+                      </details>
+                    </>
+                  )}
+                </fieldset>
+                {kind === "workflow-definition" && (
+                  <WorkflowNodeEditor
+                    disabled={busy || !canEdit}
+                    text={(() => {
+                      try {
+                        return compose(draft);
+                      } catch {
+                        return undefined;
+                      }
+                    })()}
+                    selected={selected}
+                    onSelect={setSelected}
+                    loadLabels={async (refs) =>
+                      (await call("/labels", refs)) as DefinitionLabel[]
+                    }
+                    loadDefinitions={async (after) =>
+                      (
+                        (await call("/query", {
+                          kind: "heads",
+                          type: "run-definition",
+                          after,
+                          limit: 50,
+                        })) as { data: DefinitionPage }
+                      ).data
+                    }
+                    onChange={(text) =>
+                      persist({
+                        ...draft,
+                        text,
+                        fields: {},
+                        pending: undefined,
+                      })
+                    }
+                  />
+                )}
+                <fieldset disabled={busy || !canEdit}>
+                  <button
+                    onClick={() => {
+                      try {
+                        persist({
+                          ...draft,
+                          text: compose(draft),
+                          fields: {},
+                          pending: undefined,
+                        });
+                      } catch {
+                        setNotice("項目のJSON構文を確認してください。");
+                      }
+                    }}
+                  >
+                    項目をJSONへ反映
+                  </button>
+                  <details>
+                    <summary>定義のJSON原文を編集</summary>
+                    <p>
+                      原文を直接編集すると、上の未反映の項目入力を置き換えます。
+                    </p>
+                    <textarea
+                      aria-label="定義のJSON原文"
+                      rows={15}
+                      value={draft.text}
+                      onChange={(e) =>
+                        persist({
+                          ...draft,
+                          text: e.target.value,
+                          fields: {},
+                          manual_paths: definitionFields.map(([path]) => path),
+                          pending: undefined,
+                        })
+                      }
+                    />
+                  </details>
+                  {record && draft.version !== record.version && (
+                    <>
+                      <p>
+                        下書きの前提版: {draft.version}
+                        。共有の現在版と比較してから適用してください。
+                      </p>
+                      <textarea
+                        aria-label="共有側の定義"
+                        readOnly
+                        rows={8}
+                        value={record.value_utf8}
+                      />
+                      <button
+                        onClick={() =>
+                          persist({
+                            ...draft,
+                            version: record.version,
+                            pending: undefined,
+                          })
+                        }
+                      >
+                        比較した下書きを現在版へ手動適用
+                      </button>
+                    </>
+                  )}
+                  <button disabled={!id} onClick={() => void act(save)}>
+                    定義の下書きを共有へ保存（実行しない）
+                  </button>
+                </fieldset>
+              </section>
+            )}
+            {record && (
+              <div className="team-controls">
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void act(async () =>
+                      setValidation(
+                        (await call("/validate", {
+                          id: record.id,
+                          version: record.version,
+                        })) as Validation,
+                      ),
+                    )
+                  }
+                >
+                  この固定版を静的検証（実行しない）
+                </button>
+                {canEdit && (
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(async () => {
+                        const key = "validation:" + record.id;
+                        const old = (await call(
+                          `/records/${encodeURIComponent(key)}?version=head`,
+                        ).catch((e: unknown) => {
+                          if (e instanceof SyncHTTPError && e.status === 403)
+                            return undefined;
+                          throw e;
+                        })) as Ref | undefined;
+                        const value = await requestMutation(
+                          "/verify",
+                          old?.version ?? "0",
+                          {
+                            definition: {
+                              id: record.id,
+                              version: record.version,
+                            },
+                          },
+                        );
+                        setVerified(value.data);
+                        setValidation(
+                          (await call("/validate", {
+                            id: record.id,
+                            version: record.version,
+                          })) as Validation,
+                        );
+                        setNotice(
+                          "検証結果を保存しました。採用・実行はしていません。",
+                        );
+                      })
+                    }
+                  >
+                    検証結果を版付きで保存
+                  </button>
+                )}
+                {canEdit && verified && validation?.valid && (
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(async () => {
+                        const old = (await call(
+                          `/records/${encodeURIComponent("adoption:" + record.id)}?version=head`,
+                        ).catch((e: unknown) => {
+                          if (e instanceof SyncHTTPError && e.status === 403)
+                            return undefined;
+                          throw e;
+                        })) as Ref | undefined;
+                        await requestMutation("/adopt", old?.version ?? "0", {
+                          definition: {
+                            id: record.id,
+                            version: record.version,
+                          },
+                          validation: verified,
+                        });
+                        setAdoption({ id: record.id, version: record.version });
+                        setNotice(
+                          "この固定版を採用しました。実行開始は依頼していません。",
+                        );
+                      })
+                    }
+                  >
+                    検証した固定版を採用（実行しない）
+                  </button>
+                )}
+                {native ? (
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      void act(async () => {
+                        const result = await invoke<{ path: string }>(
+                          "export_definition",
+                          { workspace, id: record.id, version: record.version },
+                        );
+                        setNotice(`定義を保存しました: ${result.path}`);
+                      })
+                    }
+                  >
+                    この定義版をファイルへ保存
+                  </button>
+                ) : (
+                  <a
+                    download
+                    href={`${base}/definitions/${encodeURIComponent(record.id)}/export?version=${encodeURIComponent(record.version)}`}
+                  >
+                    この定義版をファイルへ保存
+                  </a>
+                )}
+                {canExecute && (
+                  <p>実行開始は採用した工程版から別の操作で依頼します。</p>
+                )}
+              </div>
+            )}
+            {validation && (
+              <section aria-label="定義の検証結果">
+                <p>
+                  {validation.valid
+                    ? "静的検証済み（実行していません）"
+                    : "定義に未解決の箇所があります"}
+                </p>
+                <ul>
+                  {validation.problems.map((p, i) => (
+                    <li key={i}>
+                      <button
+                        data-variant="secondary"
+                        onClick={() => {
+                          const index = /^\/nodes\/(\d+)(?:\/|$)/.exec(p.path);
+                          if (index) {
+                            setSelected(Number(index[1]));
+                            requestAnimationFrame(() =>
+                              document
+                                .getElementById("workflow-node-settings")
+                                ?.focus(),
+                            );
+                          } else
+                            document
+                              .getElementById("cost-definition-editor")
+                              ?.focus();
+                        }}
+                      >
+                        {p.path}: {problems[p.code] ?? p.code} — 該当箇所を開く
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {notice && <p role="status">{notice}</p>}
+            <details>
+              <summary>接続能力の版を確認</summary>
+              <label>
+                端末ID
+                <input
+                  value={capDevice}
+                  onChange={(e) => setCapDevice(e.target.value)}
+                />
+              </label>
+              <label>
+                能力の固定版（headは現在版）
+                <input
+                  value={capVersion}
+                  onChange={(e) => setCapVersion(e.target.value)}
+                />
+              </label>
+              <button
+                disabled={busy || !capDevice}
+                onClick={() =>
+                  void act(async () => {
+                    const result = await call(
+                      `/capabilities/${encodeURIComponent(capDevice)}?version=${encodeURIComponent(capVersion)}`,
+                    );
+                    setCapabilities(JSON.stringify(result, null, 2));
                   })
                 }
               >
-                比較した下書きを現在版へ手動適用
+                能力を取得（実行しない）
               </button>
-            </>
-          )}
-          <button disabled={!id} onClick={() => void act(save)}>
-            定義の下書きを共有へ保存（実行しない）
-          </button>
-        </fieldset>
-      )}
-      {record && (
-        <div className="team-controls">
-          <button
-            disabled={busy}
-            onClick={() =>
-              void act(async () =>
-                setValidation(
-                  (await call("/validate", {
-                    id: record.id,
-                    version: record.version,
-                  })) as Validation,
-                ),
-              )
-            }
-          >
-            この固定版を静的検証（実行しない）
-          </button>
-          {canEdit && (
-            <button
-              disabled={busy}
-              onClick={() =>
-                void act(async () => {
-                  const key = "validation:" + record.id;
-                  const old = (await call(
-                    `/records/${encodeURIComponent(key)}?version=head`,
-                  ).catch((e: unknown) => {
-                    if (e instanceof SyncHTTPError && e.status === 403)
-                      return undefined;
-                    throw e;
-                  })) as Ref | undefined;
-                  const value = await requestMutation(
-                    "/verify",
-                    old?.version ?? "0",
-                    { definition: { id: record.id, version: record.version } },
-                  );
-                  setVerified(value.data);
-                  setValidation(
-                    (await call("/validate", {
-                      id: record.id,
-                      version: record.version,
-                    })) as Validation,
-                  );
-                  setNotice(
-                    "検証結果を保存しました。採用・実行はしていません。",
-                  );
-                })
-              }
-            >
-              検証結果を版付きで保存
-            </button>
-          )}
-          {canEdit && verified && validation?.valid && (
-            <button
-              disabled={busy}
-              onClick={() =>
-                void act(async () => {
-                  const old = (await call(
-                    `/records/${encodeURIComponent("adoption:" + record.id)}?version=head`,
-                  ).catch((e: unknown) => {
-                    if (e instanceof SyncHTTPError && e.status === 403)
-                      return undefined;
-                    throw e;
-                  })) as Ref | undefined;
-                  await requestMutation("/adopt", old?.version ?? "0", {
-                    definition: { id: record.id, version: record.version },
-                    validation: verified,
-                  });
-                  setAdoption({ id: record.id, version: record.version });
-                  setNotice(
-                    "この固定版を採用しました。実行開始は依頼していません。",
-                  );
-                })
-              }
-            >
-              検証した固定版を採用（実行しない）
-            </button>
-          )}
-          {native ? (
-            <button
-              disabled={busy}
-              onClick={() =>
-                void act(async () => {
-                  const result = await invoke<{ path: string }>(
-                    "export_definition",
-                    { workspace, id: record.id, version: record.version },
-                  );
-                  setNotice(`定義を保存しました: ${result.path}`);
-                })
-              }
-            >
-              この定義版をファイルへ保存
-            </button>
-          ) : (
-            <a
-              download
-              href={`${base}/definitions/${encodeURIComponent(record.id)}/export?version=${encodeURIComponent(record.version)}`}
-            >
-              この定義版をファイルへ保存
-            </a>
-          )}
-          {canExecute && (
-            <p>実行開始は採用した工程版から別の操作で依頼します。</p>
-          )}
-        </div>
-      )}
-      {validation && (
-        <section aria-label="定義の検証結果">
-          <p>
-            {validation.valid
-              ? "静的検証済み（実行していません）"
-              : "定義に未解決の箇所があります"}
-          </p>
-          <ul>
-            {validation.problems.map((p, i) => (
-              <li key={i}>
-                {p.path}: {problems[p.code] ?? p.code}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-      {notice && <p role="status">{notice}</p>}
-      <details>
-        <summary>接続能力の版を確認</summary>
-        <label>
-          端末ID
-          <input
-            value={capDevice}
-            onChange={(e) => setCapDevice(e.target.value)}
-          />
-        </label>
-        <label>
-          能力の固定版（headは現在版）
-          <input
-            value={capVersion}
-            onChange={(e) => setCapVersion(e.target.value)}
-          />
-        </label>
-        <button
-          disabled={busy || !capDevice}
-          onClick={() =>
-            void act(async () => {
-              const result = await call(
-                `/capabilities/${encodeURIComponent(capDevice)}?version=${encodeURIComponent(capVersion)}`,
-              );
-              setCapabilities(JSON.stringify(result, null, 2));
-            })
-          }
-        >
-          能力を取得（実行しない）
-        </button>
-        {capabilities && <pre>{capabilities}</pre>}
-      </details>
+              {capabilities && <pre>{capabilities}</pre>}
+            </details>
+          </section>
+        }
+      </ScreenContent>
       {kind === "run-definition" && draft && id && (
         <DefinitionGeneration
           key={`${api}:${user}:${workspace}:${id}`}
@@ -934,7 +1077,15 @@ export function Workflows({
         definition={record}
         canEdit={canEdit}
         canExecute={canExecute}
+        onSelect={(ref) =>
+          navigation?.navigate({
+            workspace,
+            screen: "work",
+            target: { ...ref, kind: "execution" },
+            view: "overview",
+          })
+        }
       />
-    </details>
+    </>
   );
 }

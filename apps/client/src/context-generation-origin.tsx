@@ -5,6 +5,8 @@ import { contextStates } from "./context-generation-proposal";
 import type { OperationAddress } from "./client-operation-port";
 import type { VersionRef } from "./model-connections";
 import type { Ref } from "./context-ui";
+import { NavigationLink } from "./navigation";
+import { PageList } from "./page-list";
 
 type Origin = {
   operation: VersionRef;
@@ -89,17 +91,33 @@ export function ContextGenerationOrigin({
           )}
           <p>{origin.item.reason}</p>
           <p>
-            元Run: {origin.source.run.id} · 出力版:{" "}
-            {origin.source.output.version} · 箇所: /
+            元Run: {origin.source.run.id} · {origin.source.run.version} ·
+            出力版: {origin.source.output.version} · 箇所: /
             {origin.source.path.join("/")}
           </p>
           <p>生成操作: {origin.operation.id}</p>
-          <p>
-            参照したContext:{" "}
-            {origin.item.references
-              .map((r) => `${r.kind}:${r.id}@${r.revision}`)
-              .join("、") || "元出力のみ"}
-          </p>
+          {origin.item.references.length ? (
+            <PageList label="参照したContext" items={origin.item.references}>
+              {(ref, index) => (
+                <li key={index}>
+                  {ref.kind}:{ref.id}@{ref.revision}
+                </li>
+              )}
+            </PageList>
+          ) : (
+            <p>参照したContext：元出力のみ</p>
+          )}
+          <NavigationLink
+            related
+            to={{
+              workspace: ui.workspace,
+              screen: "work",
+              target: { ...origin.source.run, kind: "run" },
+              view: "evidence",
+            }}
+          >
+            元Runの成果・検品へ戻る
+          </NavigationLink>
           <button onClick={() => void preview()}>元出力の固定箇所を確認</button>
           {excerpt && <pre>{excerpt}</pre>}
         </>

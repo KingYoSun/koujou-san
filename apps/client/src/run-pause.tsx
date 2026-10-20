@@ -91,28 +91,9 @@ export function QuestionView({ value }: { value: unknown }) {
   return (
     <section aria-label="判断に必要な情報">
       <h4>{q.question}</h4>
-      {q.background && (
-        <p>
-          <strong>背景：</strong>
-          {q.background}
-        </p>
-      )}
-      {q.waiting_for && (
-        <p>
-          <strong>回答を待つ工程：</strong>
-          {q.waiting_for}
-        </p>
-      )}
-      {q.expertise && (
-        <p>
-          <strong>必要な専門知識：</strong>
-          {q.expertise}
-        </p>
-      )}
       {q.target && (
         <p>
-          <strong>対象：</strong>
-          {q.target.label ?? "成果物"} / 版：{q.target.revision ?? "未指定"}{" "}
+          <strong>{q.target.label ?? "確認する成果物"}</strong>{" "}
           {q.target.uri && /^https?:\/\//.test(q.target.uri) && (
             <a href={q.target.uri} target="_blank" rel="noreferrer">
               対象の成果物を開く
@@ -129,23 +110,22 @@ export function QuestionView({ value }: { value: unknown }) {
       {!!q.criteria?.length && (
         <ul>
           {q.criteria.map((c) => (
-            <li key={c.id}>
-              {c.requirement}
-              <small>（{c.id}）</small>
-            </li>
+            <li key={c.id}>{c.requirement}</li>
           ))}
         </ul>
       )}
-      {!!q.options?.length && (
-        <dl>
-          {q.options.map((c) => (
-            <div key={c.value}>
-              <dt>{c.label}</dt>
-              <dd>{c.impact ?? "影響の説明なし"}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
+      <details>
+        <summary>依頼の背景・回答の影響・確認する版</summary>
+        {q.background && <p>{q.background}</p>}
+        {q.waiting_for && <p>回答を待つ工程：{q.waiting_for}</p>}
+        {q.expertise && <p>必要な専門知識：{q.expertise}</p>}
+        {q.target?.revision && <p>成果物の固定版：{q.target.revision}</p>}
+        {q.options?.map((c) => (
+          <p key={c.value}>
+            {c.label}：{c.impact ?? "影響の説明なし"}
+          </p>
+        ))}
+      </details>
       <details>
         <summary>質問の原文・技術情報</summary>
         <pre>{JSON.stringify(value, null, 2)}</pre>

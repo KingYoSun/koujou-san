@@ -1,16 +1,15 @@
+import type { ReactNode } from "react";
+import {
+  NavigationProvider,
+  ScreenContent,
+  routeHref,
+  historyActorMatches,
+  type Screen,
+} from "./navigation";
+import { WorkspaceShell } from "./workspace-shell";
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { apiRequest } from "./auth";
-import type { OutputContextSource } from "./context-generation";
-import { ContextWorkspace } from "./context-workspace";
-import { Automation } from "./automation";
-import { Hopper } from "./hopper";
-import { Workbench } from "./workbench";
-import { Workflows } from "./workflows";
-import { Inspections } from "./inspections";
-import { Publications } from "./publications";
-import { UsagePricing } from "./usage-pricing";
-import { GithubObservations } from "./github-observations";
 import { DeliveryPolicy } from "./delivery-policy";
 import { discardSyncWorkspace } from "./sync-engine";
 import { syncStorage } from "./sync-store";
@@ -77,16 +76,28 @@ function message(error: unknown) {
           : "操作を完了できませんでした。接続と現在の状態を確認してください。";
 }
 
-export function Team({ native }: { native: boolean }) {
+export function Team({
+  native,
+  account,
+  connection,
+  health,
+}: {
+  native: boolean;
+  account: ReactNode;
+  connection: ReactNode;
+  health: string;
+}) {
   const [me, setMe] = useState<{ id: string }>();
   const [status, setStatus] = useState("checking");
   const [workspaces, setWorkspaces] = useState<Page<Workspace>>(empty);
   const [selected, setSelected] = useState("");
-  const [contextSource, setContextSource] = useState<OutputContextSource>();
-  useEffect(() => setContextSource(undefined), [selected]);
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const [screen, setScreen] = useState<Screen>("work");
   const [members, setMembers] = useState<Page<Member>>(empty);
   const [invites, setInvites] = useState<Page<Invite>>(empty);
   const [devices, setDevices] = useState<Page<Device>>(empty);
+  const [pageWorkspace, setPageWorkspace] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [revision, setRevision] = useState(0);
@@ -99,16 +110,44 @@ export function Team({ native }: { native: boolean }) {
   const [identifier, setIdentifier] = useState("");
   const [invitation, setInvitation] = useState("");
   const pending = useRef(new Map<string, Record<string, unknown>>());
+  const authEpoch = useRef(0);
+  function selectWorkspace(id: string) {
+    history.pushState(
+      null,
+      "",
+      routeHref({ workspace: id, screen: "work" }) + location.hash,
+    );
+    setSelected(id);
+  }
+  useEffect(() => {
+    const restore = () => {
+      const scope = history.state?.koujou?.scope as string | undefined;
+      if (scope && me && !historyActorMatches(scope, apiIdentity, me.id)) {
+        history.replaceState(
+          null,
+          "",
+          routeHref({ workspace: selected, screen: "work" }) + location.hash,
+        );
+        return;
+      }
+      const id = new URLSearchParams(location.search).get("workspace");
+      if (id && workspaces.items.some((w) => w.id === id)) setSelected(id);
+    };
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, [workspaces, me, apiIdentity, selected]);
   const current = workspaces.items.find((w) => w.id === selected);
   const admin = current?.role === "admin";
   const mine = devices.items.find(
     (d) => d.identifier === identifier && d.registered_by === me?.id,
   );
   async function root(after = "", append = false) {
+    const epoch = authEpoch.current;
     const value = (await apiRequest(
       `/access/workspaces${after ? `?after=${encodeURIComponent(after)}` : ""}`,
       native,
     )) as Page<Workspace>;
+    if (epoch !== authEpoch.current) return;
     setWorkspaces((previous) => ({
       ...value,
       items: append ? [...previous.items, ...value.items] : value.items,
@@ -117,7 +156,12 @@ export function Team({ native }: { native: boolean }) {
       setSelected((previous) =>
         value.items.some((w) => w.id === previous)
           ? previous
-          : (value.items[0]?.id ?? ""),
+          : (value.items.find(
+              (w) =>
+                w.id === new URLSearchParams(location.search).get("workspace"),
+            )?.id ??
+            value.items[0]?.id ??
+            ""),
       );
   }
   useEffect(() => {
@@ -132,24 +176,52 @@ export function Team({ native }: { native: boolean }) {
     readInvitation();
     window.addEventListener("hashchange", readInvitation);
     let active = true;
-    const load = () => {
+    const load = (event?: Event) => {
+      const epoch = ++authEpoch.current;
+      setNotice(
+        (event as CustomEvent<{ notice?: string }> | undefined)?.detail
+          ?.notice ?? "",
+      );
+      setBusy(false);
+      setInviteRole("viewer");
+      setDeviceName("Windowsの端末");
+      setMe(undefined);
+      setWorkspaces(empty());
+      setSelected("");
+      setMembers(empty());
+      setInvites(empty());
+      setDevices(empty());
+      setPageWorkspace("");
+      setName("");
+      setLink("");
+      pending.current.clear();
       apiRequest("/auth/me", native)
         .then(async (value) => {
-          if (!active) return;
+          if (!active || epoch !== authEpoch.current) return;
           setMe((value as { user: { id: string } }).user);
           setStatus("ready");
           const config = (await apiRequest("/auth/config", native)) as {
             site_url: string;
             api_url: string;
           };
-          if (!active) return;
+          if (!active || epoch !== authEpoch.current) return;
+          const previousScope = history.state?.koujou?.scope as
+            string | undefined;
+          if (previousScope) {
+            const previousActor = JSON.parse(previousScope) as string[];
+            if (
+              previousActor[0] !== config.api_url ||
+              previousActor[1] !== (value as { user: { id: string } }).user.id
+            )
+              history.replaceState(null, "", location.pathname + location.hash);
+          }
           setPublicSite(config.site_url);
           setApiIdentity(config.api_url);
           if (native) setIdentifier(await invoke<string>("device_identifier"));
           await root();
         })
         .catch((error) => {
-          if (!active) return;
+          if (!active || epoch !== authEpoch.current) return;
           setMe(undefined);
           setStatus(
             /ログインが必要|authentication_required/.test(String(error))
@@ -166,29 +238,43 @@ export function Team({ native }: { native: boolean }) {
       window.removeEventListener("koujou-auth-changed", load);
     };
   }, [native]);
-  async function page<T>(kind: string, after = ""): Promise<Page<T>> {
+  async function page<T>(
+    kind: string,
+    after = "",
+  ): Promise<Page<T> | undefined> {
+    const epoch = authEpoch.current;
+    const owner = selected;
     const response = (await apiRequest(
       `/access/workspaces/${encodeURIComponent(selected)}/${kind}${after ? `?after=${encodeURIComponent(after)}` : ""}`,
       native,
     )) as Envelope<Page<T>>;
-    return response.data;
+    if (epoch === authEpoch.current && owner === selectedRef.current)
+      return response.data;
   }
   useEffect(() => {
     setMembers(empty());
     setDevices(empty());
     setInvites(empty());
-    if (!selected) return;
+    if (!selected || !["work", "workspace", "devices"].includes(screen)) return;
     let active = true;
+    const epoch = authEpoch.current;
     Promise.all([
-      page<Member>("members"),
-      page<Device>("devices"),
-      admin ? page<Invite>("invites") : Promise.resolve(empty<Invite>()),
+      screen === "work" || screen === "workspace"
+        ? page<Member>("members")
+        : Promise.resolve(empty<Member>()),
+      screen === "devices"
+        ? page<Device>("devices")
+        : Promise.resolve(empty<Device>()),
+      admin && screen === "workspace"
+        ? page<Invite>("invites")
+        : Promise.resolve(empty<Invite>()),
     ])
       .then(([m, d, i]) => {
-        if (active) {
+        if (active && epoch === authEpoch.current && m && d && i) {
           setMembers(m);
           setDevices(d);
           setInvites(i);
+          setPageWorkspace(selected);
         }
       })
       .catch((error) => {
@@ -197,8 +283,14 @@ export function Team({ native }: { native: boolean }) {
     return () => {
       active = false;
     };
-  }, [selected, admin, revision]);
-  useEffect(() => setLink(""), [selected, admin]);
+  }, [selected, admin, revision, screen]);
+  useEffect(() => {
+    setName("");
+    setInviteRole("viewer");
+    setDeviceName("Windowsの端末");
+    setLink("");
+    setBusy(false);
+  }, [selected, admin]);
   async function act(
     kind: string,
     body: Record<string, unknown>,
@@ -206,6 +298,10 @@ export function Team({ native }: { native: boolean }) {
     version = "0",
     workspace = selected,
   ) {
+    const epoch = authEpoch.current;
+    const owner = selectedRef.current;
+    const currentScope = () =>
+      epoch === authEpoch.current && owner === selectedRef.current;
     setBusy(true);
     setNotice("");
     const key = workspace + kind + JSON.stringify(body) + (id ?? "");
@@ -227,6 +323,7 @@ export function Team({ native }: { native: boolean }) {
         { method: "POST", body: request },
       )) as { invitation?: string };
       pending.current.delete(key);
+      if (!currentScope()) return false;
       if (
         (kind === "leave" ||
           (kind === "member-update" &&
@@ -249,19 +346,21 @@ export function Team({ native }: { native: boolean }) {
       setRevision((v) => v + 1);
       if (kind === "create") {
         setName("");
-        setSelected(target);
+        selectWorkspace(target);
       }
       return true;
     } catch (error) {
+      if (!currentScope()) return false;
       if (/更新されています|version_conflict/.test(String(error)))
         pending.current.delete(key);
       setNotice(message(error));
       return false;
     } finally {
-      setBusy(false);
+      if (currentScope()) setBusy(false);
     }
   }
   async function accept() {
+    const epoch = authEpoch.current;
     const parts = invitation.split(".");
     if (parts.length !== 3) {
       setNotice("招待リンクを確認してください。");
@@ -277,6 +376,7 @@ export function Team({ native }: { native: boolean }) {
         native,
         { method: "POST", body: { token: parts.slice(1).join(".") } },
       )) as { version: string };
+      if (epoch !== authEpoch.current) return;
       await act(
         "invite-accept",
         { token: parts.slice(1).join(".") },
@@ -315,8 +415,10 @@ export function Team({ native }: { native: boolean }) {
   }
   if (!me)
     return (
-      <section className="panel" aria-label="チームと端末">
-        <h2>チームと端末</h2>
+      <section className="panel" aria-label="Workspaceへの参加">
+        {account}
+        {notice && <p role="status">{notice}</p>}
+        <h2>Workspace</h2>
         <p>
           {status === "checking"
             ? "認証状態を確認しています…"
@@ -344,438 +446,452 @@ export function Team({ native }: { native: boolean }) {
     </select>
   );
   return (
-    <section className="panel team" aria-labelledby="team-title">
-      <h2 id="team-title">チームと端末</h2>
+    <section className="team" aria-label="Workspace">
       {notice && <p role="status">{notice}</p>}
-      {invitation && (
-        <div>
-          <p>招待リンクの所持者として参加できます。</p>
-          <button disabled={busy} onClick={accept}>
-            招待を受諾
-          </button>
-        </div>
-      )}
-      <form
-        className="auth-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          void act("create", { name }, undefined);
-        }}
-      >
-        <label>
-          新しいWorkspaceの名前
-          <input
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <button disabled={busy}>Workspaceを作成</button>
-      </form>
-      {workspaces.items.length > 0 && (
-        <label>
-          Workspace
-          <select
-            value={selected}
-            onChange={(e) => setSelected(e.target.value)}
-            disabled={busy}
-          >
-            {workspaces.items.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name}（{roles[w.role]}）
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {workspaces.next_cursor && (
-        <button onClick={() => root(workspaces.next_cursor, true)}>
-          さらにWorkspaceを表示
-        </button>
-      )}
-      {current && (
-        <>
-          <p>
-            あなたの役割: {roles[current.role]} / 実行依頼:{" "}
-            {current.can_execute ? "許可" : "不許可"}
-          </p>
-          <Workbench
-            key={`runs/${apiIdentity}/${me.id}/${selected}`}
+      {current ? (
+        <NavigationProvider
+          key={apiIdentity + "/" + me.id + "/" + selected}
+          api={apiIdentity}
+          user={me.id}
+          workspace={selected}
+        >
+          <WorkspaceShell
             native={native}
-            api={apiIdentity}
-            workspace={selected}
-            user={me?.id ?? ""}
-            role={current.role}
-            canExecute={current.can_execute}
-            members={members.items}
-            membersNext={members.next_cursor}
-            onGenerate={setContextSource}
-          />
-          {apiIdentity && me && (
-            <ContextWorkspace
-              source={contextSource}
-              key={selected}
-              role={current.role}
-              native={native}
-              api={apiIdentity}
-              workspace={selected}
-              user={me.id}
-              onRevoked={() => {
-                setNotice(
-                  "Workspaceの取得権限が失効しました。本文キャッシュと下書きを削除しました。",
-                );
-                void root().catch(() => {});
-              }}
-            />
-          )}
-          {apiIdentity && (
-            <GithubObservations
-              key={`${apiIdentity}/${me.id}/${selected}`}
-              api={apiIdentity}
-              user={me.id}
-              workspace={selected}
-              native={native}
-            />
-          )}
-          <UsagePricing
             api={apiIdentity}
             user={me.id}
-            key={`usage/${apiIdentity}/${me.id}/${selected}`}
-            native={native}
             workspace={selected}
+            name={current.name}
             role={current.role}
-          />
-          {apiIdentity && (
-            <Workflows
-              key={`workflows/${apiIdentity}/${me.id}/${selected}`}
-              native={native}
-              api={apiIdentity}
-              workspace={selected}
-              user={me.id}
-              role={current.role}
-              canExecute={current.can_execute}
-            />
-          )}
-          {apiIdentity && (
-            <Inspections
-              key={`inspections/${apiIdentity}/${me.id}/${selected}`}
-              native={native}
-              api={apiIdentity}
-              workspace={selected}
-              user={me.id}
-              role={current.role}
-              canExecute={current.can_execute}
-            />
-          )}
-          {apiIdentity && (
-            <Publications
-              key={`publications/${apiIdentity}/${me.id}/${selected}`}
-              native={native}
-              api={apiIdentity}
-              workspace={selected}
-              user={me.id}
-              role={current.role}
-              canExecute={current.can_execute}
-            />
-          )}
-          <Automation
-            key={`automation/${apiIdentity}/${me.id}/${selected}`}
-            native={native}
-            workspace={selected}
-            role={current.role}
-          />
-          <Hopper
-            key={`hopper/${apiIdentity}/${me.id}/${selected}`}
-            native={native}
-            workspace={selected}
-            role={current.role}
-          />
-          <details className="workspace-management">
-            <summary>参加者・招待・端末・共有ポリシー</summary>
-            <button
-              disabled={busy}
-              onClick={() => {
-                const own = members.items.find((m) => m.id === me.id);
-                if (own) void act("leave", {}, me.id, own.version);
-              }}
-            >
-              このWorkspaceから離脱
-            </button>
-            <h3>参加者</h3>
-            <ul>
-              {members.items.map((m) => (
-                <li key={m.id}>
-                  <span>
-                    {m.name} · {m.active ? roles[m.role] : "利用停止"}
-                  </span>
-                  {admin && (
-                    <div className="team-controls">
-                      {selectRole(m.role, (role) => {
-                        void act(
-                          "member-update",
-                          {
-                            role,
-                            can_execute: m.can_execute,
-                            active: m.active,
-                          },
-                          m.id,
-                          m.version,
-                        );
-                      })}
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={m.can_execute}
-                          disabled={busy}
-                          onChange={(e) => {
-                            void act(
-                              "member-update",
-                              {
-                                role: m.role,
-                                active: m.active,
-                                can_execute: e.target.checked,
-                              },
-                              m.id,
-                              m.version,
-                            );
-                          }}
-                        />
-                        実行依頼を許可
-                      </label>
-                      <button
-                        disabled={busy}
-                        onClick={() =>
-                          act(
-                            "member-update",
-                            {
-                              role: m.role,
-                              can_execute: m.can_execute,
-                              active: !m.active,
-                            },
-                            m.id,
-                            m.version,
-                          )
-                        }
-                      >
-                        {m.active ? "利用を停止" : "利用を再開"}
-                      </button>
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {members.next_cursor && (
-              <button
-                onClick={async () => {
-                  const value = await page<Member>(
-                    "members",
-                    members.next_cursor,
-                  );
-                  setMembers({
-                    ...value,
-                    items: [...members.items, ...value.items],
-                  });
-                }}
-              >
-                さらに参加者を表示
-              </button>
-            )}
-            {admin && (
+            canExecute={current.can_execute}
+            members={pageWorkspace === selected ? members.items : []}
+            membersNext={
+              pageWorkspace === selected ? members.next_cursor : undefined
+            }
+            onScreen={setScreen}
+            account={account}
+            connection={connection}
+            health={health}
+            onRevoked={() => {
+              setNotice(
+                "Workspaceの取得権限が失効しました。本文キャッシュと下書きを削除しました。",
+              );
+              void root().catch(() => {});
+            }}
+            selector={
               <>
-                <h3>招待</h3>
-                <p>
-                  ログイン済みのリンク所持者が1回受諾できます。リンクは7日間有効で、転送先も参加できます。
-                </p>
-                {selectRole(inviteRole, setInviteRole)}
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    act("invite-create", { role: inviteRole }, undefined)
-                  }
-                >
-                  招待リンクを作成
-                </button>
-                {link && (
-                  <label>
-                    招待リンク
-                    <input
-                      readOnly
-                      value={link}
-                      onFocus={(e) => e.target.select()}
-                    />
-                  </label>
-                )}
-                <ul>
-                  {invites.items.map((i) => (
-                    <li key={i.id}>
-                      {roles[i.role]} ·{" "}
-                      {i.cancelled
-                        ? "取消済み"
-                        : i.accepted
-                          ? "受諾済み"
-                          : new Date(i.expires_at) < new Date()
-                            ? "期限切れ"
-                            : `有効期限 ${new Date(i.expires_at).toLocaleString()}`}
-                      <button
-                        disabled={busy || i.cancelled || i.accepted}
-                        onClick={() =>
-                          act("invite-cancel", {}, i.id, i.version)
-                        }
-                      >
-                        招待を取り消す
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-                {invites.next_cursor && (
-                  <button
-                    onClick={async () => {
-                      const value = await page<Invite>(
-                        "invites",
-                        invites.next_cursor,
-                      );
-                      setInvites({
-                        ...value,
-                        items: [...invites.items, ...value.items],
-                      });
-                    }}
+                <label>
+                  Workspace
+                  <select
+                    value={selected}
+                    onChange={(e) => selectWorkspace(e.target.value)}
+                    disabled={busy}
                   >
-                    さらに招待を表示
+                    {workspaces.items.map((w) => (
+                      <option key={w.id} value={w.id}>
+                        {w.name}（{roles[w.role]}）
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {workspaces.next_cursor && (
+                  <button onClick={() => root(workspaces.next_cursor, true)}>
+                    さらにWorkspaceを表示
                   </button>
                 )}
               </>
-            )}
-            <h3>端末</h3>
-            <p>
-              端末登録と実行依頼の許可は別です。最終接続時刻から、CLIの稼働・停止は判断できません。
-            </p>
-            {native && current.role !== "viewer" && (
-              <div className="team-controls">
-                <label>
-                  この端末の名前
-                  <input
-                    disabled={busy || Boolean(mine)}
-                    value={deviceName}
-                    onChange={(e) => setDeviceName(e.target.value)}
-                  />
-                </label>
-                <button disabled={busy} onClick={() => nativeAction("enroll")}>
-                  {mine ? "この端末の資格情報を更新" : "この端末を登録"}
-                </button>
-                {mine && (
-                  <button
-                    disabled={busy}
-                    onClick={() => nativeAction("contact")}
-                  >
-                    この端末の接続を確認
-                  </button>
-                )}
-              </div>
-            )}
-            {!native && (
-              <p>
-                この端末の登録と資格情報の保存はWindowsデスクトップ版から行います。
-              </p>
-            )}
-            <ul>
-              {devices.items.map((d) => (
-                <li key={d.id}>
-                  <strong>{d.name}</strong> · {d.enabled ? "登録済み" : "失効"}
-                  <p>
-                    入力取得: {d.can_input ? "許可" : "不許可"} / 実行報告:{" "}
-                    {d.can_report ? "許可" : "不許可"} / 最終接続:{" "}
-                    {d.last_seen
-                      ? new Date(d.last_seen).toLocaleString()
-                      : "報告なし"}
-                  </p>
-                  {admin && (
-                    <div className="team-controls">
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={d.can_input}
-                          disabled={busy || !d.enabled}
-                          onChange={(e) => {
-                            void act(
-                              "device-update",
-                              {
-                                active: d.enabled,
-                                can_input: e.target.checked,
-                                can_report: d.can_report,
-                              },
-                              d.id,
-                              d.version,
-                            );
-                          }}
-                        />
-                        入力取得を許可
-                      </label>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={d.can_report}
-                          disabled={busy || !d.enabled}
-                          onChange={(e) => {
-                            void act(
-                              "device-update",
-                              {
-                                active: d.enabled,
-                                can_input: d.can_input,
-                                can_report: e.target.checked,
-                              },
-                              d.id,
-                              d.version,
-                            );
-                          }}
-                        />
-                        実行報告を許可
-                      </label>
-                      <button
-                        disabled={busy || !d.enabled}
-                        onClick={() =>
-                          act(
-                            "device-update",
-                            {
-                              active: false,
-                              can_input: false,
-                              can_report: false,
-                            },
-                            d.id,
-                            d.version,
-                          )
-                        }
-                      >
-                        端末を失効
+            }
+            management={
+              <>
+                <ScreenContent screens={["workspace"]}>
+                  <h3>Workspaceの作成・参加</h3>{" "}
+                  {invitation && (
+                    <div>
+                      <p>招待リンクの所持者として参加できます。</p>
+                      <button disabled={busy} onClick={accept}>
+                        招待を受諾
                       </button>
                     </div>
                   )}
-                </li>
-              ))}
-            </ul>
-            {devices.next_cursor && (
-              <button
-                onClick={async () => {
-                  const value = await page<Device>(
-                    "devices",
-                    devices.next_cursor,
-                  );
-                  setDevices({
-                    ...value,
-                    items: [...devices.items, ...value.items],
-                  });
-                }}
+                  <form
+                    className="auth-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void act("create", { name }, undefined);
+                    }}
+                  >
+                    <label>
+                      新しいWorkspaceの名前
+                      <input
+                        required
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                      />
+                    </label>
+                    <button disabled={busy}>Workspaceを作成</button>
+                  </form>
+                </ScreenContent>
+                {pageWorkspace === selected ? (
+                  <div className="workspace-management">
+                    <ScreenContent screens={["workspace"]}>
+                      <button
+                        disabled={busy}
+                        onClick={() => {
+                          const own = members.items.find((m) => m.id === me.id);
+                          if (own) void act("leave", {}, me.id, own.version);
+                        }}
+                      >
+                        このWorkspaceから離脱
+                      </button>
+                      <h3>参加者</h3>
+                      <ul>
+                        {members.items.map((m) => (
+                          <li key={m.id}>
+                            <span>
+                              {m.name} · {m.active ? roles[m.role] : "利用停止"}
+                            </span>
+                            {admin && (
+                              <div className="team-controls">
+                                {selectRole(m.role, (role) => {
+                                  void act(
+                                    "member-update",
+                                    {
+                                      role,
+                                      can_execute: m.can_execute,
+                                      active: m.active,
+                                    },
+                                    m.id,
+                                    m.version,
+                                  );
+                                })}
+                                <label>
+                                  <input
+                                    type="checkbox"
+                                    checked={m.can_execute}
+                                    disabled={busy}
+                                    onChange={(e) => {
+                                      void act(
+                                        "member-update",
+                                        {
+                                          role: m.role,
+                                          active: m.active,
+                                          can_execute: e.target.checked,
+                                        },
+                                        m.id,
+                                        m.version,
+                                      );
+                                    }}
+                                  />
+                                  実行依頼を許可
+                                </label>
+                                <button
+                                  disabled={busy}
+                                  onClick={() =>
+                                    act(
+                                      "member-update",
+                                      {
+                                        role: m.role,
+                                        can_execute: m.can_execute,
+                                        active: !m.active,
+                                      },
+                                      m.id,
+                                      m.version,
+                                    )
+                                  }
+                                >
+                                  {m.active ? "利用を停止" : "利用を再開"}
+                                </button>
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                      {members.next_cursor && (
+                        <button
+                          onClick={async () => {
+                            const value = await page<Member>(
+                              "members",
+                              members.next_cursor,
+                            );
+                            if (!value) return;
+                            setMembers({
+                              ...value,
+                              items: [...members.items, ...value.items],
+                            });
+                          }}
+                        >
+                          さらに参加者を表示
+                        </button>
+                      )}
+                      {admin && (
+                        <>
+                          <h3>招待</h3>
+                          <p>
+                            ログイン済みのリンク所持者が1回受諾できます。リンクは7日間有効で、転送先も参加できます。
+                          </p>
+                          {selectRole(inviteRole, setInviteRole)}
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              act(
+                                "invite-create",
+                                { role: inviteRole },
+                                undefined,
+                              )
+                            }
+                          >
+                            招待リンクを作成
+                          </button>
+                          {link && (
+                            <label>
+                              招待リンク
+                              <input
+                                readOnly
+                                value={link}
+                                onFocus={(e) => e.target.select()}
+                              />
+                            </label>
+                          )}
+                          <ul>
+                            {invites.items.map((i) => (
+                              <li key={i.id}>
+                                {roles[i.role]} ·{" "}
+                                {i.cancelled
+                                  ? "取消済み"
+                                  : i.accepted
+                                    ? "受諾済み"
+                                    : new Date(i.expires_at) < new Date()
+                                      ? "期限切れ"
+                                      : `有効期限 ${new Date(i.expires_at).toLocaleString()}`}
+                                <button
+                                  disabled={busy || i.cancelled || i.accepted}
+                                  onClick={() =>
+                                    act("invite-cancel", {}, i.id, i.version)
+                                  }
+                                >
+                                  招待を取り消す
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                          {invites.next_cursor && (
+                            <button
+                              onClick={async () => {
+                                const value = await page<Invite>(
+                                  "invites",
+                                  invites.next_cursor,
+                                );
+                                if (!value) return;
+                                setInvites({
+                                  ...value,
+                                  items: [...invites.items, ...value.items],
+                                });
+                              }}
+                            >
+                              さらに招待を表示
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </ScreenContent>
+                    <ScreenContent screens={["devices"]}>
+                      <h3>端末</h3>
+                      <p>
+                        端末登録と実行依頼の許可は別です。最終接続時刻から、CLIの稼働・停止は判断できません。
+                      </p>
+                      {native && current.role !== "viewer" && (
+                        <div className="team-controls">
+                          <label>
+                            この端末の名前
+                            <input
+                              disabled={busy || Boolean(mine)}
+                              value={deviceName}
+                              onChange={(e) => setDeviceName(e.target.value)}
+                            />
+                          </label>
+                          <button
+                            disabled={busy}
+                            onClick={() => nativeAction("enroll")}
+                          >
+                            {mine
+                              ? "この端末の資格情報を更新"
+                              : "この端末を登録"}
+                          </button>
+                          {mine && (
+                            <button
+                              disabled={busy}
+                              onClick={() => nativeAction("contact")}
+                            >
+                              この端末の接続を確認
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {!native && (
+                        <p>
+                          この端末の登録と資格情報の保存はWindowsデスクトップ版から行います。
+                        </p>
+                      )}
+                      <ul>
+                        {devices.items.map((d) => (
+                          <li key={d.id}>
+                            <strong>{d.name}</strong> ·{" "}
+                            {d.enabled ? "登録済み" : "失効"}
+                            <p>
+                              入力取得: {d.can_input ? "許可" : "不許可"} /
+                              実行報告: {d.can_report ? "許可" : "不許可"} /
+                              最終接続:{" "}
+                              {d.last_seen
+                                ? new Date(d.last_seen).toLocaleString()
+                                : "報告なし"}
+                            </p>
+                            {admin && (
+                              <div className="team-controls">
+                                <label>
+                                  <input
+                                    type="checkbox"
+                                    checked={d.can_input}
+                                    disabled={busy || !d.enabled}
+                                    onChange={(e) => {
+                                      void act(
+                                        "device-update",
+                                        {
+                                          active: d.enabled,
+                                          can_input: e.target.checked,
+                                          can_report: d.can_report,
+                                        },
+                                        d.id,
+                                        d.version,
+                                      );
+                                    }}
+                                  />
+                                  入力取得を許可
+                                </label>
+                                <label>
+                                  <input
+                                    type="checkbox"
+                                    checked={d.can_report}
+                                    disabled={busy || !d.enabled}
+                                    onChange={(e) => {
+                                      void act(
+                                        "device-update",
+                                        {
+                                          active: d.enabled,
+                                          can_input: d.can_input,
+                                          can_report: e.target.checked,
+                                        },
+                                        d.id,
+                                        d.version,
+                                      );
+                                    }}
+                                  />
+                                  実行報告を許可
+                                </label>
+                                <button
+                                  disabled={busy || !d.enabled}
+                                  onClick={() =>
+                                    act(
+                                      "device-update",
+                                      {
+                                        active: false,
+                                        can_input: false,
+                                        can_report: false,
+                                      },
+                                      d.id,
+                                      d.version,
+                                    )
+                                  }
+                                >
+                                  端末を失効
+                                </button>
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                      {devices.next_cursor && (
+                        <button
+                          onClick={async () => {
+                            const value = await page<Device>(
+                              "devices",
+                              devices.next_cursor,
+                            );
+                            if (!value) return;
+                            setDevices({
+                              ...value,
+                              items: [...devices.items, ...value.items],
+                            });
+                          }}
+                        >
+                          さらに端末を表示
+                        </button>
+                      )}
+                      {admin && (
+                        <DeliveryPolicy
+                          key={selected}
+                          native={native}
+                          workspace={selected}
+                        />
+                      )}
+                    </ScreenContent>
+                  </div>
+                ) : (
+                  <p role="status">
+                    現在のWorkspaceの管理情報を確認しています…
+                  </p>
+                )}
+              </>
+            }
+          />
+        </NavigationProvider>
+      ) : (
+        <>
+          <h2>Workspaceへの参加・作成</h2>{" "}
+          {workspaces.items.length > 0 && (
+            <label>
+              Workspace
+              <select
+                value={selected}
+                onChange={(e) => selectWorkspace(e.target.value)}
+                disabled={busy}
               >
-                さらに端末を表示
+                {workspaces.items.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}（{roles[w.role]}）
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {workspaces.next_cursor && (
+            <button onClick={() => root(workspaces.next_cursor, true)}>
+              さらにWorkspaceを表示
+            </button>
+          )}
+          {invitation && (
+            <div>
+              <p>招待リンクの所持者として参加できます。</p>
+              <button disabled={busy} onClick={accept}>
+                招待を受諾
               </button>
-            )}
-            {admin && (
-              <DeliveryPolicy
-                key={selected}
-                native={native}
-                workspace={selected}
+            </div>
+          )}
+          <form
+            className="auth-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void act("create", { name }, undefined);
+            }}
+          >
+            <label>
+              新しいWorkspaceの名前
+              <input
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
               />
-            )}
-          </details>
+            </label>
+            <button disabled={busy}>Workspaceを作成</button>
+          </form>
         </>
       )}
     </section>

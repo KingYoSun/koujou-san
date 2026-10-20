@@ -109,6 +109,19 @@ const request = {
     },
   ],
 };
+test("the initial question contains the target, instructions and criteria while background and identifiers remain available on demand", () => {
+  const html = renderToStaticMarkup(<QuestionView value={request} />);
+  const primary = html.replace(/<details[\s\S]*?<\/details>/g, "");
+  expect(primary).toContain(request.question);
+  expect(primary).toContain(request.instructions);
+  expect(primary).toContain("保存して戻ると表示される");
+  expect(primary).toContain('href="https://example.test/build"');
+  expect(primary).not.toContain(request.background);
+  expect(primary).not.toContain("build-v1");
+  expect(primary).not.toContain("修正と再検品を判断します");
+  expect(html).toContain(request.background);
+  expect(html).toContain("build-v1");
+});
 test("a review request provides its purpose, fixed target, instructions, choices and impacts without requiring raw JSON", () => {
   const html = renderToStaticMarkup(<QuestionView value={request} />);
   for (const value of [
