@@ -40,6 +40,20 @@ type Version = Ref & {
   policy_group?: string;
   observed_at?: string;
 };
+export function priorityEvidenceLabel(
+  value: unknown,
+  recommendation?: { job?: string; recommendation?: string | null },
+) {
+  const attempt = value as {
+    job?: string;
+    number?: number;
+    state?: string;
+    reason?: string;
+    decision?: { state?: string; priority?: string; reason?: string };
+  };
+  const state = attempt.decision?.state ?? attempt.state ?? "";
+  return `${recommendation?.recommendation && recommendation.job === attempt.job ? "現在の推奨の根拠" : "評価の記録"} · ${(states[state] ?? state) || "状態未確認"}${attempt.decision?.priority ? ` · 推奨 ${attempt.decision.priority}` : ""}${attempt.number ? ` · 試行${attempt.number}` : ""}：${attempt.decision?.reason || attempt.reason || "理由未取得"}`;
+}
 type Job = {
   id: string;
   kind: string;
@@ -829,7 +843,12 @@ export function Automation({
                                   ? `${r.title ?? r.id} · 採用 ${(r.value as Priority).adopted ?? "未設定"} · ${states[(r.value as Priority).state] ?? (r.value as Priority).state}`
                                   : mode === "history"
                                     ? `${states[j.state] ?? j.state} · ${(row as { at: string }).at} · ${(row as { attempt: number }).attempt}回`
-                                    : `${(r.value as { name?: string })?.name || (r.kind === "control" ? (r.id.endsWith("hopper") ? "Hopperの処理設定" : "Triageの処理設定") : r.id)} ${["jobs", "evaluations"].includes(mode) ? `${states[j.state] ?? j.state} · ${j.kind} · ${j.attempts}回` : r.version}`}
+                                    : r.kind === "model-attempt"
+                                      ? priorityEvidenceLabel(
+                                          r.value,
+                                          priorityMatches ? current : undefined,
+                                        )
+                                      : `${(r.value as { name?: string })?.name || (r.kind === "control" ? (r.id.endsWith("hopper") ? "Hopperの処理設定" : "Triageの処理設定") : r.id)} ${["jobs", "evaluations"].includes(mode) ? `${states[j.state] ?? j.state} · ${j.kind} · ${j.attempts}回` : r.version}`}
                               </summary>
                               {r.title && (
                                 <p>
@@ -864,22 +883,27 @@ export function Automation({
                                 </p>
                               )}
                               {r.kind === "model-attempt" && (
-                                <TriageAudit
-                                  value={r.value}
-                                  states={states}
-                                  reasons={reasons}
-                                  onUsage={(ref) =>
-                                    void run(async () =>
-                                      setDetail(
-                                        (await syncRequest(
-                                          `/usage/workspaces/${encodeURIComponent(workspace)}/records/${encodeURIComponent(ref.id)}?version=${encodeURIComponent(ref.version)}`,
-                                          native,
-                                          { method: "GET" },
-                                        )) as Version,
-                                      ),
-                                    )
-                                  }
-                                />
+                                <>
+                                  <p>
+                                    記録の固定版：{r.id}@{r.version}
+                                  </p>
+                                  <TriageAudit
+                                    value={r.value}
+                                    states={states}
+                                    reasons={reasons}
+                                    onUsage={(ref) =>
+                                      void run(async () =>
+                                        setDetail(
+                                          (await syncRequest(
+                                            `/usage/workspaces/${encodeURIComponent(workspace)}/records/${encodeURIComponent(ref.id)}?version=${encodeURIComponent(ref.version)}`,
+                                            native,
+                                            { method: "GET" },
+                                          )) as Version,
+                                        ),
+                                      )
+                                    }
+                                  />
+                                </>
                               )}
                               <Disclosure title="原記録のJSON">
                                 {() => (
