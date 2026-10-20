@@ -700,11 +700,12 @@ export function Workbench({
                         </label>
                         <button
                           disabled={busy}
+                          aria-busy={busy}
                           onClick={() =>
                             void act(() => list(navigation?.route.cursor ?? ""))
                           }
                         >
-                          作業一覧を更新
+                          {busy ? "作業一覧を取得中…" : "作業一覧を更新"}
                         </button>
                       </div>
                       <p>
@@ -723,6 +724,7 @@ export function Workbench({
                             className="table-scroll"
                             role="region"
                             aria-label="作業一覧"
+                            aria-busy={busy}
                             tabIndex={0}
                           >
                             <table className="work-list">

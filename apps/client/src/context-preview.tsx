@@ -13,12 +13,20 @@ type PreviewRequest = {
 import type { UI, Ref, Envelope, CandidatePage } from "./context-ui";
 import { refKey, refLabel, resultData } from "./context-ui";
 import { Completeness, reasonText } from "./context-status";
+export type DefinitionContextInput = {
+  definition: { id: string; version: string };
+  selection: Pick<UIState, "mode" | "include" | "exclude">;
+};
 export function ContextPreview({
   ui,
   active = true,
+  definitionInput,
+  onDefinitionInput,
 }: {
   ui: UI;
   active?: boolean;
+  definitionInput?: DefinitionContextInput;
+  onDefinitionInput?: (value: DefinitionContextInput) => void;
 }) {
   const visible = useScreenActive() && active;
   const navigation = useNavigation();
@@ -26,6 +34,26 @@ export function ContextPreview({
     navigation?.route.origin?.kind === "run-preparation"
       ? navigation.route.origin
       : undefined;
+  const definition =
+    navigation?.route.origin?.kind === "run-definition"
+      ? navigation.route.origin
+      : undefined;
+  const initialized = useRef<DefinitionContextInput | undefined>(undefined);
+  useEffect(() => {
+    if (
+      visible &&
+      definition &&
+      definitionInput &&
+      initialized.current !== definitionInput &&
+      definition.id === definitionInput.definition.id &&
+      definition.version === definitionInput.definition.version
+    ) {
+      ui.store.setState(definitionInput.selection);
+      setResult(undefined);
+      setError("");
+      initialized.current = definitionInput;
+    }
+  }, [visible, definitionInput, definition?.id, definition?.version]);
   const [resolvedRequest, setResolvedRequest] = useState<PreviewRequest>();
   const pending = useRef<
     | {
@@ -330,6 +358,28 @@ export function ContextPreview({
                 >
                   この固定入力をRunの準備へ戻す（起動しない）
                 </button>
+              )}
+              {definition && onDefinitionInput && ui.canCreate && (
+                <>
+                  <p>
+                    定義の根参照を選択します。直接入力・外部添付はJSONの指定を引き継ぎ、注入なしを選ぶとContext指定を空にします。
+                  </p>
+                  <button
+                    disabled={busy || !result.data?.ready || !resolvedRequest}
+                    onClick={() =>
+                      resolvedRequest &&
+                      onDefinitionInput({
+                        definition: {
+                          id: definition.id,
+                          version: definition.version,
+                        },
+                        selection: resolvedRequest.selection,
+                      })
+                    }
+                  >
+                    この選択を定義の下書きへ戻す（共有保存しない）
+                  </button>
+                </>
               )}
               <h4>構造・順序・抜粋</h4>
               <PageList

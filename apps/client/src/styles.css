@@ -453,7 +453,7 @@ button:disabled {
 .context-preview {
   padding: 20px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--card);
 }
 .context-explorer {
@@ -489,7 +489,7 @@ button:disabled {
   width: 100%;
   min-width: 0;
   padding: 9px 10px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--input);
   border-radius: var(--radius);
   background: var(--card);
   font: inherit;

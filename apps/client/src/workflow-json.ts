@@ -85,3 +85,17 @@ export function mergeFields(base: string, changes: string): string {
   visit(source, []);
   return merged;
 }
+export function selectDefinitionContext(
+  text: string,
+  selection: {
+    mode: "none" | "select";
+    include: unknown[];
+    exclude: unknown[];
+  },
+): string {
+  if (selection.mode === "none")
+    return editField(text, ["selection"], '{"mode":"none"}');
+  for (const key of ["mode", "include", "exclude"] as const)
+    text = editField(text, ["selection", key], JSON.stringify(selection[key]));
+  return text;
+}

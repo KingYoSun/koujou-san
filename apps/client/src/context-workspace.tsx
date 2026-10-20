@@ -15,7 +15,7 @@ import { editorStore, identityKey, requester } from "./context-ui";
 import type { UI } from "./context-ui";
 import { ContextExplorer } from "./context-explorer";
 import { ContextEditor } from "./context-editor";
-import { ContextPreview } from "./context-preview";
+import { ContextPreview, type DefinitionContextInput } from "./context-preview";
 import {
   ContextGeneration,
   type OutputContextSource,
@@ -30,6 +30,8 @@ export function ContextWorkspace({
   onRevoked,
   source,
   onStatus,
+  definitionInput,
+  onDefinitionInput,
 }: {
   native: boolean;
   api: string;
@@ -39,6 +41,8 @@ export function ContextWorkspace({
   onRevoked: () => void;
   source?: OutputContextSource;
   onStatus?: (status: string) => void;
+  definitionInput?: DefinitionContextInput;
+  onDefinitionInput?: (value: DefinitionContextInput) => void;
 }) {
   const navigation = useNavigation();
   const visible = useScreenActive();
@@ -363,7 +367,12 @@ export function ContextWorkspace({
                 ["scope", "membership"].includes(selected?.kind ?? ""))
             }
           />
-          <ContextPreview ui={ui} active={mode === "input"} />
+          <ContextPreview
+            ui={ui}
+            active={mode === "input"}
+            definitionInput={definitionInput}
+            onDefinitionInput={onDefinitionInput}
+          />
         </div>
         <Screen screens={["context"]} enabled={mode === "input"} background>
           <ClientSelection key={api + user + workspace} ui={ui} />

@@ -22,6 +22,7 @@ import { RunnerSettings } from "./runner-settings";
 import { ModelConnectionSettings } from "./model-connection-settings";
 import type { ModelProfile } from "./model-connections";
 import { ServerModelConnections } from "./server-model";
+import type { DefinitionContextInput } from "./context-preview";
 
 export function WorkspaceShell({
   native,
@@ -61,6 +62,10 @@ export function WorkspaceShell({
   const navigation = useNavigation()!;
   const { route } = navigation;
   const [source, setSource] = useState<OutputContextSource>();
+  const [definitionRequest, setDefinitionRequest] =
+    useState<DefinitionContextInput>();
+  const [definitionResult, setDefinitionResult] =
+    useState<DefinitionContextInput>();
   const [profile, setProfile] = useState<ModelProfile>();
   const [sync, setSync] = useState("接続確認中");
   const [group, title] = destinations[route.screen];
@@ -173,10 +178,43 @@ export function WorkspaceShell({
             source={source}
             onRevoked={onRevoked}
             onStatus={setSync}
+            definitionInput={definitionRequest}
+            onDefinitionInput={(value) => {
+              setDefinitionRequest(undefined);
+              setDefinitionResult(value);
+              navigation.navigate(
+                navigation.returnTo?.screen === "workflows" &&
+                  navigation.returnTo.target?.id === value.definition.id
+                  ? navigation.returnTo
+                  : {
+                      workspace,
+                      screen: "workflows",
+                      target: { ...value.definition, kind: "run-definition" },
+                      view: "edit",
+                    },
+              );
+            }}
           />
         </Screen>
         <Screen screens={["workflows"]}>
-          <Workflows {...common} />
+          <Workflows
+            {...common}
+            definitionInput={definitionResult}
+            onDefinitionInputUsed={() => setDefinitionResult(undefined)}
+            onContextSelection={(value) => {
+              setDefinitionRequest(value);
+              setDefinitionResult(undefined);
+              navigation.navigate(
+                {
+                  workspace,
+                  screen: "context",
+                  origin: { ...value.definition, kind: "run-definition" },
+                  view: "input",
+                },
+                { related: true },
+              );
+            }}
+          />
         </Screen>
         <Screen screens={["inspections"]}>
           <Inspections {...common} />

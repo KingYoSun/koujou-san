@@ -10,7 +10,13 @@ import {
   saveLocalDraft,
   syncStorage,
 } from "./sync-store";
-import { applyFields, fieldSource, mergeFields } from "./workflow-json";
+import {
+  applyFields,
+  fieldSource,
+  mergeFields,
+  selectDefinitionContext,
+} from "./workflow-json";
+import type { DefinitionContextInput } from "./context-preview";
 import { JSONField } from "./json-field";
 import type { JSONPath } from "jsonc-parser";
 import { WorkflowExecution } from "./workflow-execution";
@@ -74,6 +80,9 @@ export function Workflows({
   user,
   role,
   canExecute,
+  definitionInput,
+  onDefinitionInputUsed,
+  onContextSelection,
 }: {
   native: boolean;
   api: string;
@@ -81,6 +90,9 @@ export function Workflows({
   user: string;
   role: string;
   canExecute: boolean;
+  definitionInput?: DefinitionContextInput;
+  onDefinitionInputUsed?: () => void;
+  onContextSelection?: (value: DefinitionContextInput) => void;
 }) {
   const namespace = { api, user, workspace };
   const navigation = useNavigation();
@@ -336,6 +348,36 @@ export function Workflows({
       "workflow-definition",
     ).catch(() => setNotice("下書きの保存を確認できません。"));
   };
+  useEffect(() => {
+    if (
+      !visible ||
+      !canEdit ||
+      !definitionInput ||
+      !draft ||
+      id !== definitionInput.definition.id
+    )
+      return;
+    if (draft.version !== definitionInput.definition.version) {
+      setNotice(
+        "定義の前提版が変わりました。現在の定義からContextを選び直してください。",
+      );
+      return;
+    }
+    try {
+      persist({
+        ...draft,
+        text: selectDefinitionContext(
+          compose(draft),
+          definitionInput.selection,
+        ),
+        fields: {},
+        pending: undefined,
+      });
+      onDefinitionInputUsed?.();
+    } catch {
+      setNotice("定義の未保存JSONを確認してからContextを反映してください。");
+    }
+  }, [visible, canEdit, definitionInput, id, draft?.version]);
   const field = (
     label: string,
     path: JSONPath,
@@ -581,6 +623,38 @@ export function Workflows({
                         "固定Contextの選択（JSON・省略可）",
                         ["selection"],
                         "json",
+                      )}
+                      {onContextSelection && (
+                        <button
+                          disabled={busy || !canEdit}
+                          onClick={() =>
+                            void act(async () => {
+                              const value =
+                                JSON.parse(
+                                  fieldSource(compose(draft), ["selection"]) ||
+                                    "{}",
+                                ) ?? {};
+                              const mode = value.mode ?? "select";
+                              if (
+                                !["none", "select"].includes(mode) ||
+                                (value.include &&
+                                  !Array.isArray(value.include)) ||
+                                (value.exclude && !Array.isArray(value.exclude))
+                              )
+                                throw new Error("invalid_selection");
+                              onContextSelection({
+                                definition: { id, version: draft.version },
+                                selection: {
+                                  mode,
+                                  include: value.include ?? [],
+                                  exclude: value.exclude ?? [],
+                                },
+                              });
+                            })
+                          }
+                        >
+                          Contextを選択・定義の入力をプレビュー
+                        </button>
                       )}
                       {field(
                         "prompt（JSON・省略可）",
