@@ -6,7 +6,7 @@
 
 ## 現在の作業: Issue #79
 
-状態: In progress。Scope revision 1、区分C。Node・Go・Bifrostと配備CAの手順を更新し、検証中。Ory Kratos／Hydraの公式修正済みイメージが未公開のため、本人は公式版を待つ方針を選択した。AC-2は未完了であり、#79はCloseしない。遠隔配備はなく、このPCだけを対象とする。[作業範囲と証跡](2026-10-22-issue-79-evidence.md)を参照する。
+状態: 一部完了、Ory公式修正版待ち。Scope revision 1、区分C。[PR #80](https://github.com/KingYoSun/koujou-san/pull/80)でNode 22.23.4・Go 1.27.3・Bifrost v2.3.2と配備CAの手順を更新した。12経路の拒否、通常HTTPS・モデル・認証・明示CA、実配布のCA差し替えと再起動を確認した。最終CIとmerge後の照合はPRに集約する。Ory Kratos／Hydraは本人の判断により公式版を待つ。AC-2全体は未完了であり、#79はCloseしない。遠隔配備はなく、このPCだけを対象とする。[作業範囲と証跡](2026-10-22-issue-79-evidence.md)、[独立検品](2026-10-22-issue-79-inspection.md)を参照する。
 
 ## Issue #71〜#77
 

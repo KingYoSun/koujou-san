@@ -71,6 +71,8 @@ Bifrostは初期無効。`bifrost/config.json`は停止後に編集し、`config
 
 eMudhra中間CA漏えいへの対応では、修正済みのGo・外部イメージを含む配布物へ更新し、配備先のCAも更新する。[検証サイト](https://emudhra.we-have-a-problem.com/)に各OSの修正済みCA版と12本の検証URLがある。CAの原本を更新し、明示的に追加した社内CA等を維持したbundleを用意する。既存の`config/ca.pem`をホストの標準bundleだけで上書きすると、カスタムCAを失う場合がある。
 
+Ory Kratos／Hydraは公式の修正済みイメージを待っており、標準構成全体の対応は未完了。版と残作業は[#79の記録](../progress/2026-10-22-issue-79-evidence.md)を参照する。
+
 ```sh
 ./koujou stop --state "$HOME/koujou-state"
 cp -p "$HOME/koujou-state/config/ca.pem" "$HOME/private/ca-before-update.pem"
