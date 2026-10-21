@@ -247,7 +247,7 @@ export async function notices(root, stage, target) {
         modules.set(p.Module.Path, p.Module.Replace || p.Module);
     for (const m of modules.values()) await add("go", m.Path, m.Version, m.Dir);
     const goroot = run(go, ["env", "GOROOT"], root).trim();
-    await add("go", "Go runtime", "1.27.2", goroot, "BSD-3-Clause");
+    await add("go", "Go runtime", "1.27.3", goroot, "BSD-3-Clause");
   }
   if (target === "windows") {
     const extra = JSON.parse(

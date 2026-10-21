@@ -8,7 +8,7 @@
 
 Go APIを `apps/server`、Web・Tauriで共有するReact UIを `apps/client` に置く。TauriのRustコードは `apps/client/src-tauri` とし、rootのCargo workspaceで検証する。共通UIはネイティブのCLI実行APIに依存しない。
 
-Nodeによる `scripts/dev.mjs` をローカルとCIの共通入口とする。pnpm 10.16.1、Node 22.x（最低22.14.0）、Rust 1.98.1、Go 1.27.2を使う。Go SDKは公式アーカイブのSHA-256を検証して `.tools/go` に展開する。対応する固定版がシステムにある場合も使用できる。システムのSDKを置き換えない。
+Nodeによる `scripts/dev.mjs` をローカルとCIの共通入口とする。pnpm 10.16.1、Node 22.x（最低22.23.4）、Rust 1.98.1、Go 1.27.3を使う。Go SDKは公式アーカイブのSHA-256を検証して `.tools/go` に展開する。対応する固定版がシステムにある場合も使用できる。システムのSDKを置き換えない。
 
 標準サービスは開発用Composeに置く。PostgreSQLの製品・Kratos・HydraのDBとroleを分け、ArcadeDBのデータは別の永続volumeへ置く。秘密値は新規のローカル `.env` へ生成し、サービスの公開ポートはloopbackに限定する。BleveはGoへ組み込むライブラリなので、架空の外部サービスは置かない。
 

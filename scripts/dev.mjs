@@ -258,8 +258,15 @@ async function prepareBifrost() {
 }
 
 function checkNode() {
-  const [major, minor] = process.versions.node.split(".").map(Number);
-  if (major !== versions.nodeMajor || minor < 14) {
+  const [major, minor, patch] = process.versions.node.split(".").map(Number);
+  const [, minimumMinor, minimumPatch] = versions.nodeMinimum
+    .split(".")
+    .map(Number);
+  if (
+    major !== versions.nodeMajor ||
+    minor < minimumMinor ||
+    (minor === minimumMinor && patch < minimumPatch)
+  ) {
     throw new Error(
       `Use Node ${versions.nodeMajor}.x >= ${versions.nodeMinimum}; found ${process.versions.node}.`,
     );

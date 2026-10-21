@@ -65,6 +65,23 @@ Bifrostは初期無効。`bifrost/config.json`は停止後に編集し、`config
 
 生成したComposeと設定は秘密値を含む。`docker compose config`等の出力を一般ログやIssueへ貼らない。通常の管理CLIは設定や資格情報を表示しない。TLS更新・接続資格情報の変更後は、同じ保存先でサービスを再起動する。
 
+## CA bundleの更新
+
+`init --ca`は指定したbundleを配備先の`config/ca.pem`へコピーする。API・edge・Oryはこのコピーを`SSL_CERT_FILE`で使うため、ホストのCA更新だけでは既存の配備先へ反映されない。任意のBifrostはイメージ内のCAを使い、別途イメージ更新が必要になる。
+
+eMudhra中間CA漏えいへの対応では、修正済みのGo・外部イメージを含む配布物へ更新し、配備先のCAも更新する。[検証サイト](https://emudhra.we-have-a-problem.com/)に各OSの修正済みCA版と12本の検証URLがある。CAの原本を更新し、明示的に追加した社内CA等を維持したbundleを用意する。既存の`config/ca.pem`をホストの標準bundleだけで上書きすると、カスタムCAを失う場合がある。
+
+Ory Kratos／Hydraは公式の修正済みイメージを待っており、標準構成全体の対応は未完了。版と残作業は[#79の記録](../progress/2026-10-22-issue-79-evidence.md)を参照する。
+
+```sh
+./koujou stop --state "$HOME/koujou-state"
+cp -p "$HOME/koujou-state/config/ca.pem" "$HOME/private/ca-before-update.pem"
+install -m 600 "$HOME/private/updated-ca-bundle.pem" "$HOME/koujou-state/config/ca.pem"
+./koujou up --state "$HOME/koujou-state"
+```
+
+停止・CAの差し替え・再起動まで実施する。コンテナの実行イメージと`config/ca.pem`のchecksumを記録し、各実行実体から12経路が証明書エラーになることと、通常のHTTPS・モデル接続・認証が成功することを確認する。DNS・timeout・HTTPエラーは証明書拒否の証拠にはしない。検証先へ資格情報や実際の入力を送らず、TLS検証を無効にする設定は使わない。
+
 ## buildとOSS表示
 
 開発者はrootで`pnpm run dist:server`、Windowsで`pnpm run dist:desktop`を使う。完全な候補をcommitしてからbuildし、配布物の版・commit・image ID・checksumを記録する。WindowsのRunnerを同梱し、初回プレビューはコード署名しない。

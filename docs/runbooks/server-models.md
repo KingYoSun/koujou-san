@@ -11,7 +11,7 @@ pnpm run infra:llm:stop
 
 `infra:up`ではBifrostを起動しない。`infra:llm:up`は不足するローカル認証と設定を準備し、`llm` profileのBifrostだけを起動する。管理画面は`http://127.0.0.1:18080`。管理名は`koujou-admin`、秘密値はGit管理外の`.env`にある`BIFROST_ADMIN_PASSWORD`を本人の端末で確認する。秘密値をチャット・Issue・ログへ貼らない。既存の設定・認証・volumeは通常停止で保持する。
 
-固定版は`maximhq/bifrost:v2.3.0`、digest `sha256:8f37e33a8caa85faf59a875605c61d1d934738e517d8fe96e2d9fcf6f0ef9098`。sourceは`transports/v2.3.0`の`9237ec06672406e437b3cb33fc793ffd0403b3ae`。Apache-2.0の[原ライセンス](../../infra/bifrost/LICENSE)を保持する。実行依存は同imageのLinux・Go HTTP binary・SQLiteで、専用PostgreSQLは不要。サーバーは既存のGo HTTP clientで接続し、新しいSDK依存を追加しない。
+固定版は`maximhq/bifrost:v2.3.2`、digest `sha256:f5b18826349fe9e1c402c10d19f1cbb5567a3c800ad928580d07f72e69106ec7`。sourceは`transports/v2.3.2`の`a05ea20e68bf116a35e9f05b1a3d749624b3935e`。Apache-2.0の[原ライセンス](../../infra/bifrost/LICENSE)を保持する。実行依存は同imageのLinux・Go HTTP binary・SQLiteで、専用PostgreSQLは不要。サーバーは既存のGo HTTP clientで接続し、新しいSDK依存を追加しない。
 
 ## 接続を登録する
 

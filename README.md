@@ -6,7 +6,7 @@ CLI、AIエージェント、GitHub、CI、人による判断を接続するソ�
 
 ## 開発を始める
 
-Node.js 22.x（22.14.0以上）、pnpm 10.16.1、Git、rustupを用意します。Windowsのネイティブ開発にはVisual StudioのC++ Build ToolsとWebView2、サービス起動にはDocker Composeが必要です。Goはセットアップでリポジトリ内へ準備するため、システムのGoを変更しません。
+Node.js 22.x（22.23.4以上）、pnpm 10.16.1、Git、rustupを用意します。Windowsのネイティブ開発にはVisual StudioのC++ Build ToolsとWebView2、サービス起動にはDocker Composeが必要です。Goはセットアップでリポジトリ内へ準備するため、システムのGoを変更しません。
 
 ```powershell
 pnpm run setup
