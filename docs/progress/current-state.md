@@ -1,10 +1,14 @@
 # 現在状態
 
-更新日: 2026-10-21（JST）
+更新日: 2026-10-22（JST）
 
-開発環境と[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の#3〜#33を完了した。#34はユーザー判断による保留を維持し、現在は#71から続くUI/UX改修を進めている。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
+開発環境と[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の#3〜#33を完了した。#34はユーザー判断による保留を維持し、現在は#79のTLS信頼設定の更新を進めている。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
 
-## 現在の作業: Issue #71〜#77
+## 現在の作業: Issue #79
+
+状態: In progress。Scope revision 1、区分C。Node・Go・Bifrostと配備CAの手順を更新し、検証中。Ory Kratos／Hydraの公式修正済みイメージが未公開のため、本人は公式版を待つ方針を選択した。AC-2は未完了であり、#79はCloseしない。遠隔配備はなく、このPCだけを対象とする。[作業範囲と証跡](2026-10-22-issue-79-evidence.md)を参照する。
+
+## Issue #71〜#77
 
 状態: 最終CI待ち。[PR #78](https://github.com/KingYoSun/koujou-san/pull/78)で用途別シェル、作業詳細、工程、Context、自動化と優先度、比較を改修した。本人の初見では情報過多・判断材料不足が未達となったため、判断に必要な内容を先に表示し、固定版・内部ID・原記録・別操作を詳細へ移した。本人の指示に従い、背景を渡さない独立AIのS1/S3と、画面観測・差分検品で修正を確認した。本人の再確認は実施していない。
 

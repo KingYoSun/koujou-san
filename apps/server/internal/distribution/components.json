@@ -24,9 +24,9 @@
     "license_url": "https://raw.githubusercontent.com/ArcadeData/arcadedb/26.10.1/LICENSE"
   },
   "bifrost": {
-    "image": "maximhq/bifrost:v2.3.0@sha256:8f37e33a8caa85faf59a875605c61d1d934738e517d8fe96e2d9fcf6f0ef9098",
+    "image": "maximhq/bifrost:v2.3.2@sha256:f5b18826349fe9e1c402c10d19f1cbb5567a3c800ad928580d07f72e69106ec7",
     "license": "Apache-2.0",
-    "source": "https://github.com/maximhq/bifrost/tree/9237ec06672406e437b3cb33fc793ffd0403b3ae",
-    "license_url": "https://raw.githubusercontent.com/maximhq/bifrost/9237ec06672406e437b3cb33fc793ffd0403b3ae/LICENSE"
+    "source": "https://github.com/maximhq/bifrost/tree/a05ea20e68bf116a35e9f05b1a3d749624b3935e",
+    "license_url": "https://raw.githubusercontent.com/maximhq/bifrost/a05ea20e68bf116a35e9f05b1a3d749624b3935e/LICENSE"
   }
 }

@@ -1,6 +1,6 @@
 module github.com/KingYoSun/koujou-san/apps/server
 
-go 1.27.2
+go 1.27.3
 
 require (
 	github.com/ArcadeData/arcadedb-drivers/go/arcadedb v0.2.0
