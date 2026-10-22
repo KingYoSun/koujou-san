@@ -2,7 +2,7 @@
 
 更新日: 2026-10-22（JST）
 
-開発環境と[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の#3〜#33を完了した。#34はユーザー判断による保留を維持し、現在は#79のTLS信頼設定の更新を進めている。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
+開発環境と[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の#3〜#33を完了した。2026-10-23、本人が指定したgestaloka #94で#34を再開し、別プロジェクトの一巡・分離・停止後の継続とexportを検証した。#34全体の独立検品とkoujou-san側PRの統合確認が残る。[証跡](2026-10-23-issue-34-evidence.md)を参照する。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
 
 ## 現在の作業: Issue #79
 
