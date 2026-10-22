@@ -37,7 +37,7 @@ koujou-sanの基準は`feae5ebd4b903ff666cad4134e09199e1a02972e`。gestalokaの�
 
 gestalokaに参加していない既存の別メンバーからのContext取得、実行権限照会、利用量照会はすべて403。gestaloka専用端末からkukuri側の割当取得も403だった。gestalokaのWorkspaceでkukuriのContext IDと工程IDを読んでも取得できず、各Workspaceの所有者はそれぞれのContextを取得できた。`isolation.json`と`device-isolation.json`に要求先と結果を保持する。
 
-両CLI終了後も、kukuriの利用量集計21群は開始前と完全一致した。gestalokaの2群は今回の実装Runと検品Runだけへ帰属した。実測モデルはgpt-6.1-solとclaude-fable-5-1。CLIの2回だけを実行し、#33のCLI/API予算台帳は更新していない。費用の欠測・単価未設定を0として扱わず、費用優劣や節約率は主張しない。
+両CLI終了後も、kukuriの利用量集計21群は開始前と完全一致した。gestalokaの2群は今回の実装Runと検品Runだけへ帰属した。実測モデルはgpt-6.1-solとclaude-fable-5-1。製品RunnerからのCLI実行は2回で、#33のCLI/API予算台帳は更新していない。費用の欠測・単価未設定を0として扱わず、費用優劣や節約率は主張しない。
 
 ## export・停止・再接続
 
@@ -63,4 +63,12 @@ Runnerのactive 0・未送信frame/usageなしを確認し、通常の受付停�
 | AC-4 | 最終3export、停止中の元ツール操作、再接続後の同じ三固定版と追加起動なし |
 | AC-5 | 適用範囲と設定交換の一覧、共通修正なし、取得遅延と未検証範囲の明記 |
 
-INVAR-1は元checkout・CI・CLI配置の保持、INVAR-2は空Contextの別検品と固定条件、INVAR-3は本人の対象指定と事前の権限記録で照合した。#34全体の独立検品、koujou-san側PRのCI・merge後照合は、別途完了を確認する。
+INVAR-1は元checkout・CI・CLI配置の保持、INVAR-2は空Contextの別検品と固定条件、INVAR-3は本人の対象指定と事前の権限記録で照合した。
+
+## #34全体の独立検品
+
+koujou-sanの成果物`c8abd044de6b2b61461368ba875f6601f901792b`を固定し、会話履歴を継承しない新しい読み取り専用CLIセッションで検品した。[独立判定の原報告](assets/issue34-inspection.json)はAC-1〜5・INVAR-1〜3すべてPASS、blockerなし。最終exportの全1,071フレーム、固定入力・判定・完了判断、21群の不変と新2群の帰属、停止・復帰、元checkoutとtree一致を原本と照合した。Context照会の400を認可拒否の証明には使っていない。
+
+この検品用CLIは製品Runnerの2回と区別し、gestalokaの利用量へ追加していない。session・workspaceの分離保証は宣言された能力として保持し、permissions・external_accessの未観測も残す。検品後の変更は独立判定記録とその参照、現在の判定先の追記だけで、固定条件・製品コード・実行証拠は変えていない。
+
+koujou-san側の最終CI、[PR #81](https://github.com/KingYoSun/koujou-san/pull/81)のmerge、tree照合とIssue Closeの状態は、[Issue #34](https://github.com/KingYoSun/koujou-san/issues/34)の完了記録へ集約する。独立検品の時点で未発生だったCIを成功として補完しない。
