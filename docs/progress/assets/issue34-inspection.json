@@ -1,0 +1,58 @@
+{
+  "schema": "issue34-independent-inspection-v1",
+  "artifact_commit": "c8abd044de6b2b61461368ba875f6601f901792b",
+  "history_inheritance": false,
+  "context": "fresh ephemeral CLI; read-only",
+  "report_sha256": "69283aba36f0c5e38dd2bf96c4003ceb9d853ef63e4323cc5362666a35006e51",
+  "result": {
+    "verdict": "PASS",
+    "criteria": [
+      {
+        "id": "AC-1",
+        "verdict": "PASS",
+        "basis": "c8abd04の計画にgestaloka #94、対象21ファイル、G-1〜3、権限源、両基準commitを明記。implementation-input.jsonとexport内の入力・固定source・割当repositoryが一致した。"
+      },
+      {
+        "id": "AC-2",
+        "verdict": "PASS",
+        "basis": "docs-codex／docs-claude、専用Context、工程定義から実装・独立検品・approved判断へ一巡。最終工程はcompleted・count 1。feae5eb…からc8abd04のgit diff --name-onlyは文書4件のみで、共通コード変更なし。"
+      },
+      {
+        "id": "AC-3",
+        "verdict": "PASS",
+        "basis": "複数条件を1件の文書PRへまとめ、gestaloka固有方針を注入。別メンバーのContext・権限・利用量照会と別端末の割当取得は403。kukuriの利用量21群は完全一致し、新2群は今回の両Runだけに帰属した。外国Context照会の400は認可拒否の証明には数えていない。"
+      },
+      {
+        "id": "AC-4",
+        "verdict": "PASS",
+        "basis": "最終NDJSON 3件の全1,071フレームを解析し、固定版・件数・サイズ・SHA-256・末尾completeがmanifestと一致、errorなし。停止中の元CLI/GitHub操作記録と再接続後の三固定版が一致し、Runner active 0・未送信なしを確認した。"
+      },
+      {
+        "id": "AC-5",
+        "verdict": "PASS",
+        "basis": "設定交換項目、Windows・既存CLI二種・文書更新という適用範囲、共通修正なし、取得遅延と未検証範囲を記録。validation.jsonのmanifest・判断・停止・復帰・利用量を原本と照合して一致。ローカルリンクとJSON構文、git diff --checkも問題なし。"
+      },
+      {
+        "id": "INVAR-1",
+        "verdict": "PASS",
+        "basis": "両repoの固定差分は文書のみでCI・CLI配置を変更していない。cli-ledger.jsonは別worktreeを記録し、停止記録では元checkoutが基準commit・clean。候補ed39c3ceとmerge 76f4340eのtreeはともに6b93537bで一致した。"
+      },
+      {
+        "id": "INVAR-2",
+        "verdict": "PASS",
+        "basis": "検品入力はcontext_mode:none、Context本文なし、空manifestのdigest一致、実装と別worktree。G-1〜3は実装入力と同一。検品報告の固定identity・各PASS・採用判定を照合し、CLI終了コード0や実装者の自己評価とは区別した。"
+      },
+      {
+        "id": "INVAR-3",
+        "verdict": "PASS",
+        "basis": "計画に本人指定、権限源、push・PR・merge等の許可範囲と公開・配備の除外を記録。実装開始前の固定入力にも対象21件と外部書込みを親担当へ限定する指示があり、AGENTS.local.mdの権限範囲と整合した。"
+      }
+    ],
+    "blockers": [],
+    "unverified": [
+      "koujou-san側の最終PR CIとmerge後照合は検品後の運用確認として未確認。成功とは判定していない。",
+      "検品入力のsession・workspace分離保証はdeclared、permissions・external_accessはunobserved。固定入力と別worktreeは確認した。",
+      "外部リンクの最新到達性、実費、取得遅延の原因、他OS・独自CLI全般・一般的な性能保証は未確認。既存検証や人の操作は再実行せず、ファイルも変更していない。"
+    ]
+  }
+}

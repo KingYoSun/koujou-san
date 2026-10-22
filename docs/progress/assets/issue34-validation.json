@@ -1,0 +1,622 @@
+{
+  "schema": "issue34-validation-v1",
+  "at": "2026-10-22T20:03:29.197Z",
+  "baselines": {
+    "koujou": "feae5ebd4b903ff666cad4134e09199e1a02972e",
+    "gestaloka": "f60b8ec08187feacfb55226a214cdb64a7192161"
+  },
+  "workspace": "gestaloka-94",
+  "context": {
+    "kind": "sentence",
+    "id": "gestaloka-policy",
+    "revision": "K6GVAND64JEHEYOSZVDSBHK3L7"
+  },
+  "scope": {
+    "id": "scope:gestaloka-94",
+    "version": "5QYVMBMY4D2WFDY72X3XPTRWFG"
+  },
+  "workflow": {
+    "saved": {
+      "id": "run-definition:gestaloka-94-docs",
+      "version": "BFTIKKBL62PIXUWPVAJEYMMATE"
+    },
+    "workflow": {
+      "id": "workflow-definition:gestaloka-94",
+      "version": "AXJT27GMYCHJWFN7CJ4ETRGQ7U"
+    },
+    "validation": {
+      "id": "validation:workflow-definition:gestaloka-94",
+      "version": "KN2TOCHIYYDLNBRTMJ3GJLBYEL"
+    },
+    "adoption": {
+      "id": "adoption:workflow-definition:gestaloka-94",
+      "version": "AXW6CXWQ6B4IUJ7UJ5HECLPYGN"
+    },
+    "execution": {
+      "id": "workflow-execution:gestaloka-94",
+      "version": "PNTVLIZWEO7B54WMRXATDUNTUF"
+    }
+  },
+  "configuration": {
+    "runner_id": "f6ac8d7a-d935-474c-837e-5137b25de4e8",
+    "connections": [
+      {
+        "kind": "cli",
+        "target": "docs-codex",
+        "version": "0.162.1",
+        "environment": "Windows",
+        "subject": "existing-cli-account",
+        "confirmed": true,
+        "bindings": [
+          "stdin",
+          "file",
+          "argument"
+        ],
+        "capabilities": [
+          "inspection/session",
+          "inspection/workspace"
+        ],
+        "users": [
+          "LMA3EVLCOLQXSQZNZIVJ4GGGUP"
+        ],
+        "repositories": [
+          "gestaloka"
+        ]
+      },
+      {
+        "kind": "cli",
+        "target": "docs-claude",
+        "version": "2.1.300",
+        "environment": "Windows",
+        "subject": "existing-cli-account",
+        "confirmed": true,
+        "bindings": [
+          "stdin",
+          "file",
+          "argument"
+        ],
+        "capabilities": [
+          "inspection/session",
+          "inspection/workspace"
+        ],
+        "users": [
+          "LMA3EVLCOLQXSQZNZIVJ4GGGUP"
+        ],
+        "repositories": [
+          "gestaloka"
+        ]
+      }
+    ],
+    "repository_ids": [
+      "gestaloka"
+    ],
+    "adapters": [
+      {
+        "kind": "cli",
+        "target": "docs-codex",
+        "protocol": "codex-jsonl",
+        "arguments": [
+          "--ask-for-approval",
+          "never",
+          "exec",
+          "--json",
+          "--ephemeral",
+          "--skip-git-repo-check",
+          "--sandbox",
+          "workspace-write",
+          "-"
+        ],
+        "result_args": [
+          "--output-schema",
+          "{result_schema_file}"
+        ],
+        "stdin_json": true,
+        "usage": {
+          "billing": "subscription",
+          "contract": "existing-subscription",
+          "mode": "api_equivalent",
+          "model_capture": true
+        }
+      },
+      {
+        "kind": "cli",
+        "target": "docs-claude",
+        "protocol": "claude-jsonl",
+        "arguments": [
+          "C:/Users/kgm11/koujou-san/.cache/issue34/cli.mjs",
+          "claude",
+          "--print",
+          "--output-format",
+          "stream-json",
+          "--verbose",
+          "--no-session-persistence",
+          "--tools",
+          "Read,Grep,Glob,Bash",
+          "--permission-mode",
+          "plan"
+        ],
+        "result_args": [
+          "--json-schema",
+          "{result_schema}"
+        ],
+        "stdin_json": true,
+        "usage": {
+          "billing": "subscription",
+          "contract": "existing-subscription",
+          "mode": "api_equivalent",
+          "model_capture": false
+        }
+      }
+    ]
+  },
+  "implementation": {
+    "id": "run:NBXLEJ65JIHII2O462TDS3ISKP",
+    "version": "5IEFMAJHXOKC4UA5VQODKC3357",
+    "state": "succeeded",
+    "input": {
+      "id": "run-input:NBXLEJ65JIHII2O462TDS3ISKP",
+      "version": "KBWRUPGPAA4XPLYRPVGCMLG2PA"
+    },
+    "assessment": {
+      "state": "valid",
+      "report": {
+        "tests": [
+          "21文書をコード・テスト・既存完了記録と照合",
+          "ローカル参照119件をアンカー込みで検査：問題なし",
+          "変更13文書のPrettier確認：成功",
+          "yomiyasuの静的検査・差分確認を実施",
+          "git diff --check・変更範囲検査：成功"
+        ],
+        "summary": "13文書の失効した説明・参照を修正し、残る8文書は変更不要と確認しました。照合表は.cache/issue94-audit.jsonに保存済みです。PASSは自己評価であり、独立した合格判定ではありません。",
+        "verdict": "PASS",
+        "unverified": [
+          "実環境の.env・資格情報・DB設定は閲覧していません。",
+          "実DB・ブラウザー・公開・復元・モデルAPIの再検証は実行していません。"
+        ],
+        "changed_files": [
+          "README.md",
+          "documents/adr/ADR-001-world-graph.md",
+          "documents/adr/ADR-002-world-agent.md",
+          "documents/adr/ADR-003-construction-lifecycle.md",
+          "documents/adr/ADR-004-world-api.md",
+          "documents/adr/ADR-005-human-play.md",
+          "documents/adr/ADR-006-gameplay-ui.md",
+          "documents/adr/ADR-008-scene-synopsis-results.md",
+          "documents/adr/ADR-009-execution-limits.md",
+          "documents/adr/ADR-010-operations-identity.md",
+          "documents/adr/ADR-011-operations-membership.md",
+          "documents/adr/ADR-012-authenticated-world-access.md",
+          "documents/operations-auth.md",
+          ".cache/issue94-audit.json"
+        ]
+      },
+      "verdict": "PASS"
+    }
+  },
+  "inspection": {
+    "id": "run:gestaloka-94-inspection",
+    "version": "WULE2WQ3J6RD2ZRCU2TZ74XUXH",
+    "state": "succeeded",
+    "input": {
+      "id": "run-input:gestaloka-94-inspection",
+      "version": "TZCZRPP4LGMGMC3GCU45KJW5Y3"
+    },
+    "assessment": {
+      "state": "valid",
+      "report": {
+        "verdict": "PASS",
+        "inspection": {
+          "id": "inspection:gestaloka-94",
+          "version": "6OBUJVDF54AEVES6UHDH2UNQXD"
+        },
+        "unverified": [],
+        "manifest_digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "criteria_results": [
+          {
+            "verdict": "PASS",
+            "executed": true,
+            "unverified": [],
+            "criterion_id": "G-1",
+            "evidence_refs": [
+              {
+                "id": "inspection-evidence:gestaloka-94-source",
+                "version": "ISQTCG6DHV6RR5SEN7LXOFBN6I"
+              }
+            ]
+          },
+          {
+            "verdict": "PASS",
+            "executed": true,
+            "unverified": [],
+            "criterion_id": "G-2",
+            "evidence_refs": [
+              {
+                "id": "inspection-evidence:gestaloka-94-source",
+                "version": "ISQTCG6DHV6RR5SEN7LXOFBN6I"
+              }
+            ]
+          },
+          {
+            "verdict": "PASS",
+            "executed": true,
+            "unverified": [],
+            "criterion_id": "G-3",
+            "evidence_refs": [
+              {
+                "id": "inspection-evidence:gestaloka-94-source",
+                "version": "ISQTCG6DHV6RR5SEN7LXOFBN6I"
+              }
+            ]
+          }
+        ]
+      },
+      "verdict": "PASS"
+    },
+    "fixed": {
+      "commit": "ed39c3ce0e9e1526ad905e98b3e344a6bc9d0d99",
+      "evidence": {
+        "id": "inspection-evidence:gestaloka-94-source",
+        "version": "ISQTCG6DHV6RR5SEN7LXOFBN6I"
+      },
+      "template": {
+        "id": "run-definition:gestaloka-94-inspector",
+        "version": "RRGDCA3MP7EGDDIL6TROE6RUWF"
+      },
+      "definition": {
+        "id": "inspection:gestaloka-94",
+        "version": "6OBUJVDF54AEVES6UHDH2UNQXD"
+      },
+      "adoption": {
+        "id": "inspection-adoption:inspection:gestaloka-94",
+        "version": "YTX726KTF3JTHOCXGARZQJTZEM"
+      },
+      "launch": {
+        "workspace_id": "gestaloka-94",
+        "id": "inspection-launch:gestaloka-94-inspection",
+        "version": "UON5MZDVLWAK62IOR3N4IQVLZI"
+      }
+    }
+  },
+  "decision": {
+    "at": "2026-10-22T20:00:44.580Z",
+    "inspection": {
+      "id": "run:gestaloka-94-inspection",
+      "version": "WULE2WQ3J6RD2ZRCU2TZ74XUXH"
+    },
+    "definition": {
+      "id": "inspection:gestaloka-94",
+      "version": "6OBUJVDF54AEVES6UHDH2UNQXD"
+    },
+    "choice": "approved",
+    "result": {
+      "data": {
+        "workspace_id": "gestaloka-94",
+        "id": "workflow-execution:gestaloka-94",
+        "version": "HHCIX2OMSFJCF7GGVWWOXZ6XMX"
+      },
+      "meta": {
+        "workspace_id": "gestaloka-94",
+        "operation_id": "ff766950-fe70-446f-bfcb-926a97753175",
+        "position": "SL3WATLZIRDDTIYDDOU3FXHMGY",
+        "next_cursor": null,
+        "completeness": {
+          "state": "complete"
+        }
+      }
+    }
+  },
+  "isolation": {
+    "requests": [
+      {
+        "name": "other-project-member-context",
+        "status": 403
+      },
+      {
+        "name": "other-project-member-permission",
+        "status": 403
+      },
+      {
+        "name": "other-project-member-cost",
+        "status": 403
+      },
+      {
+        "name": "foreign-context-id",
+        "status": 400
+      },
+      {
+        "name": "foreign-workflow-id",
+        "status": 403
+      },
+      {
+        "name": "own-context",
+        "status": 200
+      },
+      {
+        "name": "old-project-context",
+        "status": 200
+      }
+    ],
+    "device": {
+      "body": "{\"error\":{\"code\":\"forbidden\"},\"meta\":{\"workspace_id\":\"runner-ui\",\"position\":null,\"next_cursor\":null,\"completeness\":{\"state\":\"pending\",\"reason\":\"forbidden\"}}}\n",
+      "status": 403
+    }
+  },
+  "usage": {
+    "old_workspace": "runner-ui",
+    "old_groups": 21,
+    "old_groups_unchanged": true,
+    "new_groups": [
+      {
+        "day": "2026-10-23",
+        "key": "[\"2026-10-23\", \"run\", \"run:gestaloka-94-inspection\", \"\", \"claude-fable-5-1\", \"\", \"usage\"]",
+        "kind": "usage",
+        "model": "claude-fable-5-1",
+        "amount": null,
+        "records": 1,
+        "currency": null,
+        "position": 323,
+        "workflow": "",
+        "incomplete": 0,
+        "quantities": [
+          {
+            "unit": "token",
+            "value": "737568",
+            "missing": 0,
+            "category": "cache_read",
+            "not_applicable": 0
+          },
+          {
+            "unit": "token",
+            "value": "66381",
+            "missing": 0,
+            "category": "cache_write",
+            "not_applicable": 0
+          },
+          {
+            "unit": "token",
+            "value": "514",
+            "missing": 0,
+            "category": "input",
+            "not_applicable": 0
+          },
+          {
+            "unit": "token",
+            "value": "9725",
+            "missing": 0,
+            "category": "output",
+            "not_applicable": 0
+          },
+          {
+            "unit": "token",
+            "value": "4003",
+            "missing": 0,
+            "category": "reasoning",
+            "not_applicable": 0
+          }
+        ],
+        "attribution_id": "run:gestaloka-94-inspection",
+        "attribution_kind": "run"
+      },
+      {
+        "day": "2026-10-23",
+        "key": "[\"2026-10-23\", \"run\", \"run:NBXLEJ65JIHII2O462TDS3ISKP\", \"\", \"gpt-6.1-sol\", \"\", \"usage\"]",
+        "kind": "usage",
+        "model": "gpt-6.1-sol",
+        "amount": null,
+        "records": 1,
+        "currency": null,
+        "position": 156,
+        "workflow": "",
+        "incomplete": 0,
+        "quantities": [
+          {
+            "unit": "token",
+            "value": "4258176",
+            "missing": 0,
+            "category": "cache_read",
+            "not_applicable": 0
+          },
+          {
+            "unit": "token",
+            "value": "0",
+            "missing": 0,
+            "category": "cache_write",
+            "not_applicable": 0
+          },
+          {
+            "unit": "token",
+            "value": "191663",
+            "missing": 0,
+            "category": "input",
+            "not_applicable": 0
+          },
+          {
+            "unit": "token",
+            "value": "22155",
+            "missing": 0,
+            "category": "output",
+            "not_applicable": 0
+          },
+          {
+            "unit": "token",
+            "value": "4194",
+            "missing": 0,
+            "category": "reasoning",
+            "not_applicable": 0
+          }
+        ],
+        "attribution_id": "run:NBXLEJ65JIHII2O462TDS3ISKP",
+        "attribution_kind": "run"
+      }
+    ]
+  },
+  "exports": {
+    "at": "2026-10-22T20:00:57.297Z",
+    "records": [
+      {
+        "domain": "workflows",
+        "id": "workflow-execution:gestaloka-94",
+        "version": "SUIEN7V25DQANEQZYLZK6CR6JP",
+        "state": "completed",
+        "name": "workflow-execution-gestaloka-94-SUIEN7V25DQANEQZYLZK6CR6JP.ndjson",
+        "bytes": 2408843,
+        "frames": 347,
+        "sha256": "adc15048b55dfabe8125b2e1df980ff3273c764ab2db21757105959ecba261dc",
+        "complete": {
+          "execution": {
+            "id": "workflow-execution:gestaloka-94",
+            "version": "SUIEN7V25DQANEQZYLZK6CR6JP"
+          },
+          "type": "complete"
+        }
+      },
+      {
+        "domain": "runs",
+        "id": "run:NBXLEJ65JIHII2O462TDS3ISKP",
+        "version": "5IEFMAJHXOKC4UA5VQODKC3357",
+        "state": "succeeded",
+        "name": "run-NBXLEJ65JIHII2O462TDS3ISKP-5IEFMAJHXOKC4UA5VQODKC3357.ndjson",
+        "bytes": 2356669,
+        "frames": 320,
+        "sha256": "7f64fa2d5980f51eaaced07a2ed9bd5d95f62510e60a535526cfeb35dffed344",
+        "complete": {
+          "type": "complete",
+          "run": {
+            "id": "run:NBXLEJ65JIHII2O462TDS3ISKP",
+            "version": "5IEFMAJHXOKC4UA5VQODKC3357"
+          },
+          "records": "318"
+        }
+      },
+      {
+        "domain": "runs",
+        "id": "run:gestaloka-94-inspection",
+        "version": "WULE2WQ3J6RD2ZRCU2TZ74XUXH",
+        "state": "succeeded",
+        "name": "run-gestaloka-94-inspection-WULE2WQ3J6RD2ZRCU2TZ74XUXH.ndjson",
+        "bytes": 1090261,
+        "frames": 404,
+        "sha256": "15b45117acab96a99261e397b9acdb827a9423dceda8768d14a3df0eaf3e02fb",
+        "complete": {
+          "type": "complete",
+          "run": {
+            "id": "run:gestaloka-94-inspection",
+            "version": "WULE2WQ3J6RD2ZRCU2TZ74XUXH"
+          },
+          "records": "402"
+        }
+      }
+    ]
+  },
+  "exports_check": {
+    "at": "2026-10-22T20:03:28.524Z",
+    "known_credential_matches": 0,
+    "records": [
+      {
+        "id": "workflow-execution:gestaloka-94",
+        "version": "SUIEN7V25DQANEQZYLZK6CR6JP",
+        "frames": 347,
+        "sha256": "adc15048b55dfabe8125b2e1df980ff3273c764ab2db21757105959ecba261dc",
+        "state": "completed"
+      },
+      {
+        "id": "run:NBXLEJ65JIHII2O462TDS3ISKP",
+        "version": "5IEFMAJHXOKC4UA5VQODKC3357",
+        "frames": 320,
+        "sha256": "7f64fa2d5980f51eaaced07a2ed9bd5d95f62510e60a535526cfeb35dffed344",
+        "state": "succeeded"
+      },
+      {
+        "id": "run:gestaloka-94-inspection",
+        "version": "WULE2WQ3J6RD2ZRCU2TZ74XUXH",
+        "frames": 404,
+        "sha256": "15b45117acab96a99261e397b9acdb827a9423dceda8768d14a3df0eaf3e02fb",
+        "state": "succeeded"
+      }
+    ]
+  },
+  "stopped": {
+    "at": "2026-10-22T20:02:06.823Z",
+    "api_port_before": false,
+    "api_port_after": false,
+    "runner": "stopped",
+    "versions": {
+      "codex": "codex-cli 0.162.1",
+      "claude": "2.1.300 (Claude Code)"
+    },
+    "candidate": "ed39c3ce0e9e1526ad905e98b3e344a6bc9d0d99",
+    "merged": "76f4340ecea21565c77c7906ab702e6cc6a7156c",
+    "tree": "6b93537b05c884f78f952a6d90266f8151963713",
+    "tree_equal": true,
+    "original_checkout": "f60b8ec08187feacfb55226a214cdb64a7192161",
+    "original_checkout_clean": true,
+    "formatting": "Checking formatting...\nAll matched files use Prettier code style!",
+    "files": 13,
+    "exports_verified": 3,
+    "github": {
+      "headRefOid": "ed39c3ce0e9e1526ad905e98b3e344a6bc9d0d99",
+      "mergeCommit": {
+        "oid": "76f4340ecea21565c77c7906ab702e6cc6a7156c"
+      },
+      "state": "MERGED",
+      "url": "https://github.com/KingYoSun/gestaloka/pull/96"
+    }
+  },
+  "restored": {
+    "at": "2026-10-22T20:02:47.586Z",
+    "records": [
+      {
+        "id": "workflow-execution:gestaloka-94",
+        "version": "SUIEN7V25DQANEQZYLZK6CR6JP",
+        "state": "completed",
+        "count": 1
+      },
+      {
+        "id": "run:NBXLEJ65JIHII2O462TDS3ISKP",
+        "version": "5IEFMAJHXOKC4UA5VQODKC3357",
+        "state": "succeeded"
+      },
+      {
+        "id": "run:gestaloka-94-inspection",
+        "version": "WULE2WQ3J6RD2ZRCU2TZ74XUXH",
+        "state": "succeeded"
+      }
+    ],
+    "runner": {
+      "pid": 21548,
+      "last_seen": 1792699367,
+      "connected": true,
+      "accepting": true,
+      "active": 0,
+      "journal": {
+        "pending_frames": false,
+        "pending_usage": false,
+        "unconfirmed_execution": false
+      }
+    },
+    "identity_unchanged": true
+  },
+  "github": {
+    "pull_request": 96,
+    "repository": "KingYoSun/gestaloka",
+    "ci": {
+      "id": 39844023536,
+      "head": "ed39c3ce0e9e1526ad905e98b3e344a6bc9d0d99",
+      "conclusion": "success",
+      "url": "https://github.com/KingYoSun/gestaloka/actions/runs/39844023536"
+    }
+  },
+  "cli_executions": [
+    {
+      "tool": "codex",
+      "at": "2026-10-22T19:44:44.077Z",
+      "branch": "koujou/run-b0e964dafe3565b8a3c5b9444adac250"
+    },
+    {
+      "tool": "claude",
+      "at": "2026-10-22T19:53:27.258Z",
+      "branch": "koujou/run-b0cad4aa7679be9d2a7e9ed0afc156ef"
+    }
+  ],
+  "core_changes": []
+}
