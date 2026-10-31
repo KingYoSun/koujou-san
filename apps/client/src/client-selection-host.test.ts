@@ -44,7 +44,10 @@ function fixture(
     refs: [],
     value: {
       policy: { id: "policy", version: "v1" },
-      target: { id: "selection", version: "0" },
+      target: {
+        id: purpose === "chat" ? "chat-thread:owned" : "selection",
+        version: purpose === "chat" ? "fixed" : "0",
+      },
       goal: "owned goal",
       purpose,
       model: {
@@ -157,6 +160,51 @@ function fixture(
   };
 }
 describe("client selection Host", () => {
+  it("uses only selected conversation versions and one request across lost acknowledgements", async () => {
+    const f = fixture(true, true, false, "chat");
+    const selected = { id: "chat-message:selected", version: "fixed-message" };
+    const read = f.port.read;
+    f.port.read = async <T>(ref: { id: string; version: string }) =>
+      ref.id === selected.id
+        ? {
+            ...selected,
+            root: "chat-thread:owned",
+            kind: "chat-message",
+            position: 1,
+            refs: [],
+            value: {
+              role: "human",
+              state: "complete",
+              text: "今回選んだ相談",
+            } as T,
+          }
+        : read<T>(ref);
+    f.port.query = vi.fn(async () => {
+      throw Error("must not enumerate conversation history");
+    });
+    const p: SelectionPolicy = {
+      ...policy,
+      mode: "proposal",
+      chat: { thread: f.start.value.target, messages: [selected] },
+    };
+    await runSelection(f.start, p, profile, "client", f.port, () => {});
+    expect(f.model).toHaveBeenCalledTimes(1);
+    expect(f.port.query).not.toHaveBeenCalled();
+    const body = (
+      f.model.mock.calls as unknown as [Record<string, unknown>][]
+    )[0][0];
+    expect(body.response_format).toBeUndefined();
+    expect(body.messages).toEqual([
+      expect.objectContaining({ role: "system" }),
+      { role: "user", content: "今回選んだ相談" },
+    ]);
+    expect(f.rpc).not.toHaveBeenCalled();
+    expect(f.write.mock.calls.filter((c) => c[1] === "begin")).toHaveLength(1);
+    f.setPending();
+    f.model.mockClear();
+    await runSelection(f.start, p, profile, "client", f.port, () => {});
+    expect(f.model).not.toHaveBeenCalled();
+  });
   it("uses one shared source-only Host under none without leaking fixed text", async () => {
     const f = fixture(true, true, false, "context-generation");
     f.rpc.mockImplementation(async (wire: { method: string }) => ({

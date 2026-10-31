@@ -498,6 +498,12 @@ const tasks = {
     await client("build");
     await testDatabase("mcpapi");
   },
+  "test:chat:ui": async () => {
+    env.KOUJOU_TEST_CLIENT_SELECTION_UI = "1";
+    env.KOUJOU_TEST_PROJECT_CHAT_UI = "1";
+    await client("build");
+    await testDatabase("mcpapi");
+  },
   "test:clientops": () =>
     testDatabase("clientops", "TestClientOperationsPostgres"),
   "test:hopper": () =>

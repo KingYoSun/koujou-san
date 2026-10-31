@@ -47,6 +47,9 @@ func definitionPath(path string) bool {
 	return false
 }
 func validPolicyKind(id string, p Policy) bool {
+	if p.Chat != nil {
+		return p.Definition == nil && p.Generation == nil && strings.HasPrefix(id, "chat-policy:") && p.Mode == "proposal" && chatFields(p.Chat)
+	}
 	if p.Generation != nil {
 		return p.Definition == nil && strings.HasPrefix(id, "context-policy:") && generationFields(p.Generation)
 	}

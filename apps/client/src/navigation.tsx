@@ -10,6 +10,7 @@ import {
 
 export const destinations = {
   work: ["作業", "作業と判断"],
+  chat: ["作業", "Projectチャット"],
   priority: ["作業", "Issue優先度"],
   publications: ["作業", "外部起票"],
   context: ["Context", "Context"],

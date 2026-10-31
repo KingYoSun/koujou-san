@@ -4,6 +4,8 @@ import { syncRequest } from "./auth";
 import { allowAnswerScope, answerScopeEpoch } from "./sync-store";
 import { fieldSource } from "./workflow-json";
 import type { VersionRef } from "./model-connections";
+import { linkChatTarget } from "./chat-api";
+import { useNavigation } from "./navigation";
 
 export function DefinitionRun({
   native,
@@ -31,6 +33,7 @@ export function DefinitionRun({
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
   const namespace = { api, user, workspace };
+  const navigation = useNavigation();
   const base = `/workflows/workspaces/${encodeURIComponent(workspace)}`;
   async function create() {
     setBusy(true);
@@ -72,6 +75,15 @@ export function DefinitionRun({
       )) as { data: VersionRef };
       if (allowAnswerScope(namespace, epoch)) {
         setCreated(result.data);
+        if (navigation?.route.origin?.kind === "chat-thread") {
+          await linkChatTarget(
+            native,
+            workspace,
+            navigation.route.origin,
+            "run",
+            result.data,
+          );
+        }
         setPending(undefined);
         setNotice(
           "未割当のRunを作成しました。「作業と判断」のRunで確認し、通常の割当・開始を行えます。",

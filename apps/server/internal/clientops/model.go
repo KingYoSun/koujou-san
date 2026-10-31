@@ -74,6 +74,7 @@ type Limits struct {
 	Cost    *usage.CostBudget `json:"cost,omitempty"`
 }
 type Policy struct {
+	Chat       *ChatSource        `json:"chat,omitempty"`
 	Generation *GenerationPolicy  `json:"generation,omitempty"`
 	Definition *DefinitionPolicy  `json:"definition,omitempty"`
 	Mode       string             `json:"mode"`
