@@ -6,7 +6,7 @@
 
 ## Issue #82
 
-状態: In progress。Projectの会話保存、選択した履歴によるモデル操作、範囲付きContext採用、既存作業への接続を実装中。専用DB試験、共通UIの107テスト、Windows buildを確認した。実接続と一巡、独立検品・CI・merge後照合は未完了。[条件と現在の判定](2026-10-31-issue-82-plan.md)を参照する。
+Projectの永続チャットを既存Context・Run・質問回答へ接続した。本人指定のChatGPTサブスク`gpt-6.1-sol`、#83の準備文書による実行・質問回答・独立検品、GUI閉鎖後の継続を確認した。[条件と現在の判定](2026-10-31-issue-82-plan.md)、[検証記録](2026-10-31-issue-82-evidence.md)を参照する。
 
 ## 現在の作業: Issue #79
 

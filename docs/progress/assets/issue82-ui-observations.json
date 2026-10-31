@@ -1,0 +1,41 @@
+{
+  "observed_at": "2026-10-31T14:58:24.825Z",
+  "scope": "管理下CIスナップショットの既存工程・Run原記録。外部CIの実行成功ではない。",
+  "thread_url": "http://127.0.0.1:55524/?workspace=mcp-one&screen=chat&kind=chat-thread&id=chat-thread%3Ad498310c-d42f-4636-9a2e-5b0a8c16bca1&version=I4OJA3GTCIODHDPKFUV6CWQBM7",
+  "actions": [
+    {
+      "key": "Tab",
+      "focus": {
+        "tag": "BUTTON",
+        "text": "工程の関係・試行を詳しく見る"
+      }
+    },
+    {
+      "key": "Shift+Tab",
+      "focus": {
+        "tag": "A",
+        "text": "ci（1回目）：合格（PASS） — 結果・証拠を見る"
+      }
+    },
+    {
+      "key": "Enter",
+      "url": "http://127.0.0.1:55524/?workspace=mcp-one&screen=work&kind=run&id=run%3AJLYTOOJVGJCSFDK6ZDTSFWG6KJ&version=AIJVDWL4FIFWHB53YM4M6WC6QB&view=evidence"
+    }
+  ],
+  "ci_source": {
+    "url": "http://127.0.0.1:55524/?workspace=mcp-one&screen=work&kind=run&id=run%3AJLYTOOJVGJCSFDK6ZDTSFWG6KJ&version=AIJVDWL4FIFWHB53YM4M6WC6QB&view=evidence",
+    "dom": "今回の対象・固定成果物\n\n入力に指定された固定成果物はありません。質問と原出力の証拠も確認してください。\n\nRunの報告\n\n判定：PASS\n\n判定の理由は報告されていません。下の原出力から確認できます。\n\n判定の原報告\n{\n  \"state\": \"valid\",\n  \"report\": {\n    \"source\": \"github-observation\",\n    \"target\": \"issue82-fixed-ci\",\n    \"observation\": {\n      \"url\": \"\",\n      \"jobs\": [\n        {\n          \"id\": 0,\n          \"name\": \"required\",\n          \"status\": \"completed\",\n          \"conclusion\": \"success\",\n          \"run_attempt\": 1\n        }\n      ],\n      \"state\": \"completed\",\n      \"commit\": \"cccccccccccccccccccccccccccccccccccccccc\",\n      \"run_id\": 77,\n      \"conclusion\": \"success\",\n      \"run_attempt\": 1,\n      \"source_version\": \"\"\n    },\n    \"command_state\": \"completed\"\n  },\n  \"verdict\": \"PASS\"\n}\n理由付き差し戻しを記録\n原出力・固定参照\nRunの記録を取得"
+  },
+  "returned": {
+    "url": "http://127.0.0.1:55524/?workspace=mcp-one&screen=chat&kind=chat-thread&id=chat-thread%3Ad498310c-d42f-4636-9a2e-5b0a8c16bca1&version=I4OJA3GTCIODHDPKFUV6CWQBM7",
+    "heading": "CI原記録と再訪の補完確認"
+  },
+  "reloaded": {
+    "url": "http://127.0.0.1:55524/?workspace=mcp-one&screen=chat&kind=chat-thread&id=chat-thread%3Ad498310c-d42f-4636-9a2e-5b0a8c16bca1&version=I4OJA3GTCIODHDPKFUV6CWQBM7",
+    "heading": "CI原記録と再訪の補完確認"
+  },
+  "model_reloaded": {
+    "url": "http://127.0.0.1:55524/?workspace=mcp-one&screen=chat&kind=chat-thread&id=chat-thread%3Ad498310c-d42f-4636-9a2e-5b0a8c16bca1&version=I4OJA3GTCIODHDPKFUV6CWQBM7",
+    "state": "応答完了\n\n操作と原応答を確認"
+  }
+}
