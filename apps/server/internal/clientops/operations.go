@@ -98,6 +98,9 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 			if req.Target != policy.Chat.Thread {
 				return Record{}, ErrInvalid
 			}
+			if _, _, err = s.chatThread(ctx, tx, p, w, policy.Chat.Thread, true); err != nil {
+				return Record{}, err
+			}
 			chatDependencies, err = s.chatSources(ctx, tx, p, w, policy.Chat)
 			if err != nil {
 				return Record{}, err
@@ -400,6 +403,9 @@ func (s *Service) Begin(ctx context.Context, p access.Principal, w, id string, r
 		}
 		reader := access.Principal{UserID: p.UserID, OperationID: op.ReadOperation}
 		if policy.Chat != nil {
+			if _, _, err = s.chatThread(ctx, tx, p, w, policy.Chat.Thread, true); err != nil {
+				return Record{}, err
+			}
 			if _, err = s.chatSources(ctx, tx, reader, w, policy.Chat); err != nil {
 				return Record{}, err
 			}

@@ -257,9 +257,12 @@ function ChatRun(props: Common & { target: VersionRef }) {
         native,
         { method: "GET" },
       )) as NonNullable<typeof record>;
-      const nextPause = nextRecord.value.active_pause
+      const question =
+        nextRecord.value.active_pause ??
+        (pause ? { id: pause.id, version: "head" } : undefined);
+      const nextPause = question
         ? ((await syncRequest(
-            `${base}${encodeURIComponent(nextRecord.value.active_pause.id)}?version=${encodeURIComponent(nextRecord.value.active_pause.version)}`,
+            `${base}${encodeURIComponent(question.id)}?version=${encodeURIComponent(question.version)}`,
             native,
             { method: "GET" },
           )) as NonNullable<typeof pause>)

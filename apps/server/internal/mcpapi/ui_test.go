@@ -64,6 +64,12 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 		t.Fatal(err)
 	}
 	principal := access.Principal{UserID: user.ID}
+	var chatRequests []json.RawMessage
+	var chatRequestLock sync.Mutex
+	if os.Getenv("KOUJOU_TEST_PROJECT_CHAT_UI") == "1" {
+		seedProjectChatUI(t, ctx, service, principal)
+		defer func() { projectChatUIEvidence(t, service, context.Background(), chatRequests) }()
+	}
 	refreshRunner := prepareRunnerUI(t, client, target, tokens, service, user.ID)
 	prepareInspectionUI(t, inspectionService, principal, cfg.Key)
 	if os.Getenv("KOUJOU_TEST_TRIAGE_UI") == "1" {
@@ -179,6 +185,22 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 		}
 		files := http.FileServer(http.Dir("../../../client/dist"))
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if os.Getenv("KOUJOU_TEST_PROJECT_CHAT_UI") == "1" && r.URL.Path == "/__fixture/model/v1/chat/completions" {
+				if r.Method != "POST" || r.Header.Get("Authorization") != "Bearer owned-model-key" {
+					http.Error(w, "owned model only", http.StatusForbidden)
+					return
+				}
+				body, err := io.ReadAll(r.Body)
+				if err != nil {
+					http.Error(w, "invalid owned model body", 400)
+					return
+				}
+				chatRequestLock.Lock()
+				chatRequests = append(chatRequests, json.RawMessage(body))
+				chatRequestLock.Unlock()
+				projectChatUIModel(w, body)
+				return
+			}
 			if hopperFixture != nil && hopperFixture(w, r) {
 				return
 			}
@@ -272,7 +294,7 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 			traceLock.Lock()
 			trace = append(trace, entry)
 			traceLock.Unlock()
-			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/usage/", "/automation/", "/runs/", "/workflows/", "/inspections/", "/publications/", "/workbench/", "/hopper/", "/healthz", "/readyz"} {
+			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/usage/", "/automation/", "/runs/", "/workflows/", "/inspections/", "/publications/", "/workbench/", "/hopper/", "/client-operations/", "/healthz", "/readyz"} {
 				if strings.HasPrefix(r.URL.Path, prefix) {
 					token, err := bearer()
 					if err != nil {

@@ -140,6 +140,53 @@ func checkProjectChat(t *testing.T, s *Service, url string) {
 			t.Fatal(count, err)
 		}
 	})
+	t.Run("Project_read_permission_does_not_grant_model_writes", func(t *testing.T) {
+		exec := func(sql string, args ...any) {
+			t.Helper()
+			if _, err := s.Store.Database().Exec(ctx, sql, args...); err != nil {
+				t.Fatal(err)
+			}
+		}
+		exec(`UPDATE access_members SET role='editor' WHERE workspace_id='one' AND user_id='bob'`)
+		exec(`UPDATE access_resources SET restricted=true WHERE workspace_id='one' AND id=$1`, project.ID)
+		exec(`INSERT INTO access_resource_grants(workspace_id,resource_id,user_id,can_read,can_update,can_execute) VALUES('one',$1,'alice',true,true,false),('one',$1,'bob',true,false,false)`, project.ID)
+		t.Cleanup(func() {
+			exec(`UPDATE access_members SET role='viewer' WHERE workspace_id='one' AND user_id='bob'`)
+			exec(`UPDATE access_resources SET restricted=false WHERE workspace_id='one' AND id=$1`, project.ID)
+			exec(`DELETE FROM access_resource_grants WHERE workspace_id='one' AND resource_id=$1 AND user_id IN ('alice','bob')`, project.ID)
+		})
+		if _, err := s.Read(ctx, bob, "one", human); err != nil {
+			t.Fatal("reader cannot read conversation", err)
+		}
+		bobPolicy := must(s.PutPolicy(ctx, bob, "one", "chat-policy:reader", Write{Mutation: m("0"), Value: raw(policy)}))
+		request := Start{Mutation: m("0"), Policy: bobPolicy, Target: thread, Goal: "Projectの相談", Purpose: "chat", Model: model, Client: "bob-client"}
+		if out, err := s.Start(ctx, bob, "one", "client-operation:chat-read-denied", request); err == nil && out.Error == nil {
+			t.Fatal("Project reader started a model write")
+		}
+		write := func(allowed bool) {
+			exec(`UPDATE access_resource_grants SET can_update=$2 WHERE workspace_id='one' AND resource_id=$1 AND user_id='bob'`, project.ID, allowed)
+		}
+		write(true)
+		request.Mutation = m("0")
+		operation := must(s.Start(ctx, bob, "one", "client-operation:chat-revoked", request))
+		write(false)
+		begin := Begin{Mutation: m(operation.Version), Client: "bob-client", InputDigest: strings.Repeat("e", 64), PromptVersion: "project-chat-v1"}
+		if out, err := s.Begin(ctx, bob, "one", operation.ID, begin); err == nil && out.Error == nil {
+			t.Fatal("revoked writer reserved a model request")
+		}
+		write(true)
+		begin.Mutation = m(operation.Version)
+		sending := must(s.Begin(ctx, bob, "one", operation.ID, begin))
+		var op Operation
+		r, err := s.Read(ctx, bob, "one", sending)
+		if err != nil || json.Unmarshal(r.Value, &op) != nil {
+			t.Fatal(err)
+		}
+		write(false)
+		if out, err := s.Finish(ctx, bob, "one", sending.ID, Finish{Mutation: m(sending.Version), Client: "bob-client", Turn: *op.Turn, Response: reply}); err == nil && out.Error == nil {
+			t.Fatal("revoked writer saved an assistant message")
+		}
+	})
 	page, err := s.Query(ctx, bob, "one", Request{Root: thread.ID, Kind: "chat-message", Limit: 1})
 	if err != nil || len(page.Items) != 1 || page.Items[0].Ref != human {
 		t.Fatal(page, err)

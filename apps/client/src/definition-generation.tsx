@@ -1,9 +1,10 @@
 import { ScreenContent } from "./navigation";
-import { useState } from "react";
-import { editorStore } from "./context-ui";
+import { useEffect, useState } from "react";
+import { editorStore, type Ref } from "./context-ui";
 import { syncRequest } from "./auth";
 import { ClientSelection, type DefinitionTarget } from "./client-selection";
 import type { VersionRef } from "./model-connections";
+import { fieldSource } from "./workflow-json";
 
 export function DefinitionGeneration({
   native,
@@ -29,6 +30,23 @@ export function DefinitionGeneration({
   manualPaths?: string[];
 }) {
   const [store] = useState(() => editorStore());
+  const selection = fieldSource(text, ["selection"]);
+  useEffect(() => {
+    try {
+      const value = JSON.parse(selection || '{"mode":"select"}') as {
+        mode: "select" | "none";
+        include?: Ref[];
+        exclude?: Ref[];
+      };
+      store.setState({
+        mode: value.mode,
+        include: value.include ?? [],
+        exclude: value.exclude ?? [],
+      });
+    } catch {
+      // The definition editor owns invalid drafts; do not replace its contents.
+    }
+  }, [target.id, selection, store]);
   const [devices, setDevices] = useState<{ id: string; name: string }[]>([]);
   const [next, setNext] = useState("");
   const [sources, setSources] = useState<VersionRef[]>([]);

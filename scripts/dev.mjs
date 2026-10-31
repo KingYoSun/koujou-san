@@ -499,7 +499,9 @@ const tasks = {
     await testDatabase("mcpapi");
   },
   "test:chat:ui": async () => {
-    env.KOUJOU_TEST_CLIENT_SELECTION_UI = "1";
+    env.KOUJOU_TEST_MCP_UI = "1";
+    env.KOUJOU_TEST_WORKBENCH_UI = "1";
+    env.KOUJOU_TEST_ACCEPTANCE = "1";
     env.KOUJOU_TEST_PROJECT_CHAT_UI = "1";
     await client("build");
     await testDatabase("mcpapi");

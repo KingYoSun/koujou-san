@@ -2,8 +2,10 @@ package mcpapi
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"testing"
 
@@ -25,6 +27,9 @@ func seedProjectChatUI(t *testing.T, ctx context.Context, s *Service, p access.P
 	mutation := func(id string) apicontract.Mutation {
 		return apicontract.Mutation{OperationID: "chat-ui:" + id, ExpectedVersion: "0"}
 	}
+	if _, err := s.Access.DB.Exec(ctx, `UPDATE access_members SET can_execute=true WHERE workspace_id='mcp-one' AND user_id=$1`, p.UserID); err != nil {
+		t.Fatal(err)
+	}
 	project := accept(s.Contexts.Put(ctx, p, "mcp-one", contexts.Identity{Kind: "scope", ID: "chat-project"}, contexts.Write{Mutation: mutation("project"), Value: rawUI(contexts.Scope{Kind: "project", Name: "Issue #82の受入Project"})}))
 	accept(s.Contexts.Put(ctx, p, "mcp-one", contexts.Identity{Kind: "scope", ID: "chat-issue83"}, contexts.Write{Mutation: mutation("issue83"), Value: rawUI(contexts.Scope{Kind: "issue", Name: "Issue #83: Gitea連携の準備"})}))
 	thread := accept(s.ClientOps.PutChatThread(ctx, p, "mcp-one", "chat-thread:long-history", clientops.Write{Mutation: mutation("thread"), Value: rawUI(clientops.ChatThread{Name: "受入: 長い会話の再訪", Project: project})}))
@@ -35,7 +40,28 @@ func seedProjectChatUI(t *testing.T, ctx context.Context, s *Service, p access.P
 	}
 }
 
-func projectChatUIEvidence(t *testing.T, s *Service, ctx context.Context, observed []map[string]any) {
+func projectChatUIModel(w http.ResponseWriter, body []byte) {
+	var req struct {
+		Model  string `json:"model"`
+		Format struct {
+			Schema struct {
+				Name string `json:"name"`
+			} `json:"json_schema"`
+		} `json:"response_format"`
+	}
+	if json.Unmarshal(body, &req) != nil {
+		http.Error(w, "invalid model request", 400)
+		return
+	}
+	if req.Format.Schema.Name == "run_definition" {
+		definitionUIModel(w, body)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{"id": "owned-chat-" + rand.Text(), "model": req.Model, "choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": "採用する仕様: Gitea接続は既存GitHub連携を維持し、認証と接続先を区別します。今回はIssue #83の準備文書を固定成果物として確認します。"}, "finish_reason": "stop"}}, "usage": map[string]int{"prompt_tokens": 30, "completion_tokens": 20}})
+}
+
+func projectChatUIEvidence(t *testing.T, s *Service, ctx context.Context, observed []json.RawMessage) {
 	t.Helper()
 	rows, err := s.ClientOps.Store.Database().Query(ctx, `SELECT jsonb_build_object('id',r.id,'version',r.version,'kind',r.kind,'root',r.root_id,'value',r.payload) FROM client_operation_records r JOIN shared_versions h ON h.workspace_id=r.workspace_id AND h.resource_id=r.id AND h.version=r.version WHERE r.workspace_id='mcp-one' AND (r.kind LIKE 'chat-%' OR (r.kind='operation' AND r.payload->>'purpose'='chat')) ORDER BY r.position,r.id`)
 	if err != nil {

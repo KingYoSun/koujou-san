@@ -235,7 +235,7 @@ func (s *Service) finishChat(ctx context.Context, tx pgx.Tx, p access.Principal,
 	if policy.Chat == nil || len(reply.Choices) == 0 || reply.Choices[0].Message.Content == nil || len(reply.Choices[0].Message.Calls) > 0 {
 		return ErrState
 	}
-	_, deps, err := s.chatThread(ctx, tx, p, w, policy.Chat.Thread, false)
+	_, deps, err := s.chatThread(ctx, tx, p, w, policy.Chat.Thread, true)
 	if err != nil {
 		return err
 	}

@@ -71,10 +71,6 @@ func (f *clientSelectionUI) Wait(t *testing.T, s *Service, ctx context.Context) 
 	if f.violation {
 		t.Fatal("owned model receiver detected prohibited credentials or data")
 	}
-	if os.Getenv("KOUJOU_TEST_PROJECT_CHAT_UI") == "1" {
-		projectChatUIEvidence(t, s, ctx, f.observed)
-		return
-	}
 	if os.Getenv("KOUJOU_TEST_OUTPUT_CONTEXT_UI") == "1" {
 		contextGenerationUIEvidence(t, s, ctx, f.site, f.observed)
 		return
@@ -109,9 +105,6 @@ func (f *clientSelectionUI) Wait(t *testing.T, s *Service, ctx context.Context) 
 func newClientSelectionUI(t *testing.T, ctx context.Context, s *Service, client *http.Client, cfg auth.Config, p access.Principal) *clientSelectionUI {
 	t.Helper()
 	f := &clientSelectionUI{done: make(chan struct{}, 1), site: cfg.Site}
-	if os.Getenv("KOUJOU_TEST_PROJECT_CHAT_UI") == "1" {
-		seedProjectChatUI(t, ctx, s, p)
-	}
 	certificate, err := tls.LoadX509KeyPair("../../../../.cache/tls/cert.pem", "../../../../.cache/tls/key.pem")
 	if err != nil {
 		t.Fatal(err)
@@ -325,11 +318,6 @@ func (f *clientSelectionUI) model(w http.ResponseWriter, r *http.Request, s *Ser
 	}
 	if body.Format.Schema.Name == "run_definition" {
 		definitionUIModel(w, raw)
-		return
-	}
-	if os.Getenv("KOUJOU_TEST_PROJECT_CHAT_UI") == "1" && body.Format.Schema.Name == "" {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"id": "owned-chat-" + rand.Text(), "model": body.Model, "choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": "相談を受け取りました。採用する仕様: Gitea接続は既存GitHub連携を維持し、認証と接続先を区別します。次に検証する接続先を確認してください。"}, "finish_reason": "stop"}}, "usage": map[string]int{"prompt_tokens": 30, "completion_tokens": 20}})
 		return
 	}
 	_ = s.Search.Sync(ctx)
