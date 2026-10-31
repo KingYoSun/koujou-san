@@ -95,6 +95,20 @@ func (s *Service) Finish(ctx context.Context, p access.Principal, w, id string, 
 		}
 		op.State = "failed"
 		op.Reason = reason
+		if op.Purpose == "chat" {
+			if policyErr != nil {
+				op.Reason = "policy_changed"
+			} else if reason == "" && len(result.Choices[0].Message.Calls) > 0 {
+				op.State = "ready"
+			} else if (reason == "" || reason == "incomplete_model_response") && len(result.Choices[0].Message.Calls) == 0 && result.Choices[0].Message.Content != nil {
+				if err = s.finishChat(ctx, tx, p, w, r, &op, policy, result, reason); err != nil {
+					return Record{}, err
+				}
+			} else if reason == "" {
+				op.Reason = "invalid_model_response"
+			}
+			return s.save(ctx, tx, w, p, r, "operation", op, deps)
+		}
 		if reason == "" {
 			if len(result.Choices[0].Message.Calls) > 0 {
 				op.State = "ready"

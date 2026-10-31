@@ -73,7 +73,10 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 	if req.Purpose == "context-generation" {
 		targetPrefix = "context-result:"
 	}
-	if !strings.HasPrefix(id, "client-operation:") || !strings.HasPrefix(req.Target.ID, targetPrefix) || req.Target.Version == "" || req.Target.Version == "head" || req.Goal == "" || (!validModel(req.Model) && !(req.Purpose == "context-generation" && bytes.Equal(raw(req.Model), raw(Model{})))) || (req.Purpose != "selection" && req.Purpose != "inspection" && req.Purpose != "definition" && req.Purpose != "context-generation") || p.OperationID != "" {
+	if req.Purpose == "chat" {
+		targetPrefix = "chat-thread:"
+	}
+	if !strings.HasPrefix(id, "client-operation:") || !strings.HasPrefix(req.Target.ID, targetPrefix) || req.Target.Version == "" || req.Target.Version == "head" || req.Goal == "" || (!validModel(req.Model) && !(req.Purpose == "context-generation" && bytes.Equal(raw(req.Model), raw(Model{})))) || (req.Purpose != "selection" && req.Purpose != "inspection" && req.Purpose != "definition" && req.Purpose != "context-generation" && req.Purpose != "chat") || p.OperationID != "" {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
 	return s.mutate(ctx, p, w, id, req.Mutation, req, func(tx pgx.Tx, r Ref) (Record, error) {
@@ -87,8 +90,21 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 		if !(policy.Mode == "manual" && req.Purpose == "context-generation") && !validModel(req.Model) {
 			return Record{}, ErrInvalid
 		}
-		if (policy.Definition != nil) != (req.Purpose == "definition") || (policy.Generation != nil) != (req.Purpose == "context-generation") {
+		if (policy.Definition != nil) != (req.Purpose == "definition") || (policy.Generation != nil) != (req.Purpose == "context-generation") || (policy.Chat != nil) != (req.Purpose == "chat") {
 			return Record{}, ErrInvalid
+		}
+		var chatDependencies []Ref
+		if policy.Chat != nil {
+			if req.Target != policy.Chat.Thread {
+				return Record{}, ErrInvalid
+			}
+			if _, _, err = s.chatThread(ctx, tx, p, w, policy.Chat.Thread, true); err != nil {
+				return Record{}, err
+			}
+			chatDependencies, err = s.chatSources(ctx, tx, p, w, policy.Chat)
+			if err != nil {
+				return Record{}, err
+			}
 		}
 		if req.Target.Version != "0" {
 			v, err := s.target(ctx, tx, p, w, req.Target, req.Purpose)
@@ -120,6 +136,7 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 			bounded bool
 		}{{op.ReadOperation, policy.Fixed.Mode == "none" || len(policy.Scopes) > 0}, {op.CandidateOperation, policy.Fixed.Mode == "none"}} {
 			allowed := append([]Ref{}, refs(policy.Fixed)...)
+			allowed = append(allowed, chatDependencies...)
 			for _, dependency := range generationDependencies {
 				// Source dependencies authorize the selected output; they do not grant the
 				// model direct access to unrelated library content outside its Scope.
@@ -159,6 +176,7 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 			}
 		}
 		dependencies := append([]Ref{req.Policy}, refs(policy.Fixed)...)
+		dependencies = append(dependencies, chatDependencies...)
 		dependencies = append(dependencies, generationDependencies...)
 		dependencies = append(dependencies, generationRefs(policy.Generation)...)
 		if policy.Definition != nil {
@@ -173,7 +191,14 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 		if req.Target.Version != "0" {
 			dependencies = append(dependencies, req.Target)
 		}
-		return s.save(ctx, tx, w, p, r, "operation", op, dependencies)
+		saved, err := s.save(ctx, tx, w, p, r, "operation", op, dependencies)
+		if err == nil && policy.Chat != nil {
+			_, err = s.writeRelated(ctx, tx, p, w, "chat-operation:"+hash(id), "chat-operation", struct {
+				Thread    Ref `json:"thread"`
+				Operation Ref `json:"operation"`
+			}{policy.Chat.Thread, r}, append(dependencies, r), policy.Chat.Thread.ID)
+		}
+		return saved, err
 	}, within...)
 }
 
@@ -377,6 +402,14 @@ func (s *Service) Begin(ctx context.Context, p access.Principal, w, id string, r
 			return Record{}, ErrState
 		}
 		reader := access.Principal{UserID: p.UserID, OperationID: op.ReadOperation}
+		if policy.Chat != nil {
+			if _, _, err = s.chatThread(ctx, tx, p, w, policy.Chat.Thread, true); err != nil {
+				return Record{}, err
+			}
+			if _, err = s.chatSources(ctx, tx, reader, w, policy.Chat); err != nil {
+				return Record{}, err
+			}
+		}
 		if policy.Generation != nil {
 			_, deps, err := s.generationSource(ctx, p, w, policy.Generation)
 			if err != nil {

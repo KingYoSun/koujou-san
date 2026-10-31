@@ -159,6 +159,13 @@ func (s *Service) PutPolicy(ctx context.Context, p access.Principal, w, id strin
 			return Record{}, ErrInvalid
 		}
 		rs := refs(v.Fixed)
+		if v.Chat != nil {
+			deps, err := s.chatSources(ctx, tx, p, w, v.Chat)
+			if err != nil {
+				return Record{}, err
+			}
+			rs = append(rs, deps...)
+		}
 		if v.Generation != nil {
 			_, deps, err := s.generationSource(ctx, p, w, v.Generation)
 			if err != nil {
@@ -252,14 +259,16 @@ func (s *Service) putSelection(ctx context.Context, p, reader access.Principal, 
 }
 
 type Request struct {
-	Metadata bool   `json:"metadata,omitempty"`
-	Kind     string `json:"kind"`
-	History  bool   `json:"history"`
-	ID       string `json:"id,omitempty"`
-	Root     string `json:"root,omitempty"`
-	After    int64  `json:"after,omitempty"`
-	AfterID  string `json:"after_id,omitempty"`
-	Limit    int    `json:"limit"`
+	Search     string `json:"search,omitempty"`
+	Descending bool   `json:"descending,omitempty"`
+	Metadata   bool   `json:"metadata,omitempty"`
+	Kind       string `json:"kind"`
+	History    bool   `json:"history"`
+	ID         string `json:"id,omitempty"`
+	Root       string `json:"root,omitempty"`
+	After      int64  `json:"after,omitempty"`
+	AfterID    string `json:"after_id,omitempty"`
+	Limit      int    `json:"limit"`
 }
 type Page struct {
 	Items   []Record `json:"items"`
@@ -278,7 +287,11 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, req R
 	if req.Limit < 1 || req.Limit > 100 {
 		return page, ErrInvalid
 	}
-	rows, err := s.Store.Database().Query(ctx, `SELECT r.id,r.version,r.kind,r.root_id,r.position,CASE WHEN $11 THEN jsonb_build_object('name',r.payload->>'name','goal',r.payload->>'goal','state',r.payload->>'state') ELSE r.payload END,r.refs FROM client_operation_records r LEFT JOIN shared_versions h ON h.workspace_id=r.workspace_id AND h.resource_id=r.id AND h.version=r.version WHERE r.workspace_id=$1 AND ($4='' OR r.kind=$4) AND ($5='' OR r.id=$5) AND ($6 OR h.resource_id IS NOT NULL) AND (r.position>$7 OR (r.position=$7 AND r.id>$8 AND $8<>'')) AND ($10='' OR r.root_id=$10) AND `+access.ReadFilterSQL("r.refs||jsonb_build_array(jsonb_build_object('id',r.id,'version',r.version))")+` ORDER BY r.position,r.id LIMIT $9`, w, p.UserID, p.OperationID, req.Kind, req.ID, req.History, req.After, req.AfterID, req.Limit, req.Root, req.Metadata)
+	boundary, order := "(r.position>$7 OR (r.position=$7 AND r.id>$8 AND $8<>''))", "r.position,r.id"
+	if req.Descending {
+		boundary, order = "($7=0 OR r.position<$7 OR (r.position=$7 AND r.id<$8))", "r.position DESC,r.id DESC"
+	}
+	rows, err := s.Store.Database().Query(ctx, `SELECT r.id,r.version,r.kind,r.root_id,r.position,CASE WHEN $11 THEN jsonb_build_object('name',r.payload->>'name','goal',r.payload->>'goal','state',r.payload->>'state') ELSE r.payload END,r.refs FROM client_operation_records r LEFT JOIN shared_versions h ON h.workspace_id=r.workspace_id AND h.resource_id=r.id AND h.version=r.version WHERE r.workspace_id=$1 AND ($4='' OR r.kind=$4) AND ($5='' OR r.id=$5) AND ($6 OR h.resource_id IS NOT NULL) AND `+boundary+` AND ($10='' OR r.root_id=$10) AND ($12='' OR strpos(lower(r.payload->>'name'),lower($12))>0) AND `+access.ReadFilterSQL("r.refs||jsonb_build_array(jsonb_build_object('id',r.id,'version',r.version))")+` ORDER BY `+order+` LIMIT $9`, w, p.UserID, p.OperationID, req.Kind, req.ID, req.History, req.After, req.AfterID, req.Limit, req.Root, req.Metadata, req.Search)
 	if err != nil {
 		return page, err
 	}

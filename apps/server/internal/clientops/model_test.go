@@ -7,6 +7,16 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 )
 
+func TestChatPolicyKeepsSelectedHistory(t *testing.T) {
+	var p Policy
+	if err := decode([]byte(`{"mode":"proposal","fixed":{"mode":"none"},"scopes":[],"limits":{"model_requests":32,"mcp_requests":256,"seconds":600},"chat":{"thread":{"id":"chat-thread:one","version":"v1"},"messages":[{"id":"chat-message:one","version":"v2"}]}}`), &p); err != nil || !validPolicyKind("chat-policy:one", p) {
+		t.Fatalf("a project conversation cannot select fixed messages: %v", err)
+	}
+	if validPolicyKind("selection-policy:one", p) || validPolicyKind("definition-policy:one", p) {
+		t.Fatal("chat history became input to another purpose")
+	}
+}
+
 func TestSelectionProposal(t *testing.T) {
 	a := contexts.Ref{Kind: "sentence", ID: "required", Revision: "v1"}
 	b := contexts.Ref{Kind: "paragraph", ID: "chosen", Revision: "v2"}

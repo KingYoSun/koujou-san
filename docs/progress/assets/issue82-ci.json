@@ -1,0 +1,156 @@
+{
+  "source": "管理下HTTPの合成CI snapshotを既存Workflowが観測。外部CIへの接続・開始はしていない。",
+  "execution": "workflow-execution:issue82-ci",
+  "ci_reads": 1,
+  "ci_writes": 0,
+  "run": {
+    "id": "run:JLYTOOJVGJCSFDK6ZDTSFWG6KJ",
+    "version": "AIJVDWL4FIFWHB53YM4M6WC6QB",
+    "run_id": "run:JLYTOOJVGJCSFDK6ZDTSFWG6KJ",
+    "kind": "run",
+    "position": "30347",
+    "value": {
+      "input": {
+        "id": "run-input:JLYTOOJVGJCSFDK6ZDTSFWG6KJ",
+        "version": "AIJVDWL4FIFWHB53YM4M6WC6QB"
+      },
+      "state": "succeeded",
+      "exit_code": 0,
+      "assessment": {
+        "state": "valid",
+        "report": {
+          "source": "github-observation",
+          "target": "issue82-fixed-ci",
+          "observation": {
+            "url": "",
+            "jobs": [
+              {
+                "id": 0,
+                "name": "required",
+                "status": "completed",
+                "conclusion": "success",
+                "run_attempt": 1
+              }
+            ],
+            "state": "completed",
+            "commit": "cccccccccccccccccccccccccccccccccccccccc",
+            "run_id": 77,
+            "conclusion": "success",
+            "run_attempt": 1,
+            "source_version": ""
+          },
+          "command_state": "completed"
+        },
+        "verdict": "PASS"
+      },
+      "created_at": "2026-10-31T14:57:42.759743Z",
+      "started_at": "2026-10-31T14:57:42.759743Z",
+      "finished_at": "2026-10-31T14:57:42.759743Z",
+      "observation": "known",
+      "requested_by": "T4YLDD4EBWA2GGFC2IJQZUKKCZ",
+      "cancel_requested": false,
+      "reported_through": "0",
+      "execution_requested_at": "2026-10-31T14:57:42.759743Z"
+    },
+    "refs": [
+      {
+        "id": "run-input:JLYTOOJVGJCSFDK6ZDTSFWG6KJ",
+        "version": "AIJVDWL4FIFWHB53YM4M6WC6QB"
+      }
+    ]
+  },
+  "input": {
+    "id": "run-input:JLYTOOJVGJCSFDK6ZDTSFWG6KJ",
+    "version": "AIJVDWL4FIFWHB53YM4M6WC6QB",
+    "run_id": "run:JLYTOOJVGJCSFDK6ZDTSFWG6KJ",
+    "kind": "input",
+    "position": "30347",
+    "value": {
+      "input": {
+        "command": {
+          "kind": "observation",
+          "target": "github"
+        }
+      },
+      "sources": [
+        {
+          "id": "run-definition:issue82-ci-observed",
+          "version": "MZCG7JXMIBCM6JJNK7Q2OLNT7N"
+        },
+        {
+          "id": "workflow-execution:issue82-ci",
+          "version": "QRWIVBCD5VNEEFI5FI7QSPLTOG"
+        },
+        {
+          "id": "workflow-task:issue82-ci:ci:1",
+          "version": "QRWIVBCD5VNEEFI5FI7QSPLTOG"
+        }
+      ]
+    },
+    "refs": [
+      {
+        "id": "run-definition:issue82-ci-observed",
+        "version": "MZCG7JXMIBCM6JJNK7Q2OLNT7N"
+      },
+      {
+        "id": "workflow-execution:issue82-ci",
+        "version": "QRWIVBCD5VNEEFI5FI7QSPLTOG"
+      },
+      {
+        "id": "workflow-definition:issue82-ci",
+        "version": "HQ6YH54C76GQMH352K3G227CVD"
+      },
+      {
+        "id": "validation:workflow-definition:issue82-ci",
+        "version": "WMEAGAB63X2VEMDM3S3UQIO3L6"
+      },
+      {
+        "id": "adoption:workflow-definition:issue82-ci",
+        "version": "2FTKWWQ2TUJXAMBCO7PIF66Z3A"
+      },
+      {
+        "id": "workflow-task:issue82-ci:ci:1",
+        "version": "QRWIVBCD5VNEEFI5FI7QSPLTOG"
+      },
+      {
+        "id": "run:JLYTOOJVGJCSFDK6ZDTSFWG6KJ",
+        "version": "AIJVDWL4FIFWHB53YM4M6WC6QB"
+      }
+    ]
+  },
+  "workflow": {
+    "id": "workflow-execution:issue82-ci",
+    "version": "ONWUMXMWM4DOTMEGJRTV7QVQ4M",
+    "owner_id": "workflow-execution:issue82-ci",
+    "kind": "execution",
+    "position": "30351",
+    "value": {
+      "count": 1,
+      "state": "completed",
+      "controller": "T4YLDD4EBWA2GGFC2IJQZUKKCZ",
+      "definition": {
+        "id": "workflow-definition:issue82-ci",
+        "version": "HQ6YH54C76GQMH352K3G227CVD"
+      },
+      "started_at": "2026-10-31T14:57:42.6307779Z"
+    },
+    "refs": [
+      {
+        "id": "workflow-definition:issue82-ci",
+        "version": "HQ6YH54C76GQMH352K3G227CVD"
+      },
+      {
+        "id": "run-definition:issue82-ci-observed",
+        "version": "MZCG7JXMIBCM6JJNK7Q2OLNT7N"
+      },
+      {
+        "id": "validation:workflow-definition:issue82-ci",
+        "version": "WMEAGAB63X2VEMDM3S3UQIO3L6"
+      },
+      {
+        "id": "adoption:workflow-definition:issue82-ci",
+        "version": "2FTKWWQ2TUJXAMBCO7PIF66Z3A"
+      }
+    ]
+  }
+}

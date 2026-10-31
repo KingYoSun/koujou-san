@@ -8,6 +8,7 @@ import {
   type Screen as ScreenName,
 } from "./navigation";
 import { Workbench } from "./workbench";
+import { ProjectChat } from "./project-chat";
 import { ContextWorkspace } from "./context-workspace";
 import type { OutputContextSource } from "./context-generation";
 import { Workflows } from "./workflows";
@@ -174,6 +175,9 @@ export function WorkspaceShell({
               );
             }}
           />
+        </Screen>
+        <Screen screens={["chat"]}>
+          <ProjectChat {...common} />
         </Screen>
         <Screen screens={["context"]} background>
           <ContextWorkspace

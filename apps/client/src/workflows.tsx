@@ -26,6 +26,7 @@ import type { DefinitionLabel } from "./workflow-map";
 import type { DefinitionPage } from "./definition-picker";
 import { DefinitionGeneration } from "./definition-generation";
 import { definitionFields } from "./definition-proposal";
+import { linkChatTarget } from "./chat-api";
 
 type Ref = { id: string; version: string };
 type DefinitionRecord = Ref & { kind: string; value_utf8: string };
@@ -175,6 +176,21 @@ export function Workflows({
       expected_version: version,
       operation_id: actionIDs.current.get(key)!,
     })) as { data: Ref };
+    const origin = navigationRef.current?.route.origin;
+    if (
+      origin?.kind === "chat-thread" &&
+      /^(run|workflow)-definition:/.test(result.data.id)
+    ) {
+      await linkChatTarget(
+        native,
+        workspace,
+        origin,
+        result.data.id.startsWith("run-definition:")
+          ? "run-definition"
+          : "workflow-definition",
+        result.data,
+      );
+    }
     return { data: { id: result.data.id, version: result.data.version } };
   };
   const persist = (value: Draft) => {

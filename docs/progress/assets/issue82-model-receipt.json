@@ -1,0 +1,27 @@
+{
+  "observed_on": "2026-10-31",
+  "source": "Windows共通画面の保存した原応答",
+  "operation": {
+    "id": "client-operation:chat:chat-message:eb305422-89e6-4e09-9c3d-4df1accad857",
+    "version": "OGJJVZ5KYTNSIXY2S64TJYSP6Z"
+  },
+  "request_id": "cbfcdb34-3643-4999-93d1-276c1a8ac957",
+  "input_digest": "257cf6ab69cbe5d44ac6cd5acfd9892019d5fa537cfd2566e40075d86d903401",
+  "prompt_version": "project-chat-v1",
+  "http_status": 200,
+  "state": "response",
+  "requested_model": "gpt-6.1-sol",
+  "actual_model": "gpt-6.1-sol",
+  "usage": {
+    "prompt_tokens": 254,
+    "completion_tokens": 279,
+    "prompt_tokens_details": {"cached_tokens": 0},
+    "completion_tokens_details": {"reasoning_tokens": 0}
+  },
+  "adopted_context": {
+    "kind": "sentence",
+    "id": "chat-be42250ad5627b5d126f6e94b0d2e70eb189f84eb0b9aee8feba281326a84208",
+    "revision": "HHKXFOJLYX3WBK5MODOU67THHW"
+  },
+  "note": "単価未設定のため費用金額は未算定。資格情報は含めない。専用環境は後に制限時間で停止し、Run開始は未確認。"
+}

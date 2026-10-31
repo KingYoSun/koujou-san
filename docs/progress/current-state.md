@@ -4,6 +4,10 @@
 
 開発環境と[親Issue #2](https://github.com/KingYoSun/koujou-san/issues/2)の#3〜#34の受入判定はPASS。2026-10-23、本人が指定したgestaloka #94で#34を再開し、別プロジェクトの一巡・分離・停止後の継続とexportを検証した。#34全体の独立検品も全8条件PASS。[証跡](2026-10-23-issue-34-evidence.md)を参照する。最新の必須CI、PR #81のmerge、tree照合とIssue Closeの状態は[Issue #34の完了記録](https://github.com/KingYoSun/koujou-san/issues/34)へ集約する。製品設計は[設計書](../../koujou-san-design-doc.md)、環境構築の証跡は[2026-10-15の記録](2026-10-15-development-environment.md)を参照。
 
+## Issue #82
+
+Projectの永続チャットを既存Context・Run・質問回答へ接続した。本人指定のChatGPTサブスク`gpt-6.1-sol`、#83の準備文書による実行・質問回答・独立検品、GUI閉鎖後の継続を確認した。[条件と現在の判定](2026-10-31-issue-82-plan.md)、[検証記録](2026-10-31-issue-82-evidence.md)を参照する。
+
 ## 現在の作業: Issue #79
 
 状態: 一部完了、Ory公式修正版待ち。Scope revision 1、区分C。[PR #80](https://github.com/KingYoSun/koujou-san/pull/80)でNode 22.23.4・Go 1.27.3・Bifrost v2.3.2と配備CAの手順を更新した。12経路の拒否、通常HTTPS・モデル・認証・明示CA、実配布のCA差し替えと再起動を確認した。最終CIとmerge後の照合はPRに集約する。Ory Kratos／Hydraは本人の判断により公式版を待つ。AC-2全体は未完了であり、#79はCloseしない。遠隔配備はなく、このPCだけを対象とする。[作業範囲と証跡](2026-10-22-issue-79-evidence.md)、[独立検品](2026-10-22-issue-79-inspection.md)を参照する。
