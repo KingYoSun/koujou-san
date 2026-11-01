@@ -61,9 +61,6 @@ export function ContextGenerationResults({
   return (
     <section aria-label="保存したContextと由来">
       <h3>保存したContextと由来</h3>
-      <p>
-        新しい版は既存の全文書や開始済みRunへ伝播しません。後段では基準版への明示採用と選択で使います。
-      </p>
       {page && source && sourceKey(page.source) !== sourceKey(source) && (
         <p role="status">
           この結果は別の固定出力から作られています。
@@ -94,9 +91,7 @@ export function ContextGenerationResults({
               </li>
             ))}
           </ul>
-          <p>
-            所属の変更: {page.memberships}件。構成参照とは別に保存しました。
-          </p>
+          <p>所属の変更: {page.memberships}件</p>
           {page.next && (
             <button onClick={() => void load(page.next)}>結果の次の50件</button>
           )}

@@ -122,9 +122,6 @@ export function ContextGenerationOrigin({
           {excerpt && <pre>{excerpt}</pre>}
         </>
       )}
-      <p>
-        原出力・検品判定は保持しています。この記述を検品基準へ使うときは、新しい基準版を明示的に採用してください。
-      </p>
       <p role="status">{notice}</p>
     </section>
   );

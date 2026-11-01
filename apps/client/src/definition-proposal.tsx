@@ -47,9 +47,6 @@ export function DefinitionProposal({
   const proposed = useMemo(() => sources(after), [after]);
   return (
     <section aria-label="生成した定義の項目別比較">
-      <p>
-        採用する項目を選べます。未設定・固定項目との競合・元版不一致は保存前にも検証します。
-      </p>
       {definitionFields.map(([path, label], index) => (
         <details key={path}>
           <summary>{label}</summary>

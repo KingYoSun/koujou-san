@@ -140,9 +140,6 @@ export function InspectionResult({
             ? "明示的に無注入"
             : v.launch.value.manifest.state}
         </p>
-        <p className="note">
-          固定基準・Context注入の強制は、版と注入内容の固定です。CLIから読める全ファイル・記憶の分離を保証するものではありません。
-        </p>
         <dl className="status-list">
           {Object.entries(v.launch.value.separation).map(([name, s]) => (
             <div key={name}>
@@ -450,9 +447,6 @@ export function Inspections({
       {
         <section className="panel workflow-editor" aria-label="独立検品・証拠">
           <h3>独立検品・証拠</h3>
-          <p>
-            固定成果物と選んだ条件・入力で検品します。初見検品はContextを無注入にします。実装の会話や自己評価は自動で継承しません。
-          </p>
           <label>
             一覧の種類
             <select
@@ -698,9 +692,6 @@ export function Inspections({
               {other && <InspectionResult value={other} title="比較する判定" />}
               {canEdit && (
                 <>
-                  <p>
-                    人の例外判断は別の記録として保存します。元のFAIL・INCONCLUSIVEや実行権限は変わりません。
-                  </p>
                   <label>
                     人の判断JSON
                     <textarea

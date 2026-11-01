@@ -37,10 +37,7 @@ export function ComparisonResults({
         集計時点: {page.data.as_of} / 反映位置: {page.data.through} /{" "}
         {page.data.timezone}
       </p>
-      <p>
-        {costLabel(condition.kind)}
-        。通貨・評価種別・計測範囲ごとに表示します。取得済み部分を全費用と扱いません。
-      </p>
+      <p>{costLabel(condition.kind)}</p>
       {summary && (
         <>
           <dl>
@@ -61,9 +58,6 @@ export function ComparisonResults({
               件
             </dd>
           </dl>
-          <p>
-            時間はRunごとに一度だけ数えます。実行時間にはRun内の回答待ちを含みます。手戻りは明示された前Runへの参照を数え、失敗から推測しません。
-          </p>
           <ul>
             {summary.quality.map((q, i) => (
               <li key={i}>
@@ -72,15 +66,10 @@ export function ComparisonResults({
               </li>
             ))}
           </ul>
-          <p>
-            保存時の検品結果です。現在の有効性は検品の詳細で確認してください。CLIの自己申告を独立検品のPASSとして比較しません。
-          </p>
         </>
       )}
       {page.data.items.length === 0 && (
-        <p>
-          この条件で参照できる記録はありません。未取得の費用を0と補完しません。
-        </p>
+        <p>この条件で参照できる記録はありません。</p>
       )}
       <table>
         <caption>
@@ -139,18 +128,16 @@ export function ComparisonResults({
                   <td>
                     <details>
                       <summary>数量と計測範囲</summary>
-                      {r.quantities && Array.isArray(r.quantities) ? (
-                        r.quantities.map((q) => (
-                          <p key={q.category}>
-                            {costLabel(q.category)}: {q.value ?? "未取得"}{" "}
-                            {q.unit}（実測 {q.reported}、推定 {q.estimated}
-                            、確認対象 {q.uncertain ?? 0}、未取得 {q.missing}
-                            、非該当 {q.not_applicable}）
-                          </p>
-                        ))
-                      ) : (
-                        <p>元記録の数量と取得範囲を根拠から確認できます。</p>
-                      )}
+                      {r.quantities && Array.isArray(r.quantities)
+                        ? r.quantities.map((q) => (
+                            <p key={q.category}>
+                              {costLabel(q.category)}: {q.value ?? "未取得"}{" "}
+                              {q.unit}（実測 {q.reported}、推定 {q.estimated}
+                              、確認対象 {q.uncertain ?? 0}、未取得 {q.missing}
+                              、非該当 {q.not_applicable}）
+                            </p>
+                          ))
+                        : null}
                       {costLabel(
                         r.measurement ??
                           (
@@ -180,9 +167,6 @@ export function ComparisonResults({
                     {amountLabel(r.amount, r.currency)}
                     <br />
                     {costLabel(r.state)}
-                    <p>
-                      定額・ローカルの支払額を0と扱いません。API換算額は支払額や節約額ではありません。
-                    </p>
                   </td>
                   <td>
                     {distinctCostRefs(r.refs).flatMap((ref) => {

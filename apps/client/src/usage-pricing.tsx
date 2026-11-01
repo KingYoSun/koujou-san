@@ -269,9 +269,6 @@ export function UsagePricing({
                 : "利用量の個別集計・原記録を調べる"}
             </summary>
             <h3>利用量・料金</h3>
-            <p>
-              個別契約単価を含め、既定ではWorkspace内で共有します。接続先・契約は識別名で登録し、APIキーは入力しないでください。履歴は無期限に保持します。
-            </p>
 
             <ScreenContent>
               <div className="team-controls">
@@ -382,9 +379,6 @@ export function UsagePricing({
                   取得
                 </button>
               </div>
-              <p>
-                数量の内訳は重複を除いて集計します。報告額・推定額・API料金換算額・配賦額を合算せず、通貨ごとに表示します。未算定・確認対象・再評価待ちを0円に補完しません。
-              </p>
               {page && (
                 <>
                   <p>
@@ -450,7 +444,6 @@ export function UsagePricing({
               )}
             </ScreenContent>
             <ScreenContent screens={["pricing"]}>
-              <p>料金版をIDで絞り、取得した固定版を選んで編集します。</p>
               {priceID && version !== "0" && (
                 <p>
                   編集中の料金版: {priceID} / {version}
@@ -462,9 +455,6 @@ export function UsagePricing({
               {role !== "viewer" && (
                 <fieldset disabled={busy}>
                   <legend>料金の手動設定</legend>
-                  <p>
-                    新しい料金表はIDを指定して作成します。既存の料金表は「記録・版履歴」から版を参照して編集してください。
-                  </p>
                   <button
                     onClick={() => {
                       setPrice(blank());

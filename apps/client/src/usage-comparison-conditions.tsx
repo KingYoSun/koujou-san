@@ -194,9 +194,6 @@ export function ComparisonConditions({
             }
           />
         </label>
-        <p>
-          固定版をすべて参照する消費だけを対象にします。Contextごとの許可や本文の一括取得は行いません。
-        </p>
       </details>
       <p role="status">{notice}</p>
     </fieldset>

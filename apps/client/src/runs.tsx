@@ -468,7 +468,6 @@ export function RunRecords({
               <p>
                 割当世代: {runValue.assignment.generation} / 有効期限:{" "}
                 {runValue.assignment.expires_at}
-                。期限切れはCLIの停止確認を意味しません。
               </p>
               <p>準備完了: {runValue.assignment.prepared_at ?? "未確認"}</p>
               {runValue.assignment.area && (
@@ -549,9 +548,6 @@ export function RunRecords({
                   value={required}
                   onChange={setRequired}
                 />
-                <p>
-                  端末の現在の許可と確認済み能力を照合します。repositoryを使うRunには別worktree・branchを自動作成します。割当だけではCLIは起動しません。
-                </p>
                 {runValue.handoff && handoffSource && (
                   <>
                     <p>
@@ -936,7 +932,6 @@ export function RunRecords({
               value={target}
               onChange={setTarget}
               required
-              hint="Windowsアプリの「実行先・Runner」に登録した接続名を入力します。"
             />
             <Field
               label="commandの引数・要求（JSON・任意）"
@@ -995,10 +990,7 @@ export function RunRecords({
             )}
             {handoff && (
               <>
-                <p>
-                  選択した固定出力: {outputs.length}
-                  件。元Runの全履歴や作業領域は取り込みません。開始時に元実行の終了・重複可能性を確認します。
-                </p>
+                <p>選択した固定出力: {outputs.length}件</p>
                 <ul>
                   {outputs.map((r) => (
                     <li key={`${r.id}:${r.version}`}>
@@ -1022,9 +1014,6 @@ export function RunRecords({
                 )}
               </>
             )}
-            <p>
-              元Runの会話・履歴は自動で取り込みません。Context・promptを省略し、commandだけでも作成できます。
-            </p>
             <button
               disabled={
                 !target.trim() || !commandKind.trim() || !!jsonError(parameters)

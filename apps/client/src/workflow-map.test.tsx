@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { WorkflowMap, type WorkflowGraph } from "./workflow-map";
+import { WorkflowMap, nodeDepths, type WorkflowGraph } from "./workflow-map";
 import { editField, fieldSource } from "./workflow-json";
 
 const first = {
@@ -89,16 +89,14 @@ it("shows serial, parallel joins, branches and finite returns from the fixed JSO
   expect(serial).toContain("検品");
   expect(serial).toContain("completed");
   const parallel = render(graphs[1]);
-  expect(parallel).toContain("すべて（all）");
-  expect(parallel).toContain("いずれか（any）");
+  expect(parallel).toContain("合流 all");
+  expect(parallel).not.toContain("合流 any");
+  expect(parallel).toContain("PASS · 任意");
   const branch = render(graphs[2]);
   expect(branch).toContain("人の判断");
   const returned = render(graphs[3]);
-  expect(returned).toContain("差し戻し：");
-  expect(returned).toContain("STALE");
-  expect(returned).toContain("Run数上限");
-  expect(returned).toContain("8");
-  expect(serial).toContain(first.definition.version);
+  expect(returned).toContain("↩ FAIL / STALE");
+  expect(serial).not.toContain(first.definition.version);
 });
 it("renders only a page of a large definition and identifies a connection outside the page", () => {
   const graph = {
@@ -117,8 +115,37 @@ it("renders only a page of a large definition and identifies a connection outsid
   );
   expect((html.match(/aria-pressed=/g) ?? []).length).toBe(50);
   expect(html).toContain("別ページ");
+  expect(html).toContain('data-stub="true"');
   expect(html).toContain("10000");
   expect(html).not.toContain("工程-100</button>");
+});
+it("places nodes in columns by control dependency depth and tolerates long chains and cycles", () => {
+  expect(nodeDepths(graphs[1].nodes)).toEqual([0, 0, 1, 1]);
+  expect(nodeDepths(graphs[3].nodes)).toEqual([0, 0]);
+  const chain = Array.from({ length: 10000 }, (_, i) => ({
+    id: `工程-${i}`,
+    depends: i ? [{ node: `工程-${i - 1}`, on: ["PASS"] }] : [],
+  }));
+  expect(nodeDepths(chain)[9999]).toBe(9999);
+  expect(
+    nodeDepths([
+      { id: "a", depends: [{ node: "b", on: ["PASS"] }] },
+      { id: "b", depends: [{ node: "a", on: ["PASS"] }] },
+      { id: "c", depends: [{ node: "a", on: ["PASS"] }] },
+    ]),
+  ).toEqual([0, 1, 1]);
+  const html = renderToStaticMarkup(
+    <WorkflowMap
+      graph={graphs[1]}
+      selected={2}
+      onSelect={() => {}}
+      loadLabels={async () => []}
+    />,
+  );
+  expect(html).toContain('style="grid-column:1;grid-row:2"');
+  expect(html).toContain('style="grid-column:2;grid-row:2"');
+  expect(html).toContain('id="workflow-node-settings"');
+  expect(html).toContain("<h4>両方</h4>");
 });
 it("round-trips structured connection edits without rewriting unknown values or fixed references", () => {
   let text =

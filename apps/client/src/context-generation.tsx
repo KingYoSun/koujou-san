@@ -247,9 +247,6 @@ export function ContextGeneration({
         {
           <section className="team" aria-label="出力からのContext生成">
             <h3>出力からContextを作成・更新</h3>
-            <p>
-              作業と判断で選んだ出力を使います。原出力・検品判定・過去の入力を置き換えません。
-            </p>
             <details>
               <summary>元の出力をIDで指定</summary>
               <label>

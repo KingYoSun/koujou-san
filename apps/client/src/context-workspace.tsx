@@ -306,12 +306,6 @@ export function ContextWorkspace({
                     接続を確認
                   </button>
                 </div>
-                <p className="context-meta">
-                  {native
-                    ? "Windowsアプリ · OS連携はネイティブ側で扱います。"
-                    : "Web · ローカルCLIの実行能力はありません。"}{" "}
-                  既存下書きは対象単位の保存へ移行します。移行後は旧版アプリと混在させないでください。
-                </p>
               </details>
             </header>
             {engine.notice && (

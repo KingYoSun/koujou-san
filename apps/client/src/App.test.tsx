@@ -14,7 +14,6 @@ it.each([false, true])(
     );
 
     expect(html).toContain("<h1>koujou-san</h1>");
-    expect(html).toContain(native ? "独立Runner" : "Web版");
     expect(html).toContain("Workspace");
     expect(html).not.toContain('id="environment-title"');
     queryClient.clear();

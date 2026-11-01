@@ -16,9 +16,6 @@ export function DesktopConnection({ children }: { children: ReactNode }) {
     <main className="shell">
       <section className="panel">
         <h1>koujou-sanに接続する</h1>
-        <p>
-          管理者から案内された共有サーバーのURLを入力してください。この端末に接続先を保存し、ログインへ進みます。
-        </p>
         {error && <p role="alert">{error}</p>}
         {!profile ? (
           <p role="status">接続設定を確認しています。</p>

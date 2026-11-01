@@ -107,7 +107,6 @@ export function UsageEntryView({ entry }: { entry: UsageEntry }) {
                 unknown: "未確認",
               } as Record<string, string>
             )[m.billing] ?? "未確認"}
-            。実支払額はこの記録だけでは確定しません。
           </p>
           {m.reason === "session_boundary_unconfirmed" && (
             <p>
@@ -115,16 +114,12 @@ export function UsageEntryView({ entry }: { entry: UsageEntry }) {
             </p>
           )}
           {m.estimate_usd != null && !uncertain && (
-            <p>
-              CLIの参考推定額：{m.estimate_usd} USD（実請求額ではありません）
-            </p>
+            <p>CLIの参考推定額：{m.estimate_usd} USD</p>
           )}
         </>
       )}
       {uncertain ? (
-        <p>
-          数量は今回のRunへ確定帰属していません。元記録と取得範囲を確認してください。
-        </p>
+        <p>数量は今回のRunへ確定帰属していません。</p>
       ) : (
         <dl>
           {Object.entries(entry.value.quantities ?? entry.quantities ?? {}).map(
@@ -148,11 +143,6 @@ export function UsageEntryView({ entry }: { entry: UsageEntry }) {
             ),
           )}
         </dl>
-      )}
-      {entry.kind === "usage" && (
-        <p>
-          費用は評価種別ごとに確認してください。料金版による評価がなければ未算定です。
-        </p>
       )}
       {entry.kind !== "usage" && (
         <p>
@@ -258,7 +248,6 @@ export function RunUsage({
   return (
     <section aria-label="このRunのモデル・利用量・費用">
       <h4>このRunのモデル・利用量・費用</h4>
-      <p>計測の欠測・同期状態は、Runの実行結果とは別に確認してください。</p>
       <label>
         表示する計測・評価
         <select
@@ -281,7 +270,7 @@ export function RunUsage({
       </button>
       {message && <p role="status">{message}</p>}
       {page?.data.items.length === 0 && (
-        <p>この種別の記録は未取得・未算定です。0利用・0費用とは扱いません。</p>
+        <p>この種別の記録は未取得・未算定です。</p>
       )}
       {page?.data.items.map((entry) => (
         <article key={entry.key}>
@@ -289,7 +278,7 @@ export function RunUsage({
           <details>
             <summary>計測・料金の根拠を確認</summary>
             {entry.value.measurement?.source_ref && (
-              <p>端末内の原記録は未取得です。参照とdigestを確認できます。</p>
+              <p>端末内の原記録は未取得です。</p>
             )}
             {entry.refs.map((ref) => (
               <button

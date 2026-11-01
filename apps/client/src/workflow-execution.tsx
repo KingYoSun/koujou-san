@@ -92,7 +92,6 @@ export function WorkflowExecution({
   visible?: boolean;
 }) {
   const active = useScreenActive();
-  const flowDetails = useRef<HTMLDetailsElement>(null);
   const owner = JSON.stringify([
     selected?.id,
     selected?.version,
@@ -261,11 +260,6 @@ export function WorkflowExecution({
       {
         <section aria-label="工程の実行と判断">
           {!selected && <h3>工程の状況</h3>}
-          {!selected && (
-            <p>
-              実行開始は別の依頼です。工程の判断待ちと、Run途中の質問は別々に表示します。時間・費用の予算は追加開始を止める条件で、開始済みのCLIによる消費の上限は保証しません。
-            </p>
-          )}
           <fieldset disabled={busy}>
             {!selected && (
               <details>
@@ -379,7 +373,6 @@ export function WorkflowExecution({
                     workspace={workspace}
                     onDetails={(index) => {
                       setNodeIndex(index);
-                      if (flowDetails.current) flowDetails.current.open = true;
                       requestAnimationFrame(() =>
                         document
                           .getElementById("workflow-node-settings")
@@ -388,18 +381,13 @@ export function WorkflowExecution({
                     }}
                   />
                 )}
-                {cursor && (
-                  <p role="status">
-                    未取得の試行があります。このページだけで全体の判定を確定していません。
-                  </p>
-                )}
-                <details ref={flowDetails}>
-                  <summary>工程図・全試行・入力の接続</summary>
+                {cursor && <p role="status">未取得の試行があります。</p>}
+                <section aria-label="工程図・全試行・入力の接続">
                   {record.value.cost && (
                     <p>
                       費用観測: {record.value.cost.state} /{" "}
                       {record.value.cost.amount ?? "未観測"}{" "}
-                      {record.value.cost.currency} / 制御: 追加開始のみ
+                      {record.value.cost.currency}
                     </p>
                   )}
                   {graph && (
@@ -453,9 +441,7 @@ export function WorkflowExecution({
                             </p>
                           ))
                         ) : (
-                          <p>
-                            試行はこのページに未取得。未実行・完了とは判定していません。
-                          </p>
+                          <p>試行未取得</p>
                         );
                       }}
                     >
@@ -476,9 +462,7 @@ export function WorkflowExecution({
                                 </li>
                               ))}
                             </ul>
-                          ) : (
-                            <p>前段出力からの入力接続はありません。</p>
-                          )}
+                          ) : null}
                           {page?.items
                             .filter(
                               (r) =>
@@ -587,10 +571,6 @@ export function WorkflowExecution({
                       )}
                     </WorkflowMap>
                   )}
-                  <p>
-                    取得した試行：{page?.items.length ?? 0}件。固定実行版{" "}
-                    {record.version} を50件ずつ取得しています。
-                  </p>
                   {cursor && (
                     <button
                       onClick={() =>
@@ -613,19 +593,18 @@ export function WorkflowExecution({
                       工程内の次のページ
                     </button>
                   )}
-                </details>
+                </section>
                 <details>
                   <summary>定義の変更・固定版・記録の保存</summary>
                   <p>
-                    準備したRun数：{record.value.count}（起動確認とは別） /
-                    固定定義：{record.value.definition.id}@
+                    Run数 {record.value.count} · 定義{" "}
+                    {record.value.definition.id}@
                     {record.value.definition.version}
                   </p>
                   {canEdit && canExecute && (
                     <section aria-label="採用版の適用">
                       <DefinitionPicker
                         label="適用候補の工程定義"
-                        hint="選択した定義の現在採用版を候補にします。影響確認と明示適用までは、この工程実行を変更しません。"
                         load={async (after) =>
                           (
                             (await request("/query", {
@@ -647,7 +626,6 @@ export function WorkflowExecution({
                         {candidate?.owner === record.id
                           ? candidate.name || candidate.ref.id
                           : graph?.name || record.value.definition.id}
-                        。適用する固定版は影響確認で表示します。
                       </p>
                       <button
                         onClick={() =>

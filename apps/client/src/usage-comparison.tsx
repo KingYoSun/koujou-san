@@ -227,9 +227,6 @@ export function UsageComparison({
               比較条件の次の50件
             </button>
           )}
-          <p>
-            同程度の作業を二つの条件で比較します。失敗・再試行・選択や生成・Hopper・Triageの消費も対象です。費用だけで品質やモデルの優劣を断定しません。
-          </p>
           <label>
             比較名
             <input
@@ -335,9 +332,6 @@ export function UsageComparison({
                 二群の反映位置が異なります。更新が入った範囲を確認して比較してください。
               </p>
             )}
-          <p>
-            検品条件・計測範囲・未取得の違いは各表に表示します。異なる通貨を合算せず、未確認の範囲を成功や0円へ補完しません。
-          </p>
           {role !== "viewer" && (
             <button
               disabled={busy || !comparison.name.trim()}
@@ -377,9 +371,6 @@ export function UsageComparison({
           </a>
           <details>
             <summary>根拠を確認して次の設定を手動で改善する</summary>
-            <p>
-              新しい設定は通常の編集・採用と新しいRunで試します。この比較画面から自動で実行や設定変更はしません。
-            </p>
             <NavigationLink
               to={{
                 workspace: navigation?.route.workspace ?? "",

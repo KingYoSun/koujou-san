@@ -424,7 +424,7 @@ export function Team({
             ? "認証状態を確認しています…"
             : status === "unavailable"
               ? "認証サービスへの接続を確認してください。"
-              : "ログインするとWorkspaceへの参加・作成ができます。"}
+              : "未ログイン"}
         </p>
         {invitation && (
           <p>招待リンクを保持しています。ログイン後に受諾してください。</p>
@@ -625,9 +625,6 @@ export function Team({
                       {admin && (
                         <>
                           <h3>招待</h3>
-                          <p>
-                            ログイン済みのリンク所持者が1回受諾できます。リンクは7日間有効で、転送先も参加できます。
-                          </p>
                           {selectRole(inviteRole, setInviteRole)}
                           <button
                             disabled={busy}
@@ -695,9 +692,6 @@ export function Team({
                     </ScreenContent>
                     <ScreenContent screens={["devices"]}>
                       <h3>端末</h3>
-                      <p>
-                        端末登録と実行依頼の許可は別です。最終接続時刻から、CLIの稼働・停止は判断できません。
-                      </p>
                       {native && current.role !== "viewer" && (
                         <div className="team-controls">
                           <label>
@@ -727,9 +721,7 @@ export function Team({
                         </div>
                       )}
                       {!native && (
-                        <p>
-                          この端末の登録と資格情報の保存はWindowsデスクトップ版から行います。
-                        </p>
+                        <p>端末の登録はWindowsアプリから行います。</p>
                       )}
                       <ul>
                         {devices.items.map((d) => (

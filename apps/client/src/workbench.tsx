@@ -621,9 +621,6 @@ export function Workbench({
                   {notice && <p role="status">{notice}</p>}
                   {!navigation?.route.target && !prepare && (
                     <>
-                      <p>
-                        目的と待機理由から、成果物・質問・証拠へ進めます。画面を読むだけでは実行を開始しません。
-                      </p>
                       <button
                         disabled={!canEdit}
                         onClick={() =>
@@ -664,7 +661,6 @@ export function Workbench({
                           label="Runの版"
                           value={directVersion}
                           onChange={setDirectVersion}
-                          hint="headは最新を確認してから、その固定版を開きます。"
                         />
                         <button
                           disabled={!directID.trim() || !directVersion.trim()}
@@ -956,9 +952,7 @@ export function Workbench({
                                   ))}
                                 </ul>
                               ) : (
-                                <p>
-                                  入力に指定された固定成果物はありません。質問と原出力の証拠も確認してください。
-                                </p>
+                                <p>入力に指定された固定成果物はありません。</p>
                               )}
                               {input.previous && (
                                 <button
@@ -1023,7 +1017,7 @@ export function Workbench({
                               <p>
                                 {selected.value.assessment.report?.reason ||
                                   selected.value.assessment.report?.summary ||
-                                  "判定の理由は報告されていません。下の原出力から確認できます。"}
+                                  "理由の報告なし"}
                               </p>
                               <details>
                                 <summary>判定の原報告</summary>
@@ -1042,9 +1036,6 @@ export function Workbench({
                             <details>
                               <summary>理由付き差し戻しを記録</summary>
                               <fieldset disabled={busy || detailStale}>
-                                <p>
-                                  この版の成果物と問題を記録します。記録だけでは修正commandを起動しません。
-                                </p>
                                 <Field
                                   label="対象成果物のURL・識別子"
                                   value={targetURI}

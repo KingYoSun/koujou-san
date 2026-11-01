@@ -405,12 +405,6 @@ export function Hopper({
           <NavigationLink to={{ workspace, screen: "operations" }} related>
             共通の処理枠・Worker状態を確認
           </NavigationLink>
-          <p>
-            共有された結果をサーバーが評価します。画面を閉じても動作し、発行・Run作成・実行開始はそれぞれ現在の権限で確認します。
-          </p>
-          <p>
-            Hopperは仕事を発行し、Triageは優先度を評価します。主体・処理枠・費用上限は「共通処理制御」で設定します。
-          </p>
           <p role="status">{notice}</p>
           <Tabs
             id="hopper-purpose"
@@ -668,9 +662,6 @@ export function Hopper({
                                 同じ結果を新しい履歴で再評価
                               </button>
                             )}
-                            <p>
-                              再評価は現在の証拠と許可を確認してモデルを要求し、追加の消費を記録します。過去の判定と発行先は保持します。
-                            </p>
                           </section>
                         )}
                         {e.source.previous_evaluation && (
@@ -688,10 +679,7 @@ export function Hopper({
                           </button>
                         )}
                         {e.reevaluation && (
-                          <p>
-                            再評価を受付済み: {e.reevaluation}
-                            。一覧を更新して結果を確認してください。
-                          </p>
+                          <p>再評価を受付済み: {e.reevaluation}</p>
                         )}
                         {e.cost && (
                           <p>
@@ -699,7 +687,6 @@ export function Hopper({
                             {e.cost.amount === null
                               ? "未確定"
                               : `${e.cost.amount} ${e.cost.currency}`}
-                            。欠測・遅着を含む実請求額の上限は保証しません。
                           </p>
                         )}
                         <p>
@@ -857,7 +844,6 @@ export function Hopper({
                 {selected.kind === "source" && (
                   <p>
                     元結果の固定版：{selected.id}@{selected.version}
-                    。観測した本文・状態は原記録で確認できます。
                   </p>
                 )}
                 {selected.kind === "chain" && (
@@ -870,10 +856,7 @@ export function Hopper({
                           : "再開を許可"
                       }
                     />
-                    <p>
-                      起点：{(selected.value as { root: string }).root}
-                      。Hopperの仕事発行の連鎖であり、Workflowの工程制御やContext参照とは別です。
-                    </p>
+                    <p>起点：{(selected.value as { root: string }).root}</p>
                     <NavigationLink
                       to={{
                         workspace,
@@ -921,7 +904,6 @@ export function Hopper({
                 <p>
                   編集中：{id || "未選択"} / 前提版：{version} /
                   有効化する保存版：{saved?.version ?? "未保存"}
-                  。項目の変更は端末内の下書きです。
                 </p>
                 <button
                   onClick={() =>
@@ -938,9 +920,6 @@ export function Hopper({
                 >
                   初期設定で新しいHopperを作る
                 </button>
-                <p>
-                  初期設定は自動発行・通常の割当と開始です。対象・型付き条件・登録済みテンプレートの固定版を指定してください。保存と有効化は別の操作です。
-                </p>
                 <label>
                   定義ID
                   <input
@@ -972,9 +951,7 @@ export function Hopper({
                       サーバーのモデル接続を取得
                     </button>
                     {connections.length === 0 && (
-                      <p>
-                        接続が表示されない場合は、運用者がWorkspace用のサーバー接続を登録してください。クライアントのAPIキーやCLI認証は使いません。
-                      </p>
+                      <p>利用できるサーバー接続がありません。</p>
                     )}
                     <button
                       disabled={
@@ -1024,9 +1001,6 @@ export function Hopper({
                           />
                           必要な証拠の遅着・変更時に関連評価だけ再評価する
                         </label>
-                        <p>
-                          評価Context・必要な証拠・fallback・料金版は下のJSONで指定します。Contextは選択条件と固定参照で扱い、全件を取得しません。容量超過は省略せず保留します。評価入力は発行先へ自動注入しません。
-                        </p>
                       </fieldset>
                     )}
                   </HopperRuleFields>
@@ -1111,9 +1085,6 @@ export function Hopper({
             {view === "trial" && admin && (
               <fieldset disabled={busy || !saved}>
                 <legend>過去の結果を発行せずに試す</legend>
-                <p>
-                  保存した固定版で50件ずつ評価します。Issue・Runの作成や開始は行いません。意味判断はサーバーWorkerへ受付し、モデル消費が発生します。結果は「評価と発行」の一覧を更新して確認してください。
-                </p>
                 <label>
                   結果の種類
                   <select
@@ -1165,7 +1136,7 @@ export function Hopper({
                       {(trial.value as { items: Ref[] }).items.some(
                         (item) => !item.version,
                       )
-                        ? "サーバーで処理します。「評価と発行」の一覧から結果を確認してください。"
+                        ? "サーバーで処理します。"
                         : "発行しない評価結果を保存しました。"}
                     </p>
                     <ol>

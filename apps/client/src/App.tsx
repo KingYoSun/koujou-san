@@ -40,10 +40,6 @@ export function App({ apiBaseUrl, native }: AppProps) {
           <dd>Go API・PostgreSQLで確定</dd>
         </div>
       </dl>
-      <p className="note">
-        Contextの取得・保存・入力選択と、対象作業の実行は別の操作です。
-        APIの表示はプロセスの起動確認です。
-      </p>
     </section>
   );
   return (
@@ -69,17 +65,7 @@ export function App({ apiBaseUrl, native }: AppProps) {
           }
         />
       )}
-      <footer>
-        <details>
-          <summary>このクライアントでの実行について</summary>
-          <p>Contextの編集・所属変更・プレビューから実行は始まりません。</p>
-          <p>
-            {native
-              ? "画面を閉じても、独立Runnerの許可済みの実行は継続します。"
-              : "Web版はローカルのCLI実行機構を持ちません。"}
-          </p>
-        </details>
-      </footer>
+      <footer></footer>
     </main>
   );
 }

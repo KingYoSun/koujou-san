@@ -529,11 +529,6 @@ export function Automation({
               共通の処理枠・Worker状態を確認
             </NavigationLink>
           )}
-          <p>
-            {surface === "operations"
-              ? "HopperとTriageの自動化主体・処理枠・予算・Worker状態を管理します。設定は既存の共有レコードを使い、保存後も画面の開閉から独立して処理します。"
-              : "採用値・推奨・手動固定を分けます。同じ方針・尺度の優先度順、同順位は受付順です。異なる尺度を一つの順位にせず、未評価や判断不能を最低優先度として扱いません。"}
-          </p>
           <Tabs
             id={`automation-${surface}`}
             label="作業の目的"
@@ -718,11 +713,6 @@ export function Automation({
             >
               一覧を更新
             </button>
-            {view === "history" && !filterID && (
-              <p>
-                評価要求・Worker処理から「処理履歴を見る」を選んでください。履歴の対象を指定してから取得します。
-              </p>
-            )}
             {surface === "priorities" &&
               navigation?.route.target?.kind === "scope" && (
                 <NavigationLink
@@ -1171,9 +1161,6 @@ export function Automation({
                         }
                       />
                     </label>
-                    <p>
-                      優先度は上から順に扱います。名称・段階数を変更できます。未評価や失敗は優先度の段階に含めません。
-                    </p>
                     {policy.levels.map((l, i) => (
                       <div className="team-controls" key={i}>
                         {(
@@ -1245,9 +1232,6 @@ export function Automation({
                     {admin && (
                       <details>
                         <summary>GitHub優先度ラベルの双方向同期</summary>
-                        <p>
-                          方針ごとに接続と対応ラベルを設定します。外部で人が変えた値を固定として取り込み、同時の手動変更は保留します。既存ラベルを使い、本文・状態・根拠は送信しません。
-                        </p>
                         <label>
                           GitHub接続ID
                           <input
@@ -1600,9 +1584,6 @@ export function Automation({
                 >
                   現在の設定を読み込む
                 </button>
-                <p>
-                  保存した管理者の現在のWorkspace権限を確認して処理します。ログインセッションの終了とは独立して動作し、権限の失効時は保留します。
-                </p>
                 {(
                   [
                     ["enabled", "有効にする"],
@@ -1713,9 +1694,6 @@ export function Automation({
                     </label>
                   </>
                 )}
-                <p>
-                  利用量の遅延・欠測がある経路では厳密な金額上限を保証せず、件数上限を併用します。HopperとTriageの枠・予算は別です。
-                </p>
                 <button
                   onClick={() =>
                     void run(async () => {

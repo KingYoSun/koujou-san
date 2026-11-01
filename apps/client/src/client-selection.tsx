@@ -566,9 +566,6 @@ export function ClientSelection({
                 ? "自由入力からRun定義を作る"
                 : "Contextの選択と保存"}
           </h3>
-          <p>
-            手動の必須・除外を保ち、許された候補から選びます。取得範囲・未確認事項・固定版は履歴で確認できます。
-          </p>
           <ModelConnectionSettings
             selectionOnly
             native={ui.native}
@@ -639,11 +636,6 @@ export function ClientSelection({
             )}
             {(definition || generation) && (
               <>
-                {definition && (
-                  <p>
-                    作業場所は接続設定とRun専用worktreeを使い、リポジトリ・commitはRun割当時に指定します。
-                  </p>
-                )}
                 <label>
                   Contextの取得
                   <select
@@ -706,9 +698,6 @@ export function ClientSelection({
                   onChange={(e) => setSeconds(Number(e.target.value))}
                 />
               </label>
-              <p>
-                手動で追加した項目は必須として固定します。自動選択した項目も、必要に応じて固定できます。
-              </p>
               {state.include
                 .slice(fixedPage * 50, fixedPage * 50 + 50)
                 .map((r) => (
@@ -805,9 +794,7 @@ export function ClientSelection({
               <p>{operation.value.goal}</p>
               <p>{operation.value.reason ?? ""}</p>
               {!ownsOperation && (
-                <p role="status">
-                  この操作は別のクライアントが担当しています。依頼者本人が「このクライアントへ明示して引き継ぐ」を選ぶと、編集・採用・継続できます。
-                </p>
+                <p role="status">別のクライアントが担当中です。</p>
               )}
               {generation && operationSource && (
                 <>
@@ -903,17 +890,6 @@ export function ClientSelection({
                         この案を採用
                       </button>
                     )}
-                    {operation.value.state === "proposal" &&
-                      generationDirty && (
-                        <p>
-                          手動修正したContext案を保存してから採用してください。採用は保存済みの案に対して行います。
-                        </p>
-                      )}
-                    {operation.value.state === "proposal" &&
-                      generation &&
-                      !generationDraft.chosen.length && (
-                        <p>採用する変更を選択してください。</p>
-                      )}
                     <button
                       onClick={() => {
                         epoch.current++;
@@ -1058,9 +1034,6 @@ export function ClientSelection({
                             </button>
                           </>
                         )}
-                        <p>
-                          項目を選び直したら「現在の選択を手動で保存」で反映できます。
-                        </p>
                       </>
                     )}
                   </>
@@ -1127,9 +1100,6 @@ export function ClientSelection({
             )}
           </details>
           <p role="status">{notice}</p>
-          <p>
-            画面の切替中も依頼済みの処理は継続します。アプリを終了すると新しいモデル要求を止め、結果未確認の要求は履歴に残します。
-          </p>
         </section>
       }
     </ScreenContent>

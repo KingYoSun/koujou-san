@@ -182,16 +182,6 @@ export function ModelConnectionSettings({
       {
         <section className="workspace-management">
           <h3>選択に使うモデル接続</h3>
-          <p>
-            {native
-              ? "Runで使うCLIとは独立し、モデル提供元へ直接接続します。既存CLIの認証情報は使いません。"
-              : "Runで使うCLIとは独立したHTTP接続です。接続先のキーをこの画面で扱います。"}
-          </p>
-          <p>
-            {native
-              ? "キーはWindowsの暗号化保存を使います。"
-              : "キーはこの画面を開いている間だけ保持します。開き直したら再入力してください。"}
-          </p>
           {selector}
           <button
             disabled={busy}
@@ -275,9 +265,6 @@ export function ModelConnectionSettings({
                 onChange={(e) => setAllowed(e.target.value)}
               />
             </label>
-            <p>
-              tool要求と構造化出力に対応した接続を使います。実モデル名が一致しない応答や不完全な結果は自動反映しません。
-            </p>
             {draft.auth !== "oauth" && (
               <label>
                 認証方法
@@ -308,9 +295,6 @@ export function ModelConnectionSettings({
             )}
             <details>
               <summary>個別契約単価と費用上限（任意）</summary>
-              <p>
-                単価はWorkspaceごとの固定版を指定できます。未設定・欠測を0として扱いません。
-              </p>
               <label>
                 契約の識別名
                 <input
@@ -385,10 +369,7 @@ export function ModelConnectionSettings({
                   />
                 </label>
               )}
-              <small>
-                接続ID: {draft.id}
-                。単価の接続欄にもこのIDを指定します。上限は記録済み費用で追加要求を止め、実請求額の上限は保証しません。
-              </small>
+              <small>接続ID: {draft.id}</small>
             </details>
             <button
               disabled={
@@ -406,8 +387,8 @@ export function ModelConnectionSettings({
             <section aria-label="モデル提供元の認証">
               <p>
                 {draft.credentials_saved
-                  ? "認証情報を保存済みです。利用できるモデルは提供元の契約に従います。"
-                  : "接続設定を保存してから、提供元へログインしてください。"}
+                  ? "認証情報を保存済み"
+                  : "認証情報未保存"}
               </p>
               <button
                 disabled={

@@ -5,7 +5,6 @@ export function Field({
   value,
   onChange,
   rows,
-  hint,
   error,
   required = false,
 }: {
@@ -13,7 +12,6 @@ export function Field({
   value: string;
   onChange: (value: string) => void;
   rows?: number;
-  hint?: string;
   error?: string;
   required?: boolean;
 }) {
@@ -23,7 +21,7 @@ export function Field({
     value,
     required,
     "aria-invalid": !!error,
-    "aria-describedby": hint || error ? id + "-help" : undefined,
+    "aria-describedby": error ? id + "-help" : undefined,
     onChange: (
       event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
     ) => onChange(event.target.value),
@@ -35,9 +33,9 @@ export function Field({
         {required && "（必須）"}
       </label>
       {rows ? <textarea {...props} rows={rows} /> : <input {...props} />}
-      {(hint || error) && (
+      {error && (
         <small id={id + "-help"}>
-          {error ? <span role="alert">{error}</span> : hint}
+          <span role="alert">{error}</span>
         </small>
       )}
     </div>

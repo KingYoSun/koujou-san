@@ -186,7 +186,6 @@ export function ChatWork(
       <fieldset disabled={busy}>
         <DefinitionPicker
           label="関連Run・工程"
-          hint="関連付けても実行・再開はしません。"
           load={async (after) =>
             (
               await call<{ data: { items: Work[]; next: string } }>(
@@ -201,7 +200,6 @@ export function ChatWork(
         />
         <DefinitionPicker
           label="関連Issue"
-          hint="Scopeの取得ページからIssueを選びます。"
           load={async (after) => {
             const page = await call<{
               data: {

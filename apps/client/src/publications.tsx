@@ -525,9 +525,6 @@ export function Publications({
       {
         <section className="panel workflow-editor" aria-label="外部Issueの起票">
           <h3>外部Issueの起票</h3>
-          <p>
-            下書き、共有受付、外部での作成確認を分けて記録します。応答を失った要求は再作成せず、本文末尾の照合コメントで探します。
-          </p>
           {incoming &&
             navigation?.route.target?.id === incoming.output.id &&
             navigation.route.target.version === incoming.output.version && (
@@ -654,9 +651,6 @@ export function Publications({
                   }}
                 />
               </label>
-              <p className="note">
-                本文末尾に通常表示では見えない照合用HTMLコメントを追加します。認証情報は入力しないでください。
-              </p>
               <PageList label="この下書きの参照元" items={editor.value.sources}>
                 {(ref, index) => (
                   <li key={index}>
@@ -671,7 +665,7 @@ export function Publications({
                     ref.version === incoming.output.version,
                 ) && (
                   <p className="context-warning">
-                    この下書きは、上に表示した出力とは別の参照元を持っています。出力の切替だけでは下書きの内容・参照元を変更しません。
+                    この下書きの参照元は、上の出力と異なります。
                   </p>
                 )}
               <details>

@@ -80,7 +80,7 @@ export function UsageReevaluation({
   return (
     <fieldset disabled={busy}>
       <legend>費用を明示的に再評価</legend>
-      <p>対象計測: {row.group}。表示や料金保存だけでは評価を変更しません。</p>
+      <p>対象計測: {row.group}</p>
       <label>
         評価種別
         <select value={kind} onChange={(e) => setKind(e.target.value)}>

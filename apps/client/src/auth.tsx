@@ -475,9 +475,6 @@ export function Account({ native }: { native: boolean }) {
         </p>
       ) : (
         <>
-          <p className="note">
-            メール確認後に利用できます。認証アプリは設定画面から追加できます。
-          </p>
           <button disabled={busy} onClick={login}>
             {busy ? "ブラウザで認証しています…" : "ログイン"}
           </button>

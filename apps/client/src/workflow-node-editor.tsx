@@ -121,7 +121,6 @@ export function WorkflowNodeEditor({
                 label="工程の識別名"
                 value={node.id}
                 onChange={(v) => put([...path, "id"], v)}
-                hint="参照している他ノードの識別名は自動変更しません。保存後の静的検証で確認します。"
               />
               <details>
                 <summary>Run定義の固定参照・判断の選択肢</summary>
@@ -205,7 +204,7 @@ export function WorkflowNodeEditor({
               >
                 先行工程を追加
               </button>
-              <h5>入力の接続（制御依存とは別）</h5>
+              <h5>入力の接続</h5>
               <PageList label="入力接続" items={node.bindings ?? []}>
                 {(b, i) => (
                   <li key={i}>
@@ -291,9 +290,6 @@ export function WorkflowNodeEditor({
               </button>
               {strings("開始時に明示する入力", [...path, "inputs"])}
               <h5>結果による差し戻し</h5>
-              <p>
-                戻り先にはRunノードを指定します。有限のRun数上限は工程全体の予算で設定します。
-              </p>
               <PageList
                 label="差し戻し"
                 items={Object.entries(node.retry ?? {})}
@@ -377,12 +373,7 @@ function NodeChoice({
       <summary>
         {label}：{value || "未指定"}
       </summary>
-      <Field
-        label={`${label}の識別名`}
-        value={value}
-        onChange={onChange}
-        hint="未定義の識別名も入力できます。存在確認は共有保存後の静的検証で行います。"
-      />
+      <Field label={`${label}の識別名`} value={value} onChange={onChange} />
       <label htmlFor={id}>
         名前で候補を絞る
         <input
