@@ -290,9 +290,7 @@ export function PauseAnswer({
   return (
     <fieldset disabled={busy || sending}>
       <legend>質問への回答</legend>
-      {draft.value && !stale && (
-        <p>未送信の回答案を端末に保存しています。API受付とは別です。</p>
-      )}
+      {draft.value && !stale && <p>未送信の回答案を端末に保存しています。</p>}
       {stale && (
         <p>質問の状態が変わりました。保存済みの回答案は送信できません。</p>
       )}

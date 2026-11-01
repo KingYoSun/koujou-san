@@ -71,11 +71,9 @@ it("shows missing measurements and historical quality without turning them into 
   );
   expect(html).toContain("未算定");
   expect(html).toContain("CLIの自己申告");
-  expect(html).toContain("現在の有効性は検品の詳細で確認");
   expect(html).toContain("定額契約");
   expect(html).toContain("比較結果の次の50件");
   expect(html).not.toContain("0 USD");
-  expect(html).toContain("API換算額は支払額や節約額ではありません");
 });
 
 it("loads Go conditions whose empty optional selectors are omitted", () => {

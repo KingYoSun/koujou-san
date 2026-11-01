@@ -210,9 +210,6 @@ export function ContextGenerationAutomation({
   return (
     <details aria-label="出力からの自動生成方針">
       <summary>出力からの自動生成方針・担当・履歴</summary>
-      <p>
-        保存と有効化を分けます。Contextの更新だけでは次の生成を始めません。画面の切替中も有効化した処理は継続し、アプリを終了すると新しいモデル要求を止めます。未確認要求は履歴へ残します。
-      </p>
       <fieldset disabled={!ui.canCreate || busy}>
         <label>
           方針名

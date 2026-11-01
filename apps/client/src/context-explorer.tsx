@@ -410,9 +410,6 @@ export function ContextExplorer({
         )}
         {tab === "scopes" && (
           <>
-            <p className="context-meta">
-              本文の構造とは別のGroupingです。Scopeの選択だけでは入力へ注入しません。
-            </p>
             <label>
               Scopeの種類
               <select
@@ -458,9 +455,6 @@ export function ContextExplorer({
         )}
         {tab === "graph" && (
           <>
-            <p className="context-meta">
-              開いたContextまたはScopeを起点に、範囲を指定して探索します。
-            </p>
             <label>
               方向
               <select
@@ -598,7 +592,6 @@ export function ContextExplorer({
         )}
         {tab === "drafts" && (
           <>
-            <p>端末内に保存した下書きです。再接続しても自動送信しません。</p>
             <ul>
               {draftKeys.map((key) => {
                 const draft = ui.engine.state.drafts[key];
@@ -747,9 +740,6 @@ function Grouping({
           : "このScopeにも直接所属させる"}
       </button>
       <p role="status">{notice}</p>
-      <p className="context-meta">
-        所属文書から参照される子は、文書を開き「包含・出力方向・旧版も辿る」で確認できます。直接所属には含めません。
-      </p>
     </section>
   );
 }

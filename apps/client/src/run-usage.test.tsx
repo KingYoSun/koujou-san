@@ -45,8 +45,6 @@ test("subscription estimates, missing quantities and settlement are separate", (
     "定額契約",
     "CLIの参考推定額",
     "0.0123 USD",
-    "未算定",
-    "実請求額ではありません",
   ])
     expect(html).toContain(text);
   expect(html).not.toContain("0 USD");

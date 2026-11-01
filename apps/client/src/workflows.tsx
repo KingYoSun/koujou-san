@@ -22,6 +22,7 @@ import type { JSONPath } from "jsonc-parser";
 import { WorkflowExecution } from "./workflow-execution";
 import { DefinitionRun } from "./definition-run";
 import { WorkflowNodeEditor } from "./workflow-node-editor";
+import { SidebarPane } from "./panes";
 import type { DefinitionLabel } from "./workflow-map";
 import type { DefinitionPage } from "./definition-picker";
 import { DefinitionGeneration } from "./definition-generation";
@@ -457,159 +458,195 @@ export function Workflows({
             tabIndex={-1}
             className="team-details workflow-editor"
           >
-            <h3>工程定義・検証・採用と実行</h3>
-            <p>
-              定義の保存・検証・採用と、実行開始を分けます。必要な固定入力と接続だけを指定します。
-            </p>
-            <div className="team-controls">
-              <label>
-                定義の種類
-                <select
+            <SidebarPane>
+              <section aria-label="定義一覧">
+                <label>
+                  定義の種類
+                  <select
+                    disabled={busy}
+                    value={kind}
+                    onChange={(e) => {
+                      setKind(e.target.value);
+                      setPage(undefined);
+                      setID("");
+                      setRecord(undefined);
+                      setDraft(undefined);
+                      setValidation(undefined);
+                      setVerified(undefined);
+                      setAdoption(undefined);
+                    }}
+                  >
+                    <option value="run-definition">Run定義</option>
+                    <option value="workflow-definition">工程定義</option>
+                  </select>
+                </label>
+                <button
                   disabled={busy}
-                  value={kind}
-                  onChange={(e) => {
-                    setKind(e.target.value);
-                    setPage(undefined);
-                    setID("");
-                    setRecord(undefined);
-                    setDraft(undefined);
-                    setValidation(undefined);
-                    setVerified(undefined);
-                    setAdoption(undefined);
-                  }}
+                  onClick={() =>
+                    void act(async () =>
+                      setPage(
+                        (
+                          (await call("/query", {
+                            kind: "heads",
+                            type: kind,
+                            limit: 50,
+                          })) as { data: Page }
+                        ).data,
+                      ),
+                    )
+                  }
                 >
-                  <option value="run-definition">Run定義</option>
-                  <option value="workflow-definition">工程定義</option>
-                </select>
-              </label>
-              <button
-                disabled={busy}
-                onClick={() =>
-                  void act(async () =>
-                    setPage(
-                      (
-                        (await call("/query", {
-                          kind: "heads",
-                          type: kind,
-                          limit: 50,
-                        })) as { data: Page }
-                      ).data,
-                    ),
-                  )
-                }
-              >
-                定義一覧を取得
-              </button>
-              <label>
-                定義ID
-                <input
-                  disabled={busy}
-                  value={id}
-                  onChange={(e) => {
-                    setID(e.target.value);
-                    setRecord(undefined);
-                    setDraft(undefined);
-                  }}
-                />
-              </label>
-              <label>
-                定義の版（headは現在版）
-                <input
-                  disabled={busy}
-                  value={requestedVersion}
-                  onChange={(e) => setRequestedVersion(e.target.value)}
-                />
-              </label>
-              <button
-                disabled={busy || !id}
-                onClick={() => void act(() => load(id, requestedVersion))}
-              >
-                定義を取得・更新
-              </button>
-              {canEdit && (
-                <button disabled={busy} onClick={() => fresh(kind)}>
-                  新しい定義の下書き
+                  定義一覧を取得
                 </button>
-              )}
-            </div>
-            {page && (
-              <>
-                <ul>
-                  {page.items.map((r) => (
-                    <li key={r.id}>
+                {page && (
+                  <>
+                    <ul>
+                      {page.items.map((r) => (
+                        <li key={r.id}>
+                          <button
+                            disabled={busy}
+                            aria-current={r.id === id ? "true" : undefined}
+                            onClick={() =>
+                              void act(() => load(r.id, r.version))
+                            }
+                          >
+                            {r.value.name || r.id} · {r.version}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    {page.next && (
                       <button
                         disabled={busy}
-                        onClick={() => void act(() => load(r.id, r.version))}
+                        onClick={() =>
+                          void act(async () =>
+                            setPage(
+                              (
+                                (await call("/query", {
+                                  kind: "heads",
+                                  type: kind,
+                                  after: page.next,
+                                  limit: 50,
+                                })) as { data: Page }
+                              ).data,
+                            ),
+                          )
+                        }
                       >
-                        {r.value.name || r.id} · {r.version}
+                        定義一覧の次のページ
                       </button>
-                    </li>
-                  ))}
-                </ul>
-                {page.next && (
-                  <button
-                    disabled={busy}
-                    onClick={() =>
-                      void act(async () =>
-                        setPage(
-                          (
-                            (await call("/query", {
-                              kind: "heads",
-                              type: kind,
-                              after: page.next,
-                              limit: 50,
-                            })) as { data: Page }
-                          ).data,
-                        ),
-                      )
-                    }
-                  >
-                    定義一覧の次のページ
+                    )}
+                  </>
+                )}
+                {canEdit && (
+                  <button disabled={busy} onClick={() => fresh(kind)}>
+                    新しい定義の下書き
                   </button>
                 )}
-              </>
-            )}
-            {canEdit && (
-              <label>
-                定義ファイルを新しい下書きとして読み込む
-                <input
-                  type="file"
-                  accept="application/json,.json"
-                  disabled={busy}
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file)
-                      void act(async () => {
-                        const text = await file.text();
-                        const schema = JSON.parse(
-                          fieldSource(text, ["schema"]),
-                        ) as string;
-                        if (
-                          schema !== "run-definition-v1" &&
-                          schema !== "workflow-definition-v1"
-                        )
-                          throw Error("schema");
-                        fresh(schema.slice(0, -3), text);
-                        setNotice(
-                          "ファイルを端末内の新しい下書きへ読み込みました。共有への保存・実行はしていません。",
-                        );
-                      });
-                  }}
-                />
-              </label>
-            )}
+                <details>
+                  <summary>IDと版を指定して取得</summary>
+                  <label>
+                    定義ID
+                    <input
+                      disabled={busy}
+                      value={id}
+                      onChange={(e) => {
+                        setID(e.target.value);
+                        setRecord(undefined);
+                        setDraft(undefined);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    定義の版（headは現在版）
+                    <input
+                      disabled={busy}
+                      value={requestedVersion}
+                      onChange={(e) => setRequestedVersion(e.target.value)}
+                    />
+                  </label>
+                  <button
+                    disabled={busy || !id}
+                    onClick={() => void act(() => load(id, requestedVersion))}
+                  >
+                    定義を取得・更新
+                  </button>
+                </details>
+                {canEdit && (
+                  <label>
+                    定義ファイルを新しい下書きとして読み込む
+                    <input
+                      type="file"
+                      accept="application/json,.json"
+                      disabled={busy}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file)
+                          void act(async () => {
+                            const text = await file.text();
+                            const schema = JSON.parse(
+                              fieldSource(text, ["schema"]),
+                            ) as string;
+                            if (
+                              schema !== "run-definition-v1" &&
+                              schema !== "workflow-definition-v1"
+                            )
+                              throw Error("schema");
+                            fresh(schema.slice(0, -3), text);
+                            setNotice(
+                              "ファイルを端末内の新しい下書きへ読み込みました。共有への保存・実行はしていません。",
+                            );
+                          });
+                      }}
+                    />
+                  </label>
+                )}
+              </section>
+            </SidebarPane>
             {record && (
               <p>
-                {record.id} · {record.version} / 共有下書き。採用版:{" "}
+                {record.id} · {record.version} · 採用版{" "}
                 {adoption?.version ?? "未採用"}
               </p>
             )}
             {draft && (
               <section>
+                {kind === "workflow-definition" && (
+                  <WorkflowNodeEditor
+                    disabled={busy || !canEdit}
+                    text={(() => {
+                      try {
+                        return compose(draft);
+                      } catch {
+                        return undefined;
+                      }
+                    })()}
+                    selected={selected}
+                    onSelect={setSelected}
+                    loadLabels={async (refs) =>
+                      (await call("/labels", refs)) as DefinitionLabel[]
+                    }
+                    loadDefinitions={async (after) =>
+                      (
+                        (await call("/query", {
+                          kind: "heads",
+                          type: "run-definition",
+                          after,
+                          limit: 50,
+                        })) as { data: DefinitionPage }
+                      ).data
+                    }
+                    onChange={(text) =>
+                      persist({
+                        ...draft,
+                        text,
+                        fields: {},
+                        pending: undefined,
+                      })
+                    }
+                  />
+                )}
                 <fieldset disabled={busy || !canEdit}>
-                  <p>
-                    項目の入力はこの端末の下書きへ保存し、JSON反映または共有保存時に同じ定義へ反映します。
-                  </p>
                   {field("定義の名前", ["name"])}
                   {kind === "run-definition" ? (
                     <>
@@ -696,11 +733,8 @@ export function Workflows({
                     </>
                   ) : (
                     <>
-                      <p>
-                        工程ごとにRun定義の固定版、結果条件、入力接続と戻り先を指定します。実行予算の数値は自動で設定しません。
-                      </p>
                       <details>
-                        <summary>実行予算とContext基準を確認・編集</summary>
+                        <summary>実行予算とContext基準</summary>
                         {field(
                           "同時に実行する上限",
                           ["budget", "parallel"],
@@ -730,41 +764,6 @@ export function Workflows({
                     </>
                   )}
                 </fieldset>
-                {kind === "workflow-definition" && (
-                  <WorkflowNodeEditor
-                    disabled={busy || !canEdit}
-                    text={(() => {
-                      try {
-                        return compose(draft);
-                      } catch {
-                        return undefined;
-                      }
-                    })()}
-                    selected={selected}
-                    onSelect={setSelected}
-                    loadLabels={async (refs) =>
-                      (await call("/labels", refs)) as DefinitionLabel[]
-                    }
-                    loadDefinitions={async (after) =>
-                      (
-                        (await call("/query", {
-                          kind: "heads",
-                          type: "run-definition",
-                          after,
-                          limit: 50,
-                        })) as { data: DefinitionPage }
-                      ).data
-                    }
-                    onChange={(text) =>
-                      persist({
-                        ...draft,
-                        text,
-                        fields: {},
-                        pending: undefined,
-                      })
-                    }
-                  />
-                )}
                 <fieldset disabled={busy || !canEdit}>
                   <button
                     onClick={() => {
@@ -783,10 +782,7 @@ export function Workflows({
                     項目をJSONへ反映
                   </button>
                   <details>
-                    <summary>定義のJSON原文を編集</summary>
-                    <p>
-                      原文を直接編集すると、上の未反映の項目入力を置き換えます。
-                    </p>
+                    <summary>定義のJSON原文</summary>
                     <textarea
                       aria-label="定義のJSON原文"
                       rows={15}
@@ -805,8 +801,8 @@ export function Workflows({
                   {record && draft.version !== record.version && (
                     <>
                       <p>
-                        下書きの前提版: {draft.version}
-                        。共有の現在版と比較してから適用してください。
+                        下書きの前提版 {draft.version} / 共有の現在版{" "}
+                        {record.version}
                       </p>
                       <textarea
                         aria-label="共有側の定義"
@@ -941,17 +937,12 @@ export function Workflows({
                     この定義版をファイルへ保存
                   </a>
                 )}
-                {canExecute && (
-                  <p>実行開始は採用した工程版から別の操作で依頼します。</p>
-                )}
               </div>
             )}
             {validation && (
               <section aria-label="定義の検証結果">
                 <p>
-                  {validation.valid
-                    ? "静的検証済み（実行していません）"
-                    : "定義に未解決の箇所があります"}
+                  {validation.valid ? "静的検証済み" : "未解決の箇所があります"}
                 </p>
                 <ul>
                   {validation.problems.map((p, i) => (

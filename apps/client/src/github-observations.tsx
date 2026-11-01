@@ -107,8 +107,7 @@ export function GithubSnapshot({
       )}
       {value.merge_commit && (
         <p>
-          {provider}のmerge_commit_sha（マージ前は検証用）:{" "}
-          <code>{value.merge_commit}</code>
+          {provider}のmerge_commit_sha: <code>{value.merge_commit}</code>
         </p>
       )}
       {value.run_id && (
@@ -273,9 +272,6 @@ export function GithubObservations({
       {
         <section className="workspace-management github-observations">
           <h3>GitHub・Giteaの共有観測</h3>
-          <p>
-            サーバー側で観測します。CIの結論と工程の受入判定は別の事実です。
-          </p>
           <button
             onClick={() => {
               setHistory(undefined);

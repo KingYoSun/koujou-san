@@ -22,9 +22,6 @@ export function ServerModelConnections({
   return (
     <ScreenContent>
       <section aria-label="サーバーLLM接続">
-        <p>
-          サーバーLLMはHopper・Triageの評価に使います。接続と認証はサーバー構成で管理し、各方針で利用モデル・上限・送信禁止分類を確認します。
-        </p>
         <button
           disabled={busy}
           onClick={async () => {

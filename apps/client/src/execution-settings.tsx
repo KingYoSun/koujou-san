@@ -62,9 +62,6 @@ export function ExecutionSettings({ workspace }: { workspace: string }) {
       {
         <details className="team-details">
           <summary>この端末のCLI実行と独立Runner</summary>
-          <p>
-            先にRunner設定へ接続の論理名・確認した能力・利用方針を登録し、ここで同じ論理名を端末内のprogramへ対応付けます。設定保存からRunは起動しません。
-          </p>
           <fieldset disabled={busy}>
             <label>
               実行接続の論理名
@@ -104,11 +101,6 @@ export function ExecutionSettings({ workspace }: { workspace: string }) {
               />
               stdinへcontext/promptのJSON objectを渡す
             </label>
-            <p>
-              明示JSONL対話ではinput
-              frameを使います。通常のstdinでは一つの値、JSON
-              objectでは両方の値を渡せます。省略した値を補完しません。
-            </p>
             <label>
               <input
                 type="checkbox"
@@ -134,11 +126,6 @@ export function ExecutionSettings({ workspace }: { workspace: string }) {
                   onChange={(e) => setPromptArgs(e.target.value)}
                 />
               </label>
-              <p>
-                {
-                  "{context} / {prompt} は値、{context_file} / {prompt_file} は端末内ファイルへ置き換えます。"
-                }
-              </p>
               <label>
                 結果schemaを渡す引数（JSON配列）
                 <textarea
@@ -184,9 +171,6 @@ export function ExecutionSettings({ workspace }: { workspace: string }) {
                   onChange={(e) => setEnvRefs(e.target.value)}
                 />
               </label>
-              <p>
-                秘密値は入力せず、既存の環境変数名だけを参照します。CLI自身が持つ権限を自動で狭める保証はありません。
-              </p>
             </details>
             <details>
               <summary>利用量の取得と契約</summary>
@@ -239,14 +223,8 @@ export function ExecutionSettings({ workspace }: { workspace: string }) {
                     />
                     Codexのモデルを端末内で計測する
                   </label>
-                  <p>
-                    この接続で起動するCodexのOTel出力先を、実行ごとの一時的な端末内受信先へ指定します。既存の外部OTel出力先があれば、この実行では置き換わります。会話履歴の保存と認証の設定は維持します。無効時はモデル名を未取得として表示します。
-                  </p>
                 </>
               )}
-              <p>
-                計測に未対応のCLIも実行できます。定額契約・ローカル実行を0支払とは扱いません。個別単価はWorkspaceの料金設定で管理します。
-              </p>
             </details>
             <button
               disabled={!target || !program}
@@ -322,9 +300,6 @@ export function ExecutionSettings({ workspace }: { workspace: string }) {
             </button>
           </fieldset>
           {status !== undefined && <pre>{JSON.stringify(status, null, 2)}</pre>}
-          <p>
-            CLIの診断情報は端末に保持します。共有する作業出力は原文を保ち、本文を共有していない原ログは未取得の参照として表示します。
-          </p>
           {notice && <p role="status">{notice}</p>}
         </details>
       }

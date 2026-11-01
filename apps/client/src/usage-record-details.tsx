@@ -78,9 +78,6 @@ export function UsageRecordDetails({
       )}
       {record.kind === "price" && (
         <>
-          <p>
-            この料金の固定版は過去評価の根拠です。変更後の料金を使うには明示的な再評価が必要です。
-          </p>
           <dl>
             <dt>対象モデル</dt>
             <dd>{String(value.model)}</dd>

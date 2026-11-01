@@ -107,13 +107,12 @@ export function DefinitionRun({
         <section aria-label="採用した定義からRunを作成">
           <h3>採用した定義からRunを作成</h3>
           {guarded ? (
-            <p>CI観測・条件付き書込みの定義は工程に組み込んで実行します。</p>
+            <p>工程からのみ実行できます。</p>
           ) : (
             <>
               <p>
                 宣言された入力:{" "}
                 {fieldSource(definition.value_utf8, ["inputs"]) || "なし"}
-                。リポジトリ・commitはRun割当時に指定します。
               </p>
               <label>
                 今回の入力（名前をキーにしたJSON）

@@ -63,9 +63,6 @@ export function RunnerSettings({
       {
         <details className="team-details">
           <summary>この端末のRunner設定</summary>
-          <p>
-            接続ごとに確認した版・環境・CLIの認証主体への参照と、依頼を許可するメンバーを登録します。秘密値は入力しないでください。実行ファイルと入力方式は、この端末のCLI実行設定で対応付けます。
-          </p>
           <fieldset disabled={busy}>
             <label>
               接続の種類
@@ -141,9 +138,6 @@ export function RunnerSettings({
                 <input value={path} onChange={(e) => setPath(e.target.value)} />
               </label>
             )}
-            <p>
-              pathはこの端末だけに保存します。Runごとに別worktree・branchを作成し、元のcheckoutを動かしません。終了後も成果を残します。
-            </p>
             <button
               disabled={
                 !kind ||

@@ -60,9 +60,6 @@ export function DeliveryPolicy({
   return (
     <section aria-label="LLMへの送信方針">
       <h3>LLMへの送信方針</h3>
-      <p>
-        禁止タグが付いたContextと、禁止Scopeへ直接所属するContextを自動で除外します。閲覧権限と作業の範囲も適用されます。Contextを一件ずつ許可する必要はありません。
-      </p>
       {notice && <p role="status">{notice}</p>}
       <form
         className="auth-form"
@@ -125,9 +122,6 @@ export function DeliveryPolicy({
             onChange={(event) => setScopes(event.target.value)}
           />
         </label>
-        <p>
-          禁止規則が空でも、現在の閲覧権限やRunのnone・除外の制限は残ります。
-        </p>
         <button disabled={busy || !snapshot}>送信方針を保存</button>
         <button
           type="button"

@@ -39,17 +39,10 @@ export function HopperRuleFields({
           ["targets"],
           "json",
         )}
-        <p>
-          Run・外部CIのどの結果を評価するかを指定します。Context全件の巡回ではありません。
-        </p>
       </fieldset>
       <fieldset>
         <legend>2. 条件</legend>
         {field("型付き条件（JSON）", ["condition"], "json")}
-        <p>
-          all / any /
-          notと、run.state・run.exit_code・inspection.verdict・ci.conclusionなどの条件を使います。判定の合否はサーバーが確認します。
-        </p>
       </fieldset>
       <fieldset>
         <legend>3. 読む情報・モデル</legend>
@@ -79,7 +72,6 @@ export function HopperRuleFields({
             "json",
           )}
         </details>
-        <p>発行・Run作成・実行開始の許可は別々に確認します。</p>
       </fieldset>
       <fieldset>
         <legend>5. 反映と連鎖の制御</legend>
@@ -101,9 +93,6 @@ export function HopperRuleFields({
         ))}
         {field("連鎖の費用上限（省略可、JSON）", ["bounds", "cost"], "json")}
         {field("同一問題の照合と再発方針（省略可、JSON）", ["problem"], "json")}
-        <p>
-          ルールの保存、有効化、過去結果の評価は別の操作です。共有の主体・処理枠は自動化の「共通処理制御」で設定します。
-        </p>
       </fieldset>
     </div>
   );

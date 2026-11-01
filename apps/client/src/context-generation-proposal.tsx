@@ -106,9 +106,6 @@ export function ContextGenerationProposal({
     <section aria-label="Contextの生成案と採否">
       <h4>原依頼と変更案</h4>
       <p>{goal}</p>
-      <p>
-        文書構成と所属を別の変更として扱います。類似候補だけでは統合・削除しません。開始済みRunと過去の判定・入力は保持します。
-      </p>
       <ul>
         {rows.slice(page * 50, page * 50 + 50).map((row) => (
           <li key={row.key}>
@@ -243,9 +240,6 @@ export function ContextGenerationProposal({
       ) : null}
       <details>
         <summary>変更案のJSONを編集</summary>
-        <p>
-          新規作成はtargetのrevisionを「0」とし、idを空欄または「$＋変更のkey」にします。実際のIDは採用時に確定します。
-        </p>
         <textarea
           aria-label="Context変更案のJSON"
           value={text}

@@ -231,9 +231,6 @@ export function ContextPreview({
   return (
     <aside className="context-preview" aria-label="注入プレビュー">
       <h3>注入プレビュー</h3>
-      <p className="context-meta">
-        固定した版を確認します。保存・実行は始まりません。
-      </p>
       <label>
         注入方法
         <select
@@ -361,9 +358,6 @@ export function ContextPreview({
               )}
               {definition && onDefinitionInput && ui.canCreate && (
                 <>
-                  <p>
-                    定義の根参照を選択します。直接入力・外部添付はJSONの指定を引き継ぎ、注入なしを選ぶとContext指定を空にします。
-                  </p>
                   <button
                     disabled={busy || !result.data?.ready || !resolvedRequest}
                     onClick={() =>

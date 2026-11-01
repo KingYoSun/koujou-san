@@ -224,10 +224,6 @@ export function ContextEditor({
               {kinds.indexOf(selected.kind) > 0 && (
                 <section>
                   <h4>子の参照・順序</h4>
-                  <p className="context-meta">
-                    {labels[kinds[kinds.indexOf(selected.kind) - 1]!]}
-                    の固定版を参照します。
-                  </p>
                   <ol className="context-ref-list">
                     {((value.children ?? []) as Ref[]).map(
                       (child, index, array) => (
@@ -317,7 +313,7 @@ export function ContextEditor({
               )}
               {selected.kind === "scope" && (
                 <>
-                  <p>種類: {labels[String(value.kind)]}（階層は任意）</p>
+                  <p>種類: {labels[String(value.kind)]}</p>
                   <p>
                     親Scope:{" "}
                     {value.parent ? JSON.stringify(value.parent) : "なし"}
@@ -378,9 +374,6 @@ export function ContextEditor({
                   2,
                 )}
               </pre>
-              <p className="context-meta">
-                固定済みの内容を保持します。外部からの取得は始まりません。
-              </p>
             </details>
           )}
           {!historical && draft && (

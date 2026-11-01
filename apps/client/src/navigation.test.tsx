@@ -103,18 +103,25 @@ function renderScreen(screen: Screen, native = false, role = "editor") {
   return html;
 }
 
-it.each(["work", "workflows", "account"] as const)(
+it.each(["work", "workflows", "account", "chat"] as const)(
   "renders only the selected %s screen and no hidden forms",
   (screen) => {
     const html = renderScreen(screen);
     expect(html).toContain('aria-label="主な画面"');
     expect(html).toContain('id="screen-title"');
+    expect(html).toContain('aria-label="選択した対象の詳細"');
+    expect(html).toContain('aria-label="画面内の一覧"');
+    expect(html.includes('class="chat-launcher"')).toBe(screen !== "chat");
+    expect(html.includes('class="chat-layout"')).toBe(screen === "chat");
+    expect(html).not.toContain("chat-popover");
     expect(html).not.toContain("Contextの検索語");
     expect(html).not.toContain("参加者管理フォーム");
     expect(html.includes("アカウント設定フォーム")).toBe(screen === "account");
     expect(html.includes("新しいRunを準備")).toBe(screen === "work");
     expect(html).not.toContain("command・接続先");
-    expect(html.includes("新しい定義の下書き")).toBe(screen === "workflows");
+    expect(html.includes('id="cost-definition-editor"')).toBe(
+      screen === "workflows",
+    );
   },
 );
 
@@ -130,7 +137,7 @@ it.each([
     expect(html.includes("接続先の論理名")).toBe(allowed);
     if (!allowed)
       expect(html).toContain(
-        native ? "編集権限が必要" : "Webにローカル実行能力はありません",
+        native ? "編集権限が必要" : "Windowsアプリで設定します",
       );
   },
 );

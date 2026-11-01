@@ -67,11 +67,7 @@ export function TriageAudit({
           この要求の料金版・費用を確認
         </button>
       ))}
-      {!attempt.costs.length && (
-        <p>
-          この記録には費用の確定参照がありません。未登録や欠測を0円として扱いません。
-        </p>
-      )}
+      {!attempt.costs.length && <p>この記録には費用の確定参照がありません。</p>}
     </section>
   );
 }
@@ -130,9 +126,6 @@ export function TriageModelSettings({
             connections={connections}
             onChange={(patch) => onChange({ ...value, ...patch })}
           />
-          <p>
-            Contextは選択した参照と除外から解決します。noneではContextを送りません。工数・費用・影響人数の欠測は不明のまま残します。参照の変更時は関係するIssueだけを再評価します。
-          </p>
           <button
             onClick={() =>
               setAdvanced(
@@ -179,16 +172,9 @@ export function TriageModelSettings({
               </button>
             </>
           )}
-          <p>
-            Hopperのモデル・入力・費用上限・処理枠とは別設定です。接続キーはサーバー側で管理します。
-          </p>
         </>
       )}
-      {!connections.length && (
-        <p>
-          利用可能な接続がない場合は、運用者がこのWorkspace用のサーバー接続を登録してください。
-        </p>
-      )}
+      {!connections.length && <p>利用できるサーバー接続がありません。</p>}
     </fieldset>
   );
 }
@@ -268,9 +254,6 @@ export function TriageIssue({
       </button>
       {loaded && (
         <>
-          <p>
-            ScopeのGroupingと本文を分けて保存します。期限の7日前・24時間前・到来時に再評価します。
-          </p>
           <label>
             Issue名
             <input
@@ -335,9 +318,6 @@ export function TriageIssue({
           {admin && (
             <details>
               <summary>既存の外部Issueとの接続</summary>
-              <p>
-                優先度ラベルは方針の設定を使います。本文・状態の観測は別の入力として保持し、ラベル同期では書き換えません。外部への反映には現在の実行許可も必要です。
-              </p>
               <label>
                 外部接続ID
                 <input
@@ -460,9 +440,6 @@ export function TriageBatch({
   const content = (
     <fieldset>
       <legend>既存Issueの一括評価</legend>
-      <p>
-        期間・Scope・総件数・費用を固定し、1ページずつ要求します。基準時刻と継続位置を保存し、通常の全件定期評価は行いません。
-      </p>
       <label>
         一括評価ID
         <input
@@ -576,10 +553,7 @@ export function TriageBatch({
             基準時刻: {batch.reference_time} / 要求済み: {batch.requested} /
             上限: {batch.count} / 状態: {batch.state} {batch.reason}
           </p>
-          <p>
-            継続位置: {batch.after || "先頭"}
-            。要求の受付とモデル評価の完了は別です。利用量や単価の欠測時は次の要求を保留します。
-          </p>
+          <p>継続位置: {batch.after || "先頭"}</p>
           <button
             disabled={batch.state === "complete"}
             onClick={() => void run(() => advance({ continue: true }))}
