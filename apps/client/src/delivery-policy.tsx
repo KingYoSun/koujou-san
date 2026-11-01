@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "./auth";
+import { Field } from "./field";
 
 type Policy = { denied_tags: string[]; denied_scopes: string[] };
 type Snapshot = { value: Policy; version: string };
@@ -42,17 +43,9 @@ export function DeliveryPolicy({
   };
   useEffect(() => {
     let active = true;
-    apiRequest(path, native)
-      .then((value) => {
-        if (!active) return;
-        const snapshot = value as Snapshot;
-        setSnapshot(snapshot);
-        setTags(snapshot.value.denied_tags.join("\n"));
-        setScopes(snapshot.value.denied_scopes.join("\n"));
-      })
-      .catch(() => {
-        if (active) setNotice("送信方針を取得できませんでした。");
-      });
+    load().catch(() => {
+      if (active) setNotice("送信方針を取得できませんでした。");
+    });
     return () => {
       active = false;
     };
@@ -90,7 +83,7 @@ export function DeliveryPolicy({
               throw new Error(result.error?.code ?? "unavailable");
             setSnapshot({ value, version: result.data.version });
             pending.current = undefined;
-            setNotice("送信方針を保存しました。以後の取得へ適用されます。");
+            setNotice("送信方針を保存しました。");
           } catch (error) {
             const conflict = /更新されています|version_conflict/.test(
               String(error),
@@ -98,34 +91,34 @@ export function DeliveryPolicy({
             if (conflict) pending.current = undefined;
             setNotice(
               conflict
-                ? "方針が更新されています。再読み込みして確認してください。"
-                : "保存を確認できませんでした。同じ内容で再送できます。",
+                ? "送信方針が更新されています。再読み込みして確認してください。"
+                : "送信方針を保存できませんでした。",
             );
           } finally {
             setBusy(false);
           }
         }}
       >
-        <label>
-          送信禁止タグ（1行に1つ）
-          <textarea
+        <fieldset disabled={busy || !snapshot}>
+          <Field
+            label="送信禁止タグ"
             value={tags}
-            disabled={busy || !snapshot}
-            onChange={(event) => setTags(event.target.value)}
+            onChange={setTags}
+            rows={3}
           />
-        </label>
-        <label>
-          送信禁止ScopeのID（1行に1つ）
-          <textarea
+          <Field
+            label="送信禁止ScopeのID"
             value={scopes}
-            disabled={busy || !snapshot}
-            onChange={(event) => setScopes(event.target.value)}
+            onChange={setScopes}
+            rows={3}
           />
-        </label>
+        </fieldset>
         <button disabled={busy || !snapshot}>送信方針を保存</button>
         <button
           type="button"
+          data-variant="secondary"
           disabled={busy}
+          aria-busy={busy}
           onClick={async () => {
             setBusy(true);
             try {
@@ -138,7 +131,7 @@ export function DeliveryPolicy({
             }
           }}
         >
-          再読み込み
+          送信方針を再読み込み
         </button>
       </form>
     </section>

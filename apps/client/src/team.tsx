@@ -13,6 +13,8 @@ import { apiRequest } from "./auth";
 import { DeliveryPolicy } from "./delivery-policy";
 import { discardSyncWorkspace } from "./sync-engine";
 import { syncStorage } from "./sync-store";
+import { Field } from "./field";
+import { StatusBadge } from "./status-badge";
 
 type Workspace = {
   id: string;
@@ -56,6 +58,13 @@ const roles: Record<string, string> = {
   viewer: "閲覧者",
 };
 const empty = <T,>(): Page<T> => ({ items: [] });
+const count = (label: string, list: Page<unknown>) => (
+  <p aria-live="polite">
+    {list.items.length
+      ? `${label}：${list.items.length}件を表示${list.next_cursor ? "（続きあり）" : ""}`
+      : `${label}はありません。`}
+  </p>
+);
 function message(error: unknown) {
   const text = String(error);
   if (text.includes("device_not_registered"))
@@ -88,7 +97,6 @@ export function Team({
   health: string;
 }) {
   const [me, setMe] = useState<{ id: string }>();
-  const [status, setStatus] = useState("checking");
   const [workspaces, setWorkspaces] = useState<Page<Workspace>>(empty);
   const [selected, setSelected] = useState("");
   const selectedRef = useRef(selected);
@@ -199,7 +207,6 @@ export function Team({
         .then(async (value) => {
           if (!active || epoch !== authEpoch.current) return;
           setMe((value as { user: { id: string } }).user);
-          setStatus("ready");
           const config = (await apiRequest("/auth/config", native)) as {
             site_url: string;
             api_url: string;
@@ -220,14 +227,9 @@ export function Team({
           if (native) setIdentifier(await invoke<string>("device_identifier"));
           await root();
         })
-        .catch((error) => {
+        .catch(() => {
           if (!active || epoch !== authEpoch.current) return;
           setMe(undefined);
-          setStatus(
-            /ログインが必要|authentication_required/.test(String(error))
-              ? "signed_out"
-              : "unavailable",
-          );
         });
     };
     load();
@@ -250,6 +252,21 @@ export function Team({
     )) as Envelope<Page<T>>;
     if (epoch === authEpoch.current && owner === selectedRef.current)
       return response.data;
+  }
+  async function more<T>(
+    kind: string,
+    list: Page<T>,
+    set: (value: Page<T>) => void,
+  ) {
+    setBusy(true);
+    try {
+      const value = await page<T>(kind, list.next_cursor);
+      if (value) set({ ...value, items: [...list.items, ...value.items] });
+    } catch (error) {
+      setNotice(message(error));
+    } finally {
+      setBusy(false);
+    }
   }
   useEffect(() => {
     setMembers(empty());
@@ -415,22 +432,63 @@ export function Team({
   }
   if (!me)
     return (
-      <section className="panel" aria-label="Workspaceへの参加">
+      <section aria-label="Workspaceへの参加">
         {account}
         {notice && <p role="status">{notice}</p>}
-        <h2>Workspace</h2>
-        <p>
-          {status === "checking"
-            ? "認証状態を確認しています…"
-            : status === "unavailable"
-              ? "認証サービスへの接続を確認してください。"
-              : "未ログイン"}
-        </p>
-        {invitation && (
-          <p>招待リンクを保持しています。ログイン後に受諾してください。</p>
-        )}
+        {invitation && <p>招待リンクを保持しています。</p>}
       </section>
     );
+  const workspaceSelector = (
+    <>
+      {workspaces.items.length > 0 && (
+        <label>
+          Workspace
+          <select
+            value={selected}
+            onChange={(e) => selectWorkspace(e.target.value)}
+            disabled={busy}
+          >
+            {workspaces.items.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}（{roles[w.role]}）
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {workspaces.next_cursor && (
+        <button
+          data-variant="secondary"
+          disabled={busy}
+          onClick={() => root(workspaces.next_cursor, true)}
+        >
+          Workspaceの次のページ
+        </button>
+      )}
+    </>
+  );
+  const createForm = (
+    <form
+      className="auth-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void act("create", { name }, undefined);
+      }}
+    >
+      <Field
+        label="新しいWorkspaceの名前"
+        value={name}
+        onChange={setName}
+        required
+      />
+      <button disabled={busy}>Workspaceを作成</button>
+    </form>
+  );
+  const acceptInvite = invitation && (
+    <button disabled={busy} onClick={accept}>
+      招待を受諾
+    </button>
+  );
   const selectRole = (value: string, onChange: (role: string) => void) => (
     <select
       aria-label="役割"
@@ -446,7 +504,7 @@ export function Team({
     </select>
   );
   return (
-    <section className="team" aria-label="Workspace">
+    <section className={current ? undefined : "team"} aria-label="Workspace">
       {notice && <p role="status">{notice}</p>}
       {current ? (
         <NavigationProvider
@@ -477,77 +535,29 @@ export function Team({
               );
               void root().catch(() => {});
             }}
-            selector={
-              <>
-                <label>
-                  Workspace
-                  <select
-                    value={selected}
-                    onChange={(e) => selectWorkspace(e.target.value)}
-                    disabled={busy}
-                  >
-                    {workspaces.items.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}（{roles[w.role]}）
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                {workspaces.next_cursor && (
-                  <button onClick={() => root(workspaces.next_cursor, true)}>
-                    さらにWorkspaceを表示
-                  </button>
-                )}
-              </>
-            }
+            selector={workspaceSelector}
             management={
               <>
                 <ScreenContent screens={["workspace"]}>
-                  <h3>Workspaceの作成・参加</h3>{" "}
-                  {invitation && (
-                    <div>
-                      <p>招待リンクの所持者として参加できます。</p>
-                      <button disabled={busy} onClick={accept}>
-                        招待を受諾
-                      </button>
-                    </div>
-                  )}
-                  <form
-                    className="auth-form"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      void act("create", { name }, undefined);
-                    }}
-                  >
-                    <label>
-                      新しいWorkspaceの名前
-                      <input
-                        required
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                      />
-                    </label>
-                    <button disabled={busy}>Workspaceを作成</button>
-                  </form>
+                  <h3>Workspaceの作成・参加</h3>
+                  {acceptInvite}
+                  {createForm}
                 </ScreenContent>
                 {pageWorkspace === selected ? (
-                  <div className="workspace-management">
+                  <div className="workspace-management team">
                     <ScreenContent screens={["workspace"]}>
-                      <button
-                        disabled={busy}
-                        onClick={() => {
-                          const own = members.items.find((m) => m.id === me.id);
-                          if (own) void act("leave", {}, me.id, own.version);
-                        }}
-                      >
-                        このWorkspaceから離脱
-                      </button>
                       <h3>参加者</h3>
+                      {count("参加者", members)}
                       <ul>
                         {members.items.map((m) => (
                           <li key={m.id}>
                             <span>
-                              {m.name} · {m.active ? roles[m.role] : "利用停止"}
+                              {m.name}（{roles[m.role]}）{" "}
+                              <StatusBadge
+                                label="状態"
+                                value={m.active ? "利用中" : "利用停止"}
+                                tone={m.active ? "positive" : "warning"}
+                              />
                             </span>
                             {admin && (
                               <div className="team-controls">
@@ -607,21 +617,26 @@ export function Team({
                       </ul>
                       {members.next_cursor && (
                         <button
-                          onClick={async () => {
-                            const value = await page<Member>(
-                              "members",
-                              members.next_cursor,
-                            );
-                            if (!value) return;
-                            setMembers({
-                              ...value,
-                              items: [...members.items, ...value.items],
-                            });
-                          }}
+                          data-variant="secondary"
+                          disabled={busy}
+                          aria-busy={busy}
+                          onClick={() =>
+                            void more("members", members, setMembers)
+                          }
                         >
-                          さらに参加者を表示
+                          参加者の次のページ
                         </button>
                       )}
+                      <button
+                        data-variant="secondary"
+                        disabled={busy}
+                        onClick={() => {
+                          const own = members.items.find((m) => m.id === me.id);
+                          if (own) void act("leave", {}, me.id, own.version);
+                        }}
+                      >
+                        このWorkspaceから離脱
+                      </button>
                       {admin && (
                         <>
                           <h3>招待</h3>
@@ -648,43 +663,56 @@ export function Team({
                               />
                             </label>
                           )}
+                          {count("招待", invites)}
                           <ul>
-                            {invites.items.map((i) => (
-                              <li key={i.id}>
-                                {roles[i.role]} ·{" "}
-                                {i.cancelled
-                                  ? "取消済み"
-                                  : i.accepted
-                                    ? "受諾済み"
-                                    : new Date(i.expires_at) < new Date()
-                                      ? "期限切れ"
-                                      : `有効期限 ${new Date(i.expires_at).toLocaleString()}`}
-                                <button
-                                  disabled={busy || i.cancelled || i.accepted}
-                                  onClick={() =>
-                                    act("invite-cancel", {}, i.id, i.version)
-                                  }
-                                >
-                                  招待を取り消す
-                                </button>
-                              </li>
-                            ))}
+                            {invites.items.map((i) => {
+                              const expired =
+                                new Date(i.expires_at) < new Date();
+                              return (
+                                <li key={i.id}>
+                                  {roles[i.role]}{" "}
+                                  <StatusBadge
+                                    label="状態"
+                                    value={
+                                      i.cancelled
+                                        ? "取消済み"
+                                        : i.accepted
+                                          ? "受諾済み"
+                                          : expired
+                                            ? "期限切れ"
+                                            : `${new Date(i.expires_at).toLocaleString()}まで有効`
+                                    }
+                                    tone={
+                                      i.accepted
+                                        ? "positive"
+                                        : i.cancelled || expired
+                                          ? "negative"
+                                          : "neutral"
+                                    }
+                                  />
+                                  <button
+                                    data-variant="secondary"
+                                    disabled={busy || i.cancelled || i.accepted}
+                                    onClick={() =>
+                                      act("invite-cancel", {}, i.id, i.version)
+                                    }
+                                  >
+                                    招待を取り消す
+                                  </button>
+                                </li>
+                              );
+                            })}
                           </ul>
                           {invites.next_cursor && (
                             <button
-                              onClick={async () => {
-                                const value = await page<Invite>(
-                                  "invites",
-                                  invites.next_cursor,
-                                );
-                                if (!value) return;
-                                setInvites({
-                                  ...value,
-                                  items: [...invites.items, ...value.items],
-                                });
-                              }}
+                              data-variant="secondary"
+                              disabled={busy}
+                              aria-busy={busy}
+                              onClick={() =>
+                                void more("invites", invites, setInvites)
+                              }
                             >
-                              さらに招待を表示
+                              招待の次のページ
                             </button>
                           )}
                         </>
@@ -712,6 +740,7 @@ export function Team({
                           </button>
                           {mine && (
                             <button
+                              data-variant="secondary"
                               disabled={busy}
                               onClick={() => nativeAction("contact")}
                             >
@@ -723,18 +752,35 @@ export function Team({
                       {!native && (
                         <p>端末の登録はWindowsアプリから行います。</p>
                       )}
+                      {count("端末", devices)}
                       <ul>
                         {devices.items.map((d) => (
                           <li key={d.id}>
-                            <strong>{d.name}</strong> ·{" "}
-                            {d.enabled ? "登録済み" : "失効"}
+                            <strong>{d.name}</strong>{" "}
+                            <StatusBadge
+                              label="登録"
+                              value={d.enabled ? "登録済み" : "失効"}
+                              tone={d.enabled ? "positive" : "negative"}
+                            />
                             <p>
-                              入力取得: {d.can_input ? "許可" : "不許可"} /
-                              実行報告: {d.can_report ? "許可" : "不許可"} /
-                              最終接続:{" "}
-                              {d.last_seen
-                                ? new Date(d.last_seen).toLocaleString()
-                                : "報告なし"}
+                              <StatusBadge
+                                label="入力取得"
+                                value={d.can_input ? "許可" : "不許可"}
+                                tone={d.can_input ? "positive" : "neutral"}
+                              />{" "}
+                              <StatusBadge
+                                label="実行報告"
+                                value={d.can_report ? "許可" : "不許可"}
+                                tone={d.can_report ? "positive" : "neutral"}
+                              />{" "}
+                              <StatusBadge
+                                label="最終接続"
+                                value={
+                                  d.last_seen
+                                    ? new Date(d.last_seen).toLocaleString()
+                                    : "報告なし"
+                                }
+                              />
                             </p>
                             {admin && (
                               <div className="team-controls">
@@ -779,6 +825,7 @@ export function Team({
                                   実行報告を許可
                                 </label>
                                 <button
+                                  data-variant="secondary"
                                   disabled={busy || !d.enabled}
                                   onClick={() =>
                                     act(
@@ -802,19 +849,14 @@ export function Team({
                       </ul>
                       {devices.next_cursor && (
                         <button
-                          onClick={async () => {
-                            const value = await page<Device>(
-                              "devices",
-                              devices.next_cursor,
-                            );
-                            if (!value) return;
-                            setDevices({
-                              ...value,
-                              items: [...devices.items, ...value.items],
-                            });
-                          }}
+                          data-variant="secondary"
+                          disabled={busy}
+                          aria-busy={busy}
+                          onClick={() =>
+                            void more("devices", devices, setDevices)
+                          }
                         >
-                          さらに端末を表示
+                          端末の次のページ
                         </button>
                       )}
                       {admin && (
@@ -827,9 +869,7 @@ export function Team({
                     </ScreenContent>
                   </div>
                 ) : (
-                  <p role="status">
-                    現在のWorkspaceの管理情報を確認しています…
-                  </p>
+                  <p role="status">Workspaceの管理情報を取得中…</p>
                 )}
               </>
             }
@@ -837,53 +877,10 @@ export function Team({
         </NavigationProvider>
       ) : (
         <>
-          <h2>Workspaceへの参加・作成</h2>{" "}
-          {workspaces.items.length > 0 && (
-            <label>
-              Workspace
-              <select
-                value={selected}
-                onChange={(e) => selectWorkspace(e.target.value)}
-                disabled={busy}
-              >
-                {workspaces.items.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name}（{roles[w.role]}）
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          {workspaces.next_cursor && (
-            <button onClick={() => root(workspaces.next_cursor, true)}>
-              さらにWorkspaceを表示
-            </button>
-          )}
-          {invitation && (
-            <div>
-              <p>招待リンクの所持者として参加できます。</p>
-              <button disabled={busy} onClick={accept}>
-                招待を受諾
-              </button>
-            </div>
-          )}
-          <form
-            className="auth-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void act("create", { name }, undefined);
-            }}
-          >
-            <label>
-              新しいWorkspaceの名前
-              <input
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <button disabled={busy}>Workspaceを作成</button>
-          </form>
+          <h2>Workspaceの作成・参加</h2>
+          {workspaceSelector}
+          {acceptInvite}
+          {createForm}
         </>
       )}
     </section>

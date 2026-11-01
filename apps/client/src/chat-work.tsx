@@ -11,6 +11,7 @@ import {
   PauseAnswer,
   PauseResponse,
   QuestionView,
+  pauseStateNames,
   type Pause,
 } from "./run-pause";
 import { WorkflowExecution } from "./workflow-execution";
@@ -283,7 +284,9 @@ function ChatRun(props: Common & { target: VersionRef }) {
   return (
     <section aria-label="関連Runの現在の状態">
       <h4>実行記録 · {record?.value.name || "関連Run"}</h4>
-      <button onClick={() => void load()}>Run・質問・結果を更新</button>
+      <button data-variant="secondary" onClick={() => void load()}>
+        Run・質問・結果を更新
+      </button>
       {record && (
         <>
           <WorkState value={record.value} />
@@ -300,13 +303,8 @@ function ChatRun(props: Common & { target: VersionRef }) {
           {pause && (
             <section>
               <p>
-                質問への回答:{" "}
-                {{
-                  waiting: "未回答",
-                  received: "API受付済み",
-                  delivered: "配送確認済み",
-                  resolved: "再開確認済み",
-                }[pause.value.state] ?? pause.value.state}
+                質問への回答：
+                {pauseStateNames[pause.value.state] ?? pause.value.state}
               </p>
               <QuestionView value={pause.value.request} />
               {pause.value.state === "waiting" && role !== "viewer" ? (

@@ -77,7 +77,7 @@ export function DefinitionGeneration({
       setNext(response.data.next_cursor ?? "");
     } catch {
       setNotice(
-        "端末一覧を取得できません。現在の権限と接続を確認してください。",
+        "端末一覧を取得できませんでした。権限と接続を確認してください。",
       );
     } finally {
       setBusy(false);
@@ -103,9 +103,7 @@ export function DefinitionGeneration({
       setSources([{ id: current.id, version: current.version }]);
       setConnection("");
     } catch {
-      setNotice(
-        "端末の確認済み接続を取得できません。取得できない能力を補って生成しません。",
-      );
+      setNotice("端末の確認済み接続を取得できませんでした。");
     } finally {
       setBusy(false);
     }
@@ -115,34 +113,45 @@ export function DefinitionGeneration({
       <ScreenContent>
         {
           <section className="team" aria-label="Run定義の生成設定">
-            <h3>利用する端末・接続（未設定でも質問として残せます）</h3>
-            <button disabled={busy} onClick={() => void devicesPage()}>
-              端末を50件取得
-            </button>
-            <select
-              aria-label="生成で参照する端末"
+            <h3>利用する端末・接続</h3>
+            <button
+              data-variant="secondary"
               disabled={busy}
-              value={capabilities?.id.replace(/^runner:/, "") ?? ""}
-              onChange={(e) => void chooseDevice(e.target.value)}
+              aria-busy={busy}
+              onClick={() => void devicesPage()}
             >
-              <option value="">未指定</option>
-              {capabilities &&
-                !devices.some(
-                  (d) => d.id === capabilities.id.replace(/^runner:/, ""),
-                ) && (
-                  <option value={capabilities.id.replace(/^runner:/, "")}>
-                    {deviceName}
+              {busy ? "端末を取得中…" : "端末を取得"}
+            </button>
+            <label>
+              端末
+              <select
+                disabled={busy}
+                value={capabilities?.id.replace(/^runner:/, "") ?? ""}
+                onChange={(e) => void chooseDevice(e.target.value)}
+              >
+                <option value="">未指定</option>
+                {capabilities &&
+                  !devices.some(
+                    (d) => d.id === capabilities.id.replace(/^runner:/, ""),
+                  ) && (
+                    <option value={capabilities.id.replace(/^runner:/, "")}>
+                      {deviceName}
+                    </option>
+                  )}
+                {devices.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
                   </option>
-                )}
-              {devices.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
+                ))}
+              </select>
+            </label>
             {next && (
-              <button disabled={busy} onClick={() => void devicesPage(next)}>
-                端末の次の50件
+              <button
+                data-variant="secondary"
+                disabled={busy}
+                onClick={() => void devicesPage(next)}
+              >
+                端末の次のページ
               </button>
             )}
             {capabilities && (
@@ -152,7 +161,7 @@ export function DefinitionGeneration({
                   value={connection}
                   onChange={(e) => setConnection(e.target.value)}
                 >
-                  <option value="">依頼に応じて選ぶ・不足時は質問</option>
+                  <option value="">依頼に応じて選ぶ</option>
                   {capabilities.connections.map((c) => (
                     <option
                       key={c.kind + ":" + c.target}

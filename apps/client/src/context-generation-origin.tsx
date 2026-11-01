@@ -7,6 +7,7 @@ import type { VersionRef } from "./model-connections";
 import type { Ref } from "./context-ui";
 import { NavigationLink } from "./navigation";
 import { PageList } from "./page-list";
+import { StatusBadge } from "./status-badge";
 
 type Origin = {
   operation: VersionRef;
@@ -46,7 +47,7 @@ export function ContextGenerationOrigin({
         }
       })
       .catch(() => {
-        if (active) setNotice("由来の詳細は現在の権限で取得できません。");
+        if (active) setNotice("由来を取得できませんでした。");
       });
     return () => {
       active = false;
@@ -70,7 +71,7 @@ export function ContextGenerationOrigin({
       if (allowAnswerScope(namespace, epoch))
         setExcerpt(v.output.selected_utf8);
     } catch {
-      setNotice("元出力の現在の取得権限を確認してください。");
+      setNotice("元出力を取得できませんでした。");
     }
   }
   return (
@@ -79,23 +80,20 @@ export function ContextGenerationOrigin({
       {origin && (
         <>
           <p>
-            {contextStates[origin.item.state] ?? origin.item.state} ·{" "}
-            {origin.manual
-              ? "依頼者が明示的に編集・採用"
-              : "生成方針に従って採用"}
+            <StatusBadge
+              label="状態"
+              value={contextStates[origin.item.state] ?? origin.item.state}
+            />{" "}
+            {origin.manual ? "依頼者が編集・採用" : "生成方針に従って採用"}
           </p>
-          {origin.edited && (
-            <p>
-              この版は生成後に手動で変更されています。生成時の状態と現在の記述を区別してください。
-            </p>
-          )}
+          {origin.edited && <p>この版は生成後に手動で変更されています。</p>}
           <p>{origin.item.reason}</p>
           <p>
-            元Run: {origin.source.run.id} · {origin.source.run.version} ·
-            出力版: {origin.source.output.version} · 箇所: /
+            元Run：{origin.source.run.id} · {origin.source.run.version} ·
+            出力版：{origin.source.output.version} · 箇所：/
             {origin.source.path.join("/")}
           </p>
-          <p>生成操作: {origin.operation.id}</p>
+          <p>生成操作：{origin.operation.id}</p>
           {origin.item.references.length ? (
             <PageList label="参照したContext" items={origin.item.references}>
               {(ref, index) => (
@@ -118,7 +116,9 @@ export function ContextGenerationOrigin({
           >
             元Runの成果・検品へ戻る
           </NavigationLink>
-          <button onClick={() => void preview()}>元出力の固定箇所を確認</button>
+          <button data-variant="secondary" onClick={() => void preview()}>
+            元出力の固定箇所を確認
+          </button>
           {excerpt && <pre>{excerpt}</pre>}
         </>
       )}

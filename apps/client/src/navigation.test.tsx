@@ -114,7 +114,7 @@ it.each(["work", "workflows", "account", "chat"] as const)(
     expect(html.includes('class="chat-launcher"')).toBe(screen !== "chat");
     expect(html.includes('class="chat-layout"')).toBe(screen === "chat");
     expect(html).not.toContain("chat-popover");
-    expect(html).not.toContain("Contextの検索語");
+    expect(html).not.toContain("作成する粒度");
     expect(html).not.toContain("参加者管理フォーム");
     expect(html.includes("アカウント設定フォーム")).toBe(screen === "account");
     expect(html.includes("新しいRunを準備")).toBe(screen === "work");

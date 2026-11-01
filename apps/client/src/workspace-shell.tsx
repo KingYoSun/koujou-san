@@ -69,7 +69,7 @@ export function WorkspaceShell({
   const [definitionResult, setDefinitionResult] =
     useState<DefinitionContextInput>();
   const [profile, setProfile] = useState<ModelProfile>();
-  const [sync, setSync] = useState("接続確認中");
+  const [sync, setSync] = useState("確認中");
   const [sidebar, setSidebar] = useState<HTMLElement | null>(null);
   const [detail, setDetail] = useState<HTMLElement | null>(null);
   const panes = useMemo<Panes>(() => ({ sidebar, detail }), [sidebar, detail]);
@@ -100,11 +100,6 @@ export function WorkspaceShell({
             API: {health} / 同期: {sync} / {native ? "Windowsアプリ" : "Web"}
           </p>
         </div>
-        <section
-          className="sidebar-pane"
-          aria-label="画面内の一覧"
-          ref={setSidebar}
-        />
         <nav className="primary-navigation" aria-label="主な画面">
           {groups.map((g) => (
             <section key={g}>
@@ -129,6 +124,11 @@ export function WorkspaceShell({
             </section>
           ))}
         </nav>
+        <section
+          className="sidebar-pane"
+          aria-label="画面内の一覧"
+          ref={setSidebar}
+        />
         <label className="compact-navigation">
           画面
           <select
@@ -154,6 +154,8 @@ export function WorkspaceShell({
       <section className="screen" aria-labelledby="screen-title">
         <p className="breadcrumbs">
           {name} / {group} / {title}
+          {route.target &&
+            ` / ${route.target.name ?? route.target.id}（${route.target.kind}）`}
         </p>
         <h2 id="screen-title" tabIndex={-1}>
           {title}
@@ -161,10 +163,7 @@ export function WorkspaceShell({
         {route.target && (
           <details className="target-reference">
             <summary>対象の固定版を確認</summary>
-            <p>
-              {route.target.name ?? route.target.id} / {route.target.kind} /{" "}
-              {route.target.version}
-            </p>
+            <p>版：{route.target.version}</p>
           </details>
         )}
         {navigation.returnTo && (

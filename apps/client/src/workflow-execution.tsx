@@ -4,12 +4,15 @@ import {
   type WorkflowGraph,
   type DefinitionLabel,
   fixedWorkflowRef,
+  dependLabel,
 } from "./workflow-map";
 import { StatusBadge } from "./status-badge";
+import { Field, jsonError } from "./field";
 import { DefinitionPicker, type DefinitionPage } from "./definition-picker";
 import {
   WorkflowProgress,
   workflowFocus,
+  taskResult,
   type WorkflowTask,
 } from "./workflow-progress";
 import { useEffect, useRef, useState, type ReactNode } from "react";
@@ -41,14 +44,6 @@ type Impact = {
   affected_unstarted: string[];
   invalidated_decisions: string[];
 };
-const taskStates: { [state: string]: string } = {
-  pending: "開始条件待ち",
-  prepared: "実行準備中",
-  running: "Runの報告待ち",
-  decision: "人の判断待ち",
-  done: "試行完了",
-  skipped: "条件不成立で省略",
-};
 const executionStates: { [state: string]: string } = {
   running: "工程進行中",
   waiting: "待機",
@@ -59,11 +54,6 @@ const waitReasons: { [reason: string]: string } = {
   human_decision: "人の判断待ち",
   run_budget: "Run数の上限に到達",
   time_budget_no_further_start: "工程の制御時間に到達",
-};
-const runOutcomes: { [state: string]: string } = {
-  succeeded: "正常終了",
-  failed: "実行失敗",
-  cancelled: "取消",
 };
 
 export function WorkflowExecution({
@@ -125,10 +115,11 @@ export function WorkflowExecution({
   const [notification, setNotification] = useState<{
     owner: string;
     text: string;
+    alert?: boolean;
   }>();
-  const notice = notification?.owner === owner ? notification.text : "";
-  const setNotice = (text: string) => {
-    if (ownerRef.current === owner) setNotification({ owner, text });
+  const notice = notification?.owner === owner ? notification : undefined;
+  const setNotice = (text: string, alert = false) => {
+    if (ownerRef.current === owner) setNotification({ owner, text, alert });
   };
   const [requestedExecution, setRequestedExecution] = useState<{
     owner: string;
@@ -160,6 +151,7 @@ export function WorkflowExecution({
       if (ownerRef.current !== owner) return;
       setNotice(
         "操作を完了できませんでした。現在の版・権限・入力を確認してください。",
+        true,
       );
       if (
         error instanceof SyncHTTPError &&
@@ -260,18 +252,22 @@ export function WorkflowExecution({
       {
         <section aria-label="工程の実行と判断">
           {!selected && <h3>工程の状況</h3>}
-          <fieldset disabled={busy}>
+          <fieldset disabled={busy} aria-busy={busy}>
             {!selected && (
               <details>
                 <summary>工程実行を探す・IDで開く</summary>
-                <label>
-                  工程実行ID
-                  <input value={id} onChange={(e) => setID(e.target.value)} />
-                </label>
-                <button disabled={!id} onClick={() => void act(() => load(id))}>
-                  工程実行を取得・更新
+                <Field label="工程実行ID" value={id} onChange={setID} />
+                <button
+                  data-variant="secondary"
+                  disabled={!id}
+                  aria-busy={busy}
+                  onClick={() => void act(() => load(id))}
+                >
+                  {busy ? "工程実行を取得中…" : "工程実行を取得"}
                 </button>
                 <button
+                  data-variant="secondary"
+                  aria-busy={busy}
                   onClick={() =>
                     void act(async () => {
                       const v = (await request("/query", {
@@ -283,15 +279,32 @@ export function WorkflowExecution({
                     })
                   }
                 >
-                  工程実行の一覧
+                  {busy ? "工程実行の一覧を取得中…" : "工程実行の一覧を取得"}
                 </button>
-                {executions?.items.map((r) => (
-                  <button key={r.id} onClick={() => void act(() => load(r.id))}>
-                    {r.id}: {r.value.state}
-                  </button>
-                ))}
+                {executions && (
+                  <p>
+                    {executions.items.length
+                      ? `${executions.items.length}件を表示`
+                      : "工程実行はありません。"}
+                    {executions.next && "（続きあり）"}
+                  </p>
+                )}
+                <ul>
+                  {executions?.items.map((r) => (
+                    <li key={r.id}>
+                      <button
+                        data-variant="secondary"
+                        onClick={() => void act(() => load(r.id))}
+                      >
+                        {r.id}：
+                        {executionStates[r.value.state] ?? r.value.state}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
                 {executions?.next && (
                   <button
+                    data-variant="secondary"
                     onClick={() =>
                       void act(async () => {
                         const v = (await request("/query", {
@@ -314,20 +327,20 @@ export function WorkflowExecution({
               definition.id.startsWith("workflow-definition:") && (
                 <details>
                   <summary>この定義の採用版から新しく開始する</summary>
-                  <label>
-                    明示する開始入力（node → 入力名 → JSON値）
-                    <textarea
-                      value={inputs}
-                      onChange={(e) => setInputs(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Runごとのリポジトリと固定commit（node → id・commit）
-                    <textarea
-                      value={repositories}
-                      onChange={(e) => setRepositories(e.target.value)}
-                    />
-                  </label>
+                  <Field
+                    label="明示する開始入力（JSON）"
+                    rows={4}
+                    value={inputs}
+                    onChange={setInputs}
+                    error={jsonError(inputs)}
+                  />
+                  <Field
+                    label="Runごとのリポジトリと固定commit（JSON）"
+                    rows={4}
+                    value={repositories}
+                    onChange={setRepositories}
+                    error={jsonError(repositories)}
+                  />
                   <button
                     onClick={() =>
                       void act(async () => {
@@ -354,16 +367,36 @@ export function WorkflowExecution({
               )}
             {record && (
               <>
-                {!selected && (
+                {(!selected || record.value.reason || record.value.cost) && (
                   <p>
-                    工程：
-                    {executionStates[record.value.state] ?? record.value.state}
-                  </p>
-                )}
-                {record.value.reason && (
-                  <p>
-                    待機・停止理由:{" "}
-                    {waitReasons[record.value.reason] ?? record.value.reason}
+                    {!selected && (
+                      <StatusBadge
+                        label="工程"
+                        value={
+                          executionStates[record.value.state] ??
+                          record.value.state
+                        }
+                      />
+                    )}
+                    {record.value.reason && (
+                      <StatusBadge
+                        label="待機・停止理由"
+                        value={
+                          waitReasons[record.value.reason] ??
+                          record.value.reason
+                        }
+                      />
+                    )}
+                    {record.value.cost && (
+                      <StatusBadge
+                        label={`費用（${record.value.cost.state}）`}
+                        value={
+                          record.value.cost.amount != null
+                            ? `${record.value.cost.amount} ${record.value.cost.currency}`
+                            : "未取得"
+                        }
+                      />
+                    )}
                   </p>
                 )}
                 {graph && (
@@ -381,15 +414,7 @@ export function WorkflowExecution({
                     }}
                   />
                 )}
-                {cursor && <p role="status">未取得の試行があります。</p>}
                 <section aria-label="工程図・全試行・入力の接続">
-                  {record.value.cost && (
-                    <p>
-                      費用観測: {record.value.cost.state} /{" "}
-                      {record.value.cost.amount ?? "未観測"}{" "}
-                      {record.value.cost.currency}
-                    </p>
-                  )}
                   {graph && (
                     <WorkflowMap
                       graph={graph}
@@ -407,46 +432,38 @@ export function WorkflowExecution({
                             <p key={t.id}>
                               <StatusBadge
                                 label={`試行 ${t.value.attempt}`}
-                                value={
-                                  taskStates[t.value.state] ?? t.value.state
-                                }
+                                value={taskResult(t.value)}
+                                tone={t.value.stale ? "warning" : "neutral"}
                               />
-                              <StatusBadge
-                                label={
-                                  node.choices?.length
-                                    ? "人の選択"
-                                    : [
-                                          "PASS",
-                                          "FAIL",
-                                          "INCONCLUSIVE",
-                                          "STALE",
-                                        ].includes(t.value.outcome ?? "")
-                                      ? "判定"
-                                      : "実行結果"
-                                }
-                                value={
-                                  t.value.outcome
-                                    ? (runOutcomes[t.value.outcome] ??
-                                      t.value.outcome)
-                                    : "未確認"
-                                }
-                              />
-                              {t.value.stale && (
-                                <StatusBadge
-                                  label="有効性"
-                                  value="STALE（失効）"
-                                  tone="warning"
-                                />
-                              )}
                             </p>
                           ))
                         ) : (
-                          <p>試行未取得</p>
+                          <p>{cursor ? "試行は未取得" : "試行なし"}</p>
                         );
                       }}
                     >
                       {(node) => (
                         <>
+                          {(node.depends?.length ||
+                            Object.keys(node.retry ?? {}).length) > 0 && (
+                            <>
+                              <h5>制御の接続</h5>
+                              <ul>
+                                {node.depends?.map((dep, i) => (
+                                  <li key={i}>
+                                    {dep.node} → {node.id}（{dependLabel(dep)}）
+                                  </li>
+                                ))}
+                                {Object.entries(node.retry ?? {}).map(
+                                  ([on, target]) => (
+                                    <li key={on}>
+                                      ↩ {on}：{node.id} → {target}
+                                    </li>
+                                  ),
+                                )}
+                              </ul>
+                            </>
+                          )}
                           <h5>入力の接続</h5>
                           {node.bindings?.length ? (
                             <ul>
@@ -471,17 +488,12 @@ export function WorkflowExecution({
                             .map((r) => (
                               <article key={r.id}>
                                 <p>
-                                  {r.value.node}（{r.value.attempt}回目）:{" "}
-                                  {taskStates[r.value.state] ?? r.value.state}{" "}
-                                  {r.value.outcome ?? ""}
-                                  {r.value.stale
-                                    ? "（採用変更により、この試行の判定は失効）"
-                                    : ""}
+                                  {r.value.node}（{r.value.attempt}回目）：
+                                  {taskResult(r.value)}
                                 </p>
                                 {r.value.definition && (
-                                  <p>
-                                    この試行で使用したRun定義の固定版：
-                                    {r.value.definition.id}@
+                                  <p className="target-reference">
+                                    Run定義：{r.value.definition.id}@
                                     {r.value.definition.version}
                                   </p>
                                 )}
@@ -505,12 +517,6 @@ export function WorkflowExecution({
                                       </NavigationLink>
                                     </p>
                                   )}
-                                {r.value.run &&
-                                  !fixedWorkflowRef(r.value.run) && (
-                                    <p>
-                                      Runの固定版はまだ未確定です。共有記録・起動の確認後に詳細を開けます。
-                                    </p>
-                                  )}
                                 {r.value.definition && (
                                   <button
                                     onClick={() =>
@@ -528,8 +534,15 @@ export function WorkflowExecution({
                                         };
                                         setPreview(
                                           p.input_utf8 +
-                                            "\n\n固定参照:\n" +
+                                            "\n\n固定参照：\n" +
                                             JSON.stringify(p.sources, null, 2),
+                                        );
+                                        requestAnimationFrame(() =>
+                                          document
+                                            .getElementById(
+                                              "workflow-run-preview",
+                                            )
+                                            ?.focus(),
                                         );
                                       })
                                     }
@@ -556,9 +569,7 @@ export function WorkflowExecution({
                                               },
                                             );
                                             await load(record.id);
-                                            setNotice(
-                                              "判断を記録しました。回答だけでは実行権限を付与しません。",
-                                            );
+                                            setNotice("判断を記録しました。");
                                           })
                                         }
                                       >
@@ -571,8 +582,15 @@ export function WorkflowExecution({
                       )}
                     </WorkflowMap>
                   )}
+                  {page && (
+                    <p>
+                      試行：{page.items.length}件を表示
+                      {cursor && "（続きあり）"}
+                    </p>
+                  )}
                   {cursor && (
                     <button
+                      data-variant="secondary"
                       onClick={() =>
                         void act(async () => {
                           const epoch = loadEpoch.current;
@@ -590,14 +608,14 @@ export function WorkflowExecution({
                         })
                       }
                     >
-                      工程内の次のページ
+                      試行の次のページ
                     </button>
                   )}
                 </section>
                 <details>
                   <summary>定義の変更・固定版・記録の保存</summary>
-                  <p>
-                    Run数 {record.value.count} · 定義{" "}
+                  <p className="target-reference">
+                    Run数：{record.value.count} · 定義：
                     {record.value.definition.id}@
                     {record.value.definition.version}
                   </p>
@@ -676,11 +694,11 @@ export function WorkflowExecution({
                         {impact.adoption.version}
                       </p>
                       <p>
-                        影響する未開始ノード:{" "}
+                        影響する未開始ノード：
                         {impact.affected_unstarted.join(", ") || "なし"}
                       </p>
                       <p>
-                        失効する判断:{" "}
+                        失効する判断：
                         {impact.invalidated_decisions.join(", ") || "なし"}
                       </p>
                       <button
@@ -692,9 +710,7 @@ export function WorkflowExecution({
                               { impact },
                             );
                             await load(record.id);
-                            setNotice(
-                              "影響を確認した採用版を適用しました。開始済みの入力と過去の判断は履歴に残っています。",
-                            );
+                            setNotice("影響を確認した採用版を適用しました。");
                           })
                         }
                       >
@@ -715,7 +731,7 @@ export function WorkflowExecution({
                             version: record.version,
                           });
                           setNotice(
-                            `${value.complete ? "記録を保存しました" : "取得が完了していません"}: ${value.path}`,
+                            `${value.complete ? "記録を保存しました" : "取得が完了していません"}：${value.path}`,
                           );
                         })
                       }
@@ -725,6 +741,7 @@ export function WorkflowExecution({
                   ) : (
                     <a
                       download
+                      className="record-link"
                       href={`${base}/executions/${encodeURIComponent(record.id)}/export?version=${encodeURIComponent(record.version)}`}
                     >
                       この実行版の記録をファイルへ保存
@@ -735,12 +752,19 @@ export function WorkflowExecution({
             )}
           </fieldset>
           {preview && (
-            <details open>
+            <details
+              open
+              id="workflow-run-preview"
+              tabIndex={-1}
+              className="table-scroll"
+            >
               <summary>選択したRunの入力</summary>
               <pre>{preview}</pre>
             </details>
           )}
-          {notice && <p role="status">{notice}</p>}
+          {notice?.text && (
+            <p role={notice.alert ? "alert" : "status"}>{notice.text}</p>
+          )}
           {requestedExecution?.owner === owner && (
             <NavigationLink
               to={{

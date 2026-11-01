@@ -15,6 +15,10 @@ import type {
   Saved,
   SelectionPolicy,
 } from "./client-selection-host";
+import { operationStateLabels } from "./client-selection";
+import { Disclosure } from "./disclosure";
+import { Field } from "./field";
+import { StatusBadge } from "./status-badge";
 
 type Rule = {
   name: string;
@@ -57,9 +61,9 @@ export function ContextGenerationAutomation({
   const [rule, setRule] = useState<VersionRef>(),
     [loaded, setLoaded] = useState<SelectionPolicy>(),
     [activation, setActivation] = useState<Activation>();
-  const [rules, setRules] = useState<Saved<Rule>[]>([]),
+  const [rules, setRules] = useState<Saved<Rule>[]>(),
     [ruleAfter, setRuleAfter] = useState({ after: 0, after_id: "" }),
-    [queue, setQueue] = useState<Saved[]>([]),
+    [queue, setQueue] = useState<Saved[]>(),
     [queueAfter, setQueueAfter] = useState("");
   const [from, setFrom] = useState(""),
     [until, setUntil] = useState(""),
@@ -77,7 +81,9 @@ export function ContextGenerationAutomation({
     try {
       await action();
     } catch {
-      setNotice("方針の版・現在の権限・接続設定を確認してください。");
+      setNotice(
+        "操作を実行できませんでした。方針の版・権限・接続を確認してください。",
+      );
     } finally {
       setBusy(false);
     }
@@ -124,9 +130,7 @@ export function ContextGenerationAutomation({
     );
     setRule({ id: result.data.id, version: result.data.version });
     setLoaded(template);
-    setNotice(
-      "生成方針を保存しました。有効化は別の操作です。過去の出力は処理していません。",
-    );
+    setNotice("生成方針を保存しました。");
   }
   async function activate(enabled: boolean) {
     if (!rule || (enabled && !profile)) return;
@@ -145,8 +149,8 @@ export function ContextGenerationAutomation({
     });
     setNotice(
       enabled
-        ? "このクライアントを担当にして有効化しました。新しく終了したRunの指定チャンネルの固定出力を一件ずつ生成します。"
-        : "今後の自動生成を無効化しました。開始済みの要求と原応答は履歴に保持します。",
+        ? "このクライアントを担当にして有効化しました。"
+        : "自動生成を無効化しました。",
     );
   }
   async function listRules(next = false) {
@@ -156,7 +160,7 @@ export function ContextGenerationAutomation({
       after_id: string;
     }>("/query", {
       kind: "generation-rule",
-      limit: 50,
+      limit: 100,
       metadata: true,
       ...(next ? ruleAfter : { after: 0, after_id: "" }),
     });
@@ -203,197 +207,240 @@ export function ContextGenerationAutomation({
         until: new Date(until).toISOString(),
       },
     );
-    setNotice(
-      "指定期間の出力を索引付きのページで照合します。同じ方針版で処理済みの出力は重ねて生成しません。",
-    );
+    setNotice("指定期間の照合を受け付けました。");
   }
   return (
-    <details aria-label="出力からの自動生成方針">
-      <summary>出力からの自動生成方針・担当・履歴</summary>
-      <fieldset disabled={!ui.canCreate || busy}>
-        <label>
-          方針名
-          <input value={name} onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label>
-          自動生成の目的
-          <textarea value={goal} onChange={(e) => setGoal(e.target.value)} />
-        </label>
-        <label>
-          対象チャンネル
-          <input
-            value={selectedChannel}
-            onChange={(e) => setChannel(e.target.value)}
-          />
-        </label>
-        <label>
-          対象Run・Scope・Run定義（* はWorkspaceの許可範囲）
-          <textarea
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-          />
-        </label>
-        <label>
-          反映方式
-          <select
-            value={mode}
-            onChange={(e) => setMode(e.target.value as "auto" | "proposal")}
-          >
-            <option value="auto">検証済み変更を自動反映</option>
-            <option value="proposal">案を確認して採用</option>
-          </select>
-        </label>
-        <details>
-          <summary>候補のScope・操作上限</summary>
-          <label>
-            候補を絞るScope ID
-            <input
-              value={scopeText}
-              onChange={(e) => setScopes(e.target.value)}
+    <Disclosure title="出力からの自動生成方針・担当・履歴">
+      {() => (
+        <>
+          <fieldset disabled={!ui.canCreate || busy}>
+            <Field label="方針名" value={name} onChange={setName} />
+            <Field
+              label="自動生成の目的"
+              value={goal}
+              onChange={setGoal}
+              rows={3}
             />
-          </label>
-          <label>
-            モデル要求の上限
-            <input
-              type="number"
-              min={1}
-              value={models}
-              onChange={(e) => setModels(Number(e.target.value))}
+            <Field
+              label="対象チャンネル"
+              value={selectedChannel}
+              onChange={setChannel}
             />
-          </label>
-          <label>
-            MCP要求の上限
-            <input
-              type="number"
-              min={1}
-              value={mcp}
-              onChange={(e) => setMCP(Number(e.target.value))}
+            <Field
+              label="対象Run・Scope・Run定義"
+              value={target}
+              onChange={setTarget}
+              rows={3}
             />
-          </label>
-          <label>
-            操作の上限秒
-            <input
-              type="number"
-              min={1}
-              value={seconds}
-              onChange={(e) => setSeconds(Number(e.target.value))}
-            />
-          </label>
-        </details>
-        <button
-          onClick={() => {
-            setLoaded(undefined);
-            setNotice(
-              "次回の保存に現在の固定項目・所属先・対象箇所を使います。",
-            );
-          }}
-        >
-          現在の生成設定を方針へコピー
-        </button>
-        <button
-          disabled={!name || !goal || !selectedChannel || !target}
-          onClick={() => void work(save)}
-        >
-          生成方針を保存（有効化しない）
-        </button>
-        <button
-          disabled={
-            !rule ||
-            !profile ||
-            !modelReady(ui.native, ui.api + "\0" + ui.user, profile)
-          }
-          onClick={() => void work(() => activate(true))}
-        >
-          このクライアントを担当にして有効化
-        </button>
-        <button
-          disabled={!activation?.value.enabled}
-          onClick={() => void work(() => activate(false))}
-        >
-          自動生成を無効化
-        </button>
-      </fieldset>
-      {rule && (
-        <p>
-          方針版: {rule.version} · 有効化:{" "}
-          {activation?.value.enabled ? "有効" : "無効"}
-        </p>
-      )}
-      <button disabled={busy} onClick={() => void work(() => listRules())}>
-        生成方針を50件取得
-      </button>
-      <ul>
-        {rules.map((r) => (
-          <li key={r.id}>
-            <button onClick={() => void work(() => load(r))}>
-              {r.value.name || r.id} · {r.version}
-            </button>
-          </li>
-        ))}
-      </ul>
-      {rules.length === 50 && (
-        <button onClick={() => void work(() => listRules(true))}>
-          方針の次の50件
-        </button>
-      )}
-      <button onClick={() => void work(() => listQueue())}>
-        自分の生成待ち・保留を50件取得
-      </button>
-      <ul>
-        {queue.map((r) => {
-          const v = r.value as {
-            state: string;
-            operation: string;
-            client: string;
-          };
-          return (
-            <li key={r.id}>
-              {v.state} ·{" "}
-              {v.client === operationClientID
-                ? "このクライアント"
-                : "別クライアント"}
-              {v.operation && (
-                <button
-                  onClick={() => onOpen({ id: v.operation, version: "head" })}
-                >
-                  生成操作を開く
-                </button>
+            <label>
+              反映方式
+              <select
+                value={mode}
+                onChange={(e) => setMode(e.target.value as "auto" | "proposal")}
+              >
+                <option value="auto">検証済み変更を自動反映</option>
+                <option value="proposal">案を確認して採用</option>
+              </select>
+            </label>
+            <Disclosure title="候補のScope・操作上限">
+              {() => (
+                <>
+                  <Field
+                    label="候補を絞るScope ID"
+                    value={scopeText}
+                    onChange={setScopes}
+                  />
+                  <label>
+                    モデル要求の上限
+                    <input
+                      type="number"
+                      min={1}
+                      value={models}
+                      onChange={(e) => setModels(Number(e.target.value))}
+                    />
+                  </label>
+                  <label>
+                    MCP要求の上限
+                    <input
+                      type="number"
+                      min={1}
+                      value={mcp}
+                      onChange={(e) => setMCP(Number(e.target.value))}
+                    />
+                  </label>
+                  <label>
+                    操作の上限（秒）
+                    <input
+                      type="number"
+                      min={1}
+                      value={seconds}
+                      onChange={(e) => setSeconds(Number(e.target.value))}
+                    />
+                  </label>
+                </>
               )}
-            </li>
-          );
-        })}
-      </ul>
-      {queue.length === 50 && (
-        <button onClick={() => void work(() => listQueue(true))}>
-          待機の次の50件
-        </button>
+            </Disclosure>
+            <button
+              data-variant="secondary"
+              onClick={() => {
+                setLoaded(undefined);
+                setNotice("保存時に現在の固定・所属先・対象箇所を使います。");
+              }}
+            >
+              現在の生成設定を方針へコピー
+            </button>
+            <button
+              disabled={!name || !goal || !selectedChannel || !target}
+              onClick={() => void work(save)}
+            >
+              生成方針を保存
+            </button>
+            <button
+              disabled={
+                !rule ||
+                !profile ||
+                !modelReady(ui.native, ui.api + "\0" + ui.user, profile)
+              }
+              onClick={() => void work(() => activate(true))}
+            >
+              このクライアントを担当にして有効化
+            </button>
+            <button
+              data-variant="secondary"
+              disabled={!activation?.value.enabled}
+              onClick={() => void work(() => activate(false))}
+            >
+              自動生成を無効化
+            </button>
+          </fieldset>
+          {!ui.canCreate && (
+            <p role="status">編集権限がないため方針を保存できません。</p>
+          )}
+          {rule && (
+            <p>
+              <StatusBadge label="方針版" value={rule.version} />{" "}
+              <StatusBadge
+                label="自動生成"
+                value={activation?.value.enabled ? "有効" : "無効"}
+              />
+            </p>
+          )}
+          <button
+            data-variant="secondary"
+            disabled={busy}
+            aria-busy={busy}
+            onClick={() => void work(() => listRules())}
+          >
+            {busy ? "生成方針を取得中…" : "生成方針を取得"}
+          </button>
+          {rules && (
+            <p>
+              {rules.length
+                ? `${rules.length}件を表示${rules.length === 100 ? "（続きあり）" : ""}`
+                : "該当する生成方針はありません。"}
+            </p>
+          )}
+          <ul>
+            {rules?.map((r) => (
+              <li key={r.id}>
+                <button
+                  data-variant="secondary"
+                  onClick={() => void work(() => load(r))}
+                >
+                  {r.value.name || r.id} · {r.version}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {rules?.length === 100 && (
+            <button
+              data-variant="secondary"
+              onClick={() => void work(() => listRules(true))}
+            >
+              生成方針の次のページ
+            </button>
+          )}
+          <button
+            data-variant="secondary"
+            disabled={busy}
+            aria-busy={busy}
+            onClick={() => void work(() => listQueue())}
+          >
+            {busy ? "生成待ち・保留を取得中…" : "自分の生成待ち・保留を取得"}
+          </button>
+          {queue && (
+            <p>
+              {queue.length
+                ? `${queue.length}件を表示${queue.length === 50 ? "（続きあり）" : ""}`
+                : "生成待ち・保留はありません。"}
+            </p>
+          )}
+          <ul>
+            {queue?.map((r) => {
+              const v = r.value as {
+                state: string;
+                operation: string;
+                client: string;
+              };
+              return (
+                <li key={r.id}>
+                  {operationStateLabels[v.state] ?? v.state} ·{" "}
+                  {v.client === operationClientID
+                    ? "このクライアント"
+                    : "別クライアント"}
+                  {v.operation && (
+                    <button
+                      data-variant="secondary"
+                      onClick={() =>
+                        onOpen({ id: v.operation, version: "head" })
+                      }
+                    >
+                      生成操作を開く
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {queue?.length === 50 && (
+            <button
+              data-variant="secondary"
+              onClick={() => void work(() => listQueue(true))}
+            >
+              生成待ちの次のページ
+            </button>
+          )}
+          <Disclosure title="過去の出力を指定期間で照合">
+            {() => (
+              <>
+                <label>
+                  開始日時
+                  <input
+                    type="datetime-local"
+                    value={from}
+                    onChange={(e) => setFrom(e.target.value)}
+                  />
+                </label>
+                <label>
+                  終了日時
+                  <input
+                    type="datetime-local"
+                    value={until}
+                    onChange={(e) => setUntil(e.target.value)}
+                  />
+                </label>
+                <button
+                  disabled={!activation?.value.enabled || !from || !until}
+                  onClick={() => void work(backfill)}
+                >
+                  指定期間を照合
+                </button>
+              </>
+            )}
+          </Disclosure>
+          <p role="status">{notice}</p>
+        </>
       )}
-      <details>
-        <summary>過去の出力を指定期間で照合</summary>
-        <label>
-          開始日時
-          <input
-            type="datetime-local"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-        </label>
-        <label>
-          終了日時
-          <input
-            type="datetime-local"
-            value={until}
-            onChange={(e) => setUntil(e.target.value)}
-          />
-        </label>
-        <button
-          disabled={!activation?.value.enabled || !from || !until}
-          onClick={() => void work(backfill)}
-        >
-          指定期間を明示的に照合
-        </button>
-      </details>
-      <p role="status">{notice}</p>
-    </details>
+    </Disclosure>
   );
 }

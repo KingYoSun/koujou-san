@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { syncRequest } from "./auth";
-import { NavigationLink, ScreenContent } from "./navigation";
+import { NavigationLink, ScreenContent, useScreenActive } from "./navigation";
 
 export type ModelConnection = {
   id: string;
@@ -19,60 +19,73 @@ export function ServerModelConnections({
   const [connections, setConnections] = useState<ModelConnection[]>();
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const active = useScreenActive();
+  const load = async () => {
+    setBusy(true);
+    setNotice("");
+    try {
+      setConnections(
+        (await syncRequest(
+          `/hopper/workspaces/${encodeURIComponent(workspace)}/model-connections`,
+          native,
+          { method: "GET" },
+        )) as ModelConnection[],
+      );
+    } catch {
+      setNotice(
+        "サーバーLLM接続を取得できませんでした。サーバー接続と閲覧権限を確認してください。",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (active && !connections) void load();
+  }, [active]);
   return (
     <ScreenContent>
       <section aria-label="サーバーLLM接続">
         <button
+          data-variant="secondary"
           disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            setNotice("");
-            try {
-              setConnections(
-                (await syncRequest(
-                  `/hopper/workspaces/${encodeURIComponent(workspace)}/model-connections`,
-                  native,
-                  { method: "GET" },
-                )) as ModelConnection[],
-              );
-            } catch {
-              setNotice("サーバー接続と現在の閲覧権限を確認してください。");
-            } finally {
-              setBusy(false);
-            }
-          }}
+          aria-busy={busy}
+          onClick={() => void load()}
         >
-          設定済みの接続を確認（モデル要求なし）
+          {busy ? "サーバーLLM接続を取得中…" : "サーバーLLM接続を再取得"}
         </button>
-        {connections &&
-          (connections.length ? (
-            <ul>
-              {connections.map((c) => (
-                <li key={c.id}>
-                  {c.name} / 接続: {c.id} / 版: {c.revision}
-                  <ul>
-                    {c.models.map((m) => (
-                      <li key={m.requested}>
-                        要求モデル: {m.requested} / 許可された実モデル:{" "}
-                        {m.allowed_actual.join("、")}
-                      </li>
-                    ))}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p>このWorkspaceで利用できるサーバーLLM接続はありません。</p>
-          ))}
+        {connections && (
+          <p aria-live="polite">
+            {connections.length
+              ? `サーバーLLM接続：${connections.length}件を表示`
+              : "サーバーLLM接続はありません。"}
+          </p>
+        )}
+        {!!connections?.length && (
+          <ul>
+            {connections.map((c) => (
+              <li key={c.id}>
+                {c.name} / 接続：{c.id} / 版：{c.revision}
+                <ul>
+                  {c.models.map((m) => (
+                    <li key={m.requested}>
+                      要求モデル：{m.requested} / 許可された実モデル：
+                      {m.allowed_actual.join("、")}
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        )}
         {notice && <p role="status">{notice}</p>}
         <p>
           <NavigationLink to={{ workspace, screen: "hopper" }} related>
-            Hopperの評価方針へ
+            Hopperへ
           </NavigationLink>
         </p>
         <p>
           <NavigationLink to={{ workspace, screen: "triage" }} related>
-            Triageの評価方針へ
+            Triage方針・評価へ
           </NavigationLink>
         </p>
       </section>
@@ -101,7 +114,6 @@ export function ServerModelFields({
 }) {
   return (
     <>
-      {" "}
       <label>
         モデル接続
         <select

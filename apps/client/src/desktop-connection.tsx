@@ -18,7 +18,7 @@ export function DesktopConnection({ children }: { children: ReactNode }) {
         <h1>koujou-sanに接続する</h1>
         {error && <p role="alert">{error}</p>}
         {!profile ? (
-          <p role="status">接続設定を確認しています。</p>
+          <p role="status">接続設定を取得中…</p>
         ) : (
           <form
             onSubmit={async (event) => {
@@ -29,7 +29,7 @@ export function DesktopConnection({ children }: { children: ReactNode }) {
                 setProfile(await invoke("connection_configure", { api }));
               } catch {
                 setError(
-                  "接続できませんでした。HTTPSのURLと、サーバーの稼働状態・証明書を確認してください。",
+                  "接続先を保存できませんでした。HTTPSのURLとサーバーの稼働状態・証明書を確認してください。",
                 );
               } finally {
                 setBusy(false);
@@ -41,14 +41,13 @@ export function DesktopConnection({ children }: { children: ReactNode }) {
               <input
                 type="url"
                 value={api}
-                placeholder="https://koujou.example.com/"
                 required
                 disabled={busy}
                 onChange={(event) => setApi(event.target.value)}
               />
             </label>
-            <button disabled={busy}>
-              {busy ? "接続を確認中…" : "接続先を保存する"}
+            <button disabled={busy} aria-busy={busy}>
+              {busy ? "接続先を確認中…" : "接続先を保存"}
             </button>
           </form>
         )}

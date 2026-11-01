@@ -68,11 +68,11 @@ export function UsageReevaluation({
         },
       );
       setNotice(
-        "新しい費用評価を保存しました。旧評価は保持しています。比較を再取得すると反映されます。",
+        `費用評価 ${result.data.id} @ ${result.data.version} を保存しました。`,
       );
       onSaved({ id: result.data.id, version: result.data.version });
     } catch {
-      setNotice("現在の権限・元計測の版・料金版・前評価を確認してください。");
+      setNotice("費用評価を保存できませんでした。");
     } finally {
       setBusy(false);
     }
@@ -80,7 +80,7 @@ export function UsageReevaluation({
   return (
     <fieldset disabled={busy}>
       <legend>費用を明示的に再評価</legend>
-      <p>対象計測: {row.group}</p>
+      <p>対象計測：{row.group}</p>
       <label>
         評価種別
         <select value={kind} onChange={(e) => setKind(e.target.value)}>
@@ -107,7 +107,7 @@ export function UsageReevaluation({
       ) : (
         <>
           <label>
-            金額（空欄は未算定）
+            金額
             <input value={amount} onChange={(e) => setAmount(e.target.value)} />
           </label>
           <label>
@@ -134,10 +134,10 @@ export function UsageReevaluation({
           onChange={(e) => setPreviousVersion(e.target.value)}
         />
       </label>
-      <button onClick={() => void save()}>
-        この計測を新しい評価として保存
+      <button aria-busy={busy} onClick={() => void save()}>
+        費用評価を保存
       </button>
-      <p role="status">{notice}</p>
+      <p role="status">{busy ? "費用評価を保存中…" : notice}</p>
     </fieldset>
   );
 }

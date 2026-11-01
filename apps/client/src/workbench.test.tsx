@@ -31,6 +31,7 @@ test("a viewer on the Web is offered reading without command editing or native e
     />,
   );
   expect(html).toContain("作業一覧を更新");
+  expect(html).not.toContain("選択した作業の詳細");
   for (const text of [
     "新しいRunを作成",
     "command・接続先",
@@ -60,6 +61,8 @@ test("execution, unknown observation, inspection verdict and local synchronizati
       "検品：INCONCLUSIVE",
     ],
     [{ state: "queued" }, "未実行"],
+    [{ state: "succeeded" }, "正常終了"],
+    [{ state: "succeeded", assessment: { state: "invalid" } }, "形式不正"],
   ] as const;
   for (const [value, expected] of cases)
     expect(renderToStaticMarkup(<WorkState value={value} />)).toContain(
@@ -68,11 +71,9 @@ test("execution, unknown observation, inspection verdict and local synchronizati
   expect(
     renderToStaticMarkup(<WorkState value={{ state: "paused" }} unsent />),
   ).toContain("未送信（端末内の回答案）");
-  const cached = renderToStaticMarkup(
-    <WorkState value={{ state: "succeeded" }} stale />,
-  );
-  expect(cached).toContain("古いキャッシュ");
-  expect(cached).toContain("同期確定は未確認");
+  expect(
+    renderToStaticMarkup(<WorkState value={{ state: "succeeded" }} stale />),
+  ).toContain("観測：現在は未確認");
   expect(nextAction({ state: "running", observation: "unknown" })).toContain(
     "所在を照合",
   );
@@ -81,7 +82,7 @@ test("execution, unknown observation, inspection verdict and local synchronizati
       state: "succeeded",
       assessment: { state: "valid", verdict: "FAIL" },
     }),
-  ).toContain("差し戻し");
+  ).toContain("成果・検品");
 });
 const request = {
   question: "保存後の案内を読めますか？",

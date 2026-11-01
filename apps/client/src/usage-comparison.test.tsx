@@ -1,4 +1,5 @@
 import { ComparisonConditions } from "./usage-comparison-conditions";
+import { UsageComparison } from "./usage-comparison";
 import { storedCondition } from "./usage-comparison-model";
 import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
@@ -72,7 +73,9 @@ it("shows missing measurements and historical quality without turning them into 
   expect(html).toContain("未算定");
   expect(html).toContain("CLIの自己申告");
   expect(html).toContain("定額契約");
-  expect(html).toContain("比較結果の次の50件");
+  expect(html).toContain("比較結果の次のページ");
+  expect(html).toContain("1件を表示（続きあり）");
+  expect(html).not.toContain("未取得 秒");
   expect(html).not.toContain("0 USD");
 });
 
@@ -146,4 +149,20 @@ it("shows one provenance link per fixed record and keeps detail measurement meta
   expect(html).toContain("一部計測");
   expect(html).toContain("定額契約");
   expect(html).toContain("main-only");
+});
+
+it("keeps the saved comparison conditions in the sidebar pane", () => {
+  const html = renderToStaticMarkup(
+    <UsageComparison
+      native={false}
+      workspace="owned"
+      role="editor"
+      api="api"
+      user="viewer"
+      onInspect={async () => {}}
+    />,
+  );
+  expect(html).toContain('<section aria-label="保存した比較条件">');
+  expect(html).toContain("比較条件を取得");
+  expect(html).toContain("比較Aの集計を取得");
 });

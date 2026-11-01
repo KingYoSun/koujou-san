@@ -20,6 +20,8 @@ import { allowAnswerScope, answerScopeEpoch } from "./sync-store";
 import { ContextGenerationResults } from "./context-generation-results";
 import { ContextGenerationAutomation } from "./context-generation-automation";
 import { useContextGenerationWorker } from "./context-generation-worker";
+import { Disclosure } from "./disclosure";
+import { Field } from "./field";
 
 export type OutputContextSource = {
   workspace: string;
@@ -134,7 +136,9 @@ export function ContextGeneration({
       }
     } catch {
       if (attempt !== previewEpoch.current) return;
-      setNotice("固定した出力・対象箇所・現在の閲覧権限を確認してください。");
+      setNotice(
+        "固定した出力を取得できませんでした。対象箇所と閲覧権限を確認してください。",
+      );
     } finally {
       if (attempt === previewEpoch.current) setBusy(false);
     }
@@ -187,7 +191,7 @@ export function ContextGeneration({
           data.data!.ref,
         ]);
     } catch {
-      setNotice("所属先のScopeを取得できません。");
+      setNotice("所属先のScopeを取得できませんでした。");
     }
   }
   function lockSelected() {
@@ -238,7 +242,7 @@ export function ContextGeneration({
         { related: true },
       );
     } catch {
-      setNotice("操作を取得できません。現在の権限を確認してください。");
+      setNotice("操作を取得できませんでした。");
     }
   }
   return (
@@ -247,40 +251,32 @@ export function ContextGeneration({
         {
           <section className="team" aria-label="出力からのContext生成">
             <h3>出力からContextを作成・更新</h3>
-            <details>
-              <summary>元の出力をIDで指定</summary>
-              <label>
-                元Run ID
-                <input
-                  value={runID}
-                  onChange={(e) => setRunID(e.target.value)}
-                />
-              </label>
-              <label>
-                出力ID
-                <input
-                  value={outputID}
-                  onChange={(e) => setOutputID(e.target.value)}
-                />
-              </label>
-              <label>
-                出力の固定版
-                <input
-                  value={outputVersion}
-                  onChange={(e) => setOutputVersion(e.target.value)}
-                />
-              </label>
-            </details>
-            <details>
-              <summary>出力の一部分だけを対象にする</summary>
-              <label>
-                対象箇所（JSON pointer・空欄はこの出力全体）
-                <input
+            <Disclosure title="元の出力をIDで指定">
+              {() => (
+                <>
+                  <Field label="元Run ID" value={runID} onChange={setRunID} />
+                  <Field
+                    label="出力ID"
+                    value={outputID}
+                    onChange={setOutputID}
+                  />
+                  <Field
+                    label="出力の固定版"
+                    value={outputVersion}
+                    onChange={setOutputVersion}
+                  />
+                </>
+              )}
+            </Disclosure>
+            <Disclosure title="出力の一部分だけを対象にする">
+              {() => (
+                <Field
+                  label="JSON pointer"
                   value={pointer}
-                  onChange={(e) => setPointer(e.target.value)}
+                  onChange={setPointer}
                 />
-              </label>
-            </details>
+              )}
+            </Disclosure>
             <button
               disabled={busy || !runID || !outputID || !outputVersion}
               onClick={() => void prepare()}
@@ -290,59 +286,83 @@ export function ContextGeneration({
             {preview && (
               <section aria-label="再利用する出力">
                 <h4>再利用する出力</h4>
-                <pre className="source-preview" tabIndex={0}>
+                <pre
+                  className="source-preview"
+                  tabIndex={0}
+                  aria-label="再利用する出力"
+                >
                   {preview.output.selected_utf8}
                 </pre>
                 <details>
                   <summary>出力の照合情報</summary>
-                  <small>digest: {preview.output.digest}</small>
+                  <small>digest：{preview.output.digest}</small>
                 </details>
               </section>
             )}
-            <details>
-              <summary>
-                更新対象の固定・Scopeへの所属（任意）
-                {fixed.length || groupScopes.length
+            <Disclosure
+              title={
+                "更新対象の固定・Scopeへの所属" +
+                (fixed.length || groupScopes.length
                   ? ` · 固定${fixed.length}件・所属先${groupScopes.length}件`
-                  : ""}
-              </summary>
-              <button disabled={!ui.canCreate} onClick={lockSelected}>
-                選択中Contextの本文・名称を固定
-              </button>
-              {fixed.map((lock) => (
-                <p key={lock.ref.id}>
-                  {lock.ref.kind}:{lock.ref.id} · 固定:{" "}
-                  {Object.keys(lock.fields).join("、")}
-                  <button
-                    onClick={() => setFixed(fixed.filter((v) => v !== lock))}
-                  >
-                    固定を外す
+                  : "")
+              }
+            >
+              {() => (
+                <>
+                  <button disabled={!ui.canCreate} onClick={lockSelected}>
+                    選択中Contextの本文・名称を固定
                   </button>
-                </p>
-              ))}
-              <label>
-                所属先Scope ID（文書構成と別）
-                <input
-                  value={scopeID}
-                  onChange={(e) => setScopeID(e.target.value)}
-                />
-              </label>
-              <button disabled={!scopeID} onClick={() => void group()}>
-                所属先を取得
-              </button>
-              {groupScopes.map((ref) => (
-                <p key={ref.id}>
-                  {ref.id}
+                  {!ui.canCreate && (
+                    <p role="status">編集権限がないため固定できません。</p>
+                  )}
+                  <ul>
+                    {fixed.map((lock) => (
+                      <li key={lock.ref.id}>
+                        {lock.ref.kind}:{lock.ref.id} · 固定：
+                        {Object.keys(lock.fields).join("、")}
+                        <button
+                          data-variant="secondary"
+                          onClick={() =>
+                            setFixed(fixed.filter((v) => v !== lock))
+                          }
+                        >
+                          固定を外す
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <Field
+                    label="所属先Scope ID"
+                    value={scopeID}
+                    onChange={setScopeID}
+                  />
                   <button
-                    onClick={() =>
-                      setGroupScopes(groupScopes.filter((r) => r.id !== ref.id))
-                    }
+                    data-variant="secondary"
+                    disabled={!scopeID}
+                    onClick={() => void group()}
                   >
-                    所属先から外す
+                    所属先を取得
                   </button>
-                </p>
-              ))}
-            </details>
+                  <ul>
+                    {groupScopes.map((ref) => (
+                      <li key={ref.id}>
+                        {ref.id}
+                        <button
+                          data-variant="secondary"
+                          onClick={() =>
+                            setGroupScopes(
+                              groupScopes.filter((r) => r.id !== ref.id),
+                            )
+                          }
+                        >
+                          所属先から外す
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </Disclosure>
             <ContextGenerationAutomation
               ui={ui}
               source={source}

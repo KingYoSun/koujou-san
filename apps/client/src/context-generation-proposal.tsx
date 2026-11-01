@@ -1,6 +1,10 @@
 import { useMemo, useState } from "react";
 import { editField, fieldSource } from "./workflow-json";
 import type { Ref } from "./context-ui";
+import { Disclosure } from "./disclosure";
+import { jsonError } from "./field";
+import { PageList } from "./page-list";
+import { StatusBadge } from "./status-badge";
 
 export type ContextChange = {
   key: string;
@@ -44,17 +48,12 @@ const stringField = (text: string, path: string[]) => {
   }
 };
 export const contextStates: Record<string, string> = {
-  observed: "元出力にある観測（独立検品ではありません）",
+  observed: "元出力の観測",
   inference: "モデルの推測",
   judgment: "採用する判断",
   proposal: "未確認の提案",
 };
-export type ContextProposalDraft = {
-  text: string;
-  page: number;
-  candidatePage: number;
-  chosen: string[];
-};
+export type ContextProposalDraft = { text: string; chosen: string[] };
 export function ContextGenerationProposal({
   draft,
   goal,
@@ -68,11 +67,8 @@ export function ContextGenerationProposal({
   onRevise: (value: string) => void;
   editable: boolean;
 }) {
-  const { text, page, candidatePage, chosen } = draft;
+  const { text, chosen } = draft;
   const setText = (text: string) => onDraft({ ...draft, text });
-  const setPage = (page: number) => onDraft({ ...draft, page });
-  const setCandidatePage = (candidatePage: number) =>
-    onDraft({ ...draft, candidatePage });
   const setChosen = (chosen: string[]) => onDraft({ ...draft, chosen });
   const [error, setError] = useState("");
   const data = useMemo(() => {
@@ -86,6 +82,7 @@ export function ContextGenerationProposal({
     ...(data?.changes ?? []).map((c) => ({ key: c.key, change: c })),
     ...(data?.grouping ?? []).map((g) => ({ key: g.key, group: g })),
   ];
+  const shapeError = "変更案の形式を確認してください。";
   const update = (change: ContextChange, path: string, raw: string) => {
     try {
       const next = {
@@ -99,15 +96,15 @@ export function ContextGenerationProposal({
       setText(JSON.stringify(next));
       setError("");
     } catch {
-      setError("変更した項目の形式を確認してください。");
+      setError(jsonError(change.value_utf8) ?? shapeError);
     }
   };
   return (
     <section aria-label="Contextの生成案と採否">
       <h4>原依頼と変更案</h4>
       <p>{goal}</p>
-      <ul>
-        {rows.slice(page * 50, page * 50 + 50).map((row) => (
+      <PageList label="変更案" items={rows}>
+        {(row) => (
           <li key={row.key}>
             <label>
               <input
@@ -120,7 +117,7 @@ export function ContextGenerationProposal({
                   setChosen(next);
                 }}
               />
-              この変更を採用: {row.key}
+              この変更を採用：{row.key}
             </label>
             {"change" in row ? (
               <>
@@ -135,7 +132,10 @@ export function ContextGenerationProposal({
                     : "既存の新版"}
                 </p>
                 <p>
-                  {contextStates[row.change.state] ?? row.change.state} ·{" "}
+                  <StatusBadge
+                    label="状態"
+                    value={contextStates[row.change.state] ?? row.change.state}
+                  />{" "}
                   {row.change.reason}
                 </p>
                 {row.change.target.kind === "sentence" ? (
@@ -156,7 +156,7 @@ export function ContextGenerationProposal({
                 ) : (
                   <>
                     <p>
-                      順序付きの構成参照:{" "}
+                      順序付きの構成参照：
                       {field(row.change.value_utf8, ["children"])}
                     </p>
                     {row.change.target.kind !== "paragraph" && (
@@ -178,7 +178,7 @@ export function ContextGenerationProposal({
                   </>
                 )}
                 <p>
-                  参照した固定版:{" "}
+                  参照した固定版：
                   {row.change.references
                     .map((r) => `${r.kind}:${r.id}@${r.revision}`)
                     .join("、") || "元出力のみ"}
@@ -186,67 +186,37 @@ export function ContextGenerationProposal({
               </>
             ) : (
               <p>
-                所属: {row.group.context.id} → {row.group.scope.id} ·{" "}
+                所属：{row.group.context.id} → {row.group.scope.id} ·{" "}
                 {row.group.present ? "追加" : "解除"} · 元版{" "}
                 {row.group.expected_version}
               </p>
             )}
           </li>
-        ))}
-      </ul>
-      {rows.length > 50 && (
-        <>
-          <button disabled={page === 0} onClick={() => setPage(page - 1)}>
-            変更の前の50件
-          </button>
-          <button
-            disabled={(page + 1) * 50 >= rows.length}
-            onClick={() => setPage(page + 1)}
-          >
-            変更の次の50件
-          </button>
-        </>
-      )}
+        )}
+      </PageList>
       {data?.candidates.length ? (
         <details>
           <summary>再利用・重複・矛盾の候補</summary>
-          <ul>
-            {data.candidates
-              .slice(candidatePage * 50, candidatePage * 50 + 50)
-              .map((c, i) => (
-                <li key={i}>
-                  {c.relation} · {c.ref.kind}:{c.ref.id}@{c.ref.revision} ·{" "}
-                  {c.reason}
-                </li>
-              ))}
-          </ul>
-          {data.candidates.length > 50 && (
-            <>
-              <button
-                disabled={candidatePage === 0}
-                onClick={() => setCandidatePage(candidatePage - 1)}
-              >
-                候補の前の50件
-              </button>
-              <button
-                disabled={(candidatePage + 1) * 50 >= data.candidates.length}
-                onClick={() => setCandidatePage(candidatePage + 1)}
-              >
-                候補の次の50件
-              </button>
-            </>
-          )}
+          <PageList label="候補" items={data.candidates}>
+            {(c, i) => (
+              <li key={i}>
+                {c.relation} · {c.ref.kind}:{c.ref.id}@{c.ref.revision} ·{" "}
+                {c.reason}
+              </li>
+            )}
+          </PageList>
         </details>
       ) : null}
-      <details>
-        <summary>変更案のJSONを編集</summary>
-        <textarea
-          aria-label="Context変更案のJSON"
-          value={text}
-          disabled={!editable}
-          onChange={(e) => setText(e.target.value)}
-        />
-      </details>
+      <Disclosure title="変更案のJSONを編集">
+        {() => (
+          <textarea
+            aria-label="Context変更案のJSON"
+            value={text}
+            disabled={!editable}
+            onChange={(e) => setText(e.target.value)}
+          />
+        )}
+      </Disclosure>
       {editable && (
         <button
           onClick={() => {
@@ -261,14 +231,14 @@ export function ContextGenerationProposal({
               onRevise(text);
               setError("");
             } catch {
-              setError("変更案の形式を確認してください。");
+              setError(jsonError(text) ?? shapeError);
             }
           }}
         >
-          手動修正した案を保存（LLM要求なし）
+          手動修正した案を保存
         </button>
       )}
-      <p role="status">{error}</p>
+      <p role="alert">{error}</p>
     </section>
   );
 }
