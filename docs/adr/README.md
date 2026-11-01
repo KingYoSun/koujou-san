@@ -57,3 +57,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0032: 費用・品質・時間の二群比較](0032-cost-quality-comparison.md)
 
 - [0033: Projectの永続チャットと既存操作への接続](0033-project-chat.md)
+
+- [0034: Giteaの外部識別と既存工程への接続](0034-gitea-integration.md)

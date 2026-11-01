@@ -5,14 +5,19 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/gitea"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/githubapp"
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type Target struct {
+	Provider       string `json:"provider,omitempty"`
+	Instance       string `json:"instance,omitempty"`
+	Workflow       string `json:"workflow,omitempty"`
 	ID             string `json:"id"`
 	InstallationID int64  `json:"installation_id"`
 	RepositoryID   int64  `json:"repository_id"`
@@ -38,6 +43,9 @@ type Config struct {
 	Bindings          []Binding `json:"bindings"`
 	key               *rsa.PrivateKey
 	secret            []byte
+	GiteaInstances    []gitea.Instance `json:"gitea_instances,omitempty"`
+	clients           map[string]*gitea.Client
+	giteaInterval     time.Duration
 }
 
 var repositoryPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
@@ -46,35 +54,58 @@ var idPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
 
 func Environment() (*Config, error) {
 	path := os.Getenv("KOUJOU_GITHUB_CONFIG")
-	if path == "" {
+	giteaPath := os.Getenv("KOUJOU_GITEA_CONFIG")
+	if path == "" && giteaPath == "" {
 		return nil, nil
 	}
-	raw, err := os.ReadFile(path)
-	if err != nil {
-		return nil, errors.New("GitHub configuration unreadable")
-	}
 	var c Config
-	if json.Unmarshal(raw, &c) != nil {
-		return nil, errors.New("GitHub configuration invalid")
+	if path != "" {
+		raw, err := os.ReadFile(path)
+		if err != nil || json.Unmarshal(raw, &c) != nil {
+			return nil, errors.New("GitHub configuration invalid")
+		}
 	}
-	if err = c.validate(); err != nil {
+	if giteaPath != "" {
+		raw, err := os.ReadFile(giteaPath)
+		var extra Config
+		if err != nil || json.Unmarshal(raw, &extra) != nil || len(extra.GiteaInstances) == 0 || extra.IntervalSeconds < 0 {
+			return nil, gitea.ErrConfig
+		}
+		if extra.IntervalSeconds == 0 {
+			extra.IntervalSeconds = 60
+		}
+		c.giteaInterval = time.Duration(extra.IntervalSeconds) * time.Second
+		c.GiteaInstances = append(c.GiteaInstances, extra.GiteaInstances...)
+		for _, target := range extra.Targets {
+			if target.Provider != "gitea" {
+				return nil, gitea.ErrConfig
+			}
+			c.Targets = append(c.Targets, target)
+		}
+		c.Bindings = append(c.Bindings, extra.Bindings...)
+	}
+	if err := c.validate(); err != nil {
 		return nil, err
 	}
-	c.key, err = githubapp.ReadKey(c.PrivateKeyFile)
-	if err != nil {
-		return nil, err
+	if c.AppID != "" {
+		key, err := githubapp.ReadKey(c.PrivateKeyFile)
+		if err != nil {
+			return nil, err
+		}
+		c.key = key
 	}
 	if c.WebhookSecretFile != "" {
-		c.secret, err = os.ReadFile(c.WebhookSecretFile)
-		if err != nil || len(c.secret) == 0 {
+		secret, err := os.ReadFile(c.WebhookSecretFile)
+		if err != nil || len(secret) == 0 {
 			return nil, errors.New("GitHub webhook secret unreadable")
 		}
+		c.secret = secret
 	}
 	return &c, nil
 }
 func (c *Config) validate() error {
 	bad := errors.New("GitHub configuration invalid")
-	if c.AppID == "" {
+	if c.AppID == "" && len(c.GiteaInstances) == 0 {
 		return bad
 	}
 	if c.IntervalSeconds == 0 {
@@ -85,7 +116,30 @@ func (c *Config) validate() error {
 	}
 	ids := map[string]bool{}
 	tuples := map[string]bool{}
-	for _, t := range c.Targets {
+	c.clients = map[string]*gitea.Client{}
+	for _, instance := range c.GiteaInstances {
+		client, err := instance.Open()
+		if err != nil || c.clients[client.URL] != nil {
+			return gitea.ErrConfig
+		}
+		c.clients[client.URL] = client
+	}
+	for index, t := range c.Targets {
+		if t.Provider == "gitea" {
+			origin, err := gitea.Origin(t.Instance)
+			if err != nil {
+				return err
+			}
+			t.Instance = origin
+			c.Targets[index] = t
+			if err := c.validateGitea(t, ids, tuples); err != nil {
+				return err
+			}
+			continue
+		}
+		if t.Provider != "" || t.Instance != "" || t.Workflow != "" || c.AppID == "" {
+			return bad
+		}
 		if !idPattern.MatchString(t.ID) || ids[t.ID] || t.InstallationID <= 0 || t.RepositoryID <= 0 || !repositoryPattern.MatchString(t.Repository) || t.Attempt < 0 {
 			return bad
 		}
@@ -126,4 +180,41 @@ func (c *Config) validate() error {
 	}
 	return nil
 }
-func (c *Config) interval() time.Duration { return time.Duration(c.IntervalSeconds) * time.Second }
+func (c *Config) interval(t Target) time.Duration {
+	if t.Provider == "gitea" && c.giteaInterval > 0 {
+		return c.giteaInterval
+	}
+	return time.Duration(c.IntervalSeconds) * time.Second
+}
+
+func (c *Config) validateGitea(t Target, ids, tuples map[string]bool) error {
+	origin, err := gitea.Origin(t.Instance)
+	if err != nil || origin != t.Instance || c.clients[origin] == nil || !strings.HasPrefix(t.ID, "gitea:") || !idPattern.MatchString(strings.TrimPrefix(t.ID, "gitea:")) || ids[t.ID] || !repositoryPattern.MatchString(t.Repository) || t.RepositoryID <= 0 || t.InstallationID != 0 || t.WorkflowID != 0 || t.Attempt < 0 {
+		return gitea.ErrConfig
+	}
+	if t.Workflow != "" {
+		if t.Kind != "actions" || t.ExternalID != "" || t.Attempt != 0 || strings.ContainsAny(t.Workflow, "/\\?#") {
+			return gitea.ErrConfig
+		}
+	} else if t.Kind == "commit" || t.Kind == "status" {
+		if !shaPattern.MatchString(t.ExternalID) {
+			return gitea.ErrConfig
+		}
+	} else {
+		n, e := strconv.ParseInt(t.ExternalID, 10, 64)
+		if (t.Kind != "issue" && t.Kind != "pr" && t.Kind != "actions") || e != nil || n <= 0 {
+			return gitea.ErrConfig
+		}
+	}
+	if t.Kind != "actions" && (t.Attempt != 0 || t.Event != "") {
+		return gitea.ErrConfig
+	}
+	identity := t
+	identity.ID = ""
+	tuple, _ := json.Marshal(identity)
+	if tuples[string(tuple)] {
+		return gitea.ErrConfig
+	}
+	tuples[string(tuple)], ids[t.ID] = true, true
+	return nil
+}

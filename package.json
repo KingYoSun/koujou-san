@@ -9,6 +9,9 @@
     "pnpm": "10.16.1"
   },
   "scripts": {
+    "test:forge": "node scripts/dev.mjs test:forge",
+    "test:gitea:live": "node scripts/dev.mjs test:gitea:live",
+    "test:gitea:ui": "node scripts/dev.mjs test:gitea:ui",
     "test:chat:ui": "node scripts/dev.mjs test:chat:ui",
     "test:acceptance": "node scripts/dev.mjs test:acceptance",
     "test:triage:github-live": "node scripts/dev.mjs test:triage:github-live",

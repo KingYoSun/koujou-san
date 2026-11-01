@@ -506,6 +506,49 @@ const tasks = {
     await client("build");
     await testDatabase("mcpapi");
   },
+  "test:gitea:ui": async () => {
+    if (!env.KOUJOU_GITEA_CONFIG || !env.KOUJOU_PUBLICATION_CONFIG)
+      throw new Error(
+        "Configure the explicitly approved Gitea observation and publication files.",
+      );
+    env.KOUJOU_GITHUB_CONFIG = "";
+    env.KOUJOU_TEST_GITEA_UI = "1";
+    env.KOUJOU_TEST_MCP_UI = "1";
+    env.KOUJOU_TEST_WORKBENCH_UI = "1";
+    env.KOUJOU_TEST_ACCEPTANCE = "1";
+    env.KOUJOU_TEST_PROJECT_CHAT_UI = "1";
+    await client("build");
+    await testDatabase("mcpapi");
+  },
+  "test:gitea:live": async () => {
+    if (
+      !env.KOUJOU_GITEA_CONFIG ||
+      !env.KOUJOU_PUBLICATION_CONFIG ||
+      !process.argv[3]
+    )
+      throw new Error(
+        "Pass an evidence directory and configure the approved Gitea files.",
+      );
+    await resolveGo();
+    const directory = path.resolve(root, process.argv[3]);
+    await mkdir(directory, { recursive: true });
+    env.KOUJOU_GITHUB_CONFIG = "";
+    env.KOUJOU_TEST_GITEA_LIVE = "1";
+    for (const [suite, name, evidence] of [
+      ["githubobserve", "TestGiteaLive", "observation-evidence.json"],
+      ["publications", "TestGiteaPublicationLive", "publication-evidence.json"],
+    ]) {
+      env.KOUJOU_GITEA_EVIDENCE = path.join(directory, evidence);
+      await goRun([
+        "test",
+        `./internal/${suite}`,
+        "-run",
+        `^${name}$`,
+        "-count=1",
+        "-v",
+      ]);
+    }
+  },
   "test:clientops": () =>
     testDatabase("clientops", "TestClientOperationsPostgres"),
   "test:hopper": () =>
@@ -599,6 +642,7 @@ const tasks = {
     testDatabase("automation", "TestAutomationPostgres|TestTriagePostgres"),
   "test:usage": () => testDatabase("usage", "TestUsagePostgres"),
   "test:github": () => testDatabase("githubobserve"),
+  "test:forge": () => testDatabase("githubobserve"),
   "test:github:live": async () => {
     await resolveGo();
     env.KOUJOU_TEST_GITHUB_LIVE = "1";

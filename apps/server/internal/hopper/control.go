@@ -8,6 +8,7 @@ import (
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/gitea"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -128,7 +129,7 @@ func (s *Service) Decide(ctx context.Context, p access.Principal, w, id string, 
 	})
 }
 func (s *Service) Past(ctx context.Context, p access.Principal, w string, req Past) (apicontract.Response[apicontract.Reference], error) {
-	if !fixed(req.Definition) || req.ExpectedVersion != "0" || req.Target == "" || (req.Kind != "run" && req.Kind != "github") || req.Limit < 1 || req.Limit > 100 || req.After < 0 {
+	if !fixed(req.Definition) || req.ExpectedVersion != "0" || req.Target == "" || (req.Kind != "run" && !gitea.IsProvider(req.Kind)) || req.Limit < 1 || req.Limit > 100 || req.After < 0 {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
 	return s.mutation(ctx, p, w, "hopper-past:"+req.OperationID, "manage", req.Mutation, req, func(tx pgx.Tx, ref Ref) (Record, error) {

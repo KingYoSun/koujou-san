@@ -58,7 +58,11 @@ func projectChatUIModel(w http.ResponseWriter, body []byte) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"id": "owned-chat-" + rand.Text(), "model": req.Model, "choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": "採用する仕様: Gitea接続は既存GitHub連携を維持し、認証と接続先を区別します。今回はIssue #83の準備文書を固定成果物として確認します。"}, "finish_reason": "stop"}}, "usage": map[string]int{"prompt_tokens": 30, "completion_tokens": 20}})
+	text := "採用する仕様: Gitea接続は既存GitHub連携を維持し、認証と接続先を区別します。今回はIssue #83の準備文書を固定成果物として確認します。"
+	if os.Getenv("KOUJOU_TEST_GITEA_UI") == "1" {
+		text = "採用する仕様: 専用のprivate-proofリポジトリでsum(a,b)をa+bへ修正し、sum(2,2)=4を満たします。64KiBのLFS素材は変更せず、LinuxとWindowsのCI、固定成果物の独立検品を確認してから対象commitをマージします。"
+	}
+	_ = json.NewEncoder(w).Encode(map[string]any{"id": "owned-chat-" + rand.Text(), "model": req.Model, "choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": text}, "finish_reason": "stop"}}, "usage": map[string]int{"prompt_tokens": 30, "completion_tokens": 20}})
 }
 
 func projectChatUIEvidence(t *testing.T, s *Service, ctx context.Context, observed []json.RawMessage) {

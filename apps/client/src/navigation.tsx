@@ -20,7 +20,7 @@ export const destinations = {
   triage: ["自動化", "Triage方針・評価"],
   operations: ["自動化", "共通の処理運用"],
   usage: ["分析", "費用・品質・利用量"],
-  github: ["分析", "GitHub観測"],
+  github: ["分析", "GitHub・Gitea観測"],
   account: ["設定", "アカウント"],
   workspace: ["設定", "Workspace・参加者・招待"],
   devices: ["設定", "端末・共有ポリシー"],

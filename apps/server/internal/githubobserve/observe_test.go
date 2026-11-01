@@ -443,6 +443,7 @@ func TestGithubPostgres(t *testing.T) {
 		t.Fatal("unsigned webhook accepted")
 	}
 	t.Log("shared bindings, duplicate/delayed/reversed notifications, last observation retention, read ACL, server-only reconciliation and restart passed")
+	checkGiteaPostgres(t, ctx, store, a, c)
 }
 
 func TestGithubLive(t *testing.T) {

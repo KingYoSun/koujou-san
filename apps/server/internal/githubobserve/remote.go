@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/gitea"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/githubapp"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -23,6 +25,13 @@ type Job struct {
 	Attempt    int    `json:"run_attempt"`
 }
 type Snapshot struct {
+	Provider        string `json:"provider,omitempty"`
+	Kind            string `json:"kind,omitempty"`
+	Instance        string `json:"instance,omitempty"`
+	Repository      string `json:"repository,omitempty"`
+	RepositoryID    int64  `json:"repository_id,omitempty"`
+	Workflow        string `json:"workflow,omitempty"`
+	ServerVersion   string `json:"server_version,omitempty"`
 	URL             string `json:"url"`
 	Title           string `json:"title,omitempty"`
 	SourceUpdatedAt string `json:"source_updated_at,omitempty"`
@@ -47,6 +56,7 @@ type source struct {
 	SHA         string `json:"sha"`
 	HeadSHA     string `json:"head_sha"`
 	WorkflowID  int64  `json:"workflow_id"`
+	Path        string `json:"path"`
 	Attempt     int    `json:"run_attempt"`
 	MergeCommit string `json:"merge_commit_sha"`
 	Merged      bool   `json:"merged"`
@@ -139,6 +149,9 @@ func (r *Remote) limit(resp *http.Response) {
 	}
 }
 func (r *Remote) get(ctx context.Context, t Target, path string, into any) error {
+	if t.Provider == "gitea" {
+		return r.config.clients[t.Instance].Get(ctx, path, into)
+	}
 	if time.Now().Before(r.resumeAt) {
 		return errors.New("rate_limited")
 	}
@@ -182,11 +195,40 @@ func (r *Remote) get(ctx context.Context, t Target, path string, into any) error
 	return nil
 }
 func (r *Remote) observe(ctx context.Context, t Target) (Snapshot, error) {
+	var s Snapshot
+	pageSize := "per_page"
+	if t.Provider == "gitea" {
+		client := r.config.clients[t.Instance]
+		if client == nil {
+			return s, errors.New("not_configured")
+		}
+		if err := client.Repository(ctx, t.Repository, t.RepositoryID); err != nil {
+			return s, err
+		}
+		var version struct {
+			Version string `json:"version"`
+		}
+		if err := client.Get(ctx, "/version", &version); err != nil {
+			return s, err
+		}
+		s = Snapshot{Provider: "gitea", Kind: t.Kind, Instance: client.URL, Repository: t.Repository, RepositoryID: t.RepositoryID, ServerVersion: version.Version}
+		pageSize = "limit"
+		if t.Kind == "status" {
+			if err := r.observeStatus(ctx, t, &s); err != nil {
+				return Snapshot{}, err
+			}
+			return finishSnapshot(s)
+		}
+	}
 	prefix := "/repos/" + t.Repository
-	if t.WorkflowID > 0 {
-		path := fmt.Sprintf("%s/actions/workflows/%d/runs?per_page=1", prefix, t.WorkflowID)
+	if t.WorkflowID > 0 || t.Workflow != "" {
+		workflow := strconv.FormatInt(t.WorkflowID, 10)
+		if t.Provider == "gitea" {
+			workflow = t.Workflow
+		}
+		path := fmt.Sprintf("%s/actions/workflows/%s/runs?%s=1", prefix, url.PathEscape(workflow), pageSize)
 		if t.Event != "" {
-			path += "&event=" + t.Event
+			path += "&event=" + url.QueryEscape(t.Event)
 		}
 		var listing struct {
 			Runs []source `json:"workflow_runs"`
@@ -194,11 +236,11 @@ func (r *Remote) observe(ctx context.Context, t Target) (Snapshot, error) {
 		if err := r.get(ctx, t, path, &listing); err != nil {
 			return Snapshot{}, err
 		}
-		if len(listing.Runs) != 1 || listing.Runs[0].ID < 1 || listing.Runs[0].WorkflowID != t.WorkflowID {
+		if len(listing.Runs) != 1 || listing.Runs[0].ID < 1 || (t.Provider == "" && listing.Runs[0].WorkflowID != t.WorkflowID) {
 			return Snapshot{}, errors.New("workflow_result_unavailable")
 		}
 		run := listing.Runs[0].ID
-		if old := r.workflowRuns[t.ID]; old != 0 && old != run {
+		if old := r.workflowRuns[t.ID]; t.Provider == "" && old != 0 && old != run {
 			previous := fmt.Sprintf("%s/actions/runs/%d", prefix, old)
 			for key := range r.cache {
 				if key == previous || strings.HasPrefix(key, previous+"/") {
@@ -227,7 +269,7 @@ func (r *Remote) observe(ctx context.Context, t Target) (Snapshot, error) {
 	if err := r.get(ctx, t, path, &v); err != nil {
 		return Snapshot{}, err
 	}
-	s := Snapshot{URL: v.URL, Title: v.Title, SourceUpdatedAt: v.Updated, State: v.State}
+	s.URL, s.Title, s.SourceUpdatedAt, s.State = v.URL, v.Title, v.Updated, v.State
 	switch t.Kind {
 	case "pr":
 		s.Commit = v.Head.SHA
@@ -247,7 +289,10 @@ func (r *Remote) observe(ctx context.Context, t Target) (Snapshot, error) {
 		s.RunID = v.ID
 		s.Attempt = v.Attempt
 		s.Conclusion = v.Conclusion
-		if s.Attempt < 1 || s.RunID == 0 || s.WorkflowID == 0 || s.Commit == "" {
+		if t.Provider == "gitea" {
+			s.Workflow = v.Path
+		}
+		if s.Attempt < 1 || s.RunID == 0 || (s.WorkflowID == 0 && s.Workflow == "") || s.Commit == "" {
 			return Snapshot{}, errors.New("invalid_source_response")
 		}
 		for page := 1; ; page++ {
@@ -255,7 +300,7 @@ func (r *Remote) observe(ctx context.Context, t Target) (Snapshot, error) {
 				Total int   `json:"total_count"`
 				Jobs  []Job `json:"jobs"`
 			}
-			if err := r.get(ctx, t, fmt.Sprintf("%s/actions/runs/%s/attempts/%d/jobs?per_page=100&page=%d", prefix, t.ExternalID, s.Attempt, page), &jobs); err != nil {
+			if err := r.get(ctx, t, fmt.Sprintf("%s/actions/runs/%s/attempts/%d/jobs?%s=100&page=%d", prefix, t.ExternalID, s.Attempt, pageSize, page), &jobs); err != nil {
 				return Snapshot{}, err
 			}
 			for _, j := range jobs.Jobs {
@@ -279,7 +324,11 @@ func (r *Remote) observe(ctx context.Context, t Target) (Snapshot, error) {
 			return Snapshot{}, errors.New("changed_during_read")
 		}
 	}
-	if s.URL == "" || s.State == "" {
+	return finishSnapshot(s)
+}
+
+func finishSnapshot(s Snapshot) (Snapshot, error) {
+	if s.URL == "" || s.State == "" || (s.Provider == "gitea" && !gitea.SourceURL(s.Instance, s.Repository, s.URL)) {
 		return Snapshot{}, errors.New("invalid_source_response")
 	}
 	raw, _ := json.Marshal(s)

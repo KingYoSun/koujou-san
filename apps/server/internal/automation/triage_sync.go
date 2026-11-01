@@ -20,6 +20,7 @@ type LabelEvent struct {
 	Own    bool   `json:"own"`
 }
 type ExternalSnapshot struct {
+	Provider  string       `json:"provider,omitempty"`
 	Labels    []string     `json:"labels"`
 	Events    []LabelEvent `json:"events"`
 	More      bool         `json:"more"`
@@ -270,6 +271,9 @@ func (s *Service) SyncPriority(ctx context.Context) (bool, error) {
 							priority.Origin = "external"
 							priority.Fixed = true
 							priority.AdoptedReason = "GitHubの優先度ラベルを取り込みました"
+							if snapshot.Provider == "gitea" {
+								priority.AdoptedReason = "Giteaの優先度ラベルを取り込みました"
+							}
 							priority.Reason = priority.AdoptedReason
 							prExpected := "0"
 							if adopted.ID != "" {

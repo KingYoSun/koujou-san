@@ -8,6 +8,7 @@ import (
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/automation"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/gitea"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/githubobserve"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
@@ -95,7 +96,7 @@ func (s *Service) accepted(ctx context.Context, tx pgx.Tx, c persistence.Command
 // AcceptSourceTx is called only by trusted result owners in their acceptance tx.
 // No HTTP/MCP route can submit fabricated result observations.
 func (s *Service) AcceptSourceTx(ctx context.Context, tx pgx.Tx, w string, source Source, only ...Ref) error {
-	if source.Event == "" || !fixed(source.Target) || (source.Kind != "run" && source.Kind != "github") {
+	if source.Event == "" || !fixed(source.Target) || (source.Kind != "run" && !gitea.IsProvider(source.Kind)) {
 		return ErrInvalid
 	}
 	err := tx.QueryRow(ctx, `SELECT root,depth FROM hopper_lineage WHERE workspace_id=$1 AND resource_id=$2`, w, source.Target.ID).Scan(&source.Root, &source.Depth)
@@ -170,7 +171,7 @@ func (s *Service) AcceptSourceTx(ctx context.Context, tx pgx.Tx, w string, sourc
 // GitHubAccepted attaches to the observer's committed version change, including
 // periodic reconciliation without any running client or LLM gateway.
 func (s *Service) GitHubAccepted(ctx context.Context, tx pgx.Tx, target githubobserve.Target, snapshot githubobserve.Snapshot, version int64) error {
-	if target.Kind != "actions" || snapshot.State != "completed" {
+	if (target.Kind != "actions" && target.Kind != "status") || snapshot.State != "completed" {
 		return nil
 	}
 	rows, err := tx.Query(ctx, `SELECT workspace_id FROM github_bindings WHERE target_id=$1`, target.ID)
@@ -194,7 +195,7 @@ func (s *Service) GitHubAccepted(ctx context.Context, tx pgx.Tx, target githubob
 	}
 	for _, w := range workspaces {
 		id := "hopper-result:" + target.ID
-		event := fmt.Sprintf("github:%s:%d", target.ID, version)
+		event := fmt.Sprintf("%s:%d", gitea.Resource(target.ID), version)
 		var exists bool
 		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM hopper_sources WHERE workspace_id=$1 AND event_id=$2)`, w, event).Scan(&exists); err != nil {
 			return err
@@ -206,10 +207,14 @@ func (s *Service) GitHubAccepted(ctx context.Context, tx pgx.Tx, target githubob
 		if err = tx.QueryRow(ctx, `SELECT COALESCE((SELECT version FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2),'0')`, w, id).Scan(&expected); err != nil {
 			return err
 		}
-		source := Source{Event: event, Kind: "github", Keys: []string{target.ID, "*"}, Facts: Facts{Conclusion: snapshot.Conclusion, Report: raw(snapshot)}, Refs: []Ref{{ID: "github:" + target.ID}}, Root: hash([]any{w, target.ID, snapshot.RunID, snapshot.Attempt})}
+		provider := "github"
+		if target.Provider == "gitea" {
+			provider = "gitea"
+		}
+		source := Source{Event: event, Kind: provider, Keys: []string{target.ID, "*"}, Facts: Facts{Conclusion: snapshot.Conclusion, Report: raw(snapshot)}, Refs: []Ref{{ID: gitea.Resource(target.ID)}}, Root: hash([]any{w, target.ID, snapshot.RunID, snapshot.Attempt})}
 		// This internal resource is readable only through currently configured binding
 		// and definitions. Shared scope/resource grants still apply to all its refs.
-		v, err := s.Store.Apply(ctx, persistence.Scope{ActorID: "observer:github", Grant: apicontract.Grant{WorkspaceID: w, CanRead: true, CanUpdate: true}}, persistence.Command{WorkspaceID: w, ResourceID: id, Kind: "hopper-source", Mutation: apicontract.Mutation{OperationID: source.Event, ExpectedVersion: expected}, Payload: raw(source)}, func(tx pgx.Tx, ref apicontract.Reference) (json.RawMessage, error) {
+		v, err := s.Store.Apply(ctx, persistence.Scope{ActorID: "observer:" + provider, Grant: apicontract.Grant{WorkspaceID: w, CanRead: true, CanUpdate: true}}, persistence.Command{WorkspaceID: w, ResourceID: id, Kind: "hopper-source", Mutation: apicontract.Mutation{OperationID: source.Event, ExpectedVersion: expected}, Payload: raw(source)}, func(tx pgx.Tx, ref apicontract.Reference) (json.RawMessage, error) {
 			source.Target = Ref{ID: id, Version: ref.Version}
 			r, err := s.save(ctx, tx, w, source.Target, "source", source, source.Refs)
 			if err != nil {

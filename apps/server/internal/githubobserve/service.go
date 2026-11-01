@@ -16,6 +16,7 @@ import (
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/gitea"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/jackc/pgx/v5"
 )
@@ -54,7 +55,7 @@ func New(ctx context.Context, store *persistence.Store, a *access.Service, c *Co
 			if _, e := tx.Exec(ctx, `INSERT INTO github_bindings VALUES($1,$2,$3,$4)`, b.WorkspaceID, b.TargetID, b.ExpectedCommit, jobs); e != nil {
 				return e
 			}
-			if _, e := tx.Exec(ctx, `INSERT INTO access_resources(workspace_id,id,restricted) VALUES($1,$2,false) ON CONFLICT DO NOTHING`, b.WorkspaceID, "github:"+b.TargetID); e != nil {
+			if _, e := tx.Exec(ctx, `INSERT INTO access_resources(workspace_id,id,restricted) VALUES($1,$2,false) ON CONFLICT DO NOTHING`, b.WorkspaceID, gitea.Resource(b.TargetID)); e != nil {
 				return e
 			}
 		}
@@ -109,7 +110,10 @@ func (s *Service) step(ctx context.Context) (bool, error) {
 	}
 	snapshot, observeErr := s.remote.observe(ctx, t)
 	checked := time.Now().UTC()
-	next := checked.Add(s.config.interval())
+	next := checked.Add(s.config.interval(t))
+	if client := s.config.clients[t.Instance]; client != nil && client.ResumeAt().After(next) {
+		next = client.ResumeAt()
+	}
 	if s.remote.resumeAt.After(next) {
 		next = s.remote.resumeAt
 	}
@@ -160,7 +164,7 @@ type View struct {
 // Current performs a read-only observation now, for an explicitly bound target.
 // A cached or delayed success is never sufficient to authorize an external write.
 func (s *Service) Current(ctx context.Context, p access.Principal, w, id string) (Snapshot, error) {
-	if err := s.access.Check(ctx, p, w, "github:"+id, "get"); err != nil {
+	if err := s.access.Check(ctx, p, w, gitea.Resource(id), "get"); err != nil {
 		return Snapshot{}, err
 	}
 	if s.config == nil {
@@ -182,7 +186,10 @@ func (s *Service) Current(ctx context.Context, p access.Principal, w, id string)
 func (s *Service) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /github/workspaces/{workspace}/observations", s.listHTTP)
 	mux.HandleFunc("GET /github/workspaces/{workspace}/observations/{target}/history", s.historyHTTP)
+	mux.HandleFunc("GET /forge/workspaces/{workspace}/observations", s.listHTTP)
+	mux.HandleFunc("GET /forge/workspaces/{workspace}/observations/{target}/history", s.historyHTTP)
 	mux.HandleFunc("POST /github/webhook", s.webhookHTTP)
+	mux.HandleFunc("POST /gitea/webhook/{instance}", s.giteaWebhookHTTP)
 }
 func send(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
@@ -198,7 +205,7 @@ func (s *Service) authorized(w http.ResponseWriter, r *http.Request, target stri
 	action := "read"
 	if target != "" {
 		action = "get"
-		target = "github:" + target
+		target = gitea.Resource(target)
 	}
 	if s.access.Check(r.Context(), access.Principal{UserID: id}, r.PathValue("workspace"), target, action) != nil {
 		send(w, 403, map[string]string{"error": "forbidden"})
@@ -215,7 +222,7 @@ func (s *Service) listHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	workspace := r.PathValue("workspace")
-	rows, err := s.store.Database().Query(r.Context(), `SELECT t.spec,b.expected_commit,b.required_jobs,t.checked_at,t.observed_at,t.due_at,t.reason,t.version,t.snapshot FROM github_bindings b JOIN github_targets t ON t.id=b.target_id WHERE b.workspace_id=$1 AND t.active AND t.id>$2 ORDER BY t.id LIMIT 51`, workspace, r.URL.Query().Get("after"))
+	rows, err := s.store.Database().Query(r.Context(), `SELECT t.spec,b.expected_commit,b.required_jobs,t.checked_at,t.observed_at,t.due_at,t.reason,t.version,t.snapshot FROM github_bindings b JOIN github_targets t ON t.id=b.target_id WHERE b.workspace_id=$1 AND t.active AND t.id>$2 AND ($3 OR COALESCE(t.spec->>'provider','')='') ORDER BY t.id LIMIT 51`, workspace, r.URL.Query().Get("after"), strings.HasPrefix(r.URL.Path, "/forge/"))
 	if err != nil {
 		send(w, 503, map[string]string{"error": "unavailable"})
 		return
@@ -241,7 +248,7 @@ func (s *Service) listHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		count++
 		cursor = v.Target.ID
-		if s.access.Check(r.Context(), access.Principal{UserID: id}, workspace, "github:"+v.Target.ID, "get") != nil {
+		if s.access.Check(r.Context(), access.Principal{UserID: id}, workspace, gitea.Resource(v.Target.ID), "get") != nil {
 			continue
 		}
 		_ = json.Unmarshal(jobs, &v.RequiredJobs)
@@ -256,7 +263,7 @@ func (s *Service) listHTTP(w http.ResponseWriter, r *http.Request) {
 		if v.ObservedAt == nil {
 			v.State = "not_fetched"
 		}
-		v.Delayed = time.Now().After(v.DueAt.Add(s.config.interval()))
+		v.Delayed = time.Now().After(v.DueAt.Add(s.config.interval(v.Target)))
 		items = append(items, v)
 	}
 	if rows.Err() != nil {

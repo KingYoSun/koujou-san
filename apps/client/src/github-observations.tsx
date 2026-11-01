@@ -13,6 +13,11 @@ type Job = {
   run_attempt: number;
 };
 type Snapshot = {
+  provider?: string;
+  kind?: string;
+  instance?: string;
+  server_version?: string;
+  workflow?: string;
   url: string;
   title?: string;
   source_updated_at?: string;
@@ -28,6 +33,8 @@ type Snapshot = {
 };
 type Observation = {
   target: {
+    provider?: string;
+    instance?: string;
     id: string;
     repository: string;
     repository_id: number;
@@ -53,14 +60,16 @@ type History = {
 };
 const reasons: Record<string, string> = {
   not_fetched: "未取得",
-  connection_failed: "GitHubへの接続失敗",
-  authentication_failed: "GitHubの認証失敗",
-  not_accessible: "GitHubの対象へアクセスできません",
-  rate_limited: "GitHubのAPI制限により待機中",
+  connection_failed: "接続先への接続失敗",
+  authentication_failed: "接続先の認証失敗",
+  not_accessible: "対象へアクセスできません",
+  rate_limited: "接続先のAPI制限により待機中",
   fetch_interrupted: "取得が中断されました",
-  source_unavailable: "GitHubが応答できません",
+  source_unavailable: "接続先が応答できません",
   changed_during_read: "取得中に実行状態が変化しました。再照合を待っています",
-  invalid_source_response: "GitHubの応答を確認できません",
+  invalid_source_response: "取得元の応答を確認できません",
+  status_unobserved: "statusは未観測です",
+  workflow_result_unavailable: "対象workflowの実行結果は未取得です",
   unexpected_permissions: "観測専用の権限を確認してください",
   repository_not_allowed: "接続先リポジトリの許可を確認してください",
 };
@@ -77,10 +86,11 @@ export function GithubSnapshot({
   expected?: string;
   required?: string[];
 }) {
+  const provider = value.provider === "gitea" ? "Gitea" : "GitHub";
   return (
     <div className="github-snapshot">
       <p>
-        {value.title} / GitHubの状態: {value.state}
+        {value.title} / {provider}の状態: {value.state}
         {value.conclusion ? ` / CIの結論: ${value.conclusion}` : ""}
       </p>
       {value.commit && (
@@ -97,13 +107,13 @@ export function GithubSnapshot({
       )}
       {value.merge_commit && (
         <p>
-          GitHubのmerge_commit_sha（マージ前は検証用）:{" "}
+          {provider}のmerge_commit_sha（マージ前は検証用）:{" "}
           <code>{value.merge_commit}</code>
         </p>
       )}
       {value.run_id && (
         <p>
-          workflow {value.workflow_id} / 実行 {value.run_id} /{" "}
+          workflow {value.workflow ?? value.workflow_id} / 実行 {value.run_id} /{" "}
           {value.run_attempt}回目
         </p>
       )}
@@ -129,12 +139,15 @@ export function GithubSnapshot({
       )}
       {value.jobs && (
         <details>
-          <summary>全ジョブ（{value.jobs.length}件）</summary>
+          <summary>
+            {value.kind === "status" ? "全status" : "全ジョブ"}（
+            {value.jobs.length}件）
+          </summary>
           <ul>
             {value.jobs.map((job) => (
               <li key={job.id}>
                 {job.name}: {job.status} / {job.conclusion || "結論なし"} /{" "}
-                {job.run_attempt}回目
+                {job.run_attempt > 0 ? `${job.run_attempt}回目` : ""}
               </li>
             ))}
           </ul>
@@ -147,17 +160,53 @@ export function GithubSnapshot({
     </div>
   );
 }
-function SourceLink({ href, native }: { href: string; native: boolean }) {
-  // Only the known GitHub host is an external navigation destination.
-  const url = new URL(href);
-  if (url.protocol !== "https:" || url.hostname !== "github.com") return null;
+export function sourceURL(href: string, instance = "https://github.com") {
+  try {
+    const base = new URL(instance),
+      url = new URL(href);
+    if (
+      !["http:", "https:"].includes(base.protocol) ||
+      base.username ||
+      base.password ||
+      base.search ||
+      base.hash ||
+      url.origin !== base.origin ||
+      url.username ||
+      url.password ||
+      !url.pathname.startsWith(base.pathname.replace(/\/$/, "") + "/")
+    )
+      return;
+    return url;
+  } catch {
+    return;
+  }
+}
+export function SourceLink({
+  href,
+  native,
+  instance,
+}: {
+  href: string;
+  native: boolean;
+  instance?: string;
+}) {
+  const url = sourceURL(href, instance);
+  if (!url) return null;
+  const provider = instance ? "Gitea" : "GitHub";
   return native ? (
-    <button onClick={() => void invoke("open_github", { url: href })}>
-      GitHubで開く
+    <button
+      onClick={() =>
+        void invoke(instance ? "open_forge" : "open_github", {
+          url: url.href,
+          ...(instance ? { instance } : {}),
+        })
+      }
+    >
+      {provider}で開く
     </button>
   ) : (
     <a href={href} target="_blank" rel="noreferrer">
-      GitHubで開く
+      {provider}で開く
     </a>
   );
 }
@@ -180,7 +229,7 @@ export function GithubObservations({
     page: History;
     before: string;
   }>();
-  const base = `/github/workspaces/${encodeURIComponent(workspace)}/observations`;
+  const base = `/forge/workspaces/${encodeURIComponent(workspace)}/observations`;
   const query = useQuery({
     queryKey: ["github", api, user, workspace, after],
     queryFn: async () =>
@@ -223,7 +272,7 @@ export function GithubObservations({
     <ScreenContent>
       {
         <section className="workspace-management github-observations">
-          <h3>GitHubの共有観測</h3>
+          <h3>GitHub・Giteaの共有観測</h3>
           <p>
             サーバー側で観測します。CIの結論と工程の受入判定は別の事実です。
           </p>
@@ -239,7 +288,7 @@ export function GithubObservations({
           {query.error && (
             <p role="status">
               {unavailable
-                ? "GitHubの観測接続は未設定です。"
+                ? "外部の観測接続は未設定です。"
                 : "共有観測を取得できません。表示中の結果は前回取得時点のものです。"}
             </p>
           )}
@@ -257,6 +306,13 @@ export function GithubObservations({
                 {item.target.repository} / {item.target.kind}{" "}
                 {item.target.external_id}
               </h3>
+              <p>
+                {item.target.provider === "gitea" ? "Gitea" : "GitHub"} ·{" "}
+                {item.target.instance ?? "https://github.com"}
+                {item.snapshot?.server_version
+                  ? ` / 確認した版: ${item.snapshot.server_version}`
+                  : ""}
+              </p>
               <p>
                 観測:{" "}
                 {item.observation_state === "observed"
@@ -278,7 +334,11 @@ export function GithubObservations({
                     expected={item.expected_commit}
                     required={item.required_jobs}
                   />
-                  <SourceLink href={item.snapshot.url} native={native} />
+                  <SourceLink
+                    href={item.snapshot.url}
+                    native={native}
+                    instance={item.target.instance}
+                  />
                 </>
               )}
               <button onClick={() => void readHistory(item.target.id)}>

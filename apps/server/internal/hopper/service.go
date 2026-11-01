@@ -14,6 +14,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/automation"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/gitea"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/publications"
@@ -167,7 +168,7 @@ func validDefinition(d Definition) bool {
 		return false
 	}
 	for _, t := range d.Targets {
-		if (t.Kind != "run" && t.Kind != "github") || t.ID == "" {
+		if (t.Kind != "run" && !gitea.IsProvider(t.Kind)) || t.ID == "" {
 			return false
 		}
 	}
@@ -246,8 +247,8 @@ func (s *Service) Put(ctx context.Context, p access.Principal, w, id string, req
 			for _, target := range d.Targets {
 				if target.ID != "*" {
 					id := target.ID
-					if target.Kind == "github" {
-						id = "github:" + id
+					if gitea.IsProvider(target.Kind) {
+						id = gitea.Resource(id)
 					}
 					refs = append(refs, Ref{ID: id})
 				}

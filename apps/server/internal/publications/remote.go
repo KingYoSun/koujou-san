@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/gitea"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/githubapp"
 	"io"
 	"net/http"
@@ -18,6 +19,9 @@ import (
 )
 
 type Connection struct {
+	Provider       string `json:"provider,omitempty"`
+	Instance       string `json:"instance,omitempty"`
+	ActorID        int64  `json:"actor_id,omitempty"`
 	ID             string `json:"id"`
 	Workspace      string `json:"workspace_id"`
 	Repository     string `json:"repository"`
@@ -30,6 +34,8 @@ type Config struct {
 	PrivateKeyFile          string       `json:"private_key_file"`
 	Connections             []Connection `json:"connections"`
 	key                     *rsa.PrivateKey
+	GiteaInstances          []gitea.Instance `json:"gitea_instances,omitempty"`
+	clients                 map[string]*gitea.Client
 }
 
 var repositoryName = regexp.MustCompile(`^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$`)
@@ -44,18 +50,38 @@ func Environment() (*Config, error) {
 		return nil, ErrInvalid
 	}
 	var c Config
-	if decode(b, &c) != nil || c.AppID == "" || c.PriorityIntervalSeconds < 0 {
+	if decode(b, &c) != nil || (c.AppID == "" && len(c.GiteaInstances) == 0) || c.PriorityIntervalSeconds < 0 {
 		return nil, ErrInvalid
 	}
 	seen := map[string]bool{}
-	for _, conn := range c.Connections {
+	c.clients = map[string]*gitea.Client{}
+	for _, instance := range c.GiteaInstances {
+		client, err := instance.Open()
+		if err != nil || c.clients[client.URL] != nil {
+			return nil, ErrInvalid
+		}
+		c.clients[client.URL] = client
+	}
+	for index, conn := range c.Connections {
 		key := conn.Workspace + "\x00" + conn.ID
-		if conn.ID == "" || conn.Workspace == "" || !repositoryName.MatchString(conn.Repository) || conn.RepositoryID <= 0 || conn.InstallationID <= 0 || seen[key] {
+		if conn.ID == "" || conn.Workspace == "" || !repositoryName.MatchString(conn.Repository) || conn.RepositoryID <= 0 || seen[key] {
+			return nil, ErrInvalid
+		}
+		if conn.Provider == "gitea" {
+			origin, err := gitea.Origin(conn.Instance)
+			if err != nil || c.clients[origin] == nil || conn.InstallationID != 0 {
+				return nil, ErrInvalid
+			}
+			conn.Instance = origin
+			c.Connections[index] = conn
+		} else if conn.Provider != "" || conn.Instance != "" || conn.ActorID != 0 || conn.InstallationID <= 0 || c.AppID == "" {
 			return nil, ErrInvalid
 		}
 		seen[key] = true
 	}
-	c.key, err = githubapp.ReadKey(c.PrivateKeyFile)
+	if c.AppID != "" {
+		c.key, err = githubapp.ReadKey(c.PrivateKeyFile)
+	}
 	return &c, err
 }
 
@@ -109,6 +135,13 @@ func (r *Remote) request(ctx context.Context, method, path, token string, body i
 	return response, err
 }
 func (r *Remote) token(ctx context.Context, c Connection) (string, error) {
+	if c.Provider == "gitea" {
+		client := r.config.clients[c.Instance]
+		if client == nil {
+			return "", ErrInvalid
+		}
+		return "", client.Repository(ctx, c.Repository, c.RepositoryID)
+	}
 	key := c.Workspace + ":" + c.ID
 	if t, ok := r.tokens[key]; ok && time.Until(t.Expires) > time.Minute {
 		return t.Value, nil
@@ -123,10 +156,25 @@ func outcome(state, reason string, issue *Issue) Outcome {
 	return Outcome{State: state, Reason: reason, Issue: issue, At: time.Now().UTC()}
 }
 func validIssue(c Connection, i Issue) bool {
-	return i.ID > 0 && i.Number > 0 && len(i.PullRequest) == 0 && i.URL == fmt.Sprintf("https://github.com/%s/issues/%d", c.Repository, i.Number) && i.Title != "" && !i.UpdatedAt.IsZero()
+	base := "https://github.com"
+	if c.Provider == "gitea" {
+		base = c.Instance
+	}
+	return i.ID > 0 && i.Number > 0 && plainIssue(c, i) && i.URL == fmt.Sprintf("%s/%s/issues/%d", base, c.Repository, i.Number) && i.Title != "" && !i.UpdatedAt.IsZero()
+}
+
+func plainIssue(c Connection, i Issue) bool {
+	return len(i.PullRequest) == 0 || (c.Provider == "gitea" && string(i.PullRequest) == "null")
+}
+
+func (r *Remote) send(ctx context.Context, c Connection, method, path, token string, body io.Reader) (*http.Response, error) {
+	if c.Provider == "gitea" {
+		return r.config.clients[c.Instance].Request(ctx, method, path, body)
+	}
+	return r.request(ctx, method, path, token, body)
 }
 func (r *Remote) get(ctx context.Context, c Connection, token string, n int64) Outcome {
-	resp, err := r.request(ctx, "GET", fmt.Sprintf("/repos/%s/issues/%d", c.Repository, n), token, nil)
+	resp, err := r.send(ctx, c, "GET", fmt.Sprintf("/repos/%s/issues/%d", c.Repository, n), token, nil)
 	if err != nil {
 		return outcome("unknown", "fetch_interrupted", nil)
 	}
@@ -150,7 +198,7 @@ func (r *Remote) Create(ctx context.Context, c Connection, d Draft, body string)
 	if err != nil {
 		return outcome("failed", "authentication_failed_before_send", nil)
 	}
-	resp, err := r.request(ctx, "POST", "/repos/"+c.Repository+"/issues", token, strings.NewReader(string(raw(map[string]any{"title": d.Title, "body": body}))))
+	resp, err := r.send(ctx, c, "POST", "/repos/"+c.Repository+"/issues", token, strings.NewReader(string(raw(map[string]any{"title": d.Title, "body": body}))))
 	if err != nil {
 		return outcome("unknown", "create_response_lost", nil)
 	}
@@ -180,6 +228,9 @@ func (r *Remote) Observe(ctx context.Context, c Connection, tag string, number i
 	}
 	if number > 0 {
 		return r.get(ctx, c, token, number)
+	}
+	if c.Provider == "gitea" {
+		return r.lookupGitea(ctx, c, tag)
 	}
 	digest := strings.TrimSuffix(strings.TrimPrefix(tag, "<!-- koujou-san-request:"), " -->")
 	query := url.QueryEscape("repo:" + c.Repository + " is:issue in:body " + digest)

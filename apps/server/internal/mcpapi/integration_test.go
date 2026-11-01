@@ -124,6 +124,8 @@ func TestMCPIntegration(t *testing.T) {
 		}
 		return httpapi.NewHandler(store.Ready, identity.Register, a.Register, c.Register, search.Register, graph.Register, s.Usage.Register, s.Automation.Register, runService.Register, s.Workflows.Register, inspectionService.Register, publicationService.Register, workbenchService.Register, s.Hopper.Register, s.ClientOps.Register, s.Register, sharedsync.New(store, a, c, cfg.Key).Register, func(mux *http.ServeMux) {
 			mux.Handle("/github/", githubMux)
+			mux.Handle("/forge/", githubMux)
+			mux.Handle("/gitea/", githubMux)
 			if selectionUI {
 				mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 					if selectionBrowser != nil {

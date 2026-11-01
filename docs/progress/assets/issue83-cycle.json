@@ -1,0 +1,420 @@
+{
+  "schema": "issue83-cycle-proof-v1",
+  "environment": {
+    "gitea": "28.2.0",
+    "gitea_runner": "5.2.0",
+    "instances": [
+      "https://localhost:58109",
+      "https://localhost:58110"
+    ],
+    "repository": "issue83-proof/private-proof",
+    "lfs": {
+      "bytes": 65536,
+      "sha256": "04f1c31abafc18079243f47ab01a59a40bdcd4a89389e16d4519a25640838fb7"
+    }
+  },
+  "chat": {
+    "thread": {
+      "id": "chat-thread:1e32ac60-2fe8-40f5-9657-cf62c833d9e5",
+      "version": "4TZIJCPRCFIPRV4Q7T2BRIFXEC"
+    },
+    "result": {
+      "id": "chat-message:issue83-result",
+      "version": "PHJ6MZXIPSY6G5VXBG7CJK6J5I"
+    },
+    "role": "human"
+  },
+  "input": {
+    "run": {
+      "id": "run:issue83-implementation-verified-exit",
+      "version": "IOGIPQ4OTHQ4WOAH3C4IXRCL2U"
+    },
+    "fixed_input": {
+      "id": "run-input:issue83-implementation-verified-exit",
+      "version": "GRWEFZNQAIOORL234JQNK3KJSY"
+    },
+    "context_count": 1,
+    "bound_context_prompt_equal": true
+  },
+  "runs": [
+    {
+      "id": "run:828162c2-81d3-4b7a-8841-94c6fb66873a",
+      "version": "POBYBHJF3YKFMULR32S53WSRUG",
+      "state": "failed",
+      "file": "run-828162c2-81d3-4b7a-8841-94c6fb66873a-POBYBHJF3YKFMULR32S53WSRUG.ndjson",
+      "sha256": "2246f5c55b7bc2d3c0744582fea1fff2084185d86cbd52c4c2b947292fb4d4bc",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-implementation-verified-exit",
+      "version": "IOGIPQ4OTHQ4WOAH3C4IXRCL2U",
+      "state": "succeeded",
+      "file": "run-issue83-implementation-verified-exit-IOGIPQ4OTHQ4WOAH3C4IXRCL2U.ndjson",
+      "sha256": "c1b477e631ae678cb883e194451f22bff18f55a7f8ab2f2f4b07ee04bd443873",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-failed-ci-rerun",
+      "version": "WI35IRYICEYUH4F22MAUFVYQ4Q",
+      "state": "succeeded",
+      "file": "run-issue83-failed-ci-rerun-WI35IRYICEYUH4F22MAUFVYQ4Q.ndjson",
+      "sha256": "6c7ca4447cd69e12281411be64b76b495976ffb7abacecb070b16c54eef8a6f2",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-repaired-push",
+      "version": "ZW4T24D4FDXYMTHNAVRFCGQFH5",
+      "state": "succeeded",
+      "file": "run-issue83-repaired-push-ZW4T24D4FDXYMTHNAVRFCGQFH5.ndjson",
+      "sha256": "78dd1dc7fff586cea09ca5287afdadbe2c691229d56040081c1845474e692573",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-inspection-c1-fixed",
+      "version": "FCKUJXSCRXW7THDA3X3NWQPWTH",
+      "state": "succeeded",
+      "file": "run-issue83-inspection-c1-fixed-FCKUJXSCRXW7THDA3X3NWQPWTH.ndjson",
+      "sha256": "79092fe47a0f17480afc918244ffa39d868cc9885df99aa37273d7003844499f",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-c1-inspection-status",
+      "version": "4KSTSBQXIFKTLWY46JY5ZYNU24",
+      "state": "succeeded",
+      "file": "run-issue83-c1-inspection-status-4KSTSBQXIFKTLWY46JY5ZYNU24.ndjson",
+      "sha256": "e4203d9aca8392a083f031aec1d542978df169268af1ada6eec2d4337738066c",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-create-pr",
+      "version": "7H7ELOCMHKBKQPPUWWJR7GMH4X",
+      "state": "succeeded",
+      "file": "run-issue83-create-pr-7H7ELOCMHKBKQPPUWWJR7GMH4X.ndjson",
+      "sha256": "06ab2cac0d58f7db9d6ab47177afaa4aa22cc6ab00f5e2527e5dac0da4d8995e",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-advance-head",
+      "version": "TBROTD3LWT4TQ6NWU4Y3GFBCPI",
+      "state": "succeeded",
+      "file": "run-issue83-advance-head-TBROTD3LWT4TQ6NWU4Y3GFBCPI.ndjson",
+      "sha256": "0e19aae1f6fd9d22fc0fd4e7fc192dc266d6121c2843583a102a15211cc9d82d",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-new-head-push",
+      "version": "TMXU77IM3NOV5ICJALL52OF6FH",
+      "state": "succeeded",
+      "file": "run-issue83-new-head-push-TMXU77IM3NOV5ICJALL52OF6FH.ndjson",
+      "sha256": "8c622e7469ed27c118fb1d86dd0b31f2702918ac9341b5d314fd0d40ddaa4754",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-stale-fixed-head",
+      "version": "3FVUGZTT4EEDFK5LZD7UH3X4W2",
+      "state": "failed",
+      "file": "run-issue83-stale-fixed-head-3FVUGZTT4EEDFK5LZD7UH3X4W2.ndjson",
+      "sha256": "6793e56c7f04b2011282335643543b17824c111688384bbc22a07271f2626da9",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-inspection-c2",
+      "version": "KYQYIPXZ5YVDFIRXFFUAFE2I2E",
+      "state": "succeeded",
+      "file": "run-issue83-inspection-c2-KYQYIPXZ5YVDFIRXFFUAFE2I2E.ndjson",
+      "sha256": "647bf6034fb403823598978c199cf563e025e78ae8d5713b884dd8b407ee2d22",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-old-pass-blocked",
+      "version": "4ECDJAZLHFRQKUVCRADZJIC7VD",
+      "state": "succeeded",
+      "file": "run-issue83-old-pass-blocked-4ECDJAZLHFRQKUVCRADZJIC7VD.ndjson",
+      "sha256": "2340b47a69a1d764e653739549835cf9e3bafabda0f9421caa4e3528bf2cfa12",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-c2-inspection-status",
+      "version": "FLHGJ62Y6UP3DCXAYJHLN67TS4",
+      "state": "succeeded",
+      "file": "run-issue83-c2-inspection-status-FLHGJ62Y6UP3DCXAYJHLN67TS4.ndjson",
+      "sha256": "180bca9b07480f7641758693ad82ac7d35792c0808633a049f259fe6c8286e98",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-allowed-merge",
+      "version": "LKZMZJDWKM72UIYMRFPYFVATXO",
+      "state": "succeeded",
+      "file": "run-issue83-allowed-merge-LKZMZJDWKM72UIYMRFPYFVATXO.ndjson",
+      "sha256": "dcff7628e739187cc58be2179e2866fac199e330004ef90793967701720e32f4",
+      "final_marker": "complete"
+    },
+    {
+      "id": "run:issue83-reconcile-pr",
+      "version": "S7DLG7TZAY6LP6R7X65XQ3I47P",
+      "state": "succeeded",
+      "file": "run-issue83-reconcile-pr-S7DLG7TZAY6LP6R7X65XQ3I47P.ndjson",
+      "sha256": "f51dc271643e9393e4029b01abfea90b7cb5cb2d18914d7c3aeb3602d297041b",
+      "final_marker": "complete"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 1,
+      "name": "issue83-issue83-windows",
+      "run_id": 3,
+      "commit": "a33669c339fb45cb302fbcfcfbe437cc0b3cd994",
+      "url": "https://localhost:58109/api/v1/repos/issue83-proof/private-proof/actions/artifacts/1/zip",
+      "bytes": 265,
+      "sha256": "562eb56be8054073ea8874f9be1d95fe37a1f0142898f44fe42bc98a0e62c8d1",
+      "file": "artifact-1.zip",
+      "report": {
+        "commit": "a33669c339fb45cb302fbcfcfbe437cc0b3cd994",
+        "platform": "win32",
+        "lfs_sha256": "04f1c31abafc18079243f47ab01a59a40bdcd4a89389e16d4519a25640838fb7",
+        "passed": true
+      },
+      "report_sha256": "60fa290c4574e409eebabe1ee56e7a3e8096c06f715b6cb7ce1108e136bdce1a"
+    },
+    {
+      "id": 2,
+      "name": "issue83-issue83-linux",
+      "run_id": 3,
+      "commit": "a33669c339fb45cb302fbcfcfbe437cc0b3cd994",
+      "url": "https://localhost:58109/api/v1/repos/issue83-proof/private-proof/actions/artifacts/2/zip",
+      "bytes": 265,
+      "sha256": "f93007095a4e4a28bfc68a436eca248377b58602fdd0685a457c6ece1806674f",
+      "file": "artifact-2.zip",
+      "report": {
+        "commit": "a33669c339fb45cb302fbcfcfbe437cc0b3cd994",
+        "platform": "linux",
+        "lfs_sha256": "04f1c31abafc18079243f47ab01a59a40bdcd4a89389e16d4519a25640838fb7",
+        "passed": true
+      },
+      "report_sha256": "38a16ca7a744544f4618caf8f84b07390abe32a62eff7cb3cf5cc8db620c9040"
+    },
+    {
+      "id": 5,
+      "name": "issue83-issue83-windows",
+      "run_id": 5,
+      "commit": "42351c8c7353c277a70ee2e5de47800867308441",
+      "url": "https://localhost:58109/api/v1/repos/issue83-proof/private-proof/actions/artifacts/5/zip",
+      "bytes": 265,
+      "sha256": "40b03a417ccc8c45bfcc80ac2f85cc62ff6c3f6a12ecf9406dddc1f7848b795c",
+      "file": "artifact-5.zip",
+      "report": {
+        "commit": "42351c8c7353c277a70ee2e5de47800867308441",
+        "platform": "win32",
+        "lfs_sha256": "04f1c31abafc18079243f47ab01a59a40bdcd4a89389e16d4519a25640838fb7",
+        "passed": true
+      },
+      "report_sha256": "88fff6b7c6a9be83be2886b5f4ac5a0106436a9d2645e46199bcedf5c65b87c5"
+    },
+    {
+      "id": 6,
+      "name": "issue83-issue83-linux",
+      "run_id": 5,
+      "commit": "42351c8c7353c277a70ee2e5de47800867308441",
+      "url": "https://localhost:58109/api/v1/repos/issue83-proof/private-proof/actions/artifacts/6/zip",
+      "bytes": 266,
+      "sha256": "3fcbe7e869335a715fba20ebc2f189d334296073f1ea1cc42e1282b69e7f25bc",
+      "file": "artifact-6.zip",
+      "report": {
+        "commit": "42351c8c7353c277a70ee2e5de47800867308441",
+        "platform": "linux",
+        "lfs_sha256": "04f1c31abafc18079243f47ab01a59a40bdcd4a89389e16d4519a25640838fb7",
+        "passed": true
+      },
+      "report_sha256": "c54b4eace88e8feb0ad8d6192aeb007acb0345e2b577d72e319948b5e2e19060"
+    }
+  ],
+  "workflow": {
+    "id": "workflow-execution:issue83-ci",
+    "tasks": [
+      {
+        "id": "workflow-task:issue83-ci:ci:1",
+        "version": "KBJXSC7AUXBTHRIUUSXP2W2GYY",
+        "state": "done",
+        "outcome": "PASS"
+      }
+    ]
+  },
+  "triage": {
+    "issue": {
+      "id": "issue:issue83-gitea-mirror",
+      "version": "JYHSGBAFJKZXQKWENNGQ24NOT7"
+    },
+    "origin": "gitea",
+    "observed": {
+      "at": "2026-11-01T01:26:16Z",
+      "body": "専用環境の受入試験。実データは含めない。",
+      "state": "open",
+      "title": "Issue83 dedicated proof · source after reconnect"
+    },
+    "priority": {
+      "id": "priority:scope:issue83-gitea-mirror",
+      "version": "MTDK3YIYKW622Q5VYDMF6TIM4A",
+      "adopted": "P1",
+      "reason": "Giteaの優先度ラベルを取り込みました"
+    }
+  },
+  "webhook": {
+    "hook_id": 1,
+    "source": "dedicated Gitea delivery journal",
+    "deliveries": [
+      {
+        "id": 1,
+        "hook_id": 1,
+        "event_type": "issues",
+        "is_delivered": 1,
+        "is_succeed": 0,
+        "response_status": 0
+      },
+      {
+        "id": 2,
+        "hook_id": 1,
+        "event_type": "pull_request",
+        "is_delivered": 1,
+        "is_succeed": 0,
+        "response_status": 0
+      },
+      {
+        "id": 3,
+        "hook_id": 1,
+        "event_type": "push",
+        "is_delivered": 1,
+        "is_succeed": 0,
+        "response_status": 0
+      },
+      {
+        "id": 4,
+        "hook_id": 1,
+        "event_type": "issue_label",
+        "is_delivered": 1,
+        "is_succeed": 0,
+        "response_status": 0
+      },
+      {
+        "id": 5,
+        "hook_id": 1,
+        "event_type": "issue_label",
+        "is_delivered": 1,
+        "is_succeed": 0,
+        "response_status": 0
+      },
+      {
+        "id": 6,
+        "hook_id": 1,
+        "event_type": "issues",
+        "is_delivered": 1,
+        "is_succeed": 1,
+        "response_status": 202
+      },
+      {
+        "id": 7,
+        "hook_id": 1,
+        "event_type": "issue_label",
+        "is_delivered": 1,
+        "is_succeed": 1,
+        "response_status": 202
+      },
+      {
+        "id": 8,
+        "hook_id": 1,
+        "event_type": "issue_label",
+        "is_delivered": 1,
+        "is_succeed": 1,
+        "response_status": 202
+      }
+    ]
+  },
+  "protection": {
+    "branch_name": "main",
+    "rule_name": "main",
+    "priority": 1,
+    "enable_push": false,
+    "enable_push_whitelist": false,
+    "push_whitelist_usernames": [],
+    "push_whitelist_teams": [],
+    "push_whitelist_deploy_keys": false,
+    "enable_force_push": false,
+    "enable_force_push_allowlist": false,
+    "force_push_allowlist_usernames": [],
+    "force_push_allowlist_teams": [],
+    "force_push_allowlist_deploy_keys": false,
+    "enable_merge_whitelist": false,
+    "merge_whitelist_usernames": [],
+    "merge_whitelist_teams": [],
+    "enable_bypass_allowlist": false,
+    "bypass_allowlist_usernames": [],
+    "bypass_allowlist_teams": [],
+    "enable_status_check": true,
+    "status_check_contexts": [
+      "Issue83 proof / Linux (pull_request)",
+      "Issue83 proof / Windows (pull_request)",
+      "koujou/inspection"
+    ],
+    "required_approvals": 0,
+    "enable_approvals_whitelist": false,
+    "approvals_whitelist_username": [],
+    "approvals_whitelist_teams": [],
+    "block_on_rejected_reviews": false,
+    "block_on_official_review_requests": false,
+    "block_on_codeowner_reviews": false,
+    "block_on_outdated_branch": false,
+    "dismiss_stale_approvals": false,
+    "ignore_stale_approvals": false,
+    "require_signed_commits": false,
+    "protected_file_patterns": "",
+    "unprotected_file_patterns": "",
+    "block_admin_merge_override": true,
+    "created_at": "2026-11-01T01:09:45Z",
+    "updated_at": "2026-11-01T01:09:45Z"
+  },
+  "old_pass": {
+    "request": {
+      "expect_rejection": true,
+      "action": "merge",
+      "request_id": "old-pass-blocked",
+      "instance": "https://localhost:58109",
+      "repository": "issue83-proof/private-proof",
+      "commit": "42351c8c7353c277a70ee2e5de47800867308441"
+    },
+    "result": {
+      "state": "rejected",
+      "commit": "42351c8c7353c277a70ee2e5de47800867308441",
+      "status": 405,
+      "merged": false,
+      "merge_commit": null
+    }
+  },
+  "merge": {
+    "pr": 3,
+    "head": "42351c8c7353c277a70ee2e5de47800867308441",
+    "merged": true,
+    "merge_commit": "9ccfad9fd083fbc28fb0b38c8c25acb0e7e88bb9",
+    "main": "9ccfad9fd083fbc28fb0b38c8c25acb0e7e88bb9"
+  },
+  "cleanup": {
+    "runners": [
+      {
+        "id": 1,
+        "name": "issue83-windows",
+        "status": 204
+      },
+      {
+        "id": 2,
+        "name": "issue83-linux",
+        "status": 204
+      }
+    ],
+    "remaining_runners": 0,
+    "webhook": {
+      "id": 1,
+      "deleted": 204,
+      "read_after_delete": 404
+    },
+    "repositories_preserved": true,
+    "volumes_preserved": true
+  }
+}
