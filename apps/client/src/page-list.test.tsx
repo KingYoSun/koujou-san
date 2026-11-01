@@ -22,7 +22,7 @@ it("bounds rendered fixed-input references independently of the response count",
   expect(html.match(/<li>/g)).toHaveLength(100);
   expect(html).toContain("1–100 / 10000件");
   expect(html).not.toContain("context-100 ·");
-  expect(html).toContain("この入力の配置の次ページ");
+  expect(html).toContain("この入力の配置の次のページ");
 });
 
 it("does not materialize a closed raw record, while keeping it available when opened", () => {

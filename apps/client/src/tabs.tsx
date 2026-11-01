@@ -32,7 +32,6 @@ export function Tabs({
           aria-selected={value === item.id}
           tabIndex={value === item.id ? 0 : -1}
           disabled={!!item.disabledReason}
-          title={item.disabledReason}
           onClick={() => onChange(item.id)}
           onKeyDown={(event) => {
             const enabled = items.filter((v) => !v.disabledReason);
@@ -54,6 +53,7 @@ export function Tabs({
           }}
         >
           {item.label}
+          {item.disabledReason && `（${item.disabledReason}）`}
         </button>
       ))}
     </div>

@@ -3,7 +3,15 @@ import { syncRequest, workspaceAccessLost } from "./auth";
 import { readAnswerDraft, saveAnswerDraft, syncStorage } from "./sync-store";
 import type { AnswerDraft, SyncNamespace } from "./sync-store";
 import { SyncHTTPError } from "./sync-error";
+import { Disclosure } from "./disclosure";
 
+export const pauseStateNames: Record<string, string> = {
+  waiting: "未回答",
+  received: "API受付済み",
+  delivered: "Runner配送確認済み",
+  resolved: "継続確認済み",
+  cancelled: "終了により回答待ちを解除",
+};
 export type Pause = {
   response_kind?: string;
   response_origin?: { kind: string; id: string; source?: string };
@@ -126,10 +134,9 @@ export function QuestionView({ value }: { value: unknown }) {
           </p>
         ))}
       </details>
-      <details>
-        <summary>質問の原文・技術情報</summary>
-        <pre>{JSON.stringify(value, null, 2)}</pre>
-      </details>
+      <Disclosure title="質問の原文・技術情報">
+        {() => <pre>{JSON.stringify(value, null, 2)}</pre>}
+      </Disclosure>
     </section>
   );
 }
@@ -156,10 +163,9 @@ export function PauseResponse({
         <p>判断：{v.verdict}</p>
         {typeof v.reason === "string" && <p>理由：{v.reason}</p>}
         {typeof v.evidence === "string" && <p>証拠：{v.evidence}</p>}
-        <details>
-          <summary>回答の原文</summary>
-          <pre>{JSON.stringify(value, null, 2)}</pre>
-        </details>
+        <Disclosure title="回答の原文">
+          {() => <pre>{JSON.stringify(value, null, 2)}</pre>}
+        </Disclosure>
       </section>
     );
   return <pre>{JSON.stringify(value, null, 2)}</pre>;
@@ -256,9 +262,7 @@ export function PauseAnswer({
     setDraft(value);
     setNotice("端末へ保存しています…");
     void saveAnswerDraft(native, namespace, record.id, value)
-      .then(() =>
-        setNotice("この端末に回答案を保存しました。自動送信しません。"),
-      )
+      .then(() => setNotice("この端末に回答案を保存しました。"))
       .catch(() => setNotice("回答案の保存を確認できません。"));
   };
   const human = q?.response_format === "verdict";
@@ -399,9 +403,7 @@ export function PauseAnswer({
                 json: false,
               });
               await onAccepted();
-              setNotice(
-                "APIが回答を受領しました。配送・実際の継続は別に確認してください。",
-              );
+              setNotice("APIが回答を受領しました。");
             } catch (error) {
               setNotice(String(error).replace(/^Error: /, ""));
               if (
@@ -422,6 +424,7 @@ export function PauseAnswer({
       )}
       {draft.value && (
         <button
+          data-variant="secondary"
           onClick={() => {
             void saveAnswerDraft(native, namespace, record.id)
               .then(() => {

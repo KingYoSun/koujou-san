@@ -1,4 +1,4 @@
-import { useState, useId } from "react";
+import { useState } from "react";
 import type { JSONPath } from "jsonc-parser";
 import { editField, fieldSource } from "./workflow-json";
 import { Field } from "./field";
@@ -65,7 +65,6 @@ export function WorkflowNodeEditor({
     }
     return (
       <div>
-        <p>{label}</p>
         <PageList label={label} items={values}>
           {(value, i) => (
             <li key={i}>
@@ -142,7 +141,7 @@ export function WorkflowNodeEditor({
                   data-variant="secondary"
                   onClick={() => put([...path, "definition"], undefined)}
                 >
-                  Run定義の指定を外す（判断ノード用）
+                  Run定義の指定を外す
                 </button>
                 {strings("判断の選択肢", [...path, "choices"])}
               </details>
@@ -364,7 +363,6 @@ function NodeChoice({
   nodes: WorkflowGraph["nodes"];
   onChange: (id: string) => void;
 }) {
-  const id = useId();
   const [query, setQuery] = useState("");
   // Only node metadata from this fixed definition is searched, never Workspace data.
   const candidates = nodes.filter((n) => n.id.includes(query));
@@ -374,14 +372,7 @@ function NodeChoice({
         {label}：{value || "未指定"}
       </summary>
       <Field label={`${label}の識別名`} value={value} onChange={onChange} />
-      <label htmlFor={id}>
-        名前で候補を絞る
-        <input
-          id={id}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
-      </label>
+      <Field label="名前で候補を絞る" value={query} onChange={setQuery} />
       <PageList label={`${label}の候補`} items={candidates}>
         {(n, i) => (
           <li key={i}>

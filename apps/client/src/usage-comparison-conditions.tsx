@@ -39,7 +39,7 @@ export function ComparisonConditions({
       );
       setNotice("");
     } catch {
-      setNotice("Scopeの現在の閲覧権限を確認してください。");
+      setNotice("Scope一覧を取得できませんでした。");
     }
   }
   return (
@@ -69,7 +69,7 @@ export function ComparisonConditions({
         />
       </label>
       <label>
-        {name} 実際に使ったモデル（空欄はすべて）
+        {name} 実際に使ったモデル
         <input
           value={value.model}
           onChange={(e) => set("model", e.target.value)}
@@ -95,25 +95,33 @@ export function ComparisonConditions({
         </select>
       </label>
       <label>
-        {name} 通貨（空欄でも通貨別に表示）
+        {name} 通貨
         <input
           value={value.currency}
           onChange={(e) => set("currency", e.target.value)}
         />
       </label>
       <p>
-        対象Scope:{" "}
+        対象Scope：
         {value.scopes.length
           ? value.scopes.join("、")
           : "Workspace内の閲覧可能な範囲すべて"}
       </p>
-      <button onClick={() => void scopes()}>{name} 対象Scopeを探す</button>
+      <button data-variant="secondary" onClick={() => void scopes()}>
+        {name} 対象Scopeを取得
+      </button>
       {scopePage && (
         <>
+          <p>
+            {scopePage.data.items.length
+              ? `${scopePage.data.items.length}件を表示${scopePage.meta.next_cursor ? "（続きあり）" : ""}`
+              : "Scopeはありません。"}
+          </p>
           <ul>
             {scopePage.data.items.map((s) => (
               <li key={s.ref.id}>
                 <button
+                  aria-pressed={value.scopes.includes(s.ref.id)}
                   onClick={() =>
                     set(
                       "scopes",
@@ -124,19 +132,22 @@ export function ComparisonConditions({
                   }
                 >
                   {value.scopes.includes(s.ref.id)
-                    ? "対象から外す: "
-                    : "対象にする: "}
+                    ? "対象から外す："
+                    : "対象にする："}
                   {s.name || s.ref.id}
                 </button>
               </li>
             ))}
           </ul>
           {scopePage.meta.next_cursor && (
-            <button onClick={() => void scopes(scopePage.meta.next_cursor!)}>
-              {name} Scopeの次ページ
+            <button
+              data-variant="secondary"
+              onClick={() => void scopes(scopePage.meta.next_cursor!)}
+            >
+              {name} Scopeの次のページ
             </button>
           )}
-          <button onClick={() => set("scopes", [])}>
+          <button data-variant="secondary" onClick={() => set("scopes", [])}>
             {name} Scopeの絞り込みを解除
           </button>
         </>
@@ -167,7 +178,7 @@ export function ComparisonConditions({
           </select>
         </label>
         <label>
-          {name} 帰属先ID（空欄はすべて）
+          {name} 帰属先ID
           <input
             value={value.attribution_id}
             onChange={(e) => set("attribution_id", e.target.value)}

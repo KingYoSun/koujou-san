@@ -9,14 +9,17 @@ import {
   TriageAudit,
   TriageIssue,
   TriageBatch,
+  at,
+  valuationOptions,
   type TriageModel,
 } from "./triage-panels";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { syncRequest } from "./auth";
 import { SyncHTTPError } from "./sync-error";
-import { Tabs } from "./tabs";
+import { Tabs, TabPanel } from "./tabs";
 import { StatusBadge } from "./status-badge";
 import { Disclosure } from "./disclosure";
+import { DetailPane } from "./panes";
 
 type Ref = { id: string; version: string };
 type Level = { id: string; name: string; meaning: string };
@@ -129,6 +132,9 @@ const states: Record<string, string> = {
   input_waiting: "入力待ち",
   superseded: "新しい入力で再評価",
   blocked: "保留",
+  held: "保留",
+  ready: "次のページを要求できます",
+  complete: "完了",
   running: "処理中",
   retry: "再試行待ち",
   done: "処理済み",
@@ -242,6 +248,11 @@ export function Automation({
 
   const [control, setControl] = useState(() => blankControl("triage"));
   const [controlVersion, setControlVersion] = useState("0");
+  /** 現在値の取得状況。undefined=未着手、null=再取得の要求。 */
+  const [controlLoad, setControlLoad] = useState<{
+    key: string;
+    state: "loading" | "loaded" | "failed";
+  } | null>();
   const [issueID, setIssueID] = useState("");
   const [priority, setPriority] = useState<Version | null>(null);
   const [detail, setDetail] = useState<Version | null>(null);
@@ -276,7 +287,6 @@ export function Automation({
       await fn();
     } catch (e) {
       if (!current()) return;
-      setPage(null);
       setPriority(null);
       setSelected(null);
       setDetail(null);
@@ -385,9 +395,7 @@ export function Automation({
       auto_apply: autoApply,
     });
     setMessage(
-      enabled
-        ? "この方針の固定版を有効にしました。過去対象への要求は追加していません。"
-        : "方針を無効にしました。未確定の処理は現在の権限と状態を再確認します。",
+      enabled ? "この方針の固定版を有効にしました。" : "方針を無効にしました。",
     );
   };
   useEffect(() => {
@@ -435,7 +443,6 @@ export function Automation({
     setMode(nextMode);
     setRecordKind(nextKind);
     setFilterID(requestedID);
-    setPage(null);
     if (
       !(surface === "priorities" && view === "queue" && route?.target) &&
       (nextMode !== "history" || requestedID)
@@ -496,6 +503,10 @@ export function Automation({
           if (record.kind === "control") {
             setControl(record.value as Control);
             setControlVersion(record.version);
+            setControlLoad({
+              key: `${workspace}:${(record.value as Control).kind}`,
+              state: "loaded",
+            });
           }
         },
         () => current,
@@ -509,21 +520,44 @@ export function Automation({
     navigation?.route.target?.id,
     navigation?.route.target?.version,
   ]);
+  const controlKey = `${workspace}:${control.kind}`;
+  const controlKeyRef = useRef(controlKey);
+  controlKeyRef.current = controlKey;
+  useEffect(() => {
+    if (
+      !active ||
+      surface !== "operations" ||
+      !admin ||
+      controlLoad?.key === controlKey ||
+      (controlLoad === undefined &&
+        navigation?.route.target?.kind === "automation-control")
+    )
+      return;
+    const kind = control.kind;
+    setControlLoad({ key: controlKey, state: "loading" });
+    head("control", `control:${kind}`).then(
+      (r) => {
+        if (controlKeyRef.current !== controlKey) return;
+        setControl(r ? (r.value as Control) : blankControl(kind));
+        setControlVersion(r?.version ?? "0");
+        setControlLoad({ key: controlKey, state: "loaded" });
+      },
+      () =>
+        controlKeyRef.current === controlKey &&
+        setControlLoad({ key: controlKey, state: "failed" }),
+    );
+  }, [active, controlKey, controlLoad?.key]);
   const current = priority?.value as Priority | undefined;
   const priorityMatches =
     navigation?.route.target?.kind === "scope" &&
     current?.target.id === navigation.route.target.id;
+  const scaleMismatch =
+    current?.recommendation_policy?.id !== selected?.id ||
+    current?.recommendation_policy?.version !== selected?.version;
   const content = (issueDetails: ReactNode, batchDetails: ReactNode) => (
     <ScreenContent>
       {
         <section className="team-details workflow-editor triage-editor">
-          <h3>
-            {surface === "priorities"
-              ? "Issue優先度"
-              : surface === "operations"
-                ? "共通の処理運用"
-                : "Triage方針と評価"}
-          </h3>
           {surface !== "operations" && (
             <NavigationLink to={{ workspace, screen: "operations" }} related>
               共通の処理枠・Worker状態を確認
@@ -577,58 +611,47 @@ export function Automation({
               )
             }
           />
-          <section
-            role="tabpanel"
-            id={`automation-${surface}-panel-${view}`}
-            aria-labelledby={`automation-${surface}-tab-${view}`}
-            tabIndex={0}
-          >
+          <TabPanel id={`automation-${surface}`} value={view} active={view}>
+            {message && <p role="status">{message}</p>}
             <details>
-              <summary>記録種別・版履歴・IDで絞る（詳細操作）</summary>
+              <summary>記録種別・版履歴・IDで絞る</summary>
               <div className="team-controls">
-                <label>
-                  表示
-                  <select
-                    value={mode}
-                    onChange={(e) => {
-                      setMode(e.target.value);
-                      setPage(null);
-                    }}
-                  >
-                    {surfaceModes[surface].includes("priorities") && (
-                      <option value="priorities">優先度順のIssue一覧</option>
-                    )}
-                    {surfaceModes[surface].includes("heads") && (
-                      <option value="heads">現在の版</option>
-                    )}
-                    {surfaceModes[surface].includes("records") && (
-                      <option value="records">版履歴</option>
-                    )}
-                    {surfaceModes[surface].includes("evaluations") && (
-                      <option value="evaluations">Triageの評価要求</option>
-                    )}
-                    {surfaceModes[surface].includes("attempts") && (
-                      <option value="attempts">
-                        Triageの根拠・不明点・消費
-                      </option>
-                    )}
-                    {surfaceModes[surface].includes("jobs") && (
-                      <option value="jobs">処理要求</option>
-                    )}
-                    {surfaceModes[surface].includes("history") && (
-                      <option value="history">処理履歴</option>
-                    )}
-                  </select>
-                </label>
+                {surface !== "priorities" && (
+                  <label>
+                    表示
+                    <select
+                      value={mode}
+                      onChange={(e) => setMode(e.target.value)}
+                    >
+                      {surfaceModes[surface].includes("heads") && (
+                        <option value="heads">現在の版</option>
+                      )}
+                      {surfaceModes[surface].includes("records") && (
+                        <option value="records">版履歴</option>
+                      )}
+                      {surfaceModes[surface].includes("evaluations") && (
+                        <option value="evaluations">Triageの評価要求</option>
+                      )}
+                      {surfaceModes[surface].includes("attempts") && (
+                        <option value="attempts">
+                          Triageの根拠・不明点・消費
+                        </option>
+                      )}
+                      {surfaceModes[surface].includes("jobs") && (
+                        <option value="jobs">処理要求</option>
+                      )}
+                      {surfaceModes[surface].includes("history") && (
+                        <option value="history">処理履歴</option>
+                      )}
+                    </select>
+                  </label>
+                )}
                 {["heads", "records"].includes(mode) && (
                   <label>
                     記録の種類
                     <select
                       value={recordKind}
-                      onChange={(e) => {
-                        setRecordKind(e.target.value);
-                        setPage(null);
-                      }}
+                      onChange={(e) => setRecordKind(e.target.value)}
                     >
                       {surfaceRecordKinds[surface].includes("policy") && (
                         <option value="policy">方針</option>
@@ -671,33 +694,15 @@ export function Automation({
                   IDで絞る
                   <input
                     value={filterID}
-                    onChange={(e) => {
-                      setFilterID(e.target.value);
-                      setPage(null);
-                    }}
+                    onChange={(e) => setFilterID(e.target.value)}
                   />
                 </label>
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    navigation?.navigate({
-                      ...navigation.route,
-                      target: undefined,
-                      query: JSON.stringify({
-                        mode,
-                        kind: recordKind,
-                        id: filterID,
-                      }),
-                      cursor: undefined,
-                    })
-                  }
-                >
-                  取得
-                </button>
               </div>
             </details>
             <button
+              data-variant="secondary"
               disabled={busy}
+              aria-busy={busy}
               onClick={() =>
                 navigation?.navigate({
                   ...navigation.route,
@@ -711,7 +716,7 @@ export function Automation({
                 })
               }
             >
-              一覧を更新
+              {busy ? "一覧を取得中…" : "一覧を更新"}
             </button>
             {surface === "priorities" &&
               navigation?.route.target?.kind === "scope" && (
@@ -733,22 +738,28 @@ export function Automation({
                 navigation?.route.target
               ) && (
                 <>
-                  {mode === "priorities" ? (
+                  <p aria-live="polite">
+                    {page.data.items.length
+                      ? `${page.data.items.length}件を表示${page.data.next ? "（続きあり）" : ""}`
+                      : "一致する記録がありません。"}
+                  </p>
+                  {!page.data.items.length ? null : mode === "priorities" ? (
                     <div
                       className="table-scroll"
                       role="region"
                       aria-label="方針・尺度ごとのIssue優先度"
+                      aria-busy={busy}
                       tabIndex={0}
                     >
                       <table className="work-list">
                         <thead>
                           <tr>
-                            <th>対象と目的</th>
-                            <th>採用中</th>
-                            <th>最新推奨</th>
-                            <th>固定</th>
-                            <th>評価状態・理由</th>
-                            <th>比較する方針・尺度</th>
+                            <th scope="col">対象と目的</th>
+                            <th scope="col">採用中</th>
+                            <th scope="col">最新推奨</th>
+                            <th scope="col">固定</th>
+                            <th scope="col">評価状態・理由</th>
+                            <th scope="col">比較する方針・尺度</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -774,7 +785,7 @@ export function Automation({
                                   >
                                     {r.title || p.target.id}
                                   </NavigationLink>
-                                  {r.deadline && <p>期限：{r.deadline}</p>}
+                                  {r.deadline && <p>期限：{at(r.deadline)}</p>}
                                 </th>
                                 <td>
                                   {p.adopted ?? "未設定"}
@@ -786,14 +797,6 @@ export function Automation({
                                     {reasons[p.recommendation_reason] ??
                                       p.recommendation_reason}
                                   </p>
-                                  {p.recommendation && (
-                                    <small>
-                                      推奨の尺度：
-                                      {p.recommendation_policy
-                                        ? `${p.recommendation_policy.id}@${p.recommendation_policy.version}`
-                                        : "未取得"}
-                                    </small>
-                                  )}
                                 </td>
                                 <td>
                                   <StatusBadge
@@ -829,21 +832,20 @@ export function Automation({
                           <li key={i}>
                             <details>
                               <summary>
-                                {mode === "priorities"
-                                  ? `${r.title ?? r.id} · 採用 ${(r.value as Priority).adopted ?? "未設定"} · ${states[(r.value as Priority).state] ?? (r.value as Priority).state}`
-                                  : mode === "history"
-                                    ? `${states[j.state] ?? j.state} · ${(row as { at: string }).at} · ${(row as { attempt: number }).attempt}回`
-                                    : r.kind === "model-attempt"
-                                      ? priorityEvidenceLabel(
-                                          r.value,
-                                          priorityMatches ? current : undefined,
-                                        )
-                                      : `${(r.value as { name?: string })?.name || (r.kind === "control" ? (r.id.endsWith("hopper") ? "Hopperの処理設定" : "Triageの処理設定") : r.id)} ${["jobs", "evaluations"].includes(mode) ? `${states[j.state] ?? j.state} · ${j.kind} · ${j.attempts}回` : r.version}`}
+                                {mode === "history"
+                                  ? `${states[j.state] ?? j.state} · ${at((row as { at: string }).at)} · ${(row as { attempt: number }).attempt}回`
+                                  : r.kind === "model-attempt"
+                                    ? priorityEvidenceLabel(
+                                        r.value,
+                                        priorityMatches ? current : undefined,
+                                      )
+                                    : `${(r.value as { name?: string })?.name || (r.kind === "control" ? (r.id.endsWith("hopper") ? "Hopperの処理設定" : "Triageの処理設定") : r.id)} ${["jobs", "evaluations"].includes(mode) ? `${states[j.state] ?? j.state} · ${j.kind} · ${j.attempts}回` : r.version}`}
                               </summary>
                               {r.title && (
                                 <p>
-                                  {r.title} / 採用値:{" "}
-                                  {(r.value as Priority).adopted ?? "未設定"} /{" "}
+                                  {r.title} / 採用値：
+                                  {(r.value as Priority).adopted ??
+                                    "未設定"} /{" "}
                                   {(r.value as Priority).fixed
                                     ? "手動固定"
                                     : "固定なし"}{" "}
@@ -854,22 +856,15 @@ export function Automation({
                               )}
                               {r.received_at && (
                                 <p>
-                                  受付: {r.received_at}（経過{" "}
-                                  {Math.max(
-                                    0,
-                                    Math.floor(
-                                      (Date.now() -
-                                        new Date(r.received_at).getTime()) /
-                                        60000,
-                                    ),
-                                  )}
-                                  分） / 期限: {r.deadline ?? "未設定"} /
-                                  次の期限評価: {r.next_due ?? "予定なし"}
+                                  受付：{at(r.received_at)} / 期限：
+                                  {r.deadline ? at(r.deadline) : "未設定"} /
+                                  次の期限評価：
+                                  {r.next_due ? at(r.next_due) : "予定なし"}
                                 </p>
                               )}
                               {r.policy_group && (
                                 <p>
-                                  比較する方針・尺度の固定版: {r.policy_group}
+                                  比較する方針・尺度の固定版：{r.policy_group}
                                 </p>
                               )}
                               {r.kind === "model-attempt" && (
@@ -910,6 +905,7 @@ export function Automation({
                                     : ""}
                                 </p>
                                 <button
+                                  data-variant="secondary"
                                   disabled={busy}
                                   onClick={() =>
                                     navigation?.navigate({
@@ -940,9 +936,7 @@ export function Automation({
                                               reason: "管理画面から停止",
                                             },
                                           );
-                                          setMessage(
-                                            "停止を記録しました。確定済みの副作用は取り消しません。",
-                                          );
+                                          setMessage("停止を記録しました。");
                                           setPage(null);
                                         })
                                       }
@@ -968,14 +962,12 @@ export function Automation({
                                               reason: "管理画面から明示再開",
                                             },
                                           );
-                                          setMessage(
-                                            "現在の権限と根拠を確認し、再開を記録しました。",
-                                          );
+                                          setMessage("再開を記録しました。");
                                           setPage(null);
                                         })
                                       }
                                     >
-                                      明示的に再開
+                                      処理を再開
                                     </button>
                                   </>
                                 )}
@@ -988,6 +980,7 @@ export function Automation({
                               "sync",
                             ].includes(r.kind) && (
                               <button
+                                data-variant="secondary"
                                 disabled={busy}
                                 onClick={() =>
                                   void run(async () =>
@@ -1065,7 +1058,9 @@ export function Automation({
                   )}
                   {page.data.next && (
                     <button
+                      data-variant="secondary"
                       disabled={busy}
+                      aria-busy={busy}
                       onClick={() =>
                         navigation?.navigate({
                           ...navigation.route,
@@ -1074,7 +1069,7 @@ export function Automation({
                         })
                       }
                     >
-                      次の50件
+                      {busy ? "一覧を取得中…" : "一覧の次のページ"}
                     </button>
                   )}
                 </>
@@ -1086,7 +1081,12 @@ export function Automation({
                   {detail.id} · {detail.version}
                 </p>
                 <pre>{JSON.stringify(detail.value, null, 2)}</pre>
-                <button onClick={() => setDetail(null)}>詳細を閉じる</button>
+                <button
+                  data-variant="secondary"
+                  onClick={() => setDetail(null)}
+                >
+                  詳細を閉じる
+                </button>
               </section>
             )}
             {surface === "rules" && view === "policies" && canEdit && (
@@ -1125,7 +1125,7 @@ export function Automation({
                       />
                     </label>
                     <label>
-                      対象Scope ID（複数はカンマ区切り）
+                      対象Scope ID
                       <input
                         value={policy.scopes.join(",")}
                         onChange={(e) =>
@@ -1140,7 +1140,7 @@ export function Automation({
                       />
                     </label>
                     <label>
-                      方針の優先順（大きい値を優先）
+                      方針の優先順
                       <input
                         type="number"
                         value={policy.precedence}
@@ -1199,6 +1199,7 @@ export function Automation({
                           上へ
                         </button>
                         <button
+                          data-variant="secondary"
                           onClick={() =>
                             setPolicy({
                               ...policy,
@@ -1297,15 +1298,13 @@ export function Automation({
                             },
                             { replace: true },
                           );
-                          setMessage(
-                            "方針の版を保存しました。有効化や過去対象の処理は開始していません。",
-                          );
+                          setMessage("方針の版を保存しました。");
                         })
                       }
                     >
                       方針の版を保存
                     </button>
-                    {policyVersion !== "0" && <p>選択版: {policyVersion}</p>}
+                    {policyVersion !== "0" && <p>保存版：{policyVersion}</p>}
                     {admin && policyVersion !== "0" && (
                       <>
                         <label>
@@ -1314,7 +1313,7 @@ export function Automation({
                             checked={autoApply}
                             onChange={(e) => setAutoApply(e.target.checked)}
                           />
-                          有効な評価を自動反映する（手動固定は維持）
+                          有効な評価を自動反映する
                         </label>
                         <button
                           onClick={() => void run(() => activation(true))}
@@ -1337,7 +1336,7 @@ export function Automation({
               <fieldset id="triage-priority-editor" disabled={busy}>
                 <legend>Issueの優先度</legend>
                 <details>
-                  <summary>IssueをIDで指定（詳細操作）</summary>
+                  <summary>IssueをIDで指定</summary>
                   <label>
                     Issue Scope ID
                     <input
@@ -1350,6 +1349,7 @@ export function Automation({
                     />
                   </label>
                   <button
+                    data-variant="secondary"
                     disabled={!issueID}
                     onClick={() =>
                       navigation?.navigate(
@@ -1368,192 +1368,10 @@ export function Automation({
                     現在の優先度・方針を取得
                   </button>
                 </details>
-                {current && priorityMatches && (
-                  <>
-                    <h4>{priority?.title || "Issue（名称は未取得）"}</h4>
-                    <p>
-                      採用値: {current.adopted ?? "未設定"} /{" "}
-                      {current.fixed ? "手動固定" : "固定なし（方針に従う）"} /{" "}
-                      {states[current.state] ?? current.state}
-                    </p>
-                    <p>
-                      <StatusBadge
-                        label="最新推奨"
-                        value={current.recommendation ?? "未評価"}
-                      />{" "}
-                      {reasons[current.recommendation_reason] ??
-                        current.recommendation_reason}
-                    </p>
-                    <details>
-                      <summary>評価の方針・固定版を確認</summary>
-                      {current.recommendation && (
-                        <p>
-                          推奨の尺度の固定版：
-                          {current.recommendation_policy
-                            ? `${current.recommendation_policy.id}@${current.recommendation_policy.version}`
-                            : "未取得"}{" "}
-                          / 推奨の対象版：
-                          {current.recommendation_target?.version ?? "未取得"}
-                        </p>
-                      )}
-                      <p>
-                        採用尺度の固定版:{" "}
-                        {(current.adopted_policy ?? current.policy).id} ·{" "}
-                        {(current.adopted_policy ?? current.policy).version}
-                      </p>
-                      <p>
-                        評価対象の固定版：{current.target.id}@
-                        {current.target.version}
-                      </p>
-                    </details>
-                    <p>{reasons[current.reason] ?? current.reason}</p>
-                    <p>採用理由: {current.adopted_reason || "未設定"}</p>
-                    {externalState && (
-                      <p
-                        role={
-                          externalState.state === "conflict"
-                            ? "alert"
-                            : undefined
-                        }
-                      >
-                        GitHub優先度の同期：
-                        {states[externalState.state] ??
-                          externalState.state} /{" "}
-                        {reasons[externalState.reason] ?? externalState.reason}
-                      </p>
-                    )}
-                    <button
-                      onClick={() =>
-                        navigation?.navigate({
-                          ...navigation.route,
-                          view: "evaluations",
-                          query: current.target.id,
-                          cursor: undefined,
-                        })
-                      }
-                    >
-                      このIssueの評価要求を取得
-                    </button>
-                    <button
-                      onClick={() =>
-                        navigation?.navigate({
-                          ...navigation.route,
-                          view: "attempts",
-                          query: current.target.id,
-                          cursor: undefined,
-                        })
-                      }
-                    >
-                      このIssueの根拠・不明点・消費を取得
-                    </button>
-                    {current.job && current.basis && (
-                      <button
-                        onClick={() =>
-                          void run(async () =>
-                            setDetail(
-                              (await call(
-                                `/records/${encodeURIComponent("triage-input:" + current.job)}?version=${encodeURIComponent(current.basis!)}`,
-                              )) as Version,
-                            ),
-                          )
-                        }
-                      >
-                        評価に使った固定入力を確認
-                      </button>
-                    )}
-                    {issueDetails}
-                  </>
-                )}
-                {canEdit && priority && selected && priorityMatches && (
-                  <details>
-                    <summary>優先度の変更・手動固定</summary>
-                    <label>
-                      手動で採用する優先度
-                      <select
-                        value={priorityValue}
-                        onChange={(e) => setPriorityValue(e.target.value)}
-                      >
-                        <option value="">選択してください</option>
-                        {(selected.value as Policy).levels.map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.name}（{l.id}）
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    {current?.recommendation && (
-                      <button
-                        data-variant="secondary"
-                        disabled={
-                          current.recommendation_policy?.id !== selected.id ||
-                          current.recommendation_policy?.version !==
-                            selected.version
-                        }
-                        title="現在の操作方針と推奨の尺度が一致する場合に選べます。異なる尺度は手動で確認してください。"
-                        onClick={() =>
-                          setPriorityValue(current.recommendation!)
-                        }
-                      >
-                        最新推奨を手動採用の入力欄へ選ぶ
-                      </button>
-                    )}
-                    <label>
-                      変更・解除の理由
-                      <input
-                        value={priorityReason}
-                        onChange={(e) => setPriorityReason(e.target.value)}
-                      />
-                    </label>
-                    <button
-                      disabled={!priorityValue || !priorityReason}
-                      onClick={() =>
-                        void run(async () => {
-                          await write(priority.id, priority.version, {
-                            target: selected.target,
-                            policy: {
-                              id: selected.id,
-                              version: selected.version,
-                            },
-                            value: priorityValue,
-                            reason: priorityReason,
-                            unlock: false,
-                          });
-                          await loadPriority();
-                          setMessage("手動の優先度を採用して固定しました。");
-                        })
-                      }
-                    >
-                      手動変更して固定
-                    </button>
-                    <button
-                      disabled={!current?.fixed || !priorityReason}
-                      onClick={() =>
-                        void run(async () => {
-                          await write(priority.id, priority.version, {
-                            target: selected.target,
-                            policy: {
-                              id: selected.id,
-                              version: selected.version,
-                            },
-                            value: null,
-                            reason: priorityReason,
-                            unlock: true,
-                          });
-                          await loadPriority();
-                          setMessage(
-                            "固定を解除しました。現在の入力と方針に有効な推奨だけを反映します。",
-                          );
-                        })
-                      }
-                    >
-                      固定を解除して自動反映へ戻す
-                    </button>
-                  </details>
-                )}
               </fieldset>
             )}
             {surface === "operations" && view === "settings" && admin && (
-              <fieldset disabled={busy}>
+              <fieldset disabled={busy || controlLoad?.state === "loading"}>
                 <legend>自動化主体・処理枠・予算</legend>
                 <label>
                   処理の種類
@@ -1568,22 +1386,20 @@ export function Automation({
                     <option value="hopper">Hopper</option>
                   </select>
                 </label>
-                <button
-                  onClick={() =>
-                    void run(async () => {
-                      const r = await head(
-                        "control",
-                        `control:${control.kind}`,
-                      );
-                      setControl(
-                        r ? (r.value as Control) : blankControl(control.kind),
-                      );
-                      setControlVersion(r?.version ?? "0");
-                    })
-                  }
-                >
-                  現在の設定を読み込む
-                </button>
+                {controlLoad?.state === "loading" && (
+                  <p role="status">現在値を取得中…</p>
+                )}
+                {controlLoad?.state === "failed" && (
+                  <>
+                    <p role="status">現在の処理運用を取得できませんでした。</p>
+                    <button
+                      data-variant="secondary"
+                      onClick={() => setControlLoad(null)}
+                    >
+                      再取得
+                    </button>
+                  </>
+                )}
                 {(
                   [
                     ["enabled", "有効にする"],
@@ -1686,10 +1502,11 @@ export function Automation({
                           })
                         }
                       >
-                        <option value="reported">報告額</option>
-                        <option value="estimated">推定額</option>
-                        <option value="api_equivalent">API料金換算額</option>
-                        <option value="allocated">配賦額</option>
+                        {valuationOptions.map(([v, label]) => (
+                          <option key={v} value={v}>
+                            {label}
+                          </option>
+                        ))}
                       </select>
                     </label>
                   </>
@@ -1713,10 +1530,200 @@ export function Automation({
                 </button>
               </fieldset>
             )}
-            {message && <p role="status">{message}</p>}
-          </section>
+          </TabPanel>
         </section>
       }
+      {view === "queue" && current && priorityMatches && (
+        <DetailPane>
+          <section aria-label="選択したIssueの詳細">
+            <h4>{priority?.title || "Issue（名称は未取得）"}</h4>
+            <fieldset disabled={busy}>
+              <p>
+                <StatusBadge
+                  label="採用値"
+                  value={current.adopted ?? "未設定"}
+                />{" "}
+                <StatusBadge
+                  label="反映"
+                  value={current.fixed ? "手動固定" : "固定なし"}
+                />{" "}
+                <StatusBadge
+                  label="評価"
+                  value={states[current.state] ?? current.state}
+                />
+              </p>
+              <p>
+                <StatusBadge
+                  label="最新推奨"
+                  value={current.recommendation ?? "未評価"}
+                />{" "}
+                {reasons[current.recommendation_reason] ??
+                  current.recommendation_reason}
+              </p>
+              <details>
+                <summary>評価の方針・固定版を確認</summary>
+                {current.recommendation && (
+                  <p>
+                    推奨の尺度の固定版：
+                    {current.recommendation_policy
+                      ? `${current.recommendation_policy.id}@${current.recommendation_policy.version}`
+                      : "未取得"}{" "}
+                    / 推奨の対象版：
+                    {current.recommendation_target?.version ?? "未取得"}
+                  </p>
+                )}
+                <p>
+                  採用尺度の固定版：
+                  {(current.adopted_policy ?? current.policy).id} ·{" "}
+                  {(current.adopted_policy ?? current.policy).version}
+                </p>
+                <p>
+                  評価対象の固定版：{current.target.id}@{current.target.version}
+                </p>
+              </details>
+              <p>{reasons[current.reason] ?? current.reason}</p>
+              <p>採用理由：{current.adopted_reason || "未設定"}</p>
+              {externalState && (
+                <p
+                  role={
+                    externalState.state === "conflict" ? "alert" : undefined
+                  }
+                >
+                  GitHub優先度の同期：
+                  {states[externalState.state] ?? externalState.state} /{" "}
+                  {reasons[externalState.reason] ?? externalState.reason}
+                </p>
+              )}
+              <button
+                data-variant="secondary"
+                onClick={() =>
+                  navigation?.navigate({
+                    ...navigation.route,
+                    view: "evaluations",
+                    query: current.target.id,
+                    cursor: undefined,
+                  })
+                }
+              >
+                このIssueの評価要求を取得
+              </button>
+              <button
+                data-variant="secondary"
+                onClick={() =>
+                  navigation?.navigate({
+                    ...navigation.route,
+                    view: "attempts",
+                    query: current.target.id,
+                    cursor: undefined,
+                  })
+                }
+              >
+                このIssueの根拠・不明点・消費を取得
+              </button>
+              {current.job && current.basis && (
+                <button
+                  data-variant="secondary"
+                  onClick={() =>
+                    void run(async () =>
+                      setDetail(
+                        (await call(
+                          `/records/${encodeURIComponent("triage-input:" + current.job)}?version=${encodeURIComponent(current.basis!)}`,
+                        )) as Version,
+                      ),
+                    )
+                  }
+                >
+                  評価に使った固定入力を確認
+                </button>
+              )}
+              {issueDetails}
+              {canEdit && priority && selected && (
+                <details>
+                  <summary>優先度の変更・手動固定</summary>
+                  <label>
+                    手動で採用する優先度
+                    <select
+                      value={priorityValue}
+                      onChange={(e) => setPriorityValue(e.target.value)}
+                    >
+                      <option value="">未選択</option>
+                      {(selected.value as Policy).levels.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}（{l.id}）
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {current?.recommendation && (
+                    <>
+                      <button
+                        data-variant="secondary"
+                        disabled={scaleMismatch}
+                        onClick={() =>
+                          setPriorityValue(current.recommendation!)
+                        }
+                      >
+                        最新推奨を選ぶ
+                      </button>
+                      {scaleMismatch && <p>推奨の尺度が操作方針と異なります</p>}
+                    </>
+                  )}
+                  <label>
+                    変更・解除の理由
+                    <input
+                      value={priorityReason}
+                      onChange={(e) => setPriorityReason(e.target.value)}
+                    />
+                  </label>
+                  <button
+                    disabled={!priorityValue || !priorityReason}
+                    onClick={() =>
+                      void run(async () => {
+                        await write(priority.id, priority.version, {
+                          target: selected.target,
+                          policy: {
+                            id: selected.id,
+                            version: selected.version,
+                          },
+                          value: priorityValue,
+                          reason: priorityReason,
+                          unlock: false,
+                        });
+                        await loadPriority();
+                        setMessage("手動の優先度を採用して固定しました。");
+                      })
+                    }
+                  >
+                    手動変更して固定
+                  </button>
+                  <button
+                    data-variant="secondary"
+                    disabled={!current?.fixed || !priorityReason}
+                    onClick={() =>
+                      void run(async () => {
+                        await write(priority.id, priority.version, {
+                          target: selected.target,
+                          policy: {
+                            id: selected.id,
+                            version: selected.version,
+                          },
+                          value: null,
+                          reason: priorityReason,
+                          unlock: true,
+                        });
+                        await loadPriority();
+                        setMessage("固定を解除しました。");
+                      })
+                    }
+                  >
+                    固定を解除して自動反映へ戻す
+                  </button>
+                </details>
+              )}
+            </fieldset>
+          </section>
+        </DetailPane>
+      )}
     </ScreenContent>
   );
   const withIssue = (batchDetails: ReactNode) =>
@@ -1739,6 +1746,8 @@ export function Automation({
       key={`${policyID}@${policyVersion}`}
       policy={{ id: policyID, version: policyVersion }}
       scopes={policy.scopes}
+      states={states}
+      reasons={reasons}
       call={call}
       write={write}
       run={run}

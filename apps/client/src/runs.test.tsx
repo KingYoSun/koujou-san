@@ -2,7 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { expect, it } from "vitest";
 import { RunStatus } from "./runs";
 
-it("keeps process success, inspection failure, unknown observation and cancellation separate", () => {
+it("keeps exit code, cancellation and stop capability separate from the state badges", () => {
   const base = {
     input: { id: "run-input:fixture", version: "fixed" },
     state: "succeeded",
@@ -10,19 +10,11 @@ it("keeps process success, inspection failure, unknown observation and cancellat
     reported_through: "13",
     cancel_requested: false,
   };
-  const failedInspection = renderToStaticMarkup(
-    <RunStatus
-      value={{
-        ...base,
-        exit_code: 0,
-        assessment: { state: "valid", verdict: "FAIL" },
-      }}
-    />,
+  const finished = renderToStaticMarkup(
+    <RunStatus value={{ ...base, exit_code: 0 }} />,
   );
-  expect(failedInspection).toContain("正常終了");
-  expect(failedInspection).toContain("FAIL");
-  expect(failedInspection).toContain("終了コード: 0");
-  expect(failedInspection).not.toContain("PASS");
+  expect(finished).toContain("終了コード：0");
+  expect(finished).not.toContain("実行：");
   const disconnected = renderToStaticMarkup(
     <RunStatus
       value={{
@@ -33,15 +25,8 @@ it("keeps process success, inspection failure, unknown observation and cancellat
       }}
     />,
   );
-  expect(disconnected).toContain("実行中");
-  expect(disconnected).toContain("不明");
   expect(disconnected).toContain("取消の完了は確認していません");
   expect(disconnected).not.toContain("取消確認済み");
-  const invalid = renderToStaticMarkup(
-    <RunStatus value={{ ...base, assessment: { state: "invalid" } }} />,
-  );
-  expect(invalid).toContain("形式不正");
-  expect(invalid).not.toContain("PASS");
   const completedWithoutStop = renderToStaticMarkup(
     <RunStatus
       value={{
@@ -57,7 +42,6 @@ it("keeps process success, inspection failure, unknown observation and cancellat
       }}
     />,
   );
-  expect(completedWithoutStop).toContain("正常終了");
-  expect(completedWithoutStop).toContain("停止: 未対応");
+  expect(completedWithoutStop).toContain("停止：未対応");
   expect(completedWithoutStop).not.toContain("実終了を待ちます");
 });

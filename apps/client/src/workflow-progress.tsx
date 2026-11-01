@@ -137,8 +137,8 @@ export function WorkflowProgress({
               result(issue === current ? "現在の問題" : "以前の問題", issue)}
             {back && (
               <li>
-                <strong>差し戻し先：</strong> {issue?.outcome}のとき、{node?.id}
-                から{back}へ戻る条件です。
+                <strong>差し戻し先：</strong>
+                {node?.id} → {back}（{issue?.outcome}）
               </li>
             )}
             {correction &&
@@ -159,13 +159,12 @@ export function WorkflowProgress({
             <details>
               <summary>途中の判断を確認</summary>
               <p>
-                途中の判断：{returned.node}（{returned.attempt}回目）は「
-                {returned.outcome}」。戻り先は
+                途中の判断：{returned.node}（{returned.attempt}回目）
+                {returned.outcome} →{" "}
                 {
                   graph.nodes.find((node) => node.id === returned.node)
                     ?.retry?.[returned.outcome ?? ""]
                 }
-                です。
               </p>
             </details>
           )}

@@ -4,8 +4,18 @@ import {
   type ModelConnection,
   type SemanticSettings,
 } from "./server-model";
+import { StatusBadge } from "./status-badge";
+import { Field, jsonError } from "./field";
 
 type Ref = { id: string; version: string };
+export const at = (iso: string) => new Date(iso).toLocaleString();
+export const valuationOptions = [
+  ["reported", "報告額"],
+  ["estimated", "単価からの推定額"],
+  ["api_equivalent", "API料金換算額"],
+  ["allocated", "配賦額"],
+] as const;
+const issueStates: Record<string, string> = { open: "未完了", closed: "完了" };
 type Version = Ref & { value: unknown };
 type Call = (path: string, body?: unknown) => Promise<unknown>;
 type Run = (fn: () => Promise<void>) => Promise<void>;
@@ -37,7 +47,7 @@ export function TriageAudit({
   return (
     <section aria-label="評価の根拠と消費">
       <p>
-        評価: {states[attempt.state] ?? attempt.state} /{" "}
+        評価：{states[attempt.state] ?? attempt.state} /{" "}
         {reasons[attempt.reason] ?? attempt.reason}
       </p>
       {!!attempt.decision?.unknown.length && (
@@ -58,13 +68,21 @@ export function TriageAudit({
         </blockquote>
       ))}
       {attempt.usage.map((ref) => (
-        <button key={ref.id} onClick={() => onUsage(ref)}>
-          この要求のモデル・利用量を確認
+        <button
+          key={ref.id}
+          data-variant="secondary"
+          onClick={() => onUsage(ref)}
+        >
+          モデル・利用量を確認：{ref.id}
         </button>
       ))}
       {attempt.costs.map((ref) => (
-        <button key={ref.id} onClick={() => onUsage(ref)}>
-          この要求の料金版・費用を確認
+        <button
+          key={ref.id}
+          data-variant="secondary"
+          onClick={() => onUsage(ref)}
+        >
+          料金版・費用を確認：{ref.id}
         </button>
       ))}
       {!attempt.costs.length && <p>この記録には費用の確定参照がありません。</p>}
@@ -83,12 +101,15 @@ export function TriageModelSettings({
   call: Call;
   run: Run;
 }) {
-  const [connections, setConnections] = useState<ModelConnection[]>([]),
+  const [connections, setConnections] = useState<ModelConnection[] | null>(
+      null,
+    ),
     [advanced, setAdvanced] = useState("");
   return (
     <fieldset>
       <legend>Triageのサーバーモデル</legend>
       <button
+        data-variant="secondary"
         onClick={() =>
           void run(async () =>
             setConnections(
@@ -101,10 +122,10 @@ export function TriageModelSettings({
       </button>
       {!value && (
         <button
-          disabled={!connections.length}
+          disabled={!connections?.length}
           onClick={() =>
             void run(async () => {
-              const c = connections[0],
+              const c = connections![0],
                 m = c.models[0];
               onChange({
                 ...((await call("/model-template")) as TriageModel),
@@ -123,7 +144,7 @@ export function TriageModelSettings({
         <>
           <ServerModelFields
             settings={value}
-            connections={connections}
+            connections={connections ?? []}
             onChange={(patch) => onChange({ ...value, ...patch })}
           />
           <button
@@ -153,15 +174,15 @@ export function TriageModelSettings({
           </button>
           {advanced && (
             <>
-              <label>
-                評価入力・料金の詳細（JSON）
-                <textarea
-                  rows={10}
-                  value={advanced}
-                  onChange={(e) => setAdvanced(e.target.value)}
-                />
-              </label>
+              <Field
+                label="評価入力・料金の詳細（JSON）"
+                value={advanced}
+                rows={10}
+                onChange={setAdvanced}
+                error={jsonError(advanced)}
+              />
               <button
+                disabled={!!jsonError(advanced)}
                 onClick={() =>
                   void run(async () =>
                     onChange({ ...value, ...JSON.parse(advanced) }),
@@ -174,7 +195,9 @@ export function TriageModelSettings({
           )}
         </>
       )}
-      {!connections.length && <p>利用できるサーバー接続がありません。</p>}
+      {connections && !connections.length && (
+        <p>利用できるサーバー接続がありません。</p>
+      )}
     </fieldset>
   );
 }
@@ -228,6 +251,7 @@ export function TriageIssue({
     <fieldset>
       <legend>Issueの本文・期限・依存</legend>
       <button
+        data-variant="secondary"
         onClick={() =>
           void run(async () => {
             const page = (await call("/query", {
@@ -250,7 +274,7 @@ export function TriageIssue({
           })
         }
       >
-        Issue情報を取得・編集
+        Issue情報を取得
       </button>
       {loaded && (
         <>
@@ -278,8 +302,11 @@ export function TriageIssue({
               disabled={!canEdit}
               onChange={(e) => setValue({ ...value, state: e.target.value })}
             >
-              <option value="open">未完了</option>
-              <option value="closed">完了</option>
+              {Object.entries(issueStates).map(([v, label]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
             </select>
           </label>
           <label>
@@ -307,14 +334,13 @@ export function TriageIssue({
               }
             />
           </label>
-          <label>
-            依存するIssue・Runの固定参照（JSON）
-            <textarea
-              value={deps}
-              readOnly={!canEdit}
-              onChange={(e) => setDeps(e.target.value)}
-            />
-          </label>
+          <Field
+            label="依存するIssue・Runの固定参照（JSON）"
+            value={deps}
+            rows={5}
+            onChange={(next) => canEdit && setDeps(next)}
+            error={jsonError(deps)}
+          />
           {admin && (
             <details>
               <summary>既存の外部Issueとの接続</summary>
@@ -360,15 +386,16 @@ export function TriageIssue({
             <details>
               <summary>外部で観測した本文・状態</summary>
               <p>
-                {value.observed.title} · {value.observed.state} ·{" "}
-                {value.observed.at}
+                {value.observed.title} ·{" "}
+                {issueStates[value.observed.state] ?? value.observed.state} ·{" "}
+                {at(value.observed.at)}
               </p>
               <pre>{value.observed.body}</pre>
             </details>
           )}
           {canEdit && (
             <button
-              disabled={!value.title}
+              disabled={!value.title || !!jsonError(deps)}
               onClick={() =>
                 void run(async () => {
                   const saved = await write(id, version, {
@@ -383,7 +410,7 @@ export function TriageIssue({
               Issue情報を保存して再評価を要求
             </button>
           )}
-          <p>保存版: {version}</p>
+          {version !== "0" && <p>保存版：{version}</p>}
         </>
       )}
     </fieldset>
@@ -403,6 +430,8 @@ type Batch = {
 export function TriageBatch({
   policy,
   scopes,
+  states,
+  reasons,
   call,
   write,
   run,
@@ -410,6 +439,8 @@ export function TriageBatch({
 }: {
   policy: Ref;
   scopes: string[];
+  states: Record<string, string>;
+  reasons: Record<string, string>;
   call: Call;
   write: Write;
   run: Run;
@@ -451,13 +482,17 @@ export function TriageBatch({
           }}
         />
       </label>
-      <button disabled={!id} onClick={() => void run(() => load(id))}>
+      <button
+        data-variant="secondary"
+        disabled={!id}
+        onClick={() => void run(() => load(id))}
+      >
         保存した一括評価を取得
       </button>
       {!batch && (
         <>
           <label>
-            対象Scope ID（カンマ区切り）
+            対象Scope ID
             <input
               value={scopeIDs}
               onChange={(e) => setScopes(e.target.value)}
@@ -499,7 +534,7 @@ export function TriageBatch({
             />
           </label>
           <label>
-            費用上限（十進数）
+            費用上限
             <input value={amount} onChange={(e) => setAmount(e.target.value)} />
           </label>
           <label>
@@ -515,10 +550,11 @@ export function TriageBatch({
               value={valuation}
               onChange={(e) => setValuation(e.target.value)}
             >
-              <option value="estimated">推計</option>
-              <option value="reported">実報告</option>
-              <option value="api_equivalent">API換算</option>
-              <option value="allocated">按分</option>
+              {valuationOptions.map(([v, label]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
             </select>
           </label>
           <button
@@ -550,10 +586,19 @@ export function TriageBatch({
       {batch && (
         <>
           <p>
-            基準時刻: {batch.reference_time} / 要求済み: {batch.requested} /
-            上限: {batch.count} / 状態: {batch.state} {batch.reason}
+            基準時刻：{at(batch.reference_time)} / 要求済み：{batch.requested} /
+            上限：{batch.count}
           </p>
-          <p>継続位置: {batch.after || "先頭"}</p>
+          <p>
+            <StatusBadge
+              label="状態"
+              value={states[batch.state] ?? batch.state}
+            />{" "}
+            {reasons[batch.reason] ??
+              reasons[`batch_${batch.reason}`] ??
+              batch.reason}
+          </p>
+          <p>継続位置：{batch.after || "先頭"}</p>
           <button
             disabled={batch.state === "complete"}
             onClick={() => void run(() => advance({ continue: true }))}

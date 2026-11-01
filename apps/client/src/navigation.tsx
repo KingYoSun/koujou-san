@@ -13,7 +13,7 @@ export const destinations = {
   chat: ["作業", "Projectチャット"],
   priority: ["作業", "Issue優先度"],
   publications: ["作業", "外部起票"],
-  context: ["Context", "Context"],
+  context: ["Context", "Context編集"],
   workflows: ["工程", "Run・Workflow定義"],
   inspections: ["工程", "検品定義・証拠管理"],
   hopper: ["自動化", "Hopper"],

@@ -82,6 +82,10 @@ export function nodeDepths(nodes: WorkflowNode[]): number[] {
 type Edge = { from: string; to: string; label: string; back: boolean };
 type Box = { x: number; y: number; w: number; h: number };
 const PAGE = 50;
+export const dependLabel = (
+  dep: NonNullable<WorkflowNode["depends"]>[number],
+) =>
+  (dep.on?.join(" / ") || "結果条件未指定") + (dep.required ? "" : " · 任意");
 
 export function WorkflowMap({
   graph,
@@ -126,9 +130,7 @@ export function WorkflowMap({
       edges.push({
         from: dep.node,
         to: n.id,
-        label:
-          (dep.on?.join(" / ") || "結果条件未指定") +
-          (dep.required ? "" : " · 任意"),
+        label: dependLabel(dep),
         back: false,
       });
     }
@@ -170,13 +172,13 @@ export function WorkflowMap({
     if (!active || !refs.length) return;
     let current = true;
     setNotice("");
-    setLabels({});
     void loadLabels(refs).then(
       (values) => {
         if (current)
-          setLabels(
-            Object.fromEntries(values.map((v) => [referenceKey(v), v])),
-          );
+          setLabels((prev) => ({
+            ...prev,
+            ...Object.fromEntries(values.map((v) => [referenceKey(v), v])),
+          }));
       },
       () => {
         if (current)
@@ -258,17 +260,22 @@ export function WorkflowMap({
       {graph.nodes.length > PAGE && (
         <div className="team-controls">
           <span aria-live="polite">
-            {start + 1}–{Math.min(start + PAGE, graph.nodes.length)} /{" "}
-            {graph.nodes.length}
+            ノード：{start + 1}–{Math.min(start + PAGE, graph.nodes.length)} /{" "}
+            {graph.nodes.length}件
           </span>
-          <button disabled={!start} onClick={() => setPage(page - 1)}>
-            ノードの前ページ
+          <button
+            data-variant="secondary"
+            disabled={!start}
+            onClick={() => setPage(page - 1)}
+          >
+            ノードの前のページ
           </button>
           <button
+            data-variant="secondary"
             disabled={start + PAGE >= graph.nodes.length}
             onClick={() => setPage(page + 1)}
           >
-            ノードの次ページ
+            ノードの次のページ
           </button>
         </div>
       )}
@@ -326,9 +333,7 @@ export function WorkflowMap({
                   </button>
                   <p>{describe(n)}</p>
                   {(n.depends?.length ?? 0) > 1 && (
-                    <small className="workflow-join">
-                      合流 {n.join || "未指定"}
-                    </small>
+                    <StatusBadge label="合流" value={n.join || "未指定"} />
                   )}
                   {status?.(n)}
                 </li>
