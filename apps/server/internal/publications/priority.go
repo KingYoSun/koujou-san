@@ -28,6 +28,7 @@ func (r *Remote) ReadPriority(ctx context.Context, w, id string, number int64, p
 	if !ok || number < 1 || page < 1 {
 		return out, ErrInvalid
 	}
+	out.Provider = c.Provider
 	token, err := r.token(ctx, c)
 	if err != nil {
 		return out, err

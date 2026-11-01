@@ -71,14 +71,30 @@ LFS素材は65,536 bytes、OIDは`04f1c31abafc18079243f47ab01a59a40bdcd4a89389e1
 
 C1は`run:issue83-inspection-c1-fixed`、C2は`run:issue83-inspection-c2`で、固定snapshot・条件・機械照合参照だけを別のephemeral Codexへ渡した。Contextはnone、実装会話・自己評価・前Runの出力は含めない。sumの仕様、変更path、LFS pointerの維持をそれぞれ検品し、両Runともプラットフォームが`assessment.state=valid / verdict=PASS / validity=current`と確認した。
 
-C1の検品statusは`run:issue83-c1-inspection-status`から公開し、Giteaで再取得した。PR #4は`run:issue83-create-pr`から作成・GET確認した補助検証である。C2への更新後、C1を固定した`run:issue83-stale-fixed-head`は現在のPR head不一致でAPI書込み前に失敗した。新headの検品status公開と保護規則によるmerge可否は、承認待ちの検証に残す。
+C1の検品statusは`run:issue83-c1-inspection-status`から公開し、Giteaで再取得した。PR #4は`run:issue83-create-pr`から作成・GET確認した補助検証である。保存した送信意図を使った`run:issue83-reconcile-pr`も同じPR #4を取得し、PRを再作成しなかった。C2への更新後、C1を固定した`run:issue83-stale-fixed-head`は現在のPR head不一致でAPI書込み前に失敗した。
 
-`workflow-execution:issue83-ci`は実Gitea run 5とC2、必要jobのLinux / Windowsを固定してPASSとなった。Hopperは`kind=gitea`の実失敗観測を、過去の発行しない評価へ渡した。Triageには`origin=gitea`、起票接続とIssue番号、既存優先度ラベルを保存した。自動同期の完了とはまだ主張しない。
+本人が専用repoのWebhook・main保護・終了時解除を許可した後、mainに両OSのCIと`koujou/inspection`を必須とし、直接push・force push・管理者の迂回を禁止した。C1のPASSしかないC2では、`run:issue83-old-pass-blocked`がGiteaのHTTP 405・未mergeを確認した。C2の現行独立PASSをstatusへ反映すると、`run:issue83-allowed-merge`の条件付きmergeはHTTP 200で成功した。PRとmainを再取得し、merge commitがともに`9ccfad9fd083fbc28fb0b38c8c25acb0e7e88bb9`と確認した。
+
+`workflow-execution:issue83-ci`は実Gitea run 5とC2、必要jobのLinux / Windowsを固定してPASSとなった。Hopperは`kind=gitea`の実失敗観測を、過去の発行しない評価へ渡した。Triageには専用Scopeと既存ラベルの方針を用意し、通常の`SyncPriority` Workerで実Giteaの本文・状態・ラベルを取得した。現在の管理主体と認可を通し、P1の採用と外部変更の取込みを確認した。モデル評価は行っていない。
+
+初回独立検品の理由表示の指摘は、実体でも「GitHubの優先度ラベル」と表示されることを再現した。接続backendから取得元を渡し、GiteaではGiteaと表示する。Issue自体がHopper由来でも接続先で判断し、既存GitHubの理由文字列は維持する。修正後の実同期と、GitHub/Gitea両方の専用DB試験が成功した。
+
+外部で確認した結果は`chat-message:issue83-result@PHJ6MZXIPSY6G5VXBG7CJK6J5I`へ運用者の確認メッセージとして保存・再取得した。AIの応答を偽装していない。15個のRun原記録を固定版でexportし、全件の完了markerを確認した。[一巡の固定参照と機械観測](assets/issue83-cycle.json)に対応をまとめている。
+
+## 実Webhook・切断・後片付け
+
+専用repoの署名付きWebhookを登録した。最初の配送はGiteaのegress policyが非公開IPを拒否し、配送状態は失敗だった。許可済みホスト名に、そのDocker gatewayの明示IPだけを追加すると、実Issue更新とラベル変更の配送はHTTP 202となった。配送journalから取得したのはイベント種別・成功フラグ・HTTP状態だけで、payload・認証headerは証跡へ含めない。
+
+専用Giteaを一時停止すると、同instanceの七対象が`unknown / connection_failed`になった。別instanceへ資格情報を転送して成功を補っていない。再起動後、正本のIssue更新を受信し、`observed`と新タイトルへの収束を確認した。
+
+検証後は作成したWebhookだけを削除してGET 404を確認した。Linux / Windowsの専用Runnerは停止・登録解除し、repo-level Runner一覧が0件になった。専用Gitea二実体も停止したが、repoとvolumeは保持している。OSサービスと本番環境は変更していない。
 
 ## 回帰と画面
 
-Go通常試験、GitHub/Gitea観測の専用DB、起票の専用DB、Workflow、Hopper、Triage/automation、Runの専用DB試験が成功した。共有Gitea接続への並行要求でRetry-Afterのdata raceを再現し、atomic更新後にtransport・観測・起票のrace検査が成功した。クライアントは109テスト、型検査、Web/Go buildが成功。`check:desktop`も成功した。区分Cの固定実装commitの独立検品と最終CIは別に行う。
+Go通常試験・vet、GitHub/Gitea観測の専用DB、起票の専用DB、Workflow、Hopper、Triage/automation、Runの専用DB試験が成功した。共有Gitea接続への並行要求でRetry-Afterのdata raceを再現し、atomic更新後にtransport・観測・起票のrace検査が成功した。クライアントは109テスト、型検査、Web/Go buildが成功。desktopのcheck・test・buildも成功し、native試験は33件成功、明示fixtureが必要な12件はignoredである。区分Cの固定実装commitの独立検品と最終CIは別に行う。
 
-rootの`pnpm run check`は、既存のGit管理外`apps/server/.cache/issue33-config/main.go`のgofmtで停止した。この作業の無関係なファイルは変更していない。clean checkoutのCIと、変更対象の整形・Go検査を確認する。
+rootの`pnpm run check`は、既存のGit管理外`apps/server/.cache/issue33-config/main.go`のgofmtで停止した。この作業の無関係なファイルは変更していない。初回headのclean checkoutではcheckを含むLinux / Windows CIが成功した。最終headのCIは[統合記録](https://github.com/KingYoSun/koujou-san/issues/83#issuecomment-6551788731)へ集約する。
 
-共通UIで二instanceの同名Issue、PR更新、実行回、成功/失敗/未観測と固定入力を確認した。原記録へ移動し、チャットの関連Runで終了コードと独立検品PASSが別々に表示されることを確認した。画面証跡はGit管理外の`test-results/issue83-*.png`とDOM記録に保存している。
+共通UIで二instanceの同名Issue、PR更新、実行回、成功/失敗/未観測と固定入力を確認した。390px幅では文書の横方向overflowがなく、instanceとrepo、版、状態を表示できた。原記録へ移動し、チャットの関連Runで終了コードと独立検品PASSが別々に表示されることを確認した。画面証跡はGit管理外の`test-results/issue83-*.png`とDOM記録に保存している。
+
+検証用ネイティブRunnerはactive 0・未送信frame/usageなしを確認し、通常のstop-acceptingで終了した。前回のTauri検証ウィンドウも通常終了してから再buildした。専用UI fixtureは正常終了し、実Ory・MCP・1万Context×3版を含む`TestMCPIntegration`がPASSとなった。

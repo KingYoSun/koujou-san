@@ -53,6 +53,8 @@ Gitea target IDは`gitea:`で始め、接尾辞は英数字・`_`・`-`を使う
 
 署名`X-Gitea-Signature`とrepo IDを検証し、そのinstanceの許可対象だけを再取得待ちにする。payloadの本文や成功表示で共有状態を確定しない。通知の重複・逆順・欠落は定期照合で収束させる。接続失敗時は最終成功取得と現在の未観測を分け、`Retry-After`中は再要求を保留する。
 
+Gitea側のegress policyが非公開IPを拒否する場合は、合意した通知先のホスト名と解決先IPだけを明示する。この検証では`host.docker.internal`に加えてDocker gatewayのIPが必要だった。許可範囲をLAN全体へ広げず、配送記録のHTTP状態と受信後の再取得を確認する。
+
 共通UIの「GitHub・Gitea観測」でinstance、repo、サーバー版、commit、run、実行回、必要job、取得時刻、外部出典を確認する。再読込はCI開始操作ではない。`/forge/workspaces/{workspace}/observations`は両provider、従来の`/github/…`一覧はGitHubだけを返す。
 
 ## 起票と優先度

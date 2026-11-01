@@ -25,6 +25,13 @@ func checkGiteaPostgres(t *testing.T, ctx context.Context, store *persistence.St
 	c := *original
 	c.Targets = append([]Target{}, original.Targets...)
 	c.Bindings = append([]Binding{}, original.Bindings...)
+	sameGitHub := false
+	for _, target := range original.Targets {
+		sameGitHub = sameGitHub || (target.Kind == "issue" && target.Repository == "fixture/repo" && target.RepositoryID == 8 && target.ExternalID == "12")
+	}
+	if !sameGitHub {
+		t.Fatal("same-name GitHub issue fixture is required")
+	}
 	var legacy []byte
 	if err := store.Database().QueryRow(ctx, "SELECT snapshot FROM github_targets WHERE id='action'").Scan(&legacy); err != nil {
 		t.Fatal(err)
@@ -37,12 +44,12 @@ func checkGiteaPostgres(t *testing.T, ctx context.Context, store *persistence.St
 				t.Error("Gitea observation wrote or mixed credentials")
 			}
 			switch r.URL.Path {
-			case "/api/v1/repos/proof/private":
-				_, _ = w.Write([]byte(`{"id":1,"full_name":"proof/private"}`))
+			case "/api/v1/repos/fixture/repo":
+				_, _ = w.Write([]byte(`{"id":8,"full_name":"fixture/repo"}`))
 			case "/api/v1/version":
 				_, _ = w.Write([]byte(`{"version":"28.2.0"}`))
-			case "/api/v1/repos/proof/private/issues/1":
-				_ = json.NewEncoder(w).Encode(map[string]any{"id": 1, "number": 1, "html_url": server.URL + "/proof/private/issues/1", "title": name, "state": "open"})
+			case "/api/v1/repos/fixture/repo/issues/12":
+				_ = json.NewEncoder(w).Encode(map[string]any{"id": 12, "number": 12, "html_url": server.URL + "/fixture/repo/issues/12", "title": name, "state": "open"})
 			default:
 				w.WriteHeader(404)
 			}
@@ -54,7 +61,7 @@ func checkGiteaPostgres(t *testing.T, ctx context.Context, store *persistence.St
 		_ = os.WriteFile(ca, pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw}), 0600)
 		_ = os.WriteFile(secret, []byte("hook-"+name), 0600)
 		c.GiteaInstances = append(c.GiteaInstances, gitea.Instance{URL: server.URL, TokenFile: token, CAFile: ca, WebhookSecretFile: secret})
-		c.Targets = append(c.Targets, Target{ID: "gitea:" + name, Provider: "gitea", Instance: server.URL, Repository: "proof/private", RepositoryID: 1, Kind: "issue", ExternalID: "1"})
+		c.Targets = append(c.Targets, Target{ID: "gitea:" + name, Provider: "gitea", Instance: server.URL, Repository: "fixture/repo", RepositoryID: 8, Kind: "issue", ExternalID: "12"})
 		c.Bindings = append(c.Bindings, Binding{WorkspaceID: "one", TargetID: "gitea:" + name})
 	}
 	if err := c.validate(); err != nil {
@@ -82,7 +89,7 @@ func checkGiteaPostgres(t *testing.T, ctx context.Context, store *persistence.St
 		}
 		var snapshot Snapshot
 		_ = json.Unmarshal(value, &snapshot)
-		if snapshot.Instance != target.Instance || snapshot.RepositoryID != 1 || snapshot.Title != strings.TrimPrefix(target.ID, "gitea:") {
+		if snapshot.Instance != target.Instance || snapshot.Repository != "fixture/repo" || snapshot.RepositoryID != 8 || snapshot.Title != strings.TrimPrefix(target.ID, "gitea:") {
 			t.Fatal("same-name Gitea targets mixed")
 		}
 	}
@@ -126,7 +133,7 @@ func checkGiteaPostgres(t *testing.T, ctx context.Context, store *persistence.St
 			first = client
 		}
 	}
-	body := []byte(`{"repository":{"id":1},"issue":{"state":"closed","title":"untrusted payload"}}`)
+	body := []byte(`{"repository":{"id":8},"issue":{"state":"closed","title":"untrusted payload"}}`)
 	mac := hmac.New(sha256.New, first.Secret)
 	_, _ = mac.Write(body)
 	for range 2 {
