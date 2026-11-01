@@ -61,7 +61,11 @@ func (s *Service) RecordConnector(ctx context.Context, w, id string, source Ref,
 			r.StartedAt = &now
 			r.ExecutionRequestedAt = &now
 			r.ReportedThrough = "1"
-			r.Execution = &ExecutionInfo{Environment: "server-connector", Version: "github-issues-v1", VersionObserved: true}
+			version := "github-issues-v1"
+			if spec.Derivation != nil {
+				version = spec.Derivation.Version
+			}
+			r.Execution = &ExecutionInfo{Environment: "server-connector", Version: version, VersionObserved: true}
 		} else {
 			if r.State != "running" || !json.Valid(report) {
 				return nil, ErrState

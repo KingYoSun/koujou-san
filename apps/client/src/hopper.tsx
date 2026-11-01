@@ -1123,7 +1123,8 @@ export function Hopper({
                       setPastAfter(0);
                     }}
                   >
-                    <option value="github">外部CI</option>
+                    <option value="github">GitHubの外部CI</option>
+                    <option value="gitea">GiteaのCI・status</option>
                     <option value="run">Run</option>
                   </select>
                 </label>

@@ -12,6 +12,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/githubobserve"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/inspections"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/publications"
 	"github.com/jackc/pgx/v5"
 	"io"
 	"net/http"
@@ -40,7 +41,7 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var githubConfig *githubobserve.Config
-	if os.Getenv("KOUJOU_TEST_GITHUB_LIVE") == "1" {
+	if os.Getenv("KOUJOU_TEST_GITHUB_LIVE") == "1" || os.Getenv("KOUJOU_TEST_GITEA_UI") == "1" {
 		var err error
 		githubConfig, err = githubobserve.Environment()
 		if err != nil || githubConfig == nil {
@@ -50,12 +51,33 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 		// remain exactly those of the explicit read-only live configuration.
 		githubConfig.Bindings = nil
 		for _, target := range githubConfig.Targets {
-			githubConfig.Bindings = append(githubConfig.Bindings, githubobserve.Binding{WorkspaceID: "mcp-one", TargetID: target.ID, ExpectedCommit: "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c", RequiredJobs: []string{"web-e2e / android-web-e2e"}})
+			binding := githubobserve.Binding{WorkspaceID: "mcp-one", TargetID: target.ID}
+			if target.Provider == "gitea" {
+				if target.Kind == "actions" {
+					binding.RequiredJobs = []string{"Linux", "Windows"}
+				}
+			} else {
+				binding.ExpectedCommit = "ec3a86cf6a02bfd97079fd7a2e918afd06096c3c"
+				binding.RequiredJobs = []string{"web-e2e / android-web-e2e"}
+			}
+			githubConfig.Bindings = append(githubConfig.Bindings, binding)
 		}
 	}
 	observer, err := githubobserve.New(ctx, service.Access.Store, service.Access, githubConfig)
 	if err != nil {
 		t.Fatal(err)
+	}
+	if os.Getenv("KOUJOU_TEST_GITEA_UI") == "1" {
+		publicationConfig, err := publications.Environment()
+		if err != nil || publicationConfig == nil {
+			t.Fatal("Gitea UI requires the approved scoped publisher config")
+		}
+		backend := publications.NewRemote(publicationConfig)
+		service.Hopper.Publications.Backend = backend
+		service.Automation.PriorityBackend = backend
+		service.Automation.PriorityIntervalSeconds = 2
+		service.Workflows.Observer = observer
+		observer.Accepted = service.Hopper.GitHubAccepted
 	}
 	observer.Register(githubMux)
 	observer.Start(ctx)
@@ -294,7 +316,7 @@ func inspectUI(t *testing.T, client *http.Client, target string, tokens, bob aut
 			traceLock.Lock()
 			trace = append(trace, entry)
 			traceLock.Unlock()
-			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/usage/", "/automation/", "/runs/", "/workflows/", "/inspections/", "/publications/", "/workbench/", "/hopper/", "/client-operations/", "/healthz", "/readyz"} {
+			for _, prefix := range []string{"/auth/me", "/auth/config", "/auth/csrf", "/access/", "/mcp/control/", "/contexts/", "/sync/", "/search/", "/graph/", "/github/", "/forge/", "/gitea/", "/usage/", "/automation/", "/runs/", "/workflows/", "/inspections/", "/publications/", "/workbench/", "/hopper/", "/client-operations/", "/healthz", "/readyz"} {
 				if strings.HasPrefix(r.URL.Path, prefix) {
 					token, err := bearer()
 					if err != nil {

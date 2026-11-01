@@ -334,12 +334,12 @@ export function TriageIssue({
           </label>
           {admin && (
             <details>
-              <summary>既存GitHub Issueとの接続</summary>
+              <summary>既存の外部Issueとの接続</summary>
               <p>
                 優先度ラベルは方針の設定を使います。本文・状態の観測は別の入力として保持し、ラベル同期では書き換えません。外部への反映には現在の実行許可も必要です。
               </p>
               <label>
-                GitHub接続ID
+                外部接続ID
                 <input
                   value={value.external?.connection ?? ""}
                   onChange={(e) =>
@@ -378,7 +378,7 @@ export function TriageIssue({
           )}
           {value.observed && (
             <details>
-              <summary>GitHubで観測した本文・状態</summary>
+              <summary>外部で観測した本文・状態</summary>
               <p>
                 {value.observed.title} · {value.observed.state} ·{" "}
                 {value.observed.at}

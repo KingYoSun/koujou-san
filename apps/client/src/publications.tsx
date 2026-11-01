@@ -1,5 +1,6 @@
 import { Field } from "./field";
 import { PageList } from "./page-list";
+import { SourceLink } from "./github-observations";
 import {
   NavigationLink,
   ScreenContent,
@@ -33,7 +34,7 @@ type Request = {
   reason: string;
   external_body: string;
   run_id: string;
-  connection: { repository: string };
+  connection: { repository: string; provider?: string; instance?: string };
   actor: { kind: string; user_id: string; control?: Ref };
   observed_at?: string;
   external?: {
@@ -525,7 +526,7 @@ export function Publications({
         <section className="panel workflow-editor" aria-label="外部Issueの起票">
           <h3>外部Issueの起票</h3>
           <p>
-            下書き、共有受付、GitHubでの作成確認を分けて記録します。応答を失った要求は再作成せず、本文末尾の照合コメントで探します。
+            下書き、共有受付、外部での作成確認を分けて記録します。応答を失った要求は再作成せず、本文末尾の照合コメントで探します。
           </p>
           {incoming &&
             navigation?.route.target?.id === incoming.output.id &&
@@ -631,7 +632,7 @@ export function Publications({
                 [
                   ["name", "下書きの名前"],
                   ["connection", "起票接続ID"],
-                  ["title", "GitHub Issueのタイトル"],
+                  ["title", "外部Issueのタイトル"],
                 ] as const
               ).map(([key, label]) => (
                 <label key={key}>
@@ -645,7 +646,7 @@ export function Publications({
                 </label>
               ))}
               <label>
-                GitHub Issueの本文
+                外部Issueの本文
                 <textarea
                   value={editor.value.body}
                   onChange={(e) => {
@@ -728,7 +729,12 @@ export function Publications({
             <section aria-label="起票の送信前プレビュー">
               <h4>送信前プレビュー · 外部未送信</h4>
               <p>
-                対象: {proposal.preview.connection.repository} / 要求ID:{" "}
+                対象:{" "}
+                {proposal.preview.connection.provider === "gitea"
+                  ? "Gitea"
+                  : "GitHub"}{" "}
+                · {proposal.preview.connection.instance ?? "https://github.com"}{" "}
+                / {proposal.preview.connection.repository} / 要求ID:{" "}
                 {proposal.id}
               </p>
               <p>{proposal.preview.input.title}</p>
@@ -798,6 +804,11 @@ export function Publications({
                     外部Issue: {result.external.html_url} ·{" "}
                     {result.external.state}
                   </p>
+                  <SourceLink
+                    href={result.external.html_url}
+                    native={native}
+                    instance={result.connection.instance}
+                  />
                   <h4>{result.external.title}</h4>
                   <pre>{result.external.body}</pre>
                   <p>外部更新日時: {result.external.updated_at}</p>

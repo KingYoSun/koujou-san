@@ -381,5 +381,6 @@ func TestPublicationsPostgres(t *testing.T) {
 		t.Fatal("common Run leaked restricted draft")
 	}
 	t.Log("fixed shared acceptance, one concurrent send, App token scope, GET-confirmed creation, lost-response and process-loss reconciliation, canonical edits, definite failure, current authority and bounded pages passed")
+	checkGiteaSharedPublication(t, ctx, store, a)
 }
 func errorsIsState(err error) bool { return err == ErrState }

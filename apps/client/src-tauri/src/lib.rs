@@ -10,6 +10,7 @@ pub fn run() {
             auth::api_request,
             auth::open_account,
             auth::open_github,
+            forge::open_forge,
             auth::device_identifier,
             auth::device_enroll,
             auth::device_contact,
@@ -47,6 +48,7 @@ pub fn run() {
 }
 pub mod auth;
 mod connection;
+mod forge;
 mod run_export;
 mod sync_store;
 

@@ -11,6 +11,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/gitea"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/githubobserve"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
@@ -218,9 +219,9 @@ func (s *Service) externalAccess(ctx context.Context, q query, p access.Principa
 	for _, target := range targets {
 		var err error
 		if tx, ok := q.(pgx.Tx); ok {
-			err = s.Access.CheckTx(ctx, tx, p, w, "github:"+target, "get")
+			err = s.Access.CheckTx(ctx, tx, p, w, gitea.Resource(target), "get")
 		} else {
-			err = s.Access.Check(ctx, p, w, "github:"+target, "get")
+			err = s.Access.Check(ctx, p, w, gitea.Resource(target), "get")
 		}
 		if err != nil {
 			return err

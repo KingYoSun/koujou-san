@@ -4,6 +4,8 @@ koujou-sanの製品仕様、開発手順、現在の状態をここから参照�
 
 Projectの相談は[チャットの保存・仕様採用・関連作業](runbooks/project-chat.md)を参照する。
 
+self-hosted Giteaは[接続・観測・起票・Runnerの手順](runbooks/gitea.md)を参照する。
+
 ## 読む順番
 
 1. [共通指示](../AGENTS.md)。

@@ -54,7 +54,7 @@ func DefaultModel() serverllm.Spec {
 
 func (s *Service) prepareIssue(ctx context.Context, tx pgx.Tx, p access.Principal, w, id string, raw []byte) (json.RawMessage, []Ref, error) {
 	var value Issue
-	if decode(raw, &value) != nil || !fixed(value.Scope) || !strings.HasPrefix(value.Scope.ID, "scope:") || id != "issue:"+strings.TrimPrefix(value.Scope.ID, "scope:") || value.Title == "" || (value.State != "open" && value.State != "closed") || (value.Origin != "human" && value.Origin != "hopper" && value.Origin != "github") {
+	if decode(raw, &value) != nil || !fixed(value.Scope) || !strings.HasPrefix(value.Scope.ID, "scope:") || id != "issue:"+strings.TrimPrefix(value.Scope.ID, "scope:") || value.Title == "" || (value.State != "open" && value.State != "closed") || (value.Origin != "human" && value.Origin != "hopper" && value.Origin != "github" && value.Origin != "gitea") {
 		return nil, nil, ErrInvalid
 	}
 	action := "update"
