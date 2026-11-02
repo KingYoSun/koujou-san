@@ -308,6 +308,19 @@ func checkServerModel(t *testing.T, s *Service) {
 	if err != nil || decode(r.Value, &op) != nil || op.State != "completed" {
 		t.Fatal("tool completion", op.State, err)
 	}
+	toolTurn, err := s.Read(ctx, p, "one", Ref{ID: toolReq.Turn.ID, Version: "head"})
+	if err != nil || !strings.Contains(string(toolTurn.Value), "OPAQUE_REASONING") {
+		t.Fatal("fixed tool turn lost continuation", err)
+	}
+	toolPage, err := s.Query(ctx, p, "one", Request{Kind: "turn", Root: toolOperation.ID, Limit: 10})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range toolPage.Items {
+		if strings.Contains(string(item.Value), "OPAQUE_REASONING") {
+			t.Fatal("turn list returned raw continuation history")
+		}
+	}
 	body, policyRef = previousBody, previousPolicy
 	mode.Store("revoke")
 	revoked, revokedReq := newOperation("revoked-in-flight")

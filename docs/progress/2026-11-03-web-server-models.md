@@ -61,3 +61,5 @@ UIは静的描画と実handlerによる自動試験で確認した。1440px／10
 `a079fe0e`の差分再検品ではblocker解消・追加blockerなし。AC-1〜5をPASS、AC-6は独立検品完了・CI待ちと判定した。独立再実行でもGo対象3パッケージ、Vitest対象2ファイル17件、型検査・差分検査が成功した。
 
 PR #91は最終CIの全checkが成功し、`4a25981e`でmergeした。配備前の[Responses schema](https://developers.openai.com/api/reference/resources/responses/methods/create)の再照合で、Namespace toolの必須`description`欠落を確認したため、AC-4を再開した。既存の所有fixtureがこの必須項目を検査していなかった。検査を追加して修正前の失敗を確認し、共通変換へ読取りtoolの説明を付けた。変更は当該一項目と回帰検査に限定し、追加PRで検品・CIを確認してから配備する。個人環境への切替はまだ行っていない。
+
+同じ配備前検査で、継続用の`server_output`がturn一覧へ残ることを追加DB試験で確認した。AC-5の追加原履歴を一覧から除く条件として、サーバー接続のturn一覧からこのtransport用のfieldも除去し、固定readでの保持を検査した。既存の直結・nativeのturnと、固定readを使うHostの継続は維持する。この差分も[補完PR #92](https://github.com/KingYoSun/koujou-san/pull/92)で検品する。
