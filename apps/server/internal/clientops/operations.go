@@ -84,6 +84,9 @@ func (s *Service) Start(ctx context.Context, p access.Principal, w, id string, r
 		if err != nil {
 			return Record{}, err
 		}
+		if err := s.resolveServerModel(w, &req.Model); err != nil {
+			return Record{}, err
+		}
 		if policy.Mode == "manual" && req.Purpose != "context-generation" {
 			return Record{}, ErrState
 		}
@@ -271,6 +274,9 @@ func (s *Service) Act(ctx context.Context, p access.Principal, w, id string, req
 				if !validModel(*req.Model) {
 					return Record{}, ErrInvalid
 				}
+				if err := s.resolveServerModel(w, req.Model); err != nil {
+					return Record{}, err
+				}
 				op.Model = *req.Model
 			}
 			if op.State == "waiting" {
@@ -369,17 +375,20 @@ type Begin struct {
 	Sources       []Ref  `json:"sources"`
 }
 type Turn struct {
-	RequestID     string          `json:"request_id"`
-	Operation     Ref             `json:"operation"`
-	Client        string          `json:"client"`
-	Model         Model           `json:"model"`
-	InputDigest   string          `json:"input_digest"`
-	PromptVersion string          `json:"prompt_version"`
-	Response      json.RawMessage `json:"response,omitempty"`
-	State         string          `json:"state"`
-	TimeoutMS     int64           `json:"timeout_ms"`
-	Status        int             `json:"http_status,omitempty"`
-	Failure       string          `json:"failure,omitempty"`
+	ServerResponse *Ref            `json:"server_response,omitempty"`
+	ServerProtocol string          `json:"server_protocol,omitempty"`
+	ServerDigest   string          `json:"server_digest,omitempty"`
+	RequestID      string          `json:"request_id"`
+	Operation      Ref             `json:"operation"`
+	Client         string          `json:"client"`
+	Model          Model           `json:"model"`
+	InputDigest    string          `json:"input_digest"`
+	PromptVersion  string          `json:"prompt_version"`
+	Response       json.RawMessage `json:"response,omitempty"`
+	State          string          `json:"state"`
+	TimeoutMS      int64           `json:"timeout_ms"`
+	Status         int             `json:"http_status,omitempty"`
+	Failure        string          `json:"failure,omitempty"`
 }
 
 func (s *Service) Begin(ctx context.Context, p access.Principal, w, id string, req Begin) (apicontract.Response[apicontract.Reference], error) {
@@ -394,6 +403,9 @@ func (s *Service) Begin(ctx context.Context, p access.Principal, w, id string, r
 		if req.Client == "" || op.Client != req.Client || op.State != "ready" {
 			return Record{}, ErrState
 		}
+		if err := s.resolveServerModel(w, &op.Model); err != nil {
+			return Record{}, err
+		}
 		policy, err := s.currentPolicy(ctx, tx, p, w, op)
 		if err != nil {
 			return Record{}, err
@@ -402,22 +414,8 @@ func (s *Service) Begin(ctx context.Context, p access.Principal, w, id string, r
 			return Record{}, ErrState
 		}
 		reader := access.Principal{UserID: p.UserID, OperationID: op.ReadOperation}
-		if policy.Chat != nil {
-			if _, _, err = s.chatThread(ctx, tx, p, w, policy.Chat.Thread, true); err != nil {
-				return Record{}, err
-			}
-			if _, err = s.chatSources(ctx, tx, reader, w, policy.Chat); err != nil {
-				return Record{}, err
-			}
-		}
-		if policy.Generation != nil {
-			_, deps, err := s.generationSource(ctx, p, w, policy.Generation)
-			if err != nil {
-				return Record{}, err
-			}
-			if err = s.checkRefs(ctx, tx, access.Principal{UserID: p.UserID, OperationID: op.CandidateOperation}, w, append(deps, generationRefs(policy.Generation)...)); err != nil {
-				return Record{}, err
-			}
+		if err := s.modelSources(ctx, tx, p, w, op, policy); err != nil {
+			return Record{}, err
 		}
 
 		observed, err := s.mcpSources(ctx, tx, w, op.ReadOperation, nil, false)
@@ -538,5 +536,29 @@ func (s *Service) adopt(ctx context.Context, tx pgx.Tx, p access.Principal, w st
 	op.Applied = &ref
 	op.State = "applied"
 	op.Reason = ""
+	return nil
+}
+
+// modelSources rechecks the fixed sources before reservation and dispatch.
+func (s *Service) modelSources(ctx context.Context, tx query, p access.Principal, w string, op Operation, policy Policy) error {
+	var err error
+	reader := access.Principal{UserID: p.UserID, OperationID: op.ReadOperation}
+	if policy.Chat != nil {
+		if _, _, err = s.chatThread(ctx, tx, p, w, policy.Chat.Thread, true); err != nil {
+			return err
+		}
+		if _, err = s.chatSources(ctx, tx, reader, w, policy.Chat); err != nil {
+			return err
+		}
+	}
+	if policy.Generation != nil {
+		_, deps, err := s.generationSource(ctx, p, w, policy.Generation)
+		if err != nil {
+			return err
+		}
+		if err = s.checkRefs(ctx, tx, access.Principal{UserID: p.UserID, OperationID: op.CandidateOperation}, w, append(deps, generationRefs(policy.Generation)...)); err != nil {
+			return err
+		}
+	}
 	return nil
 }

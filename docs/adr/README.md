@@ -61,3 +61,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0034: Giteaの外部識別と既存工程への接続](0034-gitea-integration.md)
 
 - [0035: サーバーのChatGPTプラン接続](0035-server-chatgpt-plan.md)
+
+- [0036: Webのクライアント操作でサーバーLLM接続を使う](0036-web-server-models.md)

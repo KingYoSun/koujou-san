@@ -3,6 +3,7 @@ package clientops
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"strings"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
@@ -10,6 +11,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/serverllm"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/workflows"
 	"github.com/jackc/pgx/v5"
@@ -20,6 +22,7 @@ type query interface {
 	QueryRow(context.Context, string, ...any) pgx.Row
 }
 type Service struct {
+	Gateway     *serverllm.Gateway
 	Runs        *runs.Service
 	Definitions *workflows.Service
 	Store       *persistence.Store
@@ -30,6 +33,7 @@ type Service struct {
 
 func New(s *persistence.Store, a *access.Service, c *contexts.Service, u *usage.Service) *Service {
 	service := &Service{Store: s, Access: a, Contexts: c, Usage: u, Runs: runs.New(s, a, c)}
+	service.Gateway = &serverllm.Gateway{ConfigFile: os.Getenv("KOUJOU_SERVER_LLM_CONFIG")}
 	previous := s.Accepted
 	s.Accepted = func(ctx context.Context, tx pgx.Tx, command persistence.Command, ref apicontract.Reference, value json.RawMessage) error {
 		if previous != nil {
@@ -291,7 +295,7 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, req R
 	if req.Descending {
 		boundary, order = "($7=0 OR r.position<$7 OR (r.position=$7 AND r.id<$8))", "r.position DESC,r.id DESC"
 	}
-	rows, err := s.Store.Database().Query(ctx, `SELECT r.id,r.version,r.kind,r.root_id,r.position,CASE WHEN $11 THEN jsonb_build_object('name',r.payload->>'name','goal',r.payload->>'goal','state',r.payload->>'state') ELSE r.payload END,r.refs FROM client_operation_records r LEFT JOIN shared_versions h ON h.workspace_id=r.workspace_id AND h.resource_id=r.id AND h.version=r.version WHERE r.workspace_id=$1 AND ($4='' OR r.kind=$4) AND ($5='' OR r.id=$5) AND ($6 OR h.resource_id IS NOT NULL) AND `+boundary+` AND ($10='' OR r.root_id=$10) AND ($12='' OR strpos(lower(r.payload->>'name'),lower($12))>0) AND `+access.ReadFilterSQL("r.refs||jsonb_build_array(jsonb_build_object('id',r.id,'version',r.version))")+` ORDER BY `+order+` LIMIT $9`, w, p.UserID, p.OperationID, req.Kind, req.ID, req.History, req.After, req.AfterID, req.Limit, req.Root, req.Metadata, req.Search)
+	rows, err := s.Store.Database().Query(ctx, `SELECT r.id,r.version,r.kind,r.root_id,r.position,CASE WHEN $11 THEN jsonb_build_object('name',r.payload->>'name','goal',r.payload->>'goal','state',r.payload->>'state') ELSE CASE WHEN r.kind='server-model-dispatch' THEN r.payload-'request'-'response' ELSE r.payload END END,r.refs FROM client_operation_records r LEFT JOIN shared_versions h ON h.workspace_id=r.workspace_id AND h.resource_id=r.id AND h.version=r.version WHERE r.workspace_id=$1 AND ($4='' OR r.kind=$4) AND ($5='' OR r.id=$5) AND ($6 OR h.resource_id IS NOT NULL) AND `+boundary+` AND ($10='' OR r.root_id=$10) AND ($12='' OR strpos(lower(r.payload->>'name'),lower($12))>0) AND `+access.ReadFilterSQL("r.refs||jsonb_build_array(jsonb_build_object('id',r.id,'version',r.version))")+` ORDER BY `+order+` LIMIT $9`, w, p.UserID, p.OperationID, req.Kind, req.ID, req.History, req.After, req.AfterID, req.Limit, req.Root, req.Metadata, req.Search)
 	if err != nil {
 		return page, err
 	}
@@ -305,7 +309,7 @@ func (s *Service) Query(ctx context.Context, p access.Principal, w string, req R
 		if err = json.Unmarshal(b, &r.Refs); err != nil {
 			return page, err
 		}
-		if req.Metadata {
+		if req.Metadata || r.Kind == "server-model-dispatch" {
 			r.MetadataOnly = true
 			r.Dependencies = r.Refs
 			r.Refs = []Ref{}

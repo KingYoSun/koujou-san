@@ -59,6 +59,7 @@ export type ClientOperation = {
   goal: string;
   purpose: string;
   model: {
+    server_connection?: string;
     connection: string;
     revision: string;
     requested: string;
@@ -73,6 +74,7 @@ export type ClientOperation = {
   applied?: VersionRef;
 };
 type ModelMessage = {
+  server_output?: unknown[];
   role: string;
   content?: string | null;
   tool_calls?: ToolCall[];
@@ -471,30 +473,14 @@ export async function runSelection(
       }
       if (!port.active()) return current;
       const resultMutation = crypto.randomUUID();
-      try {
-        const ref = await port.write(
-          current.id,
-          "finish",
-          current.version,
-          {
-            client,
-            turn: { id: intent.id, version: intent.version },
-            response: response.body,
-            http_status: response.status,
-            failure,
-          },
-          resultMutation,
-        );
-        current = await port.read<ClientOperation>(ref);
-      } catch (error) {
-        const live = await port.read<ClientOperation>(head(current));
-        if (live.value.turn?.id !== intent.id) throw error;
-        if (live.value.turn.version === intent.version) {
-          if (live.value.state !== "sending") throw error;
+      if (profile.server_connection) {
+        current = await port.read<ClientOperation>(head(current));
+      } else
+        try {
           const ref = await port.write(
-            live.id,
+            current.id,
             "finish",
-            live.version,
+            current.version,
             {
               client,
               turn: { id: intent.id, version: intent.version },
@@ -505,8 +491,27 @@ export async function runSelection(
             resultMutation,
           );
           current = await port.read<ClientOperation>(ref);
-        } else current = live;
-      }
+        } catch (error) {
+          const live = await port.read<ClientOperation>(head(current));
+          if (live.value.turn?.id !== intent.id) throw error;
+          if (live.value.turn.version === intent.version) {
+            if (live.value.state !== "sending") throw error;
+            const ref = await port.write(
+              live.id,
+              "finish",
+              live.version,
+              {
+                client,
+                turn: { id: intent.id, version: intent.version },
+                response: response.body,
+                http_status: response.status,
+                failure,
+              },
+              resultMutation,
+            );
+            current = await port.read<ClientOperation>(ref);
+          } else current = live;
+        }
       onChange(current);
       if (current.value.state !== "ready" || current.value.client !== client)
         return current;

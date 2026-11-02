@@ -129,4 +129,5 @@ func TestClientOperationsPostgres(t *testing.T) {
 	t.Run("generated_definitions_use_normal_validation_and_never_start", func(t *testing.T) { checkDefinitions(t, s) })
 	t.Run("fixed_output_to_Context_keeps_records_and_authority", func(t *testing.T) { checkContextGeneration(t, s) })
 	t.Run("project_chat_history_adoption_delivery_and_recovery", func(t *testing.T) { checkProjectChat(t, s, url) })
+	t.Run("server_model_dispatch_and_owned_chat", func(t *testing.T) { checkServerModel(t, s) })
 }

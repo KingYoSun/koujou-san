@@ -153,6 +153,7 @@ func (p Connection) AllowsChain(requested string, fallbacks, actual []string) bo
 }
 
 type Response struct {
+	Terminal  string            `json:"terminal,omitempty"`
 	Status    int               `json:"status"`
 	Body      json.RawMessage   `json:"body"`
 	RequestID string            `json:"request_id,omitempty"`

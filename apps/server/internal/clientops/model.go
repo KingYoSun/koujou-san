@@ -28,15 +28,16 @@ type Record struct {
 	Dependencies []Ref           `json:"-"`
 }
 type Model struct {
-	Cost       *usage.CostBudget    `json:"cost,omitempty"`
-	Endpoint   string               `json:"endpoint,omitempty"`
-	Connection string               `json:"connection"`
-	Revision   string               `json:"revision"`
-	Requested  string               `json:"requested"`
-	Allowed    []string             `json:"allowed"`
-	Contract   string               `json:"contract,omitempty"`
-	Prices     map[string]usage.Ref `json:"prices,omitempty"`
-	Valuation  string               `json:"valuation,omitempty"`
+	ServerConnection string               `json:"server_connection,omitempty"`
+	Cost             *usage.CostBudget    `json:"cost,omitempty"`
+	Endpoint         string               `json:"endpoint,omitempty"`
+	Connection       string               `json:"connection"`
+	Revision         string               `json:"revision"`
+	Requested        string               `json:"requested"`
+	Allowed          []string             `json:"allowed"`
+	Contract         string               `json:"contract,omitempty"`
+	Prices           map[string]usage.Ref `json:"prices,omitempty"`
+	Valuation        string               `json:"valuation,omitempty"`
 }
 type Operation struct {
 	AdoptPaths         []string         `json:"adopt_paths,omitempty"`
