@@ -42,6 +42,9 @@ import {
   type SelectionPolicy,
   type GenerationPolicy,
 } from "./client-selection-host";
+import { Disclosure } from "./disclosure";
+import { Field } from "./field";
+import { StatusBadge } from "./status-badge";
 const pin = (v: VersionRef): VersionRef => ({ id: v.id, version: v.version });
 type Proposal = {
   changes_utf8?: string;
@@ -58,13 +61,14 @@ type Selection = {
   manifest: Ref;
   items: Proposal["items"];
 };
-const labels: Record<string, string> = {
+export const operationStateLabels: Record<string, string> = {
   waiting: "処理クライアントを待機",
   ready: "選択の準備・継続待ち",
   sending: "モデルへ要求済み",
   question: "依頼者への質問",
   proposal: "確認する案があります",
   applied: "選択を保存・反映済み",
+  completed: "処理を完了",
   incomplete: "未確認事項・上限・接続を確認",
   failed: "接続・応答の確認が必要",
   cancelled: "操作を終了",
@@ -106,8 +110,6 @@ export function ClientSelection({
   generationCurrent.current = generation;
   const [generationDraft, setGenerationDraft] = useState<ContextProposalDraft>({
     text: emptyContextChanges,
-    page: 0,
-    candidatePage: 0,
     chosen: [],
   });
   const definitionCurrent = useRef(definition);
@@ -145,8 +147,6 @@ export function ClientSelection({
     const value = JSON.parse(text) as ContextChanges;
     setGenerationDraft({
       text,
-      page: 0,
-      candidatePage: 0,
       chosen: [...value.changes, ...value.grouping].map((v) => v.key),
     });
   }, [operation?.id, proposal?.id, proposal?.version]);
@@ -159,13 +159,13 @@ export function ClientSelection({
     !!generation &&
     generationDraft.text !==
       (proposal?.value.changes_utf8 ?? emptyContextChanges);
-  const [records, setRecords] = useState<Saved[]>([]),
+  const [records, setRecords] = useState<Saved[]>(),
     [kind, setKind] = useState("operation"),
     [after, setAfter] = useState<{ after: number; after_id: string }>({
       after: 0,
       after_id: "",
     }),
-    [history, setHistory] = useState<Saved[]>([]),
+    [history, setHistory] = useState<Saved[]>(),
     [historyItem, setHistoryItem] = useState<Saved>(),
     [historyCursor, setHistoryCursor] = useState({ after: 0, after_id: "" }),
     [fixedPage, setFixedPage] = useState(0),
@@ -202,8 +202,8 @@ export function ClientSelection({
     setOperation(undefined);
     setOperationSource(undefined);
     setProposal(undefined);
-    setRecords([]);
-    setHistory([]);
+    setRecords(undefined);
+    setHistory(undefined);
     setHistoryItem(undefined);
     setSelection(undefined);
     setFixed([]);
@@ -251,21 +251,18 @@ export function ClientSelection({
     if (generationCurrent.current) {
       if (expected !== undefined && expected !== inputSignature()) {
         setNotice(
-          "Contextの変更を保存しました。表示中の出力や設定は変わっているため、履歴で結果を確認してください。",
+          "Contextの変更を保存しました。表示中の出力・設定は変わっています。",
         );
         return;
       }
       await generationCurrent.current.onApplied(ref);
-      setNotice(
-        "検証したContextの版と所属を保存しました。原出力・過去の入力は変更していません。",
-      );
+      setNotice("Contextの版と所属を保存しました。");
       return;
     }
     if (definitionCurrent.current) {
+      const stale = "定義を保存しました。編集中の下書きは変わっています。";
       if (expected !== undefined && expected !== inputSignature()) {
-        setNotice(
-          "定義を保存しました。編集中の下書きは変更されているため、現在版を取得して比較してください。",
-        );
+        setNotice(stale);
         return;
       }
       const applied = await definitionCurrent.current.onApplied(
@@ -274,22 +271,16 @@ export function ClientSelection({
         () => expected === undefined || expected === inputSignature(),
       );
       if (!applied) {
-        setNotice(
-          "定義を保存しました。編集中の下書きは変更されているため、現在版を取得して比較してください。",
-        );
+        setNotice(stale);
         return;
       }
-      setNotice(
-        "検証した定義版を保存・採用しました。Runの作成・実行は始めていません。",
-      );
+      setNotice("定義版を保存・採用しました。");
       return;
     }
     const saved = await read<Selection>(ref);
     setSelection(pin(saved));
     if (expected !== undefined && expected !== inputSignature()) {
-      setNotice(
-        "選択を保存しました。画面の選択は変更されているため、差分を確認してから反映してください。",
-      );
+      setNotice("選択を保存しました。画面の選択は変わっています。");
       return;
     }
     automatic.current = JSON.stringify([
@@ -303,9 +294,7 @@ export function ClientSelection({
       exclude: saved.value.input.exclude ?? [],
     });
     setSelection(pin(saved));
-    setNotice(
-      "固定した選択を保存し、入力プレビューへ反映しました。Runは開始していません。",
-    );
+    setNotice("選択を保存し、入力プレビューへ反映しました。");
   }
   async function refresh(ref?: VersionRef) {
     const selected = ref ?? operation;
@@ -337,12 +326,10 @@ export function ClientSelection({
     } catch (error) {
       setNotice(
         error instanceof SyncHTTPError && error.status === 409
-          ? "操作の版または担当クライアントが変わっています。入力を保持したまま、処理状況と担当を確認してください。"
+          ? "操作を更新できませんでした。操作の版と担当クライアントを確認してください。"
           : error instanceof SyncHTTPError && error.status === 400
-            ? "入力または変更案の形式を受け付けられませんでした。固定参照・新規作成のIDと版・変更案JSONを確認してください。編集内容は保持しています。"
-            : definition
-              ? "入力・現在の定義版・権限・接続を確認してください。未確認の要求は自動再送しません。定義の下書きから手動編集もできます。"
-              : "入力・現在の版・権限・接続を確認してください。未確認のモデル要求は自動再送しません。手動で選択・保存することもできます。",
+            ? "入力を受け付けられませんでした。固定参照のIDと版・変更案JSONを確認してください。"
+            : "要求を実行できませんでした。入力・現在版・権限・接続を確認してください。",
       );
     } finally {
       setBusy(false);
@@ -472,7 +459,7 @@ export function ClientSelection({
       return;
     }
     if (["adopt", "answer", "resume"].includes(action) && !ownsOperation) {
-      setNotice("このクライアントへ明示的に引き継いでから操作してください。");
+      setNotice("このクライアントへ引き継いでから操作してください。");
       return;
     }
     if (!generationMatches && action !== "cancel" && action !== "takeover") {
@@ -583,20 +570,18 @@ export function ClientSelection({
                 ? "生成する目的と方針"
                 : "選択する目的と方針"}
             </legend>
-            <label>
-              作業の目的
-              <textarea
-                aria-label={
-                  generation
-                    ? "Contextを作る依頼"
-                    : definition
-                      ? "Run定義を作る依頼"
-                      : "Contextを選ぶ目的"
-                }
-                value={goal}
-                onChange={(e) => setGoal(e.target.value)}
-              />
-            </label>
+            <Field
+              label={
+                generation
+                  ? "Contextを作る依頼"
+                  : definition
+                    ? "Run定義を作る依頼"
+                    : "Contextを選ぶ目的"
+              }
+              value={goal}
+              onChange={setGoal}
+              rows={3}
+            />
             <label>
               反映方式
               <select
@@ -662,78 +647,81 @@ export function ClientSelection({
                 )}
               </>
             )}
-            <details>
-              <summary>対象Scope・上限・必須項目</summary>
-              <label>
-                絞り込むScope ID（空欄はWorkspaceの許可範囲）
-                <input
-                  value={scopes}
-                  onChange={(e) => setScopes(e.target.value)}
-                />
-              </label>
-              <label>
-                モデル要求の上限
-                <input
-                  type="number"
-                  min={1}
-                  value={models}
-                  onChange={(e) => setModels(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                MCP要求の上限
-                <input
-                  type="number"
-                  min={1}
-                  value={mcp}
-                  onChange={(e) => setMcp(Number(e.target.value))}
-                />
-              </label>
-              <label>
-                時間上限（秒）
-                <input
-                  type="number"
-                  min={1}
-                  value={seconds}
-                  onChange={(e) => setSeconds(Number(e.target.value))}
-                />
-              </label>
-              {state.include
-                .slice(fixedPage * 50, fixedPage * 50 + 50)
-                .map((r) => (
-                  <label key={refKey(r)}>
-                    <input
-                      type="checkbox"
-                      checked={fixed.some((v) => refKey(v) === refKey(r))}
-                      onChange={(e) =>
-                        setFixed(
-                          e.target.checked
-                            ? [...fixed, r]
-                            : fixed.filter((v) => refKey(v) !== refKey(r)),
-                        )
-                      }
-                    />
-                    {refLabel(r)}
-                  </label>
-                ))}
-              {state.include.length > 50 && (
+            <Disclosure title="対象Scope・上限・必須項目">
+              {() => (
                 <>
-                  <button
-                    disabled={fixedPage === 0}
-                    onClick={() => setFixedPage(fixedPage - 1)}
-                  >
-                    必須項目の前の50件
-                  </button>
-                  <span>{fixedPage * 50 + 1}件目から表示</span>
-                  <button
-                    disabled={(fixedPage + 1) * 50 >= state.include.length}
-                    onClick={() => setFixedPage(fixedPage + 1)}
-                  >
-                    必須項目の次の50件
-                  </button>
+                  <Field
+                    label="絞り込むScope ID"
+                    value={scopes}
+                    onChange={setScopes}
+                  />
+                  <label>
+                    モデル要求の上限
+                    <input
+                      type="number"
+                      min={1}
+                      value={models}
+                      onChange={(e) => setModels(Number(e.target.value))}
+                    />
+                  </label>
+                  <label>
+                    MCP要求の上限
+                    <input
+                      type="number"
+                      min={1}
+                      value={mcp}
+                      onChange={(e) => setMcp(Number(e.target.value))}
+                    />
+                  </label>
+                  <label>
+                    時間上限（秒）
+                    <input
+                      type="number"
+                      min={1}
+                      value={seconds}
+                      onChange={(e) => setSeconds(Number(e.target.value))}
+                    />
+                  </label>
+                  {state.include
+                    .slice(fixedPage * 50, fixedPage * 50 + 50)
+                    .map((r) => (
+                      <label key={refKey(r)}>
+                        <input
+                          type="checkbox"
+                          checked={fixed.some((v) => refKey(v) === refKey(r))}
+                          onChange={(e) =>
+                            setFixed(
+                              e.target.checked
+                                ? [...fixed, r]
+                                : fixed.filter((v) => refKey(v) !== refKey(r)),
+                            )
+                          }
+                        />
+                        {refLabel(r)}
+                      </label>
+                    ))}
+                  {state.include.length > 50 && (
+                    <>
+                      <button
+                        data-variant="secondary"
+                        disabled={fixedPage === 0}
+                        onClick={() => setFixedPage(fixedPage - 1)}
+                      >
+                        必須項目の前のページ
+                      </button>
+                      <span>{fixedPage * 50 + 1}件目から表示</span>
+                      <button
+                        data-variant="secondary"
+                        disabled={(fixedPage + 1) * 50 >= state.include.length}
+                        onClick={() => setFixedPage(fixedPage + 1)}
+                      >
+                        必須項目の次のページ
+                      </button>
+                    </>
+                  )}
                 </>
               )}
-            </details>
+            </Disclosure>
             {!definition && !generation && (
               <button onClick={() => void work(manual)}>
                 現在の選択を手動で保存
@@ -763,7 +751,11 @@ export function ClientSelection({
               </button>
             )}
           </fieldset>
+          {!ui.canCreate && (
+            <p role="status">編集権限がないため依頼できません。</p>
+          )}
           <button
+            data-variant="secondary"
             disabled={busy}
             onClick={() =>
               void work(async () => {
@@ -783,14 +775,20 @@ export function ClientSelection({
             <section
               aria-label={definition ? "定義生成の状態" : "選択操作の状態"}
             >
-              <h4>
-                {(definition || generation) &&
-                operation.value.state === "applied"
-                  ? generation
-                    ? "Contextを保存・採用済み"
-                    : "定義を保存・採用済み"
-                  : (labels[operation.value.state] ?? operation.value.state)}
-              </h4>
+              <p>
+                <StatusBadge
+                  label="操作の状態"
+                  value={
+                    (definition || generation) &&
+                    operation.value.state === "applied"
+                      ? generation
+                        ? "Contextを保存・採用済み"
+                        : "定義を保存・採用済み"
+                      : (operationStateLabels[operation.value.state] ??
+                        operation.value.state)
+                  }
+                />
+              </p>
               <p>{operation.value.goal}</p>
               <p>{operation.value.reason ?? ""}</p>
               {!ownsOperation && (
@@ -821,10 +819,11 @@ export function ClientSelection({
                 {operation.value.user === ui.user && (
                   <>
                     <button
+                      data-variant="secondary"
                       disabled={busy}
                       onClick={() => void work(() => act("takeover"))}
                     >
-                      このクライアントへ明示して引き継ぐ
+                      このクライアントへ引き継ぐ
                     </button>
                     {["failed", "incomplete"].includes(
                       operation.value.state,
@@ -858,13 +857,12 @@ export function ClientSelection({
                     )}
                     {operation.value.state === "question" && (
                       <>
-                        <label>
-                          質問への回答
-                          <textarea
-                            value={answer}
-                            onChange={(e) => setAnswer(e.target.value)}
-                          />
-                        </label>
+                        <Field
+                          label="質問への回答"
+                          value={answer}
+                          onChange={setAnswer}
+                          rows={3}
+                        />
                         <button
                           disabled={busy || !answer || !ownsOperation}
                           onClick={() => void work(() => act("answer"))}
@@ -891,6 +889,7 @@ export function ClientSelection({
                       </button>
                     )}
                     <button
+                      data-variant="secondary"
                       onClick={() => {
                         epoch.current++;
                         void work(() => act("cancel"));
@@ -905,6 +904,7 @@ export function ClientSelection({
                   </>
                 )}
                 <button
+                  data-variant="secondary"
                   onClick={() =>
                     void work(async () => {
                       await refresh();
@@ -913,8 +913,12 @@ export function ClientSelection({
                 >
                   処理状況を再取得
                 </button>
-                <button onClick={() => void work(() => loadHistory())}>
-                  この操作の履歴を50件取得
+                <button
+                  data-variant="secondary"
+                  aria-busy={busy}
+                  onClick={() => void work(() => loadHistory())}
+                >
+                  {busy ? "履歴を取得中…" : "この操作の履歴を取得"}
                 </button>
                 {generation && (
                   <ContextGenerationProposal
@@ -970,6 +974,7 @@ export function ClientSelection({
                           onPaths={setDefinitionPaths}
                         />
                         <button
+                          data-variant="secondary"
                           onClick={() =>
                             definition.onDraft(proposal.value.definition_utf8!)
                           }
@@ -978,12 +983,20 @@ export function ClientSelection({
                         </button>
                       </>
                     )}
-                    {proposal.value.questions.map((q, i) => (
-                      <p key={i}>{q}</p>
-                    ))}
-                    {proposal.value.unknown.map((q, i) => (
-                      <p key={i}>{q}</p>
-                    ))}
+                    {proposal.value.questions.length > 0 && (
+                      <ul aria-label="質問">
+                        {proposal.value.questions.map((q, i) => (
+                          <li key={i}>{q}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {proposal.value.unknown.length > 0 && (
+                      <ul aria-label="未確認事項">
+                        {proposal.value.unknown.map((q, i) => (
+                          <li key={i}>{q}</li>
+                        ))}
+                      </ul>
+                    )}
                     {!definition && !generation && (
                       <>
                         <ul>
@@ -1017,20 +1030,22 @@ export function ClientSelection({
                         {proposal.value.items.length > 50 && (
                           <>
                             <button
+                              data-variant="secondary"
                               disabled={proposalPage === 0}
                               onClick={() => setProposalPage(proposalPage - 1)}
                             >
-                              案の前の50件
+                              案の前のページ
                             </button>
                             <span>{proposalPage * 50 + 1}件目から表示</span>
                             <button
+                              data-variant="secondary"
                               disabled={
                                 (proposalPage + 1) * 50 >=
                                 proposal.value.items.length
                               }
                               onClick={() => setProposalPage(proposalPage + 1)}
                             >
-                              案の次の50件
+                              案の次のページ
                             </button>
                           </>
                         )}
@@ -1038,67 +1053,105 @@ export function ClientSelection({
                     )}
                   </>
                 )}
-                <details>
-                  <summary>固定版と原応答の履歴</summary>
-                  {history.length === 50 && (
-                    <button onClick={() => void work(() => loadHistory(false))}>
-                      履歴の次の50件
-                    </button>
-                  )}
-                  <ul>
-                    {history.map((r) => (
-                      <li key={r.id + "/" + r.version}>
+                <Disclosure title="固定版と原応答の履歴">
+                  {() => (
+                    <>
+                      {history && (
+                        <p>
+                          {history.length
+                            ? `${history.length}件を表示`
+                            : "履歴はありません。"}
+                        </p>
+                      )}
+                      <ul>
+                        {history?.map((r) => (
+                          <li key={r.id + "/" + r.version}>
+                            <button
+                              data-variant="secondary"
+                              onClick={() =>
+                                void work(async () =>
+                                  setHistoryItem(await read(r)),
+                                )
+                              }
+                            >
+                              {r.kind} · 版 {r.version}
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                      {history?.length === 50 && (
                         <button
-                          onClick={() =>
-                            void work(async () => setHistoryItem(await read(r)))
-                          }
+                          data-variant="secondary"
+                          onClick={() => void work(() => loadHistory(false))}
                         >
-                          {r.kind} · 版 {r.version}
+                          履歴の次のページ
                         </button>
-                      </li>
-                    ))}
-                  </ul>
-                  {historyItem && (
-                    <pre>{JSON.stringify(historyItem, null, 2)}</pre>
+                      )}
+                      {historyItem && (
+                        <pre>{JSON.stringify(historyItem, null, 2)}</pre>
+                      )}
+                    </>
                   )}
-                </details>
+                </Disclosure>
               </fieldset>
             </section>
           )}
-          <details>
-            <summary>
-              {definition
-                ? "共通の操作履歴を探す"
-                : "保存済みの選択・操作を探す"}
-            </summary>
-            <select
-              aria-label="選択履歴の種類"
-              value={kind}
-              onChange={(e) => setKind(e.target.value)}
-            >
-              <option value="operation">選択操作</option>
-              <option value="selection">保存済み選択</option>
-            </select>
-            <button onClick={() => void work(() => list())}>
-              一覧を50件取得
-            </button>
-            <ul>
-              {records.map((r) => (
-                <li key={r.id}>
-                  <button onClick={() => void work(() => choose(r))}>
-                    {(r.value as { goal?: string; name?: string }).goal ??
-                      (r.value as { name?: string }).name ??
-                      r.id}
+          <Disclosure
+            title={
+              definition ? "共通の操作履歴を探す" : "保存済みの選択・操作を探す"
+            }
+          >
+            {() => (
+              <>
+                <label>
+                  種類
+                  <select
+                    value={kind}
+                    onChange={(e) => setKind(e.target.value)}
+                  >
+                    <option value="operation">選択操作</option>
+                    <option value="selection">保存済み選択</option>
+                  </select>
+                </label>
+                <button
+                  data-variant="secondary"
+                  aria-busy={busy}
+                  onClick={() => void work(() => list())}
+                >
+                  {busy ? "一覧を取得中…" : "一覧を取得"}
+                </button>
+                {records && (
+                  <p>
+                    {records.length
+                      ? `${records.length}件を表示`
+                      : "該当する記録はありません。"}
+                  </p>
+                )}
+                <ul>
+                  {records?.map((r) => (
+                    <li key={r.id}>
+                      <button
+                        data-variant="secondary"
+                        onClick={() => void work(() => choose(r))}
+                      >
+                        {(r.value as { goal?: string; name?: string }).goal ??
+                          (r.value as { name?: string }).name ??
+                          r.id}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {records?.length === 50 && (
+                  <button
+                    data-variant="secondary"
+                    onClick={() => void work(() => list(false))}
+                  >
+                    一覧の次のページ
                   </button>
-                </li>
-              ))}
-            </ul>
-            {records.length === 50 && (
-              <button onClick={() => void work(() => list(false))}>
-                次の50件
-              </button>
+                )}
+              </>
             )}
-          </details>
+          </Disclosure>
           <p role="status">{notice}</p>
         </section>
       }

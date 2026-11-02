@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { syncRequest } from "./auth";
 import { SyncHTTPError } from "./sync-error";
+import { Disclosure } from "./disclosure";
+import { costLabel } from "./usage-comparison-model";
 
 type Ref = { id: string; version: string };
 type Quantity = {
@@ -97,17 +99,7 @@ export function UsageEntryView({ entry }: { entry: UsageEntry }) {
                     ? "CLIの処理パイプライン（範囲外の補助呼出しは未取得）"
                     : m.scope}
           </p>
-          <p>
-            契約：
-            {(
-              {
-                subscription: "定額契約",
-                local: "ローカル実行",
-                api: "API課金",
-                unknown: "未確認",
-              } as Record<string, string>
-            )[m.billing] ?? "未確認"}
-          </p>
+          <p>契約：{costLabel(m.billing)}</p>
           {m.reason === "session_boundary_unconfirmed" && (
             <p>
               セッション累計から今回のRunの消費を切り分けられないため、確定した利用量・費用へ計上していません。
@@ -136,7 +128,7 @@ export function UsageEntryView({ entry }: { entry: UsageEntry }) {
                     ? "非該当"
                     : q.value == null
                       ? "未取得"
-                      : `${q.value} ${q.unit}`}
+                      : `${/^\d+$/.test(q.value) ? Number(q.value).toLocaleString("ja-JP") : q.value} ${q.unit}`}
                   {q.state === "estimated" ? "（推定）" : ""}
                 </dd>
               </div>
@@ -265,39 +257,55 @@ export function RunUsage({
           ))}
         </select>
       </label>
-      <button disabled={busy} onClick={() => void load()}>
-        このRunの利用量を更新
+      <button
+        data-variant="secondary"
+        disabled={busy}
+        aria-busy={busy}
+        onClick={() => void load()}
+      >
+        {busy ? "利用量を取得中…" : "このRunの利用量を更新"}
       </button>
       {message && <p role="status">{message}</p>}
+      {page && (
+        <p>
+          {page.data.items.length}件を表示
+          {page.meta.next_cursor ? "（続きあり）" : ""}
+        </p>
+      )}
       {page?.data.items.length === 0 && (
         <p>この種別の記録は未取得・未算定です。</p>
       )}
       {page?.data.items.map((entry) => (
         <article key={entry.key}>
           <UsageEntryView entry={entry} />
-          <details>
-            <summary>計測・料金の根拠を確認</summary>
-            {entry.value.measurement?.source_ref && (
-              <p>端末内の原記録は未取得です。</p>
+          <Disclosure title="計測・料金の根拠を確認">
+            {() => (
+              <>
+                {entry.value.measurement?.source_ref && (
+                  <p>端末内の原記録は未取得です。</p>
+                )}
+                {entry.refs.map((ref) => (
+                  <button
+                    key={ref.id + ref.version}
+                    data-variant="secondary"
+                    disabled={busy}
+                    onClick={() => void read(ref)}
+                  >
+                    {ref.id.startsWith("price:")
+                      ? "固定した料金版"
+                      : "固定した計測・評価記録"}
+                    を開く：{ref.id}
+                  </button>
+                ))}
+                <pre>{JSON.stringify(entry.value, null, 2)}</pre>
+              </>
             )}
-            {entry.refs.map((ref) => (
-              <button
-                key={ref.id + ref.version}
-                disabled={busy}
-                onClick={() => void read(ref)}
-              >
-                {ref.id.startsWith("price:")
-                  ? "固定した料金版"
-                  : "固定した計測・評価記録"}
-                を開く：{ref.id}
-              </button>
-            ))}
-            <pre>{JSON.stringify(entry.value, null, 2)}</pre>
-          </details>
+          </Disclosure>
         </article>
       ))}
       {page?.meta.next_cursor && (
         <button
+          data-variant="secondary"
           disabled={busy}
           onClick={() => void load(page.meta.next_cursor!)}
         >

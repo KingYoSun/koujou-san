@@ -34,6 +34,8 @@ export function DefinitionPicker({
       setBusy(false);
     }
   };
+  const items =
+    page?.items.filter((r) => (r.value.name || r.id).includes(query)) ?? [];
   return (
     <>
       <button
@@ -55,28 +57,36 @@ export function DefinitionPicker({
           このページの名前を絞る
           <input value={query} onChange={(e) => setQuery(e.target.value)} />
         </label>
-        {busy && <p role="status">取得中</p>}
+        {busy && <p role="status">定義候補を取得中…</p>}
         {error && <p role="alert">{error}</p>}
+        {page && (
+          <p>
+            {items.length}件を表示{page.next ? "（続きあり）" : ""}
+          </p>
+        )}
+        {page && !items.length && <p>該当する定義はありません。</p>}
         <ul>
-          {!busy &&
-            page?.items
-              .filter((r) => (r.value.name || r.id).includes(query))
-              .map((r) => (
-                <li key={r.id}>
-                  <button
-                    onClick={() => {
-                      onChoose({ id: r.id, version: r.version }, r.value.name);
-                      dialog.current?.close();
-                    }}
-                  >
-                    {r.value.name || r.id} · {r.version}
-                  </button>
-                </li>
-              ))}
+          {items.map((r) => (
+            <li key={r.id}>
+              <button
+                onClick={() => {
+                  onChoose({ id: r.id, version: r.version }, r.value.name);
+                  dialog.current?.close();
+                }}
+              >
+                {r.value.name || r.id} · {r.version}
+              </button>
+            </li>
+          ))}
         </ul>
         {page?.next && (
-          <button disabled={busy} onClick={() => void read(page.next)}>
-            定義候補の次ページ
+          <button
+            data-variant="secondary"
+            disabled={busy}
+            aria-busy={busy}
+            onClick={() => void read(page.next)}
+          >
+            定義候補の次のページ
           </button>
         )}
         <button

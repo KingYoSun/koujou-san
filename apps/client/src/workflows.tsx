@@ -18,6 +18,9 @@ import {
 } from "./workflow-json";
 import type { DefinitionContextInput } from "./context-preview";
 import { JSONField } from "./json-field";
+import { Field } from "./field";
+import { Disclosure } from "./disclosure";
+import { StatusBadge } from "./status-badge";
 import type { JSONPath } from "jsonc-parser";
 import { WorkflowExecution } from "./workflow-execution";
 import { DefinitionRun } from "./definition-run";
@@ -118,7 +121,8 @@ export function Workflows({
   const [capabilities, setCapabilities] = useState("");
   const [selected, setSelected] = useState(0);
   const [busy, setBusy] = useState(false),
-    [notice, setNotice] = useState("");
+    [notice, setNotice] = useState(""),
+    [error, setError] = useState("");
   const actionIDs = useRef(new Map<string, string>());
   const call = async (path: string, body?: unknown) => {
     const epoch = answerScopeEpoch(namespace);
@@ -133,6 +137,7 @@ export function Workflows({
   const act = async (work: () => Promise<void>) => {
     setBusy(true);
     setNotice("");
+    setError("");
     try {
       await work();
     } catch (error) {
@@ -155,9 +160,9 @@ export function Workflows({
             undefined,
             "workflow-definition",
           );
-        setNotice("現在の閲覧・編集・実行依頼の権限を確認してください。");
+        setError("現在の閲覧・編集・実行依頼の権限を確認してください。");
       } else
-        setNotice(
+        setError(
           "操作を完了できませんでした。入力・接続・現在の版を確認してください。",
         );
     } finally {
@@ -206,11 +211,8 @@ export function Workflows({
         value,
         "workflow-definition",
       ).then(
-        () =>
-          setNotice(
-            "この端末へ下書きを保存しました。自動送信・実行はしません。",
-          ),
-        () => setNotice("下書きの保存を確認できません。"),
+        () => setNotice("この端末へ下書きを保存しました。"),
+        () => setError("下書きの保存を確認できません。"),
       );
   };
   const load = async (target: string, version = "head") => {
@@ -315,9 +317,7 @@ export function Workflows({
     const target = `${type}:${crypto.randomUUID()}`;
     setID(target);
     setRequestedVersion("head");
-    setNotice(
-      "新しい定義の下書きをこの端末で編集中です。共有への保存・採用・実行はしていません。",
-    );
+    setNotice("新しい定義の下書きをこの端末で編集中です。");
     setKind(type);
     setRecord(undefined);
     setAdoption(undefined);
@@ -363,7 +363,7 @@ export function Workflows({
       target,
       value,
       "workflow-definition",
-    ).catch(() => setNotice("下書きの保存を確認できません。"));
+    ).catch(() => setError("下書きの保存を確認できません。"));
   };
   useEffect(() => {
     if (
@@ -392,7 +392,7 @@ export function Workflows({
       });
       onDefinitionInputUsed?.();
     } catch {
-      setNotice("定義の未保存JSONを確認してからContextを反映してください。");
+      setError("定義の未保存JSONを確認してからContextを反映してください。");
     }
   }, [visible, canEdit, definitionInput, id, draft?.version]);
   const field = (
@@ -447,7 +447,7 @@ export function Workflows({
       "workflow-definition",
     );
     await load(value.data.id, value.data.version);
-    setNotice("定義の下書きを共有へ保存しました。採用・実行はしていません。");
+    setNotice("定義の下書きを共有へ保存しました。");
   };
   return (
     <>
@@ -481,7 +481,9 @@ export function Workflows({
                   </select>
                 </label>
                 <button
+                  data-variant="secondary"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() =>
                     void act(async () =>
                       setPage(
@@ -496,14 +498,21 @@ export function Workflows({
                     )
                   }
                 >
-                  定義一覧を取得
+                  {busy ? "定義一覧を取得中…" : "定義一覧を取得"}
                 </button>
                 {page && (
                   <>
+                    <p>
+                      {page.items.length
+                        ? `${page.items.length}件を表示`
+                        : "定義はありません。"}
+                      {page.next && "（続きあり）"}
+                    </p>
                     <ul>
                       {page.items.map((r) => (
                         <li key={r.id}>
                           <button
+                            data-variant="secondary"
                             disabled={busy}
                             aria-current={r.id === id ? "true" : undefined}
                             onClick={() =>
@@ -517,6 +526,7 @@ export function Workflows({
                     </ul>
                     {page.next && (
                       <button
+                        data-variant="secondary"
                         disabled={busy}
                         onClick={() =>
                           void act(async () =>
@@ -545,32 +555,30 @@ export function Workflows({
                 )}
                 <details>
                   <summary>IDと版を指定して取得</summary>
-                  <label>
-                    定義ID
-                    <input
-                      disabled={busy}
+                  <fieldset disabled={busy}>
+                    <Field
+                      label="定義ID"
                       value={id}
-                      onChange={(e) => {
-                        setID(e.target.value);
+                      onChange={(v) => {
+                        setID(v);
                         setRecord(undefined);
                         setDraft(undefined);
                       }}
                     />
-                  </label>
-                  <label>
-                    定義の版（headは現在版）
-                    <input
-                      disabled={busy}
+                    <Field
+                      label="定義の版"
                       value={requestedVersion}
-                      onChange={(e) => setRequestedVersion(e.target.value)}
+                      onChange={setRequestedVersion}
                     />
-                  </label>
-                  <button
-                    disabled={busy || !id}
-                    onClick={() => void act(() => load(id, requestedVersion))}
-                  >
-                    定義を取得・更新
-                  </button>
+                    <button
+                      data-variant="secondary"
+                      disabled={!id}
+                      aria-busy={busy}
+                      onClick={() => void act(() => load(id, requestedVersion))}
+                    >
+                      {busy ? "定義を取得中…" : "定義を取得"}
+                    </button>
+                  </fieldset>
                 </details>
                 {canEdit && (
                   <label>
@@ -594,7 +602,7 @@ export function Workflows({
                               throw Error("schema");
                             fresh(schema.slice(0, -3), text);
                             setNotice(
-                              "ファイルを端末内の新しい下書きへ読み込みました。共有への保存・実行はしていません。",
+                              "ファイルを端末内の新しい下書きへ読み込みました。",
                             );
                           });
                       }}
@@ -604,13 +612,17 @@ export function Workflows({
               </section>
             </SidebarPane>
             {record && (
-              <p>
-                {record.id} · {record.version} · 採用版{" "}
-                {adoption?.version ?? "未採用"}
+              <p className="target-reference">
+                {record.id} · {record.version}{" "}
+                <StatusBadge
+                  label="採用版"
+                  value={adoption?.version ?? "未採用"}
+                />
               </p>
             )}
             {draft && (
               <section>
+                {!canEdit && <p>編集には編集権限が必要です。</p>}
                 {kind === "workflow-definition" && (
                   <WorkflowNodeEditor
                     disabled={busy || !canEdit}
@@ -673,7 +685,7 @@ export function Workflows({
                         "json",
                       )}
                       {field(
-                        "固定Contextの選択（JSON・省略可）",
+                        "固定Contextの選択（JSON）",
                         ["selection"],
                         "json",
                       )}
@@ -710,58 +722,55 @@ export function Workflows({
                         </button>
                       )}
                       {field(
-                        "prompt（JSON・省略可）",
+                        "prompt（JSON）",
                         ["spec", "input", "prompt"],
                         "json",
                       )}
                       {field(
-                        "検品などの派生契約（JSON・省略可）",
+                        "検品などの派生契約（JSON）",
                         ["spec", "derivation"],
                         "json",
                       )}
                       {field(
-                        "前段から受ける必須入力（JSON・省略可）",
+                        "前段から受ける必須入力（JSON）",
                         ["inputs"],
                         "json",
                       )}
-                      {field(
-                        "必要な接続能力（JSON・省略可）",
-                        ["required"],
-                        "json",
-                      )}
-                      {field("担当端末ID（省略可）", ["device_id"])}
+                      {field("必要な接続能力（JSON）", ["required"], "json")}
+                      {field("担当端末ID", ["device_id"])}
                     </>
                   ) : (
-                    <>
-                      <details>
-                        <summary>実行予算とContext基準</summary>
-                        {field(
-                          "同時に実行する上限",
-                          ["budget", "parallel"],
-                          "number",
-                        )}
-                        {field(
-                          "生成するRun数の上限（循環時は必須）",
-                          ["budget", "max_runs"],
-                          "number",
-                        )}
-                        {field(
-                          "工程の制御時間（秒・省略可）",
-                          ["budget", "seconds"],
-                          "number",
-                        )}
-                        {field(
-                          "費用予算（JSON・省略可）",
-                          ["budget", "cost"],
-                          "json",
-                        )}
-                        {field(
-                          "Context基準の固定参照（JSON・省略可）",
-                          ["baseline"],
-                          "json",
-                        )}
-                      </details>
-                    </>
+                    <Disclosure title="実行予算とContext基準">
+                      {() => (
+                        <>
+                          {field(
+                            "同時に実行する上限",
+                            ["budget", "parallel"],
+                            "number",
+                          )}
+                          {field(
+                            "生成するRun数の上限",
+                            ["budget", "max_runs"],
+                            "number",
+                          )}
+                          {field(
+                            "工程の制御時間（秒）",
+                            ["budget", "seconds"],
+                            "number",
+                          )}
+                          {field(
+                            "費用予算（JSON）",
+                            ["budget", "cost"],
+                            "json",
+                          )}
+                          {field(
+                            "Context基準の固定参照（JSON）",
+                            ["baseline"],
+                            "json",
+                          )}
+                        </>
+                      )}
+                    </Disclosure>
                   )}
                 </fieldset>
                 <fieldset disabled={busy || !canEdit}>
@@ -775,33 +784,36 @@ export function Workflows({
                           pending: undefined,
                         });
                       } catch {
-                        setNotice("項目のJSON構文を確認してください。");
+                        setError("項目のJSON構文を確認してください。");
                       }
                     }}
                   >
                     項目をJSONへ反映
                   </button>
-                  <details>
-                    <summary>定義のJSON原文</summary>
-                    <textarea
-                      aria-label="定義のJSON原文"
-                      rows={15}
-                      value={draft.text}
-                      onChange={(e) =>
-                        persist({
-                          ...draft,
-                          text: e.target.value,
-                          fields: {},
-                          manual_paths: definitionFields.map(([path]) => path),
-                          pending: undefined,
-                        })
-                      }
-                    />
-                  </details>
+                  <Disclosure title="定義のJSON原文">
+                    {() => (
+                      <Field
+                        label="定義のJSON原文"
+                        rows={15}
+                        value={draft.text}
+                        onChange={(text) =>
+                          persist({
+                            ...draft,
+                            text,
+                            fields: {},
+                            manual_paths: definitionFields.map(
+                              ([path]) => path,
+                            ),
+                            pending: undefined,
+                          })
+                        }
+                      />
+                    )}
+                  </Disclosure>
                   {record && draft.version !== record.version && (
                     <>
-                      <p>
-                        下書きの前提版 {draft.version} / 共有の現在版{" "}
+                      <p role="status">
+                        元版が変わりました。下書き {draft.version} / 現在版{" "}
                         {record.version}
                       </p>
                       <textarea
@@ -824,7 +836,7 @@ export function Workflows({
                     </>
                   )}
                   <button disabled={!id} onClick={() => void act(save)}>
-                    定義の下書きを共有へ保存（実行しない）
+                    定義の下書きを共有へ保存
                   </button>
                 </fieldset>
               </section>
@@ -844,7 +856,7 @@ export function Workflows({
                     )
                   }
                 >
-                  この固定版を静的検証（実行しない）
+                  この固定版を静的検証
                 </button>
                 {canEdit && (
                   <button
@@ -876,9 +888,7 @@ export function Workflows({
                             version: record.version,
                           })) as Validation,
                         );
-                        setNotice(
-                          "検証結果を保存しました。採用・実行はしていません。",
-                        );
+                        setNotice("検証結果を保存しました。");
                       })
                     }
                   >
@@ -905,13 +915,11 @@ export function Workflows({
                           validation: verified,
                         });
                         setAdoption({ id: record.id, version: record.version });
-                        setNotice(
-                          "この固定版を採用しました。実行開始は依頼していません。",
-                        );
+                        setNotice("この固定版を採用しました。");
                       })
                     }
                   >
-                    検証した固定版を採用（実行しない）
+                    検証した固定版を採用
                   </button>
                 )}
                 {native ? (
@@ -923,7 +931,7 @@ export function Workflows({
                           "export_definition",
                           { workspace, id: record.id, version: record.version },
                         );
-                        setNotice(`定義を保存しました: ${result.path}`);
+                        setNotice(`定義を保存しました：${result.path}`);
                       })
                     }
                   >
@@ -932,6 +940,7 @@ export function Workflows({
                 ) : (
                   <a
                     download
+                    className="record-link"
                     href={`${base}/definitions/${encodeURIComponent(record.id)}/export?version=${encodeURIComponent(record.version)}`}
                   >
                     この定義版をファイルへ保存
@@ -942,7 +951,11 @@ export function Workflows({
             {validation && (
               <section aria-label="定義の検証結果">
                 <p>
-                  {validation.valid ? "静的検証済み" : "未解決の箇所があります"}
+                  <StatusBadge
+                    label="静的検証"
+                    value={validation.valid ? "済み" : "未解決あり"}
+                    tone={validation.valid ? "positive" : "negative"}
+                  />
                 </p>
                 <ul>
                   {validation.problems.map((p, i) => (
@@ -964,7 +977,7 @@ export function Workflows({
                               ?.focus();
                         }}
                       >
-                        {p.path}: {problems[p.code] ?? p.code} — 該当箇所を開く
+                        {p.path}：{problems[p.code] ?? p.code} — 該当箇所を開く
                       </button>
                     </li>
                   ))}
@@ -972,37 +985,39 @@ export function Workflows({
               </section>
             )}
             {notice && <p role="status">{notice}</p>}
-            <details>
-              <summary>接続能力の版を確認</summary>
-              <label>
-                端末ID
-                <input
-                  value={capDevice}
-                  onChange={(e) => setCapDevice(e.target.value)}
-                />
-              </label>
-              <label>
-                能力の固定版（headは現在版）
-                <input
-                  value={capVersion}
-                  onChange={(e) => setCapVersion(e.target.value)}
-                />
-              </label>
-              <button
-                disabled={busy || !capDevice}
-                onClick={() =>
-                  void act(async () => {
-                    const result = await call(
-                      `/capabilities/${encodeURIComponent(capDevice)}?version=${encodeURIComponent(capVersion)}`,
-                    );
-                    setCapabilities(JSON.stringify(result, null, 2));
-                  })
-                }
-              >
-                能力を取得（実行しない）
-              </button>
-              {capabilities && <pre>{capabilities}</pre>}
-            </details>
+            {error && <p role="alert">{error}</p>}
+            <Disclosure title="接続能力の版を確認">
+              {() => (
+                <>
+                  <Field
+                    label="端末ID"
+                    value={capDevice}
+                    onChange={setCapDevice}
+                  />
+                  <Field
+                    label="能力の固定版"
+                    value={capVersion}
+                    onChange={setCapVersion}
+                  />
+                  <button
+                    data-variant="secondary"
+                    disabled={busy || !capDevice}
+                    aria-busy={busy}
+                    onClick={() =>
+                      void act(async () => {
+                        const result = await call(
+                          `/capabilities/${encodeURIComponent(capDevice)}?version=${encodeURIComponent(capVersion)}`,
+                        );
+                        setCapabilities(JSON.stringify(result, null, 2));
+                      })
+                    }
+                  >
+                    {busy ? "能力を取得中…" : "能力を取得"}
+                  </button>
+                  {capabilities && <pre>{capabilities}</pre>}
+                </>
+              )}
+            </Disclosure>
           </section>
         }
       </ScreenContent>

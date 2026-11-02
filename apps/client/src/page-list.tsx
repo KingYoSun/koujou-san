@@ -32,7 +32,7 @@ export function PageList<T>({
             disabled={start === 0}
             onClick={() => setPage(Math.max(0, start / 100 - 1))}
           >
-            {label}の前ページ
+            {label}の前のページ
           </button>
           <button
             data-variant="secondary"
@@ -40,7 +40,7 @@ export function PageList<T>({
             disabled={start + 100 >= items.length}
             onClick={() => setPage(start / 100 + 1)}
           >
-            {label}の次ページ
+            {label}の次のページ
           </button>
         </div>
       )}

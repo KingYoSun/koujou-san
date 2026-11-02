@@ -229,19 +229,15 @@ export function ContextWorkspace({
     prefix,
     store,
   ]);
-  useEffect(
-    () =>
-      onStatus?.(
-        engine?.status === "current"
-          ? "接続確認済み"
-          : engine?.status === "revoked"
-            ? "権限失効"
-            : engine?.status === "offline"
-              ? "オフライン"
-              : "接続確認中",
-      ),
-    [engine?.status, onStatus],
-  );
+  const status =
+    engine?.status === "current"
+      ? "確認済み"
+      : engine?.status === "revoked"
+        ? "権限失効"
+        : engine?.status === "offline"
+          ? "オフライン"
+          : "確認中";
+  useEffect(() => onStatus?.(status), [status, onStatus]);
   if (!engine)
     return (
       <ScreenContent>
@@ -267,40 +263,18 @@ export function ContextWorkspace({
     <>
       <ScreenContent>
         {
-          <section
-            id="cost-context-editor"
-            tabIndex={-1}
-            className="context-workspace"
-            aria-label="コンテキスト管理"
-          >
+          <section className="context-workspace" aria-label="コンテキスト管理">
             <header className="context-heading">
               <details>
-                <summary>
-                  Contextの同期・保存について（
-                  {engine.status === "current"
-                    ? "同期確認済み"
-                    : engine.status === "revoked"
-                      ? "権限失効"
-                      : engine.status === "offline"
-                        ? "オフライン"
-                        : "接続確認中"}
-                  ）
-                </summary>
+                <summary>同期：{status}</summary>
                 <div className="context-connection">
-                  <strong>
-                    {engine.status === "current"
-                      ? "接続確認済み"
-                      : engine.status === "checking"
-                        ? "接続確認中"
-                        : engine.status === "revoked"
-                          ? "権限失効"
-                          : "オフライン・保存済み表示"}
-                  </strong>
                   <small>
-                    最終確認: {engine.state.confirmedAt ?? "未確認"}
+                    最終確認：{engine.state.confirmedAt ?? "未確認"}
                   </small>
                   <button
+                    data-variant="secondary"
                     disabled={engine.busy}
+                    aria-busy={engine.busy}
                     onClick={() => void engine.refresh()}
                   >
                     接続を確認
@@ -316,16 +290,18 @@ export function ContextWorkspace({
             {error && (
               <p role="alert">
                 {error}
-                <button onClick={() => setError("")}>閉じる</button>
+                <button data-variant="secondary" onClick={() => setError("")}>
+                  閉じる
+                </button>
               </p>
             )}
             <Tabs
               id="context-mode"
               label="Contextの作業"
               items={[
-                { id: "documents", label: "文書を探す・編集" },
-                { id: "scopes", label: "Scopeで整理" },
-                { id: "input", label: "Run入力を選択" },
+                { id: "documents", label: "文書編集" },
+                { id: "scopes", label: "Scope所属" },
+                { id: "input", label: "入力選択" },
                 { id: "generation", label: "出力から反映" },
               ]}
               value={mode}
@@ -346,7 +322,6 @@ export function ContextWorkspace({
                 </p>
               </details>
             )}
-            <div id="cost-model-editor" tabIndex={-1}></div>
           </section>
         }
       </ScreenContent>
@@ -357,29 +332,21 @@ export function ContextWorkspace({
         aria-labelledby={`context-mode-tab-${mode}`}
         tabIndex={0}
       >
-        <div
-          className="context-layout"
-          hidden={!visible}
-          data-mode={mode}
-          role="region"
-          aria-label="Contextの作業領域"
-        >
-          <ContextExplorer ui={ui} active={mode !== "generation"} mode={mode} />
-          <ContextEditor
-            ui={ui}
-            active={
-              mode === "documents" ||
-              (mode === "scopes" &&
-                ["scope", "membership"].includes(selected?.kind ?? ""))
-            }
-          />
-          <ContextPreview
-            ui={ui}
-            active={mode === "input"}
-            definitionInput={definitionInput}
-            onDefinitionInput={onDefinitionInput}
-          />
-        </div>
+        <ContextExplorer ui={ui} active={mode !== "generation"} mode={mode} />
+        <ContextEditor
+          ui={ui}
+          active={
+            mode === "documents" ||
+            (mode === "scopes" &&
+              ["scope", "membership"].includes(selected?.kind ?? ""))
+          }
+        />
+        <ContextPreview
+          ui={ui}
+          active={mode === "input"}
+          definitionInput={definitionInput}
+          onDefinitionInput={onDefinitionInput}
+        />
         <Screen screens={["context"]} enabled={mode === "input"} background>
           <ClientSelection key={api + user + workspace} ui={ui} />
         </Screen>

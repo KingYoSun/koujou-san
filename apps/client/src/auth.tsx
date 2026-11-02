@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { useNavigation } from "./navigation";
 import { stopSyncActor } from "./sync-engine";
 import { allowAnswerActor, purgeStoredActor } from "./sync-store";
 import { SyncHTTPError } from "./sync-error";
@@ -178,6 +179,7 @@ export async function workspaceAccessLost(
 }
 
 function Field({ node }: { node: Node }) {
+  const id = useId();
   const attributes = node.attributes;
   if (node.type === "img")
     return (
@@ -209,6 +211,7 @@ function Field({ node }: { node: Node }) {
         {node.meta?.label?.text ?? "続ける"}
       </button>
     );
+  const invalid = !!node.messages?.length;
   return (
     <label className="auth-field">
       {labels[name] ?? node.meta?.label?.text ?? name}
@@ -218,6 +221,8 @@ function Field({ node }: { node: Node }) {
         required={Boolean(attributes.required)}
         disabled={Boolean(attributes.disabled)}
         defaultValue={value}
+        aria-invalid={invalid}
+        aria-describedby={invalid ? id + "-help" : undefined}
         autoComplete={
           type === "password"
             ? "current-password"
@@ -226,11 +231,11 @@ function Field({ node }: { node: Node }) {
               : undefined
         }
       />
-      {node.messages?.map((message, index) => (
-        <small role="alert" key={index}>
-          {message.text}
+      {invalid && (
+        <small id={id + "-help"} role="alert">
+          {node.messages!.map((message) => message.text).join(" ")}
         </small>
-      ))}
+      )}
     </label>
   );
 }
@@ -273,7 +278,7 @@ function IdentityFlow({
     };
   }, [kind, query.toString()]);
   if (error) return <p role="alert">{error}</p>;
-  if (!flow) return <p role="status">読み込んでいます…</p>;
+  if (!flow) return <p role="status">認証フローを取得中…</p>;
   const groups = [
     ...new Set(
       flow.ui.nodes
@@ -299,15 +304,15 @@ function IdentityFlow({
           key={`${flow.id}-${group}`}
         >
           {groups.length > 1 && (
-            <h2>
+            <h3>
               {group === "totp"
-                ? "認証アプリ（任意）"
+                ? "認証アプリ"
                 : group === "password"
                   ? "パスワード"
                   : group === "profile"
                     ? "プロフィール"
                     : titles[kind]}
-            </h2>
+            </h3>
           )}
           {flow.ui.nodes
             .filter(
@@ -325,6 +330,7 @@ function IdentityFlow({
 }
 
 export function Account({ native }: { native: boolean }) {
+  const shell = !!useNavigation();
   const [user, setUser] = useState<User>();
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -441,9 +447,10 @@ export function Account({ native }: { native: boolean }) {
   }
   const link = (target: string) =>
     `/auth/${target}${query.get("login_challenge") ? `?login_challenge=${encodeURIComponent(query.get("login_challenge")!)}` : ""}`;
+  const title = titles[kind] ?? "アカウント";
   return (
-    <section className="panel account" aria-labelledby="account-title">
-      <h2 id="account-title">{titles[kind] ?? "アカウント"}</h2>
+    <section className={shell ? undefined : "panel account"} aria-label={title}>
+      {!shell && <h2>{title}</h2>}
       {notice && <p role="status">{notice}</p>}
       {user ? (
         <>
@@ -454,31 +461,30 @@ export function Account({ native }: { native: boolean }) {
           </p>
           <div className="auth-actions">
             <button
+              data-variant="secondary"
               onClick={() =>
                 native
                   ? invoke("open_account", { path: "settings" })
                   : window.location.assign("/auth/settings")
               }
             >
-              アカウント設定
+              アカウント設定を開く
             </button>
-            <button disabled={busy} onClick={logout}>
+            <button data-variant="secondary" disabled={busy} onClick={logout}>
               この端末からログアウト
             </button>
           </div>
         </>
       ) : status === "checking" ? (
-        <p role="status">認証状態を確認しています…</p>
+        <p role="status">認証状態を確認中…</p>
       ) : status === "unavailable" ? (
         <p role="alert">
           認証状態を確認できません。サービスへの接続を確認して、再読み込みしてください。
         </p>
       ) : (
-        <>
-          <button disabled={busy} onClick={login}>
-            {busy ? "ブラウザで認証しています…" : "ログイン"}
-          </button>
-        </>
+        <button disabled={busy} aria-busy={busy} onClick={login}>
+          {busy ? "認証を確認中…" : "ログイン"}
+        </button>
       )}
       {!native &&
         titles[kind] &&

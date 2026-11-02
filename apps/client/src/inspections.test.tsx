@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { InspectionResult } from "./inspections";
+import { InspectionResult, Inspections } from "./inspections";
 
 const view = (state: string, report: unknown) =>
   ({
@@ -30,7 +30,7 @@ const view = (state: string, report: unknown) =>
     evidence_current: {},
   }) as Parameters<typeof InspectionResult>[0]["value"];
 
-test("a malformed stored report remains visible without rendering invalid criterion rows", () => {
+test("a malformed stored report keeps the verdict without rendering invalid criterion rows", () => {
   const original = {
     criteria_results: "malformed-original",
     unverified: { malformed: true },
@@ -39,8 +39,8 @@ test("a malformed stored report remains visible without rendering invalid criter
     <InspectionResult value={view("invalid", original)} title="検品" />,
   );
   expect(html).toContain("invalid");
-  expect(html).toContain("INCONCLUSIVE");
-  expect(html).toContain("malformed-original");
+  expect(html).toContain("判断不能");
+  expect(html).toContain("固定入力・Manifest・原レポート");
   expect(html).not.toContain("<td");
 });
 
@@ -61,7 +61,7 @@ test("a valid report shows the criterion verdict and its evidence", () => {
     <InspectionResult value={view("valid", report)} title="検品" />,
   );
   expect(html).toContain("<td>AC-1</td>");
-  expect(html).toContain("<td>FAIL</td>");
+  expect(html).toContain("<td>不合格</td>");
   expect(html).toContain("inspection-evidence:one@fixed");
 });
 
@@ -85,3 +85,20 @@ test.each(["invalid", "valid"])(
     expect(html).toContain("実行未確認");
   },
 );
+
+test("the definition list sits in the sidebar and the judgment pane waits for a selection", () => {
+  const html = renderToStaticMarkup(
+    <Inspections
+      native={false}
+      api=""
+      user="u"
+      workspace="w"
+      role="editor"
+      canExecute
+    />,
+  );
+  expect(html).toContain('aria-label="検品定義一覧"');
+  expect(html).toContain("IDと版を指定して取得");
+  expect(html).toContain("検品定義を新規作成");
+  expect(html).not.toContain("選択した検品の判定");
+});

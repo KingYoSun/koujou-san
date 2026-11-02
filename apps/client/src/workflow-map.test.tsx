@@ -89,8 +89,8 @@ it("shows serial, parallel joins, branches and finite returns from the fixed JSO
   expect(serial).toContain("検品");
   expect(serial).toContain("completed");
   const parallel = render(graphs[1]);
-  expect(parallel).toContain("合流 all");
-  expect(parallel).not.toContain("合流 any");
+  expect(parallel).toContain("合流：all");
+  expect(parallel).not.toContain("合流：any");
   expect(parallel).toContain("PASS · 任意");
   const branch = render(graphs[2]);
   expect(branch).toContain("人の判断");

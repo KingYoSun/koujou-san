@@ -1,5 +1,7 @@
 import { fieldSources } from "./workflow-json";
 import { useMemo } from "react";
+import { Disclosure } from "./disclosure";
+import { jsonError } from "./field";
 export const definitionFields = [
   ["/name", "名称"],
   ["/device_id", "端末"],
@@ -40,13 +42,16 @@ export function DefinitionProposal({
         definitionFields.map(([path]) => path.slice(1).split("/")),
       ).map((value) => value || "未設定");
     } catch {
-      return definitionFields.map(() => "JSONの構文を確認してください。");
+      return undefined;
     }
   };
   const previous = useMemo(() => sources(before), [before]);
   const proposed = useMemo(() => sources(after), [after]);
   return (
     <section aria-label="生成した定義の項目別比較">
+      {(!previous || !proposed) && (
+        <p role="alert">{jsonError(previous ? after : before)}</p>
+      )}
       {definitionFields.map(([path, label], index) => (
         <details key={path}>
           <summary>{label}</summary>
@@ -65,9 +70,9 @@ export function DefinitionProposal({
             この項目を採用
           </label>
           <p>現在の下書き</p>
-          <pre>{previous[index]}</pre>
+          <pre>{previous?.[index] ?? "未取得"}</pre>
           <p>生成案</p>
-          <pre>{proposed[index]}</pre>
+          <pre>{proposed?.[index] ?? "未取得"}</pre>
         </details>
       ))}
     </section>
@@ -82,24 +87,25 @@ export function DefinitionFixedFields({
   onPaths: (paths: string[]) => void;
 }) {
   return (
-    <details>
-      <summary>変更させない定義の項目</summary>
-      {definitionFields.map(([path, label]) => (
-        <label key={path}>
-          <input
-            type="checkbox"
-            checked={paths.includes(path)}
-            onChange={(e) =>
-              onPaths(
-                e.target.checked
-                  ? [...paths, path]
-                  : paths.filter((p) => p !== path),
-              )
-            }
-          />
-          {label}を固定
-        </label>
-      ))}
-    </details>
+    <Disclosure title="変更させない定義の項目">
+      {() =>
+        definitionFields.map(([path, label]) => (
+          <label key={path}>
+            <input
+              type="checkbox"
+              checked={paths.includes(path)}
+              onChange={(e) =>
+                onPaths(
+                  e.target.checked
+                    ? [...paths, path]
+                    : paths.filter((p) => p !== path),
+                )
+              }
+            />
+            {label}を固定
+          </label>
+        ))
+      }
+    </Disclosure>
   );
 }

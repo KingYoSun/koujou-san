@@ -1,6 +1,9 @@
-import { Field } from "./field";
+import { Disclosure } from "./disclosure";
+import { Field, jsonError } from "./field";
 import { PageList } from "./page-list";
-import { SourceLink } from "./github-observations";
+import { DetailPane, SidebarPane } from "./panes";
+import { at, SourceLink } from "./github-observations";
+import { StatusBadge } from "./status-badge";
 import {
   NavigationLink,
   ScreenContent,
@@ -95,6 +98,10 @@ export function publicationIssue(id: string, value: Request): Ref | undefined {
       ref.version !== "head",
   );
 }
+const count = (p: Page, empty: string) =>
+  p.items.length
+    ? `${p.items.length}件を表示${p.next ? "（続きあり）" : ""}`
+    : empty;
 const states: Record<string, string> = {
   preview: "送信前プレビュー",
   accepted: "共有受付・外部未確認",
@@ -142,8 +149,8 @@ export function Publications({
     [page, setPage] = useState<Page>(),
     [history, setHistory] = useState<Page>();
   const [proposal, setProposal] = useState<Proposal>(),
-    [requestID, setRequestID] = useState(""),
-    [request, setRequest] = useState<Entry>();
+    [request, setRequest] = useState<Entry>(),
+    [sourcesText, setSourcesText] = useState<string>();
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
   const epoch = useRef(answerScopeEpoch(namespace));
@@ -162,14 +169,9 @@ export function Publications({
       if (saved) {
         setEditor(saved);
         setID(saved.id);
-        setNotice(
-          "端末の編集内容を復元しました。共有の現在版と起票要求を確認してください。自動送信はしません。",
-        );
+        setNotice("端末の下書きを復元しました。");
       }
-      if (pending) {
-        setProposal(pending);
-        setRequestID(pending.id);
-      }
+      if (pending) setProposal(pending);
     });
     return () => {
       active = false;
@@ -193,7 +195,7 @@ export function Publications({
       "active",
       value,
       "publication-editor",
-    ).catch(() => setNotice("下書きの端末保存を確認できません。"));
+    ).catch(() => setNotice("下書きを端末に保存できませんでした。"));
   };
   const forgetProposal = () => {
     setProposal(undefined);
@@ -203,7 +205,7 @@ export function Publications({
       "active",
       undefined,
       "publication-proposal",
-    ).catch(() => setNotice("送信案の端末保存を確認できません。"));
+    ).catch(() => setNotice("送信案を端末に保存できませんでした。"));
   };
   const edit = (value: Draft) => {
     if (editor) persist({ ...editor, value, pending: undefined });
@@ -255,13 +257,8 @@ export function Publications({
             );
           }
         }
-        setNotice(
-          "現在の閲覧・編集・実行権限と、許可された起票接続を確認してください。",
-        );
-      } else
-        setNotice(
-          "操作を完了できませんでした。端末の下書きは自動送信しません。接続・現在版・要求の状態を確認してください。",
-        );
+        setNotice("閲覧・編集・実行権限または起票接続が不足しています。");
+      } else setNotice("操作を完了できませんでした。");
     } finally {
       setBusy(false);
     }
@@ -291,7 +288,6 @@ export function Publications({
         );
     } else {
       setRequest(value);
-      setRequestID(value.id);
       if (proposal?.id === value.id) forgetProposal();
     }
   };
@@ -299,7 +295,6 @@ export function Publications({
     const current = navigationRef.current;
     if (targetOwner.current !== owner) return;
     setRequest(value);
-    setRequestID(value.id);
     if (proposal?.id === value.id) forgetProposal();
     if (current?.route.screen === "publications")
       current.navigate(
@@ -310,7 +305,7 @@ export function Publications({
         { replace: true },
       );
   };
-  const readRequest = async (target = requestID) => {
+  const readRequest = async (target: string) => {
     const owner = targetOwner.current;
     const value = (await call(
       `/records/${encodeURIComponent(target)}`,
@@ -368,7 +363,7 @@ export function Publications({
       undefined,
       "publication-proposal",
     );
-    setNotice("共有下書きを保存しました。外部起票は依頼していません。");
+    setNotice("共有下書きを保存しました。");
   };
   const preview = async () => {
     if (!editor) return;
@@ -394,7 +389,6 @@ export function Publications({
       mutation: { operation_id: crypto.randomUUID(), expected_version: "0" },
     };
     setProposal(pending);
-    setRequestID(target);
     await saveLocalDraft(
       native,
       namespace,
@@ -421,7 +415,7 @@ export function Publications({
     if (existing) {
       setRequest(existing);
       forgetProposal();
-      setNotice("既存の共有要求を取得しました。新しい作成は依頼していません。");
+      setNotice("既存の起票要求を取得しました。");
       return;
     }
     await call(`/submit/${encodeURIComponent(proposal.id)}`, {
@@ -429,7 +423,7 @@ export function Publications({
       draft: proposal.draft,
     });
     await readRequest(proposal.id);
-    setNotice("共有で受け付けました。外部作成の確認とは別の状態です。");
+    setNotice("起票要求を共有で受け付けました。");
   };
   const historyPage = async (after = "") => {
     const root = request ?? entry;
@@ -458,7 +452,7 @@ export function Publications({
       undefined,
       "publication-proposal",
     );
-    setNotice("端末内の新しい下書きです。自動送信しません。");
+    setNotice("新しい下書きを端末に作成しました。");
   };
   useEffect(() => {
     const route = navigation?.route;
@@ -507,6 +501,7 @@ export function Publications({
       current = false;
     };
   }, [active, navigation?.route.target?.id, navigation?.route.target?.version]);
+  useEffect(() => setSourcesText(undefined), [editor?.id, editor?.version]);
   const shared = entry?.kind === "draft" ? entry : undefined;
   const selectedTarget = navigation?.route.target;
   const requestMatches =
@@ -520,249 +515,303 @@ export function Publications({
     : undefined;
   const issue =
     result && request ? publicationIssue(request.id, result) : undefined;
-  return (
-    <ScreenContent>
-      {
-        <section className="panel workflow-editor" aria-label="外部Issueの起票">
-          <h3>外部Issueの起票</h3>
-          {incoming &&
-            navigation?.route.target?.id === incoming.output.id &&
-            navigation.route.target.version === incoming.output.version && (
-              <section aria-label="起票元の固定出力">
-                <h4>起票元の固定出力</h4>
-                <p>
-                  {incoming.run.id} · {incoming.run.version}
-                </p>
-                <p>
-                  {incoming.output.id} · {incoming.output.version}
-                </p>
-                <details>
-                  <summary>原出力を確認</summary>
-                  <pre>{format(incoming.value)}</pre>
-                </details>
-                <button
-                  disabled={!canEdit || busy}
-                  onClick={() => {
-                    forgetProposal();
-                    setRequest(undefined);
-                    setEntry(undefined);
-                    const id = `publication-draft:${crypto.randomUUID()}`;
-                    setID(id);
-                    persist({
-                      id,
-                      version: "0",
-                      value: {
-                        ...empty(),
-                        name: "固定出力からの起票",
-                        body: format(incoming.value),
-                        sources: [incoming.run, incoming.output],
-                      },
-                    });
-                    setNotice(
-                      "固定出力を含む端末の下書きを準備しました。共有保存・外部送信は行っていません。",
-                    );
-                  }}
-                >
-                  この固定出力を含む新規下書きを準備
-                </button>
-              </section>
-            )}
-          <label>
-            一覧の種類
-            <select
-              value={kind}
-              onChange={(e) => {
-                setKind(e.target.value);
-                setPage(undefined);
-              }}
-            >
-              <option value="draft">共有下書き</option>
-              <option value="request">起票要求</option>
-            </select>
-          </label>
-          <button disabled={busy} onClick={() => void act(() => list())}>
-            起票の一覧を取得
-          </button>
+  const historyView = (entry || request) && (
+    <>
+      <button
+        data-variant="secondary"
+        disabled={busy}
+        aria-busy={busy}
+        onClick={() => void act(() => historyPage())}
+      >
+        {busy ? "起票操作の履歴を取得中…" : "起票操作の履歴を取得"}
+      </button>
+      {history && (
+        <>
+          <p>{count(history, "起票操作の履歴はありません。")}</p>
           <ul>
-            {page?.items.map((value) => (
-              <li key={value.id}>
-                <button
-                  disabled={busy}
-                  onClick={() => void act(() => load(value.id, "head"))}
-                >
-                  {value.value.name || value.value.title || value.id} ·{" "}
-                  {states[value.value.state ?? ""] ?? value.version}
-                </button>
+            {history.items.map((value) => (
+              <li key={`${value.id}@${value.version}`}>
+                {value.id}@{value.version}
+                <Disclosure title="起票履歴の内容">
+                  {() => <pre>{format(value.value)}</pre>}
+                </Disclosure>
               </li>
             ))}
           </ul>
-          {page?.next && (
-            <button
-              disabled={busy}
-              onClick={() => void act(() => list(page.next))}
-            >
-              次の起票一覧ページ
-            </button>
-          )}
-          <Field label="共有下書き・要求ID" value={id} onChange={setID} />
-          <Field
-            label="取得する起票記録の版"
-            value={version}
-            onChange={setVersion}
-          />
-          <button disabled={busy || !id} onClick={() => void act(() => load())}>
-            起票の固定記録を取得
-          </button>
-          {canEdit && (
-            <button disabled={busy} onClick={fresh}>
-              起票下書きを新規作成
-            </button>
-          )}
-          {editor && (
-            <fieldset disabled={!canEdit || busy}>
-              <legend>端末の下書き · {editor.id}</legend>
-              <p>
-                前提版: {editor.version} / 取得した共有版:{" "}
-                {shared?.version ?? "未取得"}
-              </p>
-              {(
-                [
-                  ["name", "下書きの名前"],
-                  ["connection", "起票接続ID"],
-                  ["title", "外部Issueのタイトル"],
-                ] as const
-              ).map(([key, label]) => (
-                <label key={key}>
-                  {label}
-                  <input
-                    value={editor.value[key]}
-                    onChange={(e) => {
-                      edit({ ...editor.value, [key]: e.target.value });
-                    }}
-                  />
-                </label>
-              ))}
-              <label>
-                外部Issueの本文
-                <textarea
-                  value={editor.value.body}
-                  onChange={(e) => {
-                    edit({ ...editor.value, body: e.target.value });
-                  }}
-                />
-              </label>
-              <PageList label="この下書きの参照元" items={editor.value.sources}>
-                {(ref, index) => (
-                  <li key={index}>
-                    {ref.id} · {ref.version}
-                  </li>
-                )}
-              </PageList>
-              {incoming &&
-                !editor.value.sources.some(
-                  (ref) =>
-                    ref.id === incoming.output.id &&
-                    ref.version === incoming.output.version,
-                ) && (
-                  <p className="context-warning">
-                    この下書きの参照元は、上の出力と異なります。
-                  </p>
-                )}
-              <details>
-                <summary>参照元の固定記録</summary>
-                <label>
-                  起票の参照元JSON
-                  <textarea
-                    key={`${editor.id}@${editor.version}`}
-                    defaultValue={format(editor.value.sources)}
-                    onBlur={(e) => {
-                      try {
-                        const sources = JSON.parse(e.target.value) as Ref[];
-                        edit({ ...editor.value, sources });
-                      } catch {
-                        setNotice(
-                          "参照元をJSONの固定ID・版の配列で指定してください。",
-                        );
-                      }
-                    }}
-                  />
-                </label>
-              </details>
-              <button onClick={() => void act(save)}>
-                下書きを確認して共有へ保存
-              </button>
-              {shared && (
-                <button
-                  onClick={() => {
-                    persist({
-                      id: shared.id,
-                      version: shared.version,
-                      value: shared.value as Draft,
-                    });
-                    forgetProposal();
-                  }}
-                >
-                  取得した共有内容から編集し直す
-                </button>
-              )}
-            </fieldset>
-          )}
-          {shared && (
-            <details>
-              <summary>取得した共有下書き</summary>
-              <pre>{format(shared.value)}</pre>
-            </details>
-          )}
-          <button
-            disabled={busy || !canEdit || !editor || editor.version === "0"}
-            onClick={() => void act(preview)}
-          >
-            固定下書きから送信内容をプレビュー
-          </button>
-          {proposal && (
-            <section aria-label="起票の送信前プレビュー">
-              <h4>送信前プレビュー · 外部未送信</h4>
-              <p>
-                対象:{" "}
-                {proposal.preview.connection.provider === "gitea"
-                  ? "Gitea"
-                  : "GitHub"}{" "}
-                · {proposal.preview.connection.instance ?? "https://github.com"}{" "}
-                / {proposal.preview.connection.repository} / 要求ID:{" "}
-                {proposal.id}
-              </p>
-              <p>{proposal.preview.input.title}</p>
-              <pre>{proposal.preview.external_body}</pre>
-              <button
-                disabled={busy || !canEdit || !canExecute}
-                onClick={() => void act(submit)}
+        </>
+      )}
+      {history?.next && (
+        <button
+          data-variant="secondary"
+          disabled={busy}
+          onClick={() => void act(() => historyPage(history.next))}
+        >
+          起票履歴の次のページ
+        </button>
+      )}
+    </>
+  );
+  return (
+    <ScreenContent>
+      <section className="workflow-editor" aria-label="外部Issueの起票">
+        <SidebarPane>
+          <section aria-label="起票要求一覧">
+            <label>
+              一覧の種類
+              <select
+                value={kind}
+                onChange={(e) => {
+                  setKind(e.target.value);
+                  setPage(undefined);
+                }}
               >
-                この固定内容で起票を依頼
+                <option value="draft">共有下書き</option>
+                <option value="request">起票要求</option>
+              </select>
+            </label>
+            <button
+              data-variant="secondary"
+              disabled={busy}
+              aria-busy={busy}
+              onClick={() => void act(() => list())}
+            >
+              {busy ? "起票一覧を取得中…" : "起票一覧を取得"}
+            </button>
+            {page && (
+              <>
+                <p>
+                  {count(
+                    page,
+                    kind === "draft"
+                      ? "共有下書きはありません。"
+                      : "起票要求はありません。",
+                  )}
+                </p>
+                <ul>
+                  {page.items.map((value) => (
+                    <li key={value.id}>
+                      <button
+                        data-variant="secondary"
+                        disabled={busy}
+                        aria-current={value.id === id ? "true" : undefined}
+                        onClick={() => void act(() => load(value.id, "head"))}
+                      >
+                        {value.value.name || value.value.title || value.id} ·{" "}
+                        {states[value.value.state ?? ""] ?? value.version}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {page?.next && (
+              <button
+                data-variant="secondary"
+                disabled={busy}
+                onClick={() => void act(() => list(page.next))}
+              >
+                起票一覧の次のページ
+              </button>
+            )}
+            {canEdit && (
+              <button disabled={busy} onClick={fresh}>
+                起票下書きを新規作成
+              </button>
+            )}
+            <details>
+              <summary>IDと版を指定して取得</summary>
+              <Field label="共有下書き・要求ID" value={id} onChange={setID} />
+              <Field
+                label="取得する起票記録の版"
+                value={version}
+                onChange={setVersion}
+              />
+              <button
+                data-variant="secondary"
+                disabled={busy || !id}
+                aria-busy={busy}
+                onClick={() => void act(() => load())}
+              >
+                {busy ? "起票の固定記録を取得中…" : "起票の固定記録を取得"}
+              </button>
+            </details>
+          </section>
+        </SidebarPane>
+        {incoming &&
+          navigation?.route.target?.id === incoming.output.id &&
+          navigation.route.target.version === incoming.output.version && (
+            <section aria-label="起票元の固定出力">
+              <h4>起票元の固定出力</h4>
+              <p>
+                {incoming.run.id} · {incoming.run.version}
+              </p>
+              <p>
+                {incoming.output.id} · {incoming.output.version}
+              </p>
+              <Disclosure title="原出力">
+                {() => <pre>{format(incoming.value)}</pre>}
+              </Disclosure>
+              <button
+                disabled={!canEdit || busy}
+                onClick={() => {
+                  forgetProposal();
+                  setRequest(undefined);
+                  setEntry(undefined);
+                  const id = `publication-draft:${crypto.randomUUID()}`;
+                  setID(id);
+                  persist({
+                    id,
+                    version: "0",
+                    value: {
+                      ...empty(),
+                      name: "固定出力からの起票",
+                      body: format(incoming.value),
+                      sources: [incoming.run, incoming.output],
+                    },
+                  });
+                  setNotice("固定出力を含む下書きを端末に作成しました。");
+                }}
+              >
+                固定出力から下書きを作成
               </button>
             </section>
           )}
-          <Field
-            label="確認する起票要求ID"
-            value={requestID}
-            onChange={setRequestID}
-          />
-          <button
-            disabled={busy || !requestID}
-            onClick={() => void act(() => readRequest())}
-          >
-            起票要求の状態を取得
-          </button>
-          {request && result && (
-            <section aria-label="外部起票の確認">
-              <h4>{states[result.state] ?? result.state}</h4>
+        {editor && (
+          <fieldset disabled={!canEdit || busy}>
+            <legend>端末の下書き · {editor.id}</legend>
+            <p>
+              前提版：{editor.version} / 取得した共有版：
+              {shared?.version ?? "未取得"}
+            </p>
+            {(
+              [
+                ["name", "下書きの名前"],
+                ["connection", "起票接続ID"],
+                ["title", "外部Issueのタイトル"],
+              ] as const
+            ).map(([key, label]) => (
+              <Field
+                key={key}
+                label={label}
+                value={editor.value[key]}
+                onChange={(v) => edit({ ...editor.value, [key]: v })}
+              />
+            ))}
+            <Field
+              label="外部Issueの本文"
+              rows={6}
+              value={editor.value.body}
+              onChange={(body) => edit({ ...editor.value, body })}
+            />
+            <PageList label="この下書きの参照元" items={editor.value.sources}>
+              {(ref, index) => (
+                <li key={index}>
+                  {ref.id} · {ref.version}
+                </li>
+              )}
+            </PageList>
+            {incoming &&
+              !editor.value.sources.some(
+                (ref) =>
+                  ref.id === incoming.output.id &&
+                  ref.version === incoming.output.version,
+              ) && (
+                <p role="status" className="context-warning">
+                  参照元に起票元の固定出力が含まれていません。
+                </p>
+              )}
+            <Disclosure title="参照元の固定記録">
+              {() => (
+                <Field
+                  label="起票の参照元JSON"
+                  rows={4}
+                  value={sourcesText ?? format(editor.value.sources)}
+                  error={jsonError(sourcesText ?? "[]")}
+                  onChange={(v) => {
+                    setSourcesText(v);
+                    try {
+                      edit({
+                        ...editor.value,
+                        sources: JSON.parse(v) as Ref[],
+                      });
+                    } catch {
+                      /* the field shows the JSON error until it parses */
+                    }
+                  }}
+                />
+              )}
+            </Disclosure>
+            <button onClick={() => void act(save)}>下書きを共有へ保存</button>
+            {shared && (
+              <button
+                data-variant="secondary"
+                onClick={() => {
+                  persist({
+                    id: shared.id,
+                    version: shared.version,
+                    value: shared.value as Draft,
+                  });
+                  setSourcesText(undefined);
+                  forgetProposal();
+                }}
+              >
+                共有版から編集し直す
+              </button>
+            )}
+          </fieldset>
+        )}
+        {shared && (
+          <Disclosure title="取得した共有下書き">
+            {() => <pre>{format(shared.value)}</pre>}
+          </Disclosure>
+        )}
+        <button
+          disabled={busy || !canEdit || !editor || editor.version === "0"}
+          onClick={() => void act(preview)}
+        >
+          送信内容をプレビュー
+        </button>
+        {proposal && (
+          <section aria-label="起票の送信前プレビュー">
+            <h4>{states.preview}</h4>
+            <p>
+              対象：
+              {proposal.preview.connection.provider === "gitea"
+                ? "Gitea"
+                : "GitHub"}{" "}
+              · {proposal.preview.connection.instance ?? "https://github.com"} /{" "}
+              {proposal.preview.connection.repository} / 要求ID：{proposal.id}
+            </p>
+            <p>{proposal.preview.input.title}</p>
+            <pre>{proposal.preview.external_body}</pre>
+            <button
+              disabled={busy || !canEdit || !canExecute}
+              onClick={() => void act(submit)}
+            >
+              起票を依頼
+            </button>
+          </section>
+        )}
+        {!result && historyView}
+        <p role="status">{notice}</p>
+        {request && result && (
+          <DetailPane>
+            <section aria-label="選択した起票要求の詳細">
+              <h4>{result.input.title || request.id}</h4>
               <p>
-                要求: {request.id}@{request.version} / 共通Run: {result.run_id}
+                <StatusBadge
+                  label="起票"
+                  value={states[result.state] ?? result.state}
+                />
               </p>
               <p>
-                主体: {result.actor.kind} · {result.actor.user_id}
+                要求：{request.id}@{request.version} / 共通Run：{result.run_id}
               </p>
               <p>
-                確認時刻: {result.observed_at ?? "未確認"} / 理由:{" "}
+                主体：{result.actor.kind} · {result.actor.user_id}
+              </p>
+              <p>
+                確認時刻：{at(result.observed_at)} / 理由：
                 {result.reason || "なし"}
               </p>
               {issue && (
@@ -778,6 +827,7 @@ export function Publications({
                 </NavigationLink>
               )}
               <button
+                data-variant="secondary"
                 disabled={busy}
                 onClick={() =>
                   void act(async () => {
@@ -790,12 +840,12 @@ export function Publications({
                   })
                 }
               >
-                既存Issueと照合・外部内容を再取得
+                外部Issueを再照合
               </button>
               {result.external && (
                 <>
                   <p>
-                    外部Issue: {result.external.html_url} ·{" "}
+                    外部Issue：{result.external.html_url} ·{" "}
                     {result.external.state}
                   </p>
                   <SourceLink
@@ -805,49 +855,17 @@ export function Publications({
                   />
                   <h4>{result.external.title}</h4>
                   <pre>{result.external.body}</pre>
-                  <p>外部更新日時: {result.external.updated_at}</p>
+                  <p>外部更新日時：{at(result.external.updated_at)}</p>
                 </>
               )}
-              <details>
-                <summary>受付した固定内容と原記録</summary>
-                <pre>{format(result)}</pre>
-              </details>
+              <Disclosure title="受付した固定内容と原記録">
+                {() => <pre>{format(result)}</pre>}
+              </Disclosure>
+              {historyView}
             </section>
-          )}
-          {(entry || request) && (
-            <>
-              <button
-                disabled={busy}
-                onClick={() => void act(() => historyPage())}
-              >
-                起票操作の履歴を取得
-              </button>
-              <ul>
-                {history?.items.map((value) => (
-                  <li key={`${value.id}@${value.version}`}>
-                    {value.id}@{value.version}
-                    <details>
-                      <summary>起票履歴の内容</summary>
-                      <pre>{format(value.value)}</pre>
-                    </details>
-                  </li>
-                ))}
-              </ul>
-              {history?.next && (
-                <button
-                  disabled={busy}
-                  onClick={() => void act(() => historyPage(history.next))}
-                >
-                  次の起票履歴ページ
-                </button>
-              )}
-            </>
-          )}
-          <p role="status" aria-live="polite">
-            {notice}
-          </p>
-        </section>
-      }
+          </DetailPane>
+        )}
+      </section>
     </ScreenContent>
   );
 }

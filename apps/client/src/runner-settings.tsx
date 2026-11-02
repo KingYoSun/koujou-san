@@ -1,6 +1,7 @@
 import { ScreenContent } from "./navigation";
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { Field } from "./field";
 
 const words = (s: string) => s.split(/[\s,]+/).filter(Boolean);
 export function RunnerSettings({
@@ -24,6 +25,7 @@ export function RunnerSettings({
     [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   async function apply(save: boolean) {
+    const label = save ? "Runner接続を保存" : "保存済みのRunner接続を再送";
     setBusy(true);
     setNotice("");
     try {
@@ -47,12 +49,10 @@ export function RunnerSettings({
           repositories: repository ? { [repository]: path } : {},
         });
       else await invoke("runner_contact", { workspace });
-      setNotice(
-        "この端末のRunner接続を更新しました。commandは起動していません。",
-      );
+      setNotice(`${label}しました。`);
     } catch {
       setNotice(
-        "端末登録・入力取得/報告の許可と設定を確認してください。接続の更新を確認できませんでした。",
+        `${label}できませんでした。端末登録・入力取得/報告の許可と設定を確認してください。`,
       );
     } finally {
       setBusy(false);
@@ -60,104 +60,92 @@ export function RunnerSettings({
   }
   return (
     <ScreenContent>
-      {
-        <details className="team-details">
-          <summary>この端末のRunner設定</summary>
-          <fieldset disabled={busy}>
-            <label>
-              接続の種類
-              <input value={kind} onChange={(e) => setKind(e.target.value)} />
-            </label>
-            <label>
-              接続先の論理名
-              <input
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-              />
-            </label>
-            <label>
-              確認したCLI・接続の版
-              <input
-                value={version}
-                onChange={(e) => setVersion(e.target.value)}
-              />
-            </label>
-            <label>
-              実行環境
-              <input
-                value={environment}
-                onChange={(e) => setEnvironment(e.target.value)}
-              />
-            </label>
-            <label>
-              CLI認証主体への参照
-              <input
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-              />
-            </label>
-            <label>
-              依頼を許可するメンバーID（空白区切り）
-              <textarea
-                value={users}
-                onChange={(e) => setUsers(e.target.value)}
-              />
-            </label>
-            <label>
-              確認した入力方式（stdin、file等、空白区切り）
-              <input
-                value={bindings}
-                onChange={(e) => setBindings(e.target.value)}
-              />
-            </label>
-            <label>
-              確認した能力（pause、stop等、空白区切り）
-              <input
-                value={capabilities}
-                onChange={(e) => setCapabilities(e.target.value)}
-              />
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={confirmed}
-                onChange={(e) => setConfirmed(e.target.checked)}
-              />
-              この版・環境で接続能力を確認済み
-            </label>
-            <label>
-              repositoryの論理ID（使う場合）
-              <input
-                value={repository}
-                onChange={(e) => setRepository(e.target.value)}
-              />
-            </label>
-            {repository && (
-              <label>
-                この端末内のrepositoryのpath
-                <input value={path} onChange={(e) => setPath(e.target.value)} />
-              </label>
-            )}
-            <button
-              disabled={
-                !kind ||
-                !target ||
-                !version ||
-                !environment ||
-                !subject ||
-                (!!repository && !path)
-              }
-              onClick={() => void apply(true)}
-            >
-              接続設定を保存・更新
-            </button>
-            <button onClick={() => void apply(false)}>
-              保存済みのRunner接続を更新
-            </button>
-          </fieldset>
-          {notice && <p role="status">{notice}</p>}
-        </details>
-      }
+      <section className="team-details">
+        <h3>この端末のRunner接続</h3>
+        <fieldset disabled={busy}>
+          <Field label="接続の種類" value={kind} onChange={setKind} required />
+          <Field
+            label="接続先の論理名"
+            value={target}
+            onChange={setTarget}
+            required
+          />
+          <Field
+            label="確認したCLI・接続の版"
+            value={version}
+            onChange={setVersion}
+            required
+          />
+          <Field
+            label="実行環境"
+            value={environment}
+            onChange={setEnvironment}
+            required
+          />
+          <Field
+            label="CLI認証主体への参照"
+            value={subject}
+            onChange={setSubject}
+            required
+          />
+          <Field
+            label="依頼を許可するメンバーID"
+            value={users}
+            onChange={setUsers}
+            rows={2}
+          />
+          <Field
+            label="確認した入力方式"
+            value={bindings}
+            onChange={setBindings}
+            rows={2}
+          />
+          <Field
+            label="確認した能力"
+            value={capabilities}
+            onChange={setCapabilities}
+            rows={2}
+          />
+          <label>
+            <input
+              type="checkbox"
+              checked={confirmed}
+              onChange={(e) => setConfirmed(e.target.checked)}
+            />
+            この版・環境で接続能力を確認済み
+          </label>
+          <Field
+            label="repositoryの論理ID"
+            value={repository}
+            onChange={setRepository}
+          />
+          {repository && (
+            <Field
+              label="この端末内のrepositoryのpath"
+              value={path}
+              onChange={setPath}
+              required
+            />
+          )}
+          <button
+            disabled={
+              !kind ||
+              !target ||
+              !version ||
+              !environment ||
+              !subject ||
+              (!!repository && !path)
+            }
+            onClick={() => void apply(true)}
+          >
+            Runner接続を保存
+          </button>
+          <button data-variant="secondary" onClick={() => void apply(false)}>
+            保存済みのRunner接続を再送
+          </button>
+        </fieldset>
+        {notice && <p role="status">{notice}</p>}
+      </section>
     </ScreenContent>
   );
 }

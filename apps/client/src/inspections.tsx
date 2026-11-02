@@ -1,4 +1,8 @@
+import { Disclosure } from "./disclosure";
+import { Field, jsonError } from "./field";
 import { ScreenContent } from "./navigation";
+import { DetailPane, SidebarPane } from "./panes";
+import { StatusBadge } from "./status-badge";
 import { useRef, useState } from "react";
 import { syncRequest, workspaceAccessLost } from "./auth";
 import { SyncHTTPError } from "./sync-error";
@@ -65,10 +69,20 @@ type View = {
   >;
 };
 const format = (v: unknown) => JSON.stringify(v, null, 2);
+const count = (p: Page, empty: string) =>
+  p.items.length
+    ? `${p.items.length}件を表示${p.next ? "（続きあり）" : ""}`
+    : empty;
 const acceptedReport = (v: View) =>
   v.run.value.assessment?.state === "valid"
     ? (v.run.value.assessment.report as ReportData | undefined)
     : undefined;
+const verdicts: Record<string, string> = {
+  PASS: "合格",
+  FAIL: "不合格",
+  INCONCLUSIVE: "判断不能",
+};
+const verdict = (code?: string) => (code ? (verdicts[code] ?? code) : "未判定");
 const sourceKinds: Record<string, string> = {
   "machine-observation": "実行・機器の観測",
   "human-confirmation": "人の確認",
@@ -122,35 +136,46 @@ export function InspectionResult({
     <section aria-label={title}>
       <h4>{title}</h4>
       <p>
-        過去の判定:{" "}
-        <strong>{v.run.value.assessment?.verdict ?? "未判定"}</strong> / 形式:{" "}
-        {v.run.value.assessment?.state ?? "未確認"} / 現在の適用:{" "}
-        <strong>
-          {v.validity === "STALE"
-            ? "Stale（基準変更・再検品が必要）"
-            : "採用中の基準に一致"}
-        </strong>
+        <StatusBadge
+          label="判定"
+          value={verdict(v.run.value.assessment?.verdict)}
+        />{" "}
+        <StatusBadge
+          label="形式"
+          value={v.run.value.assessment?.state ?? "未確認"}
+        />{" "}
+        <StatusBadge
+          label="現在の適用"
+          value={
+            v.validity === "STALE"
+              ? "採用中の基準と不一致"
+              : "採用中の基準に一致"
+          }
+        />
       </p>
-      <details>
-        <summary>検品環境・固定入力の分離を確認</summary>
-        <p>
-          実行: {v.run.value.state} / 終了コード:{" "}
-          {v.run.value.exit_code ?? "未観測"} / Context:{" "}
-          {v.launch.value.manifest.state === "none"
-            ? "明示的に無注入"
-            : v.launch.value.manifest.state}
-        </p>
-        <dl className="status-list">
-          {Object.entries(v.launch.value.separation).map(([name, s]) => (
-            <div key={name}>
-              <dt>{dimensions[name] ?? name}</dt>
-              <dd>
-                {levels[s.level] ?? s.level} · {s.method || "方法未確認"}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </details>
+      <Disclosure title="検品環境・固定入力の分離">
+        {() => (
+          <>
+            <p>
+              実行：{v.run.value.state} / 終了コード：
+              {v.run.value.exit_code ?? "未観測"} / Context：
+              {v.launch.value.manifest.state === "none"
+                ? "明示的に無注入"
+                : v.launch.value.manifest.state}
+            </p>
+            <dl className="status-list">
+              {Object.entries(v.launch.value.separation).map(([name, s]) => (
+                <div key={name}>
+                  <dt>{dimensions[name] ?? name}</dt>
+                  <dd>
+                    {levels[s.level] ?? s.level} · {s.method || "方法未確認"}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </>
+        )}
+      </Disclosure>
       <div className="table-scroll">
         <table className="inspection-results">
           <thead>
@@ -166,7 +191,7 @@ export function InspectionResult({
             {rows.map(({ id, label, result: c }) => (
               <tr key={id}>
                 <td>{label}</td>
-                <td>{c?.verdict ?? "未判定"}</td>
+                <td>{verdict(c?.verdict)}</td>
                 <td>
                   {c ? (c.executed ? "実行済み" : "未実行") : "実行未確認"}
                 </td>
@@ -187,7 +212,7 @@ export function InspectionResult({
         </table>
       </div>
       <p>
-        全体の未確認:{" "}
+        全体の未確認：
         {report
           ? report.unverified?.join(" / ") || "記載なし"
           : "形式未確認・不正のため未判定"}
@@ -213,10 +238,9 @@ export function InspectionResult({
           </li>
         ))}
       </ul>
-      <details>
-        <summary>固定入力・Manifest・原レポート</summary>
-        <pre>{format(v)}</pre>
-      </details>
+      <Disclosure title="固定入力・Manifest・原レポート">
+        {() => <pre>{format(v)}</pre>}
+      </Disclosure>
     </section>
   );
 }
@@ -257,6 +281,8 @@ export function Inspections({
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
   const operations = useRef(new Map<string, string>());
+  const fetching = (label: string) =>
+    busy ? `${label}を取得中…` : `${label}を取得`;
   const call = async (path: string, body?: unknown) => {
     const epoch = answerScopeEpoch(namespace);
     const result = await syncRequest(base + path, native, {
@@ -298,11 +324,8 @@ export function Inspections({
             undefined,
             "inspection",
           );
-        setNotice("現在の閲覧・編集・実行権限を確認してください。");
-      } else
-        setNotice(
-          "操作を完了できませんでした。入力、分離能力、現在の版・接続を確認してください。",
-        );
+        setNotice("閲覧・編集・実行権限が不足しています。");
+      } else setNotice("操作を完了できませんでした。");
     } finally {
       setBusy(false);
     }
@@ -440,13 +463,12 @@ export function Inspections({
       },
       target,
     );
-    setNotice("端末内の下書きです。共有への保存・採用・実行は別の操作です。");
+    setNotice("端末内に新しい下書きを作成しました。");
   };
   return (
     <ScreenContent>
-      {
-        <section className="panel workflow-editor" aria-label="独立検品・証拠">
-          <h3>独立検品・証拠</h3>
+      <SidebarPane>
+        <section aria-label="検品定義一覧">
           <label>
             一覧の種類
             <select
@@ -460,49 +482,49 @@ export function Inspections({
               <option value="evidence">証拠</option>
             </select>
           </label>
-          <button disabled={busy} onClick={() => void act(() => list())}>
-            一覧を取得
+          <button
+            data-variant="secondary"
+            disabled={busy}
+            aria-busy={busy}
+            onClick={() => void act(() => list())}
+          >
+            {fetching("検品・証拠一覧")}
           </button>
-          <ul>
-            {page?.items.map((e) => (
-              <li key={e.id}>
+          {page && (
+            <>
+              <p>
+                {count(
+                  page,
+                  type === "definition"
+                    ? "検品定義はありません。"
+                    : "証拠はありません。",
+                )}
+              </p>
+              <ul>
+                {page.items.map((e) => (
+                  <li key={e.id}>
+                    <button
+                      data-variant="secondary"
+                      disabled={busy}
+                      aria-current={e.id === id ? "true" : undefined}
+                      onClick={() => void act(() => load(e.id, "head"))}
+                    >
+                      {String(e.value.name ?? e.id)} · {e.version}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {page.next && (
                 <button
+                  data-variant="secondary"
                   disabled={busy}
-                  onClick={() => void act(() => load(e.id, "head"))}
+                  onClick={() => void act(() => list(page.next))}
                 >
-                  {String(e.value.name ?? e.id)} · {e.version}
+                  一覧の次のページ
                 </button>
-              </li>
-            ))}
-          </ul>
-          {page?.next && (
-            <button
-              disabled={busy}
-              onClick={() => void act(() => list(page.next))}
-            >
-              次の一覧ページ
-            </button>
+              )}
+            </>
           )}
-          <label>
-            検品・証拠ID
-            <input
-              value={id}
-              onChange={(e) => {
-                setID(e.target.value);
-                clear();
-              }}
-            />
-          </label>
-          <label>
-            取得する版
-            <input
-              value={version}
-              onChange={(e) => setVersion(e.target.value)}
-            />
-          </label>
-          <button disabled={busy || !id} onClick={() => void act(() => load())}>
-            固定版を取得
-          </button>
           {canEdit && (
             <>
               <button disabled={busy} onClick={() => fresh(false)}>
@@ -513,219 +535,252 @@ export function Inspections({
               </button>
             </>
           )}
-          {draft && (
-            <>
-              <p>
-                共有版: {record?.version ?? "未保存"} / 下書きの前提版:{" "}
-                {draft.version}
-              </p>
-              <label>
-                検品・証拠のJSON
-                <textarea
-                  className="workflow-editor"
-                  readOnly={!canEdit}
-                  value={draft.text}
-                  onChange={(e) => persist({ ...draft, text: e.target.value })}
-                />
-              </label>
-              <button
-                disabled={busy || !canEdit}
-                onClick={() =>
-                  void act(async () => {
-                    const r = await mutate(
-                      `/records/${encodeURIComponent(id)}`,
-                      draft.version,
-                      { value_utf8: draft.text },
-                    );
-                    await saveLocalDraft<Draft>(
-                      native,
-                      namespace,
-                      id,
-                      undefined,
-                      "inspection",
-                    );
-                    await load(r.data.id, r.data.version);
-                    setNotice("共有へ保存しました。採用・開始はしていません。");
-                  })
-                }
-              >
-                内容を確認して共有へ保存
-              </button>
-              {record && (
-                <details>
-                  <summary>取得した共有の内容</summary>
-                  <pre>{format(record.value)}</pre>
-                </details>
-              )}
-            </>
-          )}
-          {record?.kind === "definition" && (
-            <>
-              <button
-                disabled={busy || !canEdit}
-                onClick={() =>
-                  void act(async () => {
-                    const r = await mutate("/adopt", adoption?.version ?? "0", {
-                      definition: { id: record.id, version: record.version },
-                    });
-                    setAdoption(r.data);
-                    setNotice(
-                      "この固定版を採用しました。実行は始まっていません。",
-                    );
-                  })
-                }
-              >
-                取得した固定版を採用
-              </button>
-              <p>
-                採用記録:{" "}
-                {adoption
-                  ? `${adoption.id}@${adoption.version}`
-                  : "未取得・未採用"}
-              </p>
-              <label>
-                接続端末ID
-                <input
-                  value={device}
-                  onChange={(e) => setDevice(e.target.value)}
-                />
-              </label>
-              <label>
-                固定リポジトリ指定（不要ならnull）
-                <textarea
-                  value={repository}
-                  onChange={(e) => setRepository(e.target.value)}
-                />
-              </label>
-              <button
-                disabled={busy || !canExecute || !adoption || !device}
-                onClick={() =>
-                  void act(async () => {
-                    const target = `run:${crypto.randomUUID()}`;
-                    await mutate(`/start/${encodeURIComponent(target)}`, "0", {
-                      adoption,
-                      device_id: device,
-                      repository: JSON.parse(repository) as unknown,
-                    });
-                    setRun(target);
-                    await showRun(target);
-                    setNotice(
-                      "許可と必須分離能力を照合し、共通Runへ実行を依頼しました。",
-                    );
-                  })
-                }
-              >
-                採用版で新しい検品を依頼
-              </button>
-              <button
-                disabled={busy}
-                onClick={() => void act(() => showHistory())}
-              >
-                検品・判断の履歴を取得
-              </button>
-              <ul>
-                {history?.items.map((e) => (
-                  <li key={`${e.id}@${e.version}`}>
-                    {e.kind} · {e.id}@{e.version}
-                    {e.kind === "launch" ? (
-                      <button
-                        disabled={busy}
-                        onClick={() =>
-                          void act(() => showRun(String(e.value.run_id)))
-                        }
-                      >
-                        この検品の判定を表示
-                      </button>
-                    ) : (
-                      <details>
-                        <summary>記録の内容</summary>
-                        <pre>{format(e.value)}</pre>
-                      </details>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              {history?.next && (
-                <button
-                  disabled={busy}
-                  onClick={() => void act(() => showHistory(history.next))}
-                >
-                  次の履歴ページ
-                </button>
-              )}
-            </>
-          )}
-          <label>
-            検品Run ID
-            <input value={run} onChange={(e) => setRun(e.target.value)} />
-          </label>
-          <button
-            disabled={busy || !run}
-            onClick={() => void act(() => showRun())}
-          >
-            判定と現在の証拠を取得
-          </button>
-          {view && (
-            <>
-              <InspectionResult value={view} title="選択した判定" />
-              <label>
-                比較する検品Run ID
-                <input
-                  value={compare}
-                  onChange={(e) => setCompare(e.target.value)}
-                />
-              </label>
-              <button
-                disabled={busy || !compare}
-                onClick={() =>
-                  void act(async () =>
-                    setOther(
-                      (await call(
-                        `/current/${encodeURIComponent(compare)}`,
-                      )) as View,
-                    ),
-                  )
-                }
-              >
-                別の判定を並べて表示
-              </button>
-              {other && <InspectionResult value={other} title="比較する判定" />}
-              {canEdit && (
-                <>
-                  <label>
-                    人の判断JSON
-                    <textarea
-                      className="workflow-editor"
-                      value={decision}
-                      onChange={(e) => setDecision(e.target.value)}
-                    />
-                  </label>
-                  <button
-                    disabled={busy}
-                    onClick={() =>
-                      void act(async () => {
-                        await mutate(
-                          `/judgments/inspection-judgment:${crypto.randomUUID()}`,
-                          "0",
-                          JSON.parse(decision) as object,
-                        );
-                        setNotice(
-                          "人の判断を保存しました。元の判定と実行権限は保持されています。",
-                        );
-                      })
-                    }
-                  >
-                    内容を確認して人の判断を保存
-                  </button>
-                </>
-              )}
-            </>
-          )}
-          <p role="status" aria-live="polite">
-            {notice}
-          </p>
+          <details>
+            <summary>IDと版を指定して取得</summary>
+            <Field
+              label="検品・証拠ID"
+              value={id}
+              onChange={(value) => {
+                setID(value);
+                clear();
+              }}
+            />
+            <Field label="取得する版" value={version} onChange={setVersion} />
+            <button
+              data-variant="secondary"
+              disabled={busy || !id}
+              aria-busy={busy}
+              onClick={() => void act(() => load())}
+            >
+              {fetching("固定版")}
+            </button>
+          </details>
         </section>
-      }
+      </SidebarPane>
+      <section className="workflow-editor">
+        {draft && (
+          <>
+            <p>
+              共有版：{record?.version ?? "未保存"} / 下書きの前提版：
+              {draft.version}
+            </p>
+            {canEdit && (
+              <>
+                <Field
+                  label="検品・証拠のJSON"
+                  rows={12}
+                  value={draft.text}
+                  onChange={(text) => persist({ ...draft, text })}
+                  error={jsonError(draft.text)}
+                />
+                <button
+                  disabled={busy || !!jsonError(draft.text)}
+                  onClick={() =>
+                    void act(async () => {
+                      const r = await mutate(
+                        `/records/${encodeURIComponent(id)}`,
+                        draft.version,
+                        { value_utf8: draft.text },
+                      );
+                      await saveLocalDraft<Draft>(
+                        native,
+                        namespace,
+                        id,
+                        undefined,
+                        "inspection",
+                      );
+                      await load(r.data.id, r.data.version);
+                      setNotice("共有へ保存しました。");
+                    })
+                  }
+                >
+                  共有へ保存
+                </button>
+              </>
+            )}
+            {record && (
+              <Disclosure title="取得した共有の内容">
+                {() => <pre>{format(record.value)}</pre>}
+              </Disclosure>
+            )}
+          </>
+        )}
+        {record?.kind === "definition" && (
+          <>
+            <button
+              disabled={busy || !canEdit}
+              onClick={() =>
+                void act(async () => {
+                  const r = await mutate("/adopt", adoption?.version ?? "0", {
+                    definition: { id: record.id, version: record.version },
+                  });
+                  setAdoption(r.data);
+                  setNotice("この固定版を採用しました。");
+                })
+              }
+            >
+              取得した固定版を採用
+            </button>
+            <p>
+              採用記録：
+              {adoption
+                ? `${adoption.id}@${adoption.version}`
+                : "未取得・未採用"}
+            </p>
+            <Field label="接続端末ID" value={device} onChange={setDevice} />
+            <Field
+              label="固定リポジトリ（JSON）"
+              rows={4}
+              value={repository}
+              onChange={setRepository}
+              error={jsonError(repository)}
+            />
+            <button
+              disabled={
+                busy ||
+                !canExecute ||
+                !adoption ||
+                !device ||
+                !!jsonError(repository)
+              }
+              title={
+                !canExecute
+                  ? "実行権限がありません"
+                  : !adoption
+                    ? "固定版を採用してください"
+                    : !device
+                      ? "接続端末IDを入力してください"
+                      : undefined
+              }
+              onClick={() =>
+                void act(async () => {
+                  const target = `run:${crypto.randomUUID()}`;
+                  await mutate(`/start/${encodeURIComponent(target)}`, "0", {
+                    adoption,
+                    device_id: device,
+                    repository: JSON.parse(repository) as unknown,
+                  });
+                  setRun(target);
+                  await showRun(target);
+                  setNotice("共通Runへ検品の実行を依頼しました。");
+                })
+              }
+            >
+              採用版で新しい検品を依頼
+            </button>
+            <button
+              data-variant="secondary"
+              disabled={busy}
+              aria-busy={busy}
+              onClick={() => void act(() => showHistory())}
+            >
+              {fetching("検品・判断の履歴")}
+            </button>
+            {history && (
+              <>
+                <p>{count(history, "履歴はありません。")}</p>
+                <ul>
+                  {history.items.map((e) => (
+                    <li key={`${e.id}@${e.version}`}>
+                      {e.kind} · {e.id}@{e.version}
+                      {e.kind === "launch" ? (
+                        <button
+                          data-variant="secondary"
+                          disabled={busy}
+                          onClick={() =>
+                            void act(() => showRun(String(e.value.run_id)))
+                          }
+                        >
+                          この検品の判定を表示
+                        </button>
+                      ) : (
+                        <Disclosure title="記録の内容">
+                          {() => <pre>{format(e.value)}</pre>}
+                        </Disclosure>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {history?.next && (
+              <button
+                data-variant="secondary"
+                disabled={busy}
+                onClick={() => void act(() => showHistory(history.next))}
+              >
+                履歴の次のページ
+              </button>
+            )}
+          </>
+        )}
+        <Field label="検品Run ID" value={run} onChange={setRun} />
+        <button
+          data-variant="secondary"
+          disabled={busy || !run}
+          aria-busy={busy}
+          onClick={() => void act(() => showRun())}
+        >
+          {fetching("判定と現在の証拠")}
+        </button>
+        {view && (
+          <>
+            <Field
+              label="比較する検品Run ID"
+              value={compare}
+              onChange={setCompare}
+            />
+            <button
+              data-variant="secondary"
+              disabled={busy || !compare}
+              onClick={() =>
+                void act(async () =>
+                  setOther(
+                    (await call(
+                      `/current/${encodeURIComponent(compare)}`,
+                    )) as View,
+                  ),
+                )
+              }
+            >
+              別の判定を並べて表示
+            </button>
+            {other && <InspectionResult value={other} title="比較する判定" />}
+            {canEdit && (
+              <>
+                <Field
+                  label="人の判断JSON"
+                  rows={8}
+                  value={decision}
+                  onChange={setDecision}
+                  error={jsonError(decision)}
+                />
+                <button
+                  disabled={busy || !!jsonError(decision)}
+                  onClick={() =>
+                    void act(async () => {
+                      await mutate(
+                        `/judgments/inspection-judgment:${crypto.randomUUID()}`,
+                        "0",
+                        JSON.parse(decision) as object,
+                      );
+                      setNotice("人の判断を保存しました。");
+                    })
+                  }
+                >
+                  人の判断を保存
+                </button>
+              </>
+            )}
+          </>
+        )}
+        <p role="status">{notice}</p>
+      </section>
+      {view && (
+        <DetailPane>
+          <InspectionResult value={view} title="選択した検品の判定" />
+        </DetailPane>
+      )}
     </ScreenContent>
   );
 }

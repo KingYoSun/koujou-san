@@ -1,13 +1,11 @@
-import {
-  ScreenContent,
-  NavigationLink,
-  useNavigation,
-  useScreenActive,
-} from "./navigation";
+import { ScreenContent, useScreenActive } from "./navigation";
 import { useEffect, useRef, useState } from "react";
 import { syncRequest } from "./auth";
 import { allowAnswerScope, answerScopeEpoch } from "./sync-store";
 import { SyncHTTPError } from "./sync-error";
+import { Disclosure } from "./disclosure";
+import { SidebarPane } from "./panes";
+import { StatusBadge } from "./status-badge";
 import { ComparisonConditions } from "./usage-comparison-conditions";
 import { ComparisonResults } from "./usage-comparison-results";
 import { UsageReevaluation } from "./usage-reevaluation";
@@ -37,7 +35,6 @@ export function UsageComparison({
   user: string;
   onInspect: (r: CostRef & { kind: string }) => Promise<void>;
 }) {
-  const navigation = useNavigation();
   const visible = useScreenActive();
   const [comparison, setComparison] = useState<CostComparison>(() => ({
     name: "費用・品質・時間の比較",
@@ -45,7 +42,7 @@ export function UsageComparison({
     right: newCondition(),
   }));
   const [saved, setSaved] = useState<CostRef>(),
-    [list, setList] = useState<Saved[]>([]),
+    [list, setList] = useState<Saved[]>(),
     [listCursor, setListCursor] = useState(""),
     [views, setViews] = useState<Partial<Record<"left" | "right", View>>>({});
   const [basisNames, setBasisNames] = useState<Record<string, string>>({});
@@ -109,23 +106,23 @@ export function UsageComparison({
       throw new SyncHTTPError(403, undefined);
     return result as T;
   };
-  async function work(action: () => Promise<void>) {
+  async function work(action: () => Promise<void>, failed: string) {
     setBusy(true);
     setNotice("");
     try {
       await action();
     } catch (error) {
       if (active.current) {
-        setViews({});
-        setSelected(undefined);
         if (
           error instanceof SyncHTTPError &&
           [401, 403].includes(error.status)
         ) {
-          setList([]);
+          setViews({});
+          setSelected(undefined);
+          setList(undefined);
           setSaved(undefined);
-        }
-        setNotice("現在の権限・条件・固定版・接続を確認してください。");
+          setNotice("閲覧権限がありません。");
+        } else setNotice(`${failed}できませんでした。`);
       }
     } finally {
       if (active.current) setBusy(false);
@@ -162,7 +159,7 @@ export function UsageComparison({
     );
     setSaved({ id: result.data.id, version: result.data.version });
     setNotice(
-      "比較条件を版付きで保存しました。Run・モデル・Context・検品の設定は変更していません。",
+      `比較条件 ${result.data.id} @ ${result.data.version} を保存しました。`,
     );
   }
   async function listSaved(next = false) {
@@ -204,29 +201,54 @@ export function UsageComparison({
       {
         <section className="team-details" aria-label="費用・品質・時間の比較">
           <h3>費用・品質・時間を比較</h3>
-          <button disabled={busy} onClick={() => void work(() => listSaved())}>
-            保存した比較条件を50件取得
-          </button>
-          <ul>
-            {list.map((r) => (
-              <li key={r.id + "@" + r.version}>
+          <SidebarPane>
+            <section aria-label="保存した比較条件">
+              <button
+                disabled={busy}
+                aria-busy={busy}
+                data-variant="secondary"
+                onClick={() => void work(() => listSaved(), "比較条件を取得")}
+              >
+                {busy ? "比較条件を取得中…" : "比較条件を取得"}
+              </button>
+              {list && (
+                <p>
+                  {list.length
+                    ? `${list.length}件を表示${listCursor ? "（続きあり）" : ""}`
+                    : "保存した比較条件はありません。"}
+                </p>
+              )}
+              <ul aria-busy={busy}>
+                {list?.map((r) => (
+                  <li key={r.id + "@" + r.version}>
+                    <button
+                      data-variant="secondary"
+                      disabled={busy}
+                      aria-current={
+                        saved?.id === r.id && saved.version === r.version
+                          ? "true"
+                          : undefined
+                      }
+                      onClick={() => void work(() => load(r), "比較条件を取得")}
+                    >
+                      {r.value.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {listCursor && (
                 <button
                   disabled={busy}
-                  onClick={() => void work(() => load(r))}
+                  data-variant="secondary"
+                  onClick={() =>
+                    void work(() => listSaved(true), "比較条件を取得")
+                  }
                 >
-                  {r.value.name}
+                  比較条件の次のページ
                 </button>
-              </li>
-            ))}
-          </ul>
-          {listCursor && (
-            <button
-              disabled={busy}
-              onClick={() => void work(() => listSaved(true))}
-            >
-              比較条件の次の50件
-            </button>
-          )}
+              )}
+            </section>
+          </SidebarPane>
           <label>
             比較名
             <input
@@ -249,37 +271,43 @@ export function UsageComparison({
                         comparison[side].basis[0].id +
                           "@" +
                           comparison[side].basis[0].version
-                      ] ?? "定義名は未取得（固定版は条件で確認）")
+                      ] ?? "定義名は未取得")
                     : `固定条件 ${comparison[side].basis.length}件`}
                 </p>
                 <p>
                   {comparison[side].model || "モデル指定なし"} /{" "}
                   {comparison[side].from} ～ {comparison[side].until}
                 </p>
-                <details>
-                  <summary>比較{i === 0 ? "A" : "B"}の条件を確認・編集</summary>
-                  <ComparisonConditions
-                    name={"比較" + (i === 0 ? "A" : "B")}
-                    value={comparison[side]}
-                    onChange={(v) => condition(side, v)}
-                    call={call}
-                    workspace={workspace}
-                    disabled={busy}
-                  />
-                </details>
+                <Disclosure title={"比較" + (i === 0 ? "A" : "B") + "の条件"}>
+                  {() => (
+                    <ComparisonConditions
+                      name={"比較" + (i === 0 ? "A" : "B")}
+                      value={comparison[side]}
+                      onChange={(v) => condition(side, v)}
+                      call={call}
+                      workspace={workspace}
+                      disabled={busy}
+                    />
+                  )}
+                </Disclosure>
                 <button
                   disabled={busy}
-                  onClick={() => void work(() => query(side))}
+                  aria-busy={busy}
+                  onClick={() => void work(() => query(side), "集計を取得")}
                 >
                   比較{i === 0 ? "A" : "B"}の集計を取得
                 </button>
                 <button
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() =>
-                    void work(() => query(side, "compare_quality"))
+                    void work(
+                      () => query(side, "compare_quality"),
+                      "検品条件を取得",
+                    )
                   }
                 >
-                  比較{i === 0 ? "A" : "B"}の検品条件を50件取得
+                  比較{i === 0 ? "A" : "B"}の検品条件を取得
                 </button>
                 {views[side] && (
                   <ComparisonResults
@@ -289,14 +317,21 @@ export function UsageComparison({
                     busy={busy}
                     editable={role !== "viewer"}
                     onNext={() =>
-                      void work(() => query(side, views[side]!.mode, true))
+                      void work(
+                        () => query(side, views[side]!.mode, true),
+                        "比較結果を取得",
+                      )
                     }
                     onDetails={() =>
-                      void work(() => query(side, "compare_details"))
+                      void work(
+                        () => query(side, "compare_details"),
+                        "元計測・料金を取得",
+                      )
                     }
                     onRead={(ref) =>
-                      void work(() =>
-                        onInspect({ ...ref, kind: ref.id.split(":")[0] }),
+                      void work(
+                        () => onInspect({ ...ref, kind: ref.id.split(":")[0] }),
+                        "記録を取得",
                       )
                     }
                     onReevaluate={setSelected}
@@ -307,35 +342,34 @@ export function UsageComparison({
           </div>
           <button
             disabled={busy}
+            aria-busy={busy}
             onClick={() =>
               void work(async () => {
                 await Promise.all([query("left"), query("right")]);
-              })
+              }, "集計を取得")
             }
           >
             二つの集計を取得
           </button>
           {!equalKinds && (
-            <p role="note">
-              評価種別が異なるため、金額の差を費用削減と扱えません。
-            </p>
+            <StatusBadge label="評価種別" value="A・Bで異なる" tone="warning" />
           )}
           {!equalPeriods && (
-            <p role="note">
-              対象期間が異なります。件数・失敗・計測範囲を揃えて判断してください。
-            </p>
+            <StatusBadge label="期間" value="A・Bで異なる" tone="warning" />
           )}
           {views.left &&
             views.right &&
             views.left.page.data.through !== views.right.page.data.through && (
-              <p role="note">
-                二群の反映位置が異なります。更新が入った範囲を確認して比較してください。
-              </p>
+              <StatusBadge
+                label="反映位置"
+                value="A・Bで異なる"
+                tone="warning"
+              />
             )}
           {role !== "viewer" && (
             <button
               disabled={busy || !comparison.name.trim()}
-              onClick={() => void work(save)}
+              onClick={() => void work(save, "比較条件を保存")}
             >
               比較条件を保存
             </button>
@@ -357,7 +391,7 @@ export function UsageComparison({
           </button>
           {saved && (
             <p>
-              保存した条件版: {saved.id} @ {saved.version}
+              保存した条件版：{saved.id} @ {saved.version}
             </p>
           )}
           <a
@@ -369,42 +403,15 @@ export function UsageComparison({
           >
             二群の条件を書き出す
           </a>
-          <details>
-            <summary>根拠を確認して次の設定を手動で改善する</summary>
-            <NavigationLink
-              to={{
-                workspace: navigation?.route.workspace ?? "",
-                screen: "models",
-              }}
-              related
-            >
-              モデル接続の編集へ
-            </NavigationLink>
-            <NavigationLink
-              to={{
-                workspace: navigation?.route.workspace ?? "",
-                screen: "context",
-              }}
-              related
-            >
-              Contextの編集へ
-            </NavigationLink>
-            <NavigationLink
-              to={{
-                workspace: navigation?.route.workspace ?? "",
-                screen: "workflows",
-              }}
-              related
-            >
-              工程定義の編集へ
-            </NavigationLink>
-          </details>
           {selected && role !== "viewer" && (
             <UsageReevaluation
               row={selected}
               call={(path, body) => call(base + path, body)}
               onSaved={(ref) =>
-                void work(() => onInspect({ ...ref, kind: "evaluation" }))
+                void work(
+                  () => onInspect({ ...ref, kind: "evaluation" }),
+                  "記録を取得",
+                )
               }
             />
           )}

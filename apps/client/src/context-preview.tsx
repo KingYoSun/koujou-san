@@ -13,6 +13,7 @@ type PreviewRequest = {
 import type { UI, Ref, Envelope, CandidatePage } from "./context-ui";
 import { refKey, refLabel, resultData } from "./context-ui";
 import { Completeness, reasonText } from "./context-status";
+import { StatusBadge } from "./status-badge";
 export type DefinitionContextInput = {
   definition: { id: string; version: string };
   selection: Pick<UIState, "mode" | "include" | "exclude">;
@@ -229,33 +230,30 @@ export function ContextPreview({
   }
   if (!visible) return null;
   return (
-    <aside className="context-preview" aria-label="注入プレビュー">
+    <section className="context-preview" aria-label="注入プレビュー">
       <h3>注入プレビュー</h3>
       <label>
         注入方法
         <select
-          aria-label="注入方法"
           value={state.mode}
           onChange={(event) =>
             ui.store.setState({ mode: event.target.value as "none" | "select" })
           }
         >
           <option value="select">Contextを選ぶ</option>
-          <option value="none">注入なし（明示）</option>
+          <option value="none">注入なし</option>
         </select>
       </label>
-      {(["include", "exclude"] as const).map((field) => (
-        <section
-          key={field}
-          aria-label={field === "include" ? "注入する順序" : "除外する固定版"}
-        >
-          <h4>
-            {field === "include" ? "注入する順序" : "除外する固定版"} (
-            {state[field].length})
-          </h4>
-          {!state[field].length && <p className="context-meta">未選択</p>}
+      {(
+        [
+          ["include", "注入する順序"],
+          ["exclude", "除外する固定版"],
+        ] as const
+      ).map(([field, name]) => (
+        <section key={field} aria-label={name}>
+          <h4>{name}</h4>
           <PageList
-            label={field === "include" ? "注入する順序" : "除外する固定版"}
+            label={name}
             items={state[field]}
             listClassName="context-ref-list"
           >
@@ -264,8 +262,9 @@ export function ContextPreview({
                 <span>{refLabel(ref)}</span>
                 <div className="context-actions">
                   <button
+                    data-variant="secondary"
                     disabled={index === 0}
-                    aria-label={`${field} ${index + 1}を上へ`}
+                    aria-label={`${name} ${index + 1}を上へ`}
                     onClick={() => {
                       const values = [...state[field]];
                       [values[index - 1], values[index]] = [
@@ -278,8 +277,9 @@ export function ContextPreview({
                     ↑
                   </button>
                   <button
+                    data-variant="secondary"
                     disabled={index === state[field].length - 1}
-                    aria-label={`${field} ${index + 1}を下へ`}
+                    aria-label={`${name} ${index + 1}を下へ`}
                     onClick={() => {
                       const values = [...state[field]];
                       [values[index + 1], values[index]] = [
@@ -292,6 +292,7 @@ export function ContextPreview({
                     ↓
                   </button>
                   <button
+                    data-variant="secondary"
                     onClick={() =>
                       update(
                         field,
@@ -307,19 +308,18 @@ export function ContextPreview({
           </PageList>
         </section>
       ))}
-      <button onClick={() => ui.store.setState({ include: [], exclude: [] })}>
+      <button
+        data-variant="secondary"
+        onClick={() => ui.store.setState({ include: [], exclude: [] })}
+      >
         選択をクリア
       </button>
-      <button
-        className="primary"
-        disabled={busy}
-        onClick={() => void preview()}
-      >
-        {busy ? "確認中…" : "選択した固定版を確認してプレビュー"}
+      <button disabled={busy} aria-busy={busy} onClick={() => void preview()}>
+        {busy ? "注入をプレビュー中…" : "注入をプレビュー"}
       </button>
       {!current && result && (
         <p className="context-warning">
-          選択または閲覧権限の確認状態が変わりました。もう一度プレビューしてください。
+          選択または権限が変わりました。プレビューは選択前の結果です。
         </p>
       )}
       {error && <p role="alert">{error}</p>}
@@ -327,7 +327,7 @@ export function ContextPreview({
         <>
           <Completeness meta={result.meta} />
           {!result.data?.ready && (
-            <div role="alert">
+            <div role="status">
               <strong>入力は未確定です</strong>
               <ul>
                 {result.data?.missing.map((gap, index) => (
@@ -346,14 +346,17 @@ export function ContextPreview({
                 {manifest.state === "none"
                   ? "注入なしを確認しました。"
                   : "選択した固定版の入力を確認しました。"}{" "}
-                読取状態: {manifest.read_status}
+                <StatusBadge
+                  label="読取状態"
+                  value={reasonText(manifest.read_status)}
+                />
               </p>
               {preparation && navigation?.returnTo && (
                 <button
                   disabled={busy || !result.data?.ready}
                   onClick={() => void useInput()}
                 >
-                  この固定入力をRunの準備へ戻す（起動しない）
+                  この固定入力をRunの準備へ戻す
                 </button>
               )}
               {definition && onDefinitionInput && ui.canCreate && (
@@ -371,7 +374,7 @@ export function ContextPreview({
                       })
                     }
                   >
-                    この選択を定義の下書きへ戻す（共有保存しない）
+                    この選択を定義の下書きへ戻す
                   </button>
                 </>
               )}
@@ -383,8 +386,8 @@ export function ContextPreview({
               >
                 {(placement, index) => (
                   <li key={index}>
-                    {placement.path.join(" / ")} · {refLabel(placement.ref)}{" "}
-                    {placement.excerpt ? "（抜粋）" : "（元の構造）"}
+                    {placement.path.join(" / ")} · {refLabel(placement.ref)} ·{" "}
+                    {placement.excerpt ? "抜粋" : "元の構造"}
                   </li>
                 )}
               </PageList>
@@ -431,10 +434,9 @@ export function ContextPreview({
               ) : (
                 <p>なし</p>
               )}
-              <details open>
-                <summary>実入力・添付（固定した内容）</summary>
-                <pre>{manifest.input_utf8 ?? "入力なし"}</pre>
-              </details>
+              <Disclosure title="実入力・添付" defaultOpen>
+                {() => <pre>{manifest.input_utf8 ?? "入力なし"}</pre>}
+              </Disclosure>
               <Disclosure title="版・由来の記録">
                 {() => (
                   <pre>
@@ -446,6 +448,6 @@ export function ContextPreview({
           )}
         </>
       )}
-    </aside>
+    </section>
   );
 }

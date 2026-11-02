@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useStore } from "zustand";
 import type { ContextRecord } from "./context-contract";
-import type { UI, Ref, Candidate } from "./context-ui";
+import type { UI, Ref, Identity, Candidate } from "./context-ui";
 import {
   contextPath,
   identityKey,
+  identityLabel,
   refKey,
   refLabel,
   labels,
@@ -13,7 +14,9 @@ import {
   scopeKinds,
 } from "./context-ui";
 import { ContextGenerationOrigin } from "./context-generation-origin";
-import { EnvelopeStatus } from "./context-status";
+import { EnvelopeStatus, ListCount } from "./context-status";
+import { Disclosure } from "./disclosure";
+import { StatusBadge } from "./status-badge";
 import { useScreenActive } from "./navigation";
 export function ContextEditor({
   ui,
@@ -26,12 +29,8 @@ export function ContextEditor({
   const state = useStore(ui.store);
   const selected = state.selected;
   const key = selected ? identityKey(selected) : "";
-  const [historyAfter, setHistoryAfter] = useState("");
-  const [historyBack, setHistoryBack] = useState<string[]>([]);
   const queryClient = useQueryClient();
   useEffect(() => {
-    setHistoryAfter("");
-    setHistoryBack([]);
     if (visible && selected) void ui.engine.open(selected).catch(ui.fail);
   }, [key, ui.engine, visible]);
   const current =
@@ -45,23 +44,6 @@ export function ContextEditor({
     queryFn: () =>
       ui.request<ContextRecord<Record<string, unknown>>>(
         `${contextPath(ui.workspace, historical!)}?revision=${encodeURIComponent(historical!.revision)}`,
-      ),
-  });
-  const history = useQuery({
-    queryKey: [
-      ...ui.prefix,
-      "history",
-      key,
-      historyAfter,
-      current?.record.ref.revision,
-    ],
-    enabled:
-      visible && Boolean(selected && current?.record.ref.revision !== "0"),
-    retry: false,
-    queryFn: () =>
-      ui.request<{ items: Candidate[] }>(
-        `/contexts/workspaces/${encodeURIComponent(ui.workspace)}/catalog`,
-        { kind: selected!.kind, id: selected!.id, after: historyAfter },
       ),
   });
   const fixedRecord = historical ? fixed.data?.data : undefined;
@@ -100,7 +82,7 @@ export function ContextEditor({
     return (
       <section className="context-editor">
         <h3>Contextを編集</h3>
-        <p>検索からContextを開くか、新しく作成してください。</p>
+        <p>Contextが選ばれていません。</p>
       </section>
     );
   return (
@@ -111,9 +93,11 @@ export function ContextEditor({
       {ref && <p className="context-meta">{refLabel(ref)}</p>}
       {historical && (
         <>
-          <p className="context-warning">固定した過去の版を表示しています。</p>
           <EnvelopeStatus value={fixed.data} error={fixed.error} />
-          <button onClick={() => ui.store.setState({ historical: undefined })}>
+          <button
+            data-variant="secondary"
+            onClick={() => ui.store.setState({ historical: undefined })}
+          >
             最新の版へ戻る
           </button>
           {fixedRecord && current?.editable && (
@@ -141,24 +125,32 @@ export function ContextEditor({
       )}
       {value && (
         <>
-          <p className={draft ? "context-warning" : "context-meta"}>
-            {historical
-              ? "過去の固定版"
-              : draft?.pending
-                ? "保存結果が未確認（同じ要求IDで再送）"
-                : draft?.latest
-                  ? "競合・未送信の下書き"
-                  : draft
-                    ? "未送信の下書き"
-                    : ui.engine.status === "current"
-                      ? "共有版を確認済み"
-                      : "最後に確認した本文キャッシュ"}
-            {!current?.editable && " · 閲覧のみ"}
+          <p>
+            <StatusBadge
+              label="状態"
+              tone={draft ? "warning" : "neutral"}
+              value={
+                historical
+                  ? "過去の固定版"
+                  : draft?.pending
+                    ? "保存結果が未確認"
+                    : draft?.latest
+                      ? "競合・未送信の下書き"
+                      : draft
+                        ? "未送信の下書き"
+                        : ui.engine.status === "current"
+                          ? "共有版を確認済み"
+                          : "最後に確認した本文キャッシュ"
+              }
+            />
+            {!current?.editable && (
+              <StatusBadge label="権限" value="閲覧のみ" />
+            )}
           </p>
           {selected.kind === "membership" ? (
             <>
-              <p>Scope: {JSON.stringify(value.scope)}</p>
-              <p>Context: {JSON.stringify(value.context)}</p>
+              <p>Scope：{identityLabel(value.scope as Identity)}</p>
+              <p>Context：{identityLabel(value.context as Identity)}</p>
               <label>
                 <input
                   type="checkbox"
@@ -178,7 +170,6 @@ export function ContextEditor({
                   ? "名前"
                   : "タイトル"}
                 <input
-                  aria-label="Contextの名前"
                   disabled={!editable}
                   value={String(
                     selected.kind === "section" || selected.kind === "document"
@@ -200,7 +191,6 @@ export function ContextEditor({
                 <label>
                   本文
                   <textarea
-                    aria-label="Contextの本文"
                     rows={8}
                     disabled={!editable || Boolean(value.external)}
                     value={String(value.text ?? "")}
@@ -210,9 +200,8 @@ export function ContextEditor({
               )}
               {kinds.includes(selected.kind) && (
                 <label>
-                  分類タグ（1行に1件）
+                  分類タグ
                   <textarea
-                    aria-label="Contextの分類タグ"
                     disabled={!editable}
                     value={((value.tags ?? []) as string[]).join("\n")}
                     onChange={(event) =>
@@ -224,6 +213,10 @@ export function ContextEditor({
               {kinds.indexOf(selected.kind) > 0 && (
                 <section>
                   <h4>子の参照・順序</h4>
+                  <ListCount
+                    label="子"
+                    items={(value.children ?? []) as Ref[]}
+                  />
                   <ol className="context-ref-list">
                     {((value.children ?? []) as Ref[]).map(
                       (child, index, array) => (
@@ -241,6 +234,7 @@ export function ContextEditor({
                           </button>
                           <div className="context-actions">
                             <button
+                              data-variant="secondary"
                               disabled={!editable || index === 0}
                               aria-label={`子${index + 1}を上へ`}
                               onClick={() => {
@@ -255,6 +249,7 @@ export function ContextEditor({
                               ↑
                             </button>
                             <button
+                              data-variant="secondary"
                               disabled={!editable || index === array.length - 1}
                               aria-label={`子${index + 1}を下へ`}
                               onClick={() => {
@@ -269,6 +264,7 @@ export function ContextEditor({
                               ↓
                             </button>
                             <button
+                              data-variant="secondary"
                               disabled={!editable}
                               onClick={() =>
                                 edit({
@@ -278,7 +274,10 @@ export function ContextEditor({
                             >
                               参照を外す
                             </button>
-                            <button onClick={() => state.add(child, true)}>
+                            <button
+                              data-variant="secondary"
+                              onClick={() => state.add(child, true)}
+                            >
                               入力から除外
                             </button>
                           </div>
@@ -305,7 +304,7 @@ export function ContextEditor({
                   </button>
                   {state.reference && (
                     <p className="context-meta">
-                      参照候補: {state.reference.name} ·{" "}
+                      参照候補：{state.reference.name} ·{" "}
                       {refLabel(state.reference.ref)}
                     </p>
                   )}
@@ -313,10 +312,12 @@ export function ContextEditor({
               )}
               {selected.kind === "scope" && (
                 <>
-                  <p>種類: {labels[String(value.kind)]}</p>
+                  <p>種類：{labels[String(value.kind)]}</p>
                   <p>
-                    親Scope:{" "}
-                    {value.parent ? JSON.stringify(value.parent) : "なし"}
+                    親Scope：
+                    {value.parent
+                      ? identityLabel(value.parent as Identity)
+                      : "なし"}
                   </p>
                   <button
                     disabled={
@@ -338,6 +339,7 @@ export function ContextEditor({
                     候補のScopeを親へ設定
                   </button>
                   <button
+                    data-variant="secondary"
                     disabled={!editable}
                     onClick={() => edit({ parent: undefined })}
                   >
@@ -361,24 +363,25 @@ export function ContextEditor({
               />
             )}
           {(value.origin || value.external || value.attachments) && (
-            <details open>
-              <summary>由来・固定参照・添付・取得状態</summary>
-              <pre>
-                {JSON.stringify(
-                  {
-                    origin: value.origin,
-                    external: value.external,
-                    attachments: value.attachments,
-                  },
-                  null,
-                  2,
-                )}
-              </pre>
-            </details>
+            <Disclosure title="由来・固定参照・添付・取得状態" defaultOpen>
+              {() => (
+                <pre>
+                  {JSON.stringify(
+                    {
+                      origin: value.origin,
+                      external: value.external,
+                      attachments: value.attachments,
+                    },
+                    null,
+                    2,
+                  )}
+                </pre>
+              )}
+            </Disclosure>
           )}
           {!historical && draft && (
             <>
-              <p role="alert">{draft.error}</p>
+              {draft.error && <p role="alert">{draft.error}</p>}
               {draft.latest && (
                 <>
                   <h4>競合した変更を比較</h4>
@@ -403,7 +406,6 @@ export function ContextEditor({
                 </>
               )}
               <button
-                className="primary"
                 disabled={
                   ui.engine.status !== "current" ||
                   (!editable && !draft.pending) ||
@@ -413,9 +415,9 @@ export function ContextEditor({
                 onClick={() => void save(Boolean(draft.latest))}
               >
                 {draft.latest
-                  ? "差分を確認し、この下書きを最新の版へ再適用"
+                  ? "下書きを最新の版へ再適用"
                   : draft.pending
-                    ? "同じ要求IDで保存結果を確認"
+                    ? "保存結果を確認"
                     : "下書きを共有版へ保存"}
               </button>
             </>
@@ -425,52 +427,95 @@ export function ContextEditor({
               <button onClick={() => state.add(ref)}>
                 この固定版を入力へ追加
               </button>
-              <button onClick={() => state.add(ref, true)}>
+              <button
+                data-variant="secondary"
+                onClick={() => state.add(ref, true)}
+              >
                 この固定版を入力から除外
               </button>
             </div>
           )}
           {ui.engine.state.receipts[key] && (
             <p className="context-meta">
-              保存済みの版: {ui.engine.state.receipts[key]!.revision}
+              保存済みの版：{ui.engine.state.receipts[key]!.revision}
             </p>
           )}
         </>
       )}
-      <details>
-        <summary>版履歴</summary>
-        <EnvelopeStatus value={history.data} error={history.error} />
-        <ul>
-          {history.data?.data?.items.map((candidate) => (
-            <li key={refKey(candidate.ref)}>
-              <button
-                className="link-button"
-                onClick={() => ui.store.setState({ historical: candidate.ref })}
-              >
-                {candidate.name || candidate.ref.id} · {candidate.ref.revision}
-              </button>
-            </li>
-          ))}
-        </ul>
-        <button
-          disabled={!historyBack.length}
-          onClick={() => {
-            setHistoryAfter(historyBack.at(-1)!);
-            setHistoryBack(historyBack.slice(0, -1));
-          }}
-        >
-          新しい版へ
-        </button>
-        <button
-          disabled={!history.data?.meta.next_cursor}
-          onClick={() => {
-            setHistoryBack([...historyBack, historyAfter]);
-            setHistoryAfter(history.data!.meta.next_cursor!);
-          }}
-        >
-          古い版へ
-        </button>
-      </details>
+      <Disclosure title="版履歴">
+        {() => (
+          <VersionHistory
+            key={key}
+            ui={ui}
+            selected={selected}
+            revision={current?.record.ref.revision}
+          />
+        )}
+      </Disclosure>
     </section>
+  );
+}
+function VersionHistory({
+  ui,
+  selected,
+  revision,
+}: {
+  ui: UI;
+  selected: Identity;
+  revision?: string;
+}) {
+  const [after, setAfter] = useState("");
+  const [back, setBack] = useState<string[]>([]);
+  const history = useQuery({
+    queryKey: [...ui.prefix, "history", identityKey(selected), after, revision],
+    enabled: revision !== "0",
+    retry: false,
+    queryFn: () =>
+      ui.request<{ items: Candidate[] }>(
+        `/contexts/workspaces/${encodeURIComponent(ui.workspace)}/catalog`,
+        { kind: selected.kind, id: selected.id, after },
+      ),
+  });
+  return (
+    <>
+      <EnvelopeStatus value={history.data} error={history.error} />
+      <ListCount
+        label="版履歴"
+        items={history.data?.data?.items}
+        more={history.data?.meta.next_cursor}
+      />
+      <ul>
+        {history.data?.data?.items.map((candidate) => (
+          <li key={refKey(candidate.ref)}>
+            <button
+              className="link-button"
+              onClick={() => ui.store.setState({ historical: candidate.ref })}
+            >
+              {candidate.name || candidate.ref.id} · {candidate.ref.revision}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        data-variant="secondary"
+        disabled={!back.length}
+        onClick={() => {
+          setAfter(back.at(-1)!);
+          setBack(back.slice(0, -1));
+        }}
+      >
+        版履歴の前のページ
+      </button>
+      <button
+        data-variant="secondary"
+        disabled={!history.data?.meta.next_cursor}
+        onClick={() => {
+          setBack([...back, after]);
+          setAfter(history.data!.meta.next_cursor!);
+        }}
+      >
+        版履歴の次のページ
+      </button>
+    </>
   );
 }

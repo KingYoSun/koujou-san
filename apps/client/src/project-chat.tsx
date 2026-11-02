@@ -9,6 +9,7 @@ import {
   useScreenActive,
 } from "./navigation";
 import { DetailPane } from "./panes";
+import { Disclosure } from "./disclosure";
 import { ModelConnectionSettings } from "./model-connection-settings";
 import {
   modelReady,
@@ -23,6 +24,7 @@ import {
   type Saved,
   type SelectionPolicy,
 } from "./client-selection-host";
+import { operationStateLabels } from "./client-selection";
 import {
   chatBase,
   pin,
@@ -34,16 +36,6 @@ import {
   type ChatThread,
 } from "./chat-api";
 import { ChatWork } from "./chat-work";
-
-const stateNames: Record<string, string> = {
-  ready: "送信前",
-  sending: "モデルへ要求済み・応答待ち",
-  completed: "応答完了",
-  incomplete: "応答は未完了",
-  failed: "応答を取得できませんでした",
-  cancelled: "操作を終了",
-  waiting: "担当クライアント待ち",
-};
 
 export function ProjectChat({
   native,
@@ -78,12 +70,13 @@ export function ProjectChat({
       name: string;
       scope_kind: string;
     }[]
-  >([]);
+  >();
   const [projectNext, setProjectNext] = useState("");
   const [threads, setThreads] = useState<ChatPage>();
   const [thread, setThread] = useState<Saved<ChatThread>>();
   const [timeline, setTimeline] = useState<ChatPage>();
   const [operations, setOperations] = useState<Saved<ClientOperation>[]>([]);
+  const [turns, setTurns] = useState<Record<string, string>>({});
   const [chosen, setChosen] = useState<VersionRef[]>([]);
   const [profile, setProfile] = useState<ModelProfile>();
   const [name, setName] = useState(""),
@@ -164,7 +157,7 @@ export function ProjectChat({
           await syncStorage(native).remove(namespace);
       }
       setNotice(
-        "操作を確認できません。接続・現在の権限・対象版を確認して再取得してください。結果不明のモデル要求は自動再送しません。",
+        "操作を確認できません。接続・権限・対象版を確認して再取得してください。",
       );
     } finally {
       setBusy(false);
@@ -172,7 +165,7 @@ export function ProjectChat({
   }
   async function listProjects(after = "") {
     const page = await call<{
-      data: { items: typeof projects };
+      data: { items: NonNullable<typeof projects> };
       meta: { next_cursor?: string };
     }>(`/contexts/workspaces/${encodeURIComponent(workspace)}/catalog`, {
       kind: "scope",
@@ -252,6 +245,9 @@ export function ProjectChat({
   useEffect(() => {
     if (embedded && initialThread) void act(() => refresh(initialThread));
   }, []);
+  useEffect(() => {
+    if (visible && !projects) void act(() => listProjects());
+  }, [visible]);
   useEffect(() => {
     const element = scroller.current;
     if (!element) return;
@@ -369,9 +365,7 @@ export function ProjectChat({
     setExcerpt(undefined);
     setAdoptName("");
     await refresh(thread);
-    setNotice(
-      "選んだ範囲を版付きContextに保存しました。Runは開始していません。",
-    );
+    setNotice("選んだ範囲を版付きContextに保存しました。");
   }
   const work = (props: { adoption?: ChatAdoption; link?: ChatLink }) =>
     thread && (
@@ -402,12 +396,20 @@ export function ProjectChat({
             <button
               data-variant="secondary"
               disabled={busy}
+              aria-busy={busy}
               onClick={() => void act(() => listProjects())}
             >
-              Projectを探す
+              Projectを再取得
             </button>
+            {projects && (
+              <p>
+                {projects.length
+                  ? `${projects.length}件を表示${projectNext ? "（続きあり）" : ""}`
+                  : "Projectはありません。"}
+              </p>
+            )}
             <ul className="chat-channels">
-              {projects.map((p) => (
+              {projects?.map((p) => (
                 <li key={p.ref.id}>
                   <button
                     aria-current={
@@ -432,7 +434,7 @@ export function ProjectChat({
                 data-variant="secondary"
                 onClick={() => void act(() => listProjects(projectNext))}
               >
-                Project候補の次ページ
+                Project候補の次のページ
               </button>
             )}
           </div>
@@ -452,15 +454,26 @@ export function ProjectChat({
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </label>
-                <button data-variant="secondary" disabled={busy}>
-                  検索・更新
+                <button
+                  data-variant="secondary"
+                  disabled={busy}
+                  aria-busy={busy}
+                >
+                  スレッドを検索
                 </button>
               </form>
+              {threads && (
+                <p>
+                  {threads.items.length
+                    ? `${threads.items.length}件を表示${threads.items.length === 50 ? "（続きあり）" : ""}`
+                    : "スレッドはありません。"}
+                </p>
+              )}
               <ul className="chat-channels">
                 {threads?.items.map((r) => (
                   <li key={r.id}>
                     <button
-                      aria-current={thread?.id === r.id ? "page" : undefined}
+                      aria-current={thread?.id === r.id ? "true" : undefined}
                       onClick={() => open(r)}
                     >
                       # {(r.value as ChatThread).name}
@@ -473,7 +486,7 @@ export function ProjectChat({
                   data-variant="secondary"
                   onClick={() => void act(() => listThreads(threads))}
                 >
-                  スレッドの次ページ
+                  スレッドの次のページ
                 </button>
               )}
               {canEdit && (
@@ -510,9 +523,10 @@ export function ProjectChat({
                 <button
                   data-variant="secondary"
                   disabled={busy}
+                  aria-busy={busy}
                   onClick={() => void act(() => refresh(thread))}
                 >
-                  再取得
+                  会話を再取得
                 </button>
               </header>
               <div className="chat-scroller" ref={scroller} onScroll={track}>
@@ -522,7 +536,7 @@ export function ProjectChat({
                     disabled={busy}
                     onClick={() => void act(() => refresh(thread, timeline))}
                   >
-                    以前の会話を取得（50件ずつ）
+                    以前の会話の次のページ
                   </button>
                 )}
                 <ol className="chat-timeline">
@@ -575,7 +589,7 @@ export function ProjectChat({
                                 )
                               }
                             >
-                              固定版・採用・原応答
+                              詳細を表示
                             </button>
                           </div>
                         </li>
@@ -620,31 +634,40 @@ export function ProjectChat({
                     aria-label="モデル操作"
                   >
                     <p role="status">
-                      {stateNames[op.value.state] ?? op.value.state}
+                      {operationStateLabels[op.value.state] ?? op.value.state}
                       {op.value.reason && ` · ${op.value.reason}`}
                     </p>
                     {op.value.state === "sending" &&
                       op.value.client !== operationClientID && (
                         <p>別クライアントで送信中</p>
                       )}
-                    <details>
-                      <summary>操作と原応答を確認</summary>
-                      <p>
-                        {op.id} / {op.version}
-                      </p>
-                      <button
-                        data-variant="secondary"
-                        onClick={() =>
-                          void act(async () => {
-                            if (!op.value.turn) return;
-                            const turn = await read(op.value.turn);
-                            setNotice(JSON.stringify(turn.value, null, 2));
-                          })
-                        }
-                      >
-                        保存した原応答を取得
-                      </button>
-                    </details>
+                    <Disclosure title="操作と原応答を確認">
+                      {() => (
+                        <>
+                          <p>
+                            {op.id} / {op.version}
+                          </p>
+                          <button
+                            data-variant="secondary"
+                            disabled={busy}
+                            aria-busy={busy}
+                            onClick={() =>
+                              void act(async () => {
+                                if (!op.value.turn) return;
+                                const turn = await read(op.value.turn);
+                                setTurns((current) => ({
+                                  ...current,
+                                  [op.id]: JSON.stringify(turn.value, null, 2),
+                                }));
+                              })
+                            }
+                          >
+                            保存した原応答を取得
+                          </button>
+                          {turns[op.id] && <pre>{turns[op.id]}</pre>}
+                        </>
+                      )}
+                    </Disclosure>
                   </section>
                 ))}
               </div>
@@ -679,28 +702,30 @@ export function ProjectChat({
                       onChange={(e) => setText(e.target.value)}
                     />
                   </label>
-                  <details className="chat-composer-options">
-                    <summary>
-                      {profile?.name || "モデル未選択"} · 履歴 {chosen.length}件
-                      · {context ? "Context参照" : "Context不参照"}
-                    </summary>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={context}
-                        onChange={(e) => setContext(e.target.checked)}
-                      />
-                      Contextを参照
-                    </label>
-                    <ModelConnectionSettings
-                      native={native}
-                      actor={api + "\0" + user}
-                      workspace={workspace}
-                      selected={profile}
-                      onSelected={setProfile}
-                      selectionOnly
-                    />
-                  </details>
+                  <Disclosure
+                    title={`${profile?.name || "モデル未選択"} · 履歴 ${chosen.length}件 · ${context ? "Context参照" : "Context不参照"}`}
+                  >
+                    {() => (
+                      <>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={context}
+                            onChange={(e) => setContext(e.target.checked)}
+                          />
+                          Contextを参照
+                        </label>
+                        <ModelConnectionSettings
+                          native={native}
+                          actor={api + "\0" + user}
+                          workspace={workspace}
+                          selected={profile}
+                          onSelected={setProfile}
+                          selectionOnly
+                        />
+                      </>
+                    )}
+                  </Disclosure>
                   <div className="chat-composer-actions">
                     <button
                       type="button"
@@ -724,7 +749,7 @@ export function ProjectChat({
             </p>
           )}
           <p role="status" className="chat-notice" tabIndex={-1}>
-            {notice}
+            {busy ? "取得中…" : notice}
           </p>
         </section>
       </div>
@@ -736,20 +761,24 @@ export function ProjectChat({
           >
             <h4>{author(focused.value)}のメッセージ</h4>
             <p className="chat-source">
-              固定版: {focused.id} / {focused.version}
+              固定版：{focused.id} / {focused.version}
             </p>
             {focused.value.operation && (
               <button
                 data-variant="secondary"
+                disabled={busy}
+                aria-busy={busy}
                 onClick={() =>
-                  void act(async () =>
-                    setOperations([
-                      await read<ClientOperation>({
-                        id: focused.value.operation!.id,
-                        version: "head",
-                      }),
-                    ]),
-                  )
+                  void act(async () => {
+                    const record = await read<ClientOperation>({
+                      id: focused.value.operation!.id,
+                      version: "head",
+                    });
+                    setOperations((current) => [
+                      record,
+                      ...current.filter((r) => r.id !== record.id),
+                    ]);
+                  })
                 }
               >
                 モデル操作の現在の記録を確認

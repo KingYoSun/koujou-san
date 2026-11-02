@@ -34,11 +34,7 @@ export function HopperRuleFields({
       <fieldset>
         <legend>1. 対象結果</legend>
         {field("ルールの名前", ["name"])}
-        {field(
-          "監視対象（kind: run / github / gitea、id、JSON）",
-          ["targets"],
-          "json",
-        )}
+        {field("監視対象（JSON）", ["targets"], "json")}
       </fieldset>
       <fieldset>
         <legend>2. 条件</legend>

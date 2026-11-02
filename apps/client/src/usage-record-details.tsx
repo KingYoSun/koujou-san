@@ -1,5 +1,6 @@
 import { NavigationLink, useNavigation } from "./navigation";
 import { useEffect, useRef } from "react";
+import { Disclosure } from "./disclosure";
 import { UsageEntryView, type UsageEntry } from "./run-usage";
 import { amountLabel, costLabel, type CostRef } from "./usage-comparison-model";
 export function UsageRecordDetails({
@@ -72,21 +73,19 @@ export function UsageRecordDetails({
           <dd>{ref(value.price)}</dd>
           <dt>前の費用評価</dt>
           <dd>{ref(value.previous)}</dd>
-          <dt>通貨換算の根拠</dt>
-          <dd>{value.fx ? JSON.stringify(value.fx) : "通貨換算なし"}</dd>
+          <dt>通貨換算</dt>
+          <dd>{value.fx ? "通貨換算あり" : "通貨換算なし"}</dd>
         </dl>
       )}
       {record.kind === "price" && (
-        <>
-          <dl>
-            <dt>対象モデル</dt>
-            <dd>{String(value.model)}</dd>
-            <dt>通貨</dt>
-            <dd>{String(value.currency)}</dd>
-            <dt>料金の情報源</dt>
-            <dd>{String(value.source)}</dd>
-          </dl>
-        </>
+        <dl>
+          <dt>対象モデル</dt>
+          <dd>{String(value.model)}</dd>
+          <dt>通貨</dt>
+          <dd>{String(value.currency)}</dd>
+          <dt>料金の情報源</dt>
+          <dd>{String(value.source)}</dd>
+        </dl>
       )}
       <NavigationLink
         to={{ workspace: navigation?.route.workspace ?? "", screen: "models" }}
@@ -109,10 +108,9 @@ export function UsageRecordDetails({
       >
         この根拠から工程定義の編集へ
       </NavigationLink>
-      <details>
-        <summary>記録の技術情報と全項目</summary>
-        <pre>{JSON.stringify(record, null, 2)}</pre>
-      </details>
+      <Disclosure title="記録の全項目（JSON）">
+        {() => <pre>{JSON.stringify(record, null, 2)}</pre>}
+      </Disclosure>
     </section>
   );
 }

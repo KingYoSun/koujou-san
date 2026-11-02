@@ -12,9 +12,11 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { syncRequest } from "./auth";
 import { SyncHTTPError } from "./sync-error";
-import { Tabs } from "./tabs";
+import { Tabs, TabPanel } from "./tabs";
 import { StatusBadge } from "./status-badge";
 import { Disclosure } from "./disclosure";
+import { DetailPane } from "./panes";
+import { Field, jsonError } from "./field";
 import { HopperRuleFields } from "./hopper-rule-fields";
 import { applyFields } from "./workflow-json";
 
@@ -72,6 +74,13 @@ const states: Record<string, string> = {
   complete: "意味判断を保存済み",
   not_matched: "条件不成立",
   matched: "条件成立・発行なし",
+};
+const kinds: Record<string, string> = {
+  definition: "定義",
+  activation: "有効化",
+  evaluation: "評価",
+  chain: "連鎖",
+  source: "元結果",
 };
 const reasons: Record<string, string> = {
   historical_no_publication: "過去の結果を発行せずに試行しました",
@@ -141,7 +150,9 @@ export function Hopper({
   const [pastAfter, setPastAfter] = useState(0);
   const [trial, setTrial] = useState<Version | null>(null);
   const [bounds, setBounds] = useState("");
-  const [connections, setConnections] = useState<ModelConnection[]>([]);
+  const [connections, setConnections] = useState<ModelConnection[] | null>(
+    null,
+  );
   const [attempts, setAttempts] = useState<Page | null>(null);
   const [detail, setDetail] = useState<Version | null>(null);
   const pending = useRef<{ key: string; id: string } | null>(null);
@@ -160,7 +171,6 @@ export function Hopper({
       await f();
     } catch (e) {
       if (!current()) return;
-      setPage(null);
       setSelected(null);
       setTrial(null);
       setAttempts(null);
@@ -172,14 +182,14 @@ export function Hopper({
         setDraft("");
         setFields({});
         setSaved(null);
-        setConnections([]);
+        setConnections(null);
         setID("");
         setVersion("0");
         pending.current = null;
         setNotice("現在の閲覧・編集・管理権限を確認してください。");
       } else
         setNotice(
-          "入力・接続・現在の版を確認してください。同じ内容は同じ操作として再送します。",
+          "操作を完了できませんでした。入力・接続・現在の版を確認してください。",
         );
     } finally {
       running.current--;
@@ -228,9 +238,7 @@ export function Hopper({
       { value: { definition: saved, enabled, controller: "" } },
     );
     setNotice(
-      enabled
-        ? "保存した版を有効化しました。過去の結果は発行しません。"
-        : "新しい評価と未確定の発行を停止しました。発行済みの仕事は保持されます。",
+      enabled ? "保存した版を有効化しました。" : "このHopperを無効化しました。",
     );
   };
   const decide = async (record: Version, action: string) => {
@@ -260,7 +268,7 @@ export function Hopper({
     setNotice(
       stopped
         ? "この起点からの連鎖を停止しました。"
-        : "連鎖を再開可能にしました。保留した発行は履歴から明示して再開してください。",
+        : "連鎖を再開可能にしました。",
     );
   };
   let semantic: SemanticSettings | undefined;
@@ -330,7 +338,6 @@ export function Hopper({
     }
     setKind(nextKind);
     setMode(nextMode);
-    setPage(null);
     let after = 0,
       after_id = "";
     try {
@@ -397,11 +404,20 @@ export function Hopper({
   } catch {
     /* invalid fields remain editable */
   }
+  const boundsError = bounds.trim() ? jsonError(bounds) : undefined;
+  const boundsField = (
+    <Field
+      label="再開時の連鎖上限（JSON）"
+      value={bounds}
+      rows={4}
+      onChange={setBounds}
+      error={boundsError}
+    />
+  );
   return (
     <ScreenContent>
       {
         <section className="workspace-management workflow-editor hopper-editor">
-          <h3>Hopper: 結果から次の仕事を発行</h3>
           <NavigationLink to={{ workspace, screen: "operations" }} related>
             共通の処理枠・Worker状態を確認
           </NavigationLink>
@@ -411,7 +427,11 @@ export function Hopper({
             label="Hopperの目的"
             items={[
               { id: "rules", label: "ルール" },
-              { id: "trial", label: "発行せずに試す" },
+              {
+                id: "trial",
+                label: "発行せずに試す",
+                disabledReason: admin ? undefined : "管理権限が必要です",
+              },
               { id: "evaluations", label: "評価・発行履歴" },
               { id: "chains", label: "連鎖・停止" },
             ]}
@@ -430,12 +450,7 @@ export function Hopper({
               )
             }
           />
-          <section
-            role="tabpanel"
-            id={`hopper-purpose-panel-${view}`}
-            aria-labelledby={`hopper-purpose-tab-${view}`}
-            tabIndex={0}
-          >
+          <TabPanel id="hopper-purpose" value={view} active={view}>
             {view !== "trial" && (
               <fieldset disabled={busy}>
                 <legend>
@@ -446,17 +461,13 @@ export function Hopper({
                       : "ルール一覧"}
                 </legend>
                 <details>
-                  <summary>
-                    履歴の範囲・記録種別・起点を指定（詳細操作）
-                  </summary>
-
+                  <summary>履歴の範囲・記録種別・起点</summary>
                   <label>
                     表示対象
                     <select
                       value={kind}
                       onChange={(e) => {
                         setKind(e.target.value);
-                        setPage(null);
                         setSelected(null);
                       }}
                     >
@@ -470,10 +481,7 @@ export function Hopper({
                     版の範囲
                     <select
                       value={mode}
-                      onChange={(e) => {
-                        setMode(e.target.value);
-                        setPage(null);
-                      }}
+                      onChange={(e) => setMode(e.target.value)}
                     >
                       <option value="heads">現在</option>
                       <option value="history">履歴・過去の試行を含む</option>
@@ -488,6 +496,8 @@ export function Hopper({
                   </label>
                 </details>
                 <button
+                  data-variant="secondary"
+                  aria-busy={busy}
                   onClick={() =>
                     navigation?.navigate({
                       ...navigation.route,
@@ -497,32 +507,52 @@ export function Hopper({
                     })
                   }
                 >
-                  Hopperの一覧を取得
+                  {busy ? "一覧を取得中…" : "Hopperの一覧を取得"}
                 </button>
-                <ul>
-                  {page?.items.map((r) => (
-                    <li key={`${r.id}/${r.version}`}>
-                      <NavigationLink
-                        to={{
-                          ...(navigation?.route ?? {
-                            workspace,
-                            screen: "hopper",
-                          }),
-                          target: { ...hopperRef(r), kind: `hopper-${r.kind}` },
-                        }}
-                        related
-                      >
-                        {r.kind === "definition"
-                          ? (r.value as { name: string }).name
-                          : (states[(r.value as Evaluation).state] ??
-                            r.kind)}{" "}
-                        · {r.id}
-                      </NavigationLink>
-                    </li>
-                  ))}
-                </ul>
+                {page && (
+                  <p aria-live="polite">
+                    {page.items.length
+                      ? `${page.items.length}件を表示${page.items.length === 50 ? "（続きあり）" : ""}`
+                      : "一致する記録がありません。"}
+                  </p>
+                )}
+                {!!page?.items.length && (
+                  <ul>
+                    {page.items.map((r) => (
+                      <li key={`${r.id}/${r.version}`}>
+                        <NavigationLink
+                          to={{
+                            ...(navigation?.route ?? {
+                              workspace,
+                              screen: "hopper",
+                            }),
+                            target: {
+                              ...hopperRef(r),
+                              kind: `hopper-${r.kind}`,
+                            },
+                          }}
+                          related
+                          aria-current={
+                            selected?.id === r.id &&
+                            selected.version === r.version
+                              ? "page"
+                              : undefined
+                          }
+                        >
+                          {r.kind === "definition"
+                            ? (r.value as { name: string }).name
+                            : (states[(r.value as Evaluation).state] ??
+                              r.kind)}{" "}
+                          <small>{r.id}</small>
+                        </NavigationLink>
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {page?.items.length === 50 && (
                   <button
+                    data-variant="secondary"
+                    aria-busy={busy}
                     onClick={() =>
                       navigation?.navigate({
                         ...navigation.route,
@@ -531,372 +561,10 @@ export function Hopper({
                       })
                     }
                   >
-                    次の50件
+                    {busy ? "一覧を取得中…" : "一覧の次のページ"}
                   </button>
                 )}
               </fieldset>
-            )}
-            {selected && (
-              <section aria-label="Hopperの詳細">
-                {selected.kind === "evaluation" &&
-                  (() => {
-                    const e = selected.value as Evaluation;
-                    return (
-                      <>
-                        <h3>
-                          {states[e.state] ?? e.state}
-                          {e.dry_run ? "（過去の試行・発行なし）" : ""}
-                        </h3>
-                        <p>{reasons[e.reason] ?? e.reason}</p>
-                        {e.semantic && (
-                          <section aria-label="意味判断の根拠と消費">
-                            <h4>
-                              意味判断:{" "}
-                              {states[e.semantic.state] ?? e.semantic.state}
-                            </h4>
-                            <p>
-                              {reasons[e.semantic.reason ?? ""] ??
-                                e.semantic.reason}
-                            </p>
-                            <p>
-                              この評価のモデル消費: {e.semantic.usage.length}件
-                              / 費用:{" "}
-                              {e.semantic.usage_state === "complete"
-                                ? "算定済み"
-                                : e.semantic.usage_state === "not_applicable"
-                                  ? "要求なし"
-                                  : "欠測・未算定あり"}
-                              。元のRunや発行先の消費とは分けて記録します。
-                            </p>
-                            {e.semantic.decision && (
-                              <>
-                                <p>{e.semantic.decision.reason}</p>
-                                <pre>
-                                  {JSON.stringify(
-                                    {
-                                      candidate: e.semantic.decision.candidate,
-                                      evidence: e.semantic.decision.evidence,
-                                      unknown: e.semantic.decision.unknown,
-                                    },
-                                    null,
-                                    2,
-                                  )}
-                                </pre>
-                              </>
-                            )}
-                            {e.semantic.input && (
-                              <button
-                                disabled={busy}
-                                onClick={() =>
-                                  void run(() =>
-                                    fixedDetail(e.semantic!.input!),
-                                  )
-                                }
-                              >
-                                固定した評価入力を確認
-                              </button>
-                            )}
-                            {e.semantic.response && (
-                              <button
-                                disabled={busy}
-                                onClick={() =>
-                                  void run(() =>
-                                    fixedDetail(e.semantic!.response!),
-                                  )
-                                }
-                              >
-                                採用したモデルの原応答を確認
-                              </button>
-                            )}
-                            <button
-                              disabled={busy}
-                              onClick={() =>
-                                void run(() => loadAttempts(selected))
-                              }
-                            >
-                              この評価の試行・消費履歴を取得
-                            </button>
-                            {attempts && (
-                              <>
-                                <ul>
-                                  {attempts.items.map((a) => (
-                                    <li key={`${a.id}/${a.version}`}>
-                                      <button
-                                        disabled={busy}
-                                        onClick={() =>
-                                          void run(() => fixedDetail(a))
-                                        }
-                                      >
-                                        試行{" "}
-                                        {(a.value as { number: number }).number}{" "}
-                                        · {a.id}
-                                      </button>
-                                    </li>
-                                  ))}
-                                </ul>
-                                {attempts.items.length === 50 && (
-                                  <button
-                                    disabled={busy}
-                                    onClick={() =>
-                                      void run(() =>
-                                        loadAttempts(
-                                          selected,
-                                          attempts.after,
-                                          attempts.after_id,
-                                        ),
-                                      )
-                                    }
-                                  >
-                                    次の50試行
-                                  </button>
-                                )}
-                              </>
-                            )}
-                            {admin && (
-                              <button
-                                disabled={busy}
-                                onClick={() =>
-                                  void run(() => decide(selected, "reevaluate"))
-                                }
-                              >
-                                同じ結果を新しい履歴で再評価
-                              </button>
-                            )}
-                          </section>
-                        )}
-                        {e.source.previous_evaluation && (
-                          <button
-                            disabled={busy}
-                            onClick={() =>
-                              void run(async () => {
-                                await fixedDetail(
-                                  e.source.previous_evaluation!,
-                                );
-                              })
-                            }
-                          >
-                            前の評価と発行先を確認
-                          </button>
-                        )}
-                        {e.reevaluation && (
-                          <p>再評価を受付済み: {e.reevaluation}</p>
-                        )}
-                        {e.cost && (
-                          <p>
-                            記録済み費用（{e.cost.valuation}）:{" "}
-                            {e.cost.amount === null
-                              ? "未確定"
-                              : `${e.cost.amount} ${e.cost.currency}`}
-                          </p>
-                        )}
-                        <p>
-                          条件の判定:{" "}
-                          {e.verdict === "true"
-                            ? "成立"
-                            : e.verdict === "false"
-                              ? "不成立"
-                              : "判断不能"}{" "}
-                          / 深度: {e.depth}
-                        </p>
-                        <div className="team-controls">
-                          <StatusBadge
-                            label="発行"
-                            value={states[e.state] ?? e.state}
-                          />
-                          <StatusBadge
-                            label="評価方法"
-                            value={e.dry_run ? "試行・発行なし" : "本番の結果"}
-                          />
-                          <NavigationLink
-                            to={{
-                              workspace,
-                              screen: e.source.target.id.startsWith("run:")
-                                ? "work"
-                                : "hopper",
-                              target: {
-                                ...e.source.target,
-                                kind: e.source.target.id.startsWith("run:")
-                                  ? "run"
-                                  : "hopper-source",
-                              },
-                              view: e.source.target.id.startsWith("run:")
-                                ? "evidence"
-                                : "evaluations",
-                            }}
-                            related
-                          >
-                            元の固定結果を確認
-                          </NavigationLink>
-                          <NavigationLink
-                            to={{
-                              workspace,
-                              screen: "hopper",
-                              view: "rules",
-                              target: {
-                                ...e.definition,
-                                kind: "hopper-definition",
-                              },
-                            }}
-                            related
-                          >
-                            使用したルールの固定版
-                          </NavigationLink>
-                          {e.destination && (
-                            <NavigationLink
-                              to={{
-                                workspace,
-                                screen: e.destination.id.startsWith("run:")
-                                  ? "work"
-                                  : e.destination.id.startsWith("scope:")
-                                    ? "priority"
-                                    : "publications",
-                                target: {
-                                  ...e.destination,
-                                  kind: e.destination.id.startsWith("run:")
-                                    ? "run"
-                                    : e.destination.id.startsWith("scope:")
-                                      ? "scope"
-                                      : "publication",
-                                },
-                                view: e.destination.id.startsWith("run:")
-                                  ? "overview"
-                                  : undefined,
-                              }}
-                              related
-                            >
-                              発行先を確認（作成・起動とは別）
-                            </NavigationLink>
-                          )}
-                          {!e.destination && <p>発行先は未確定です。</p>}
-                        </div>
-                        <button
-                          disabled={busy}
-                          onClick={() => {
-                            navigation?.navigate({
-                              workspace,
-                              screen: "hopper",
-                              view: "chains",
-                              query: e.root,
-                              target: {
-                                ...hopperRef(selected),
-                                kind: "hopper-evaluation",
-                              },
-                            });
-                          }}
-                        >
-                          この起点の連鎖を絞り込む
-                        </button>
-                        {admin && !e.dry_run && (
-                          <>
-                            {e.state === "published" &&
-                              e.destination?.id.startsWith("run:") && (
-                                <button
-                                  disabled={busy}
-                                  onClick={() =>
-                                    void run(() => decide(selected, "resume"))
-                                  }
-                                >
-                                  割当の保留を再開
-                                </button>
-                              )}
-                            {[
-                              "proposal",
-                              "held",
-                              "blocked",
-                              "input_waiting",
-                            ].includes(e.state) &&
-                              (!e.semantic ||
-                                e.semantic.state === "complete") && (
-                                <button
-                                  disabled={busy}
-                                  onClick={() =>
-                                    void run(() => decide(selected, "publish"))
-                                  }
-                                >
-                                  この提案・保留を発行する
-                                </button>
-                              )}
-                            <button
-                              disabled={busy}
-                              onClick={() => void run(() => chain(true))}
-                            >
-                              この連鎖を停止
-                            </button>
-                            <label>
-                              再開時の連鎖上限（変更する場合だけJSONで指定）
-                              <textarea
-                                aria-label="再開時の連鎖上限"
-                                value={bounds}
-                                onChange={(e) => setBounds(e.target.value)}
-                              />
-                            </label>
-                            <button
-                              disabled={busy}
-                              onClick={() => void run(() => chain(false))}
-                            >
-                              この連鎖を明示的に再開
-                            </button>
-                          </>
-                        )}
-                      </>
-                    );
-                  })()}
-                {selected.kind === "source" && (
-                  <p>
-                    元結果の固定版：{selected.id}@{selected.version}
-                  </p>
-                )}
-                {selected.kind === "chain" && (
-                  <>
-                    <StatusBadge
-                      label="連鎖"
-                      value={
-                        (selected.value as { stopped: boolean }).stopped
-                          ? "停止"
-                          : "再開を許可"
-                      }
-                    />
-                    <p>起点：{(selected.value as { root: string }).root}</p>
-                    <NavigationLink
-                      to={{
-                        workspace,
-                        screen: "hopper",
-                        view: "chains",
-                        query: (selected.value as { root: string }).root,
-                      }}
-                      related
-                    >
-                      この起点の評価・発行を確認
-                    </NavigationLink>
-                    {admin && (
-                      <fieldset disabled={busy}>
-                        <button onClick={() => void run(() => chain(true))}>
-                          この連鎖を停止
-                        </button>
-                        <label>
-                          再開時の連鎖上限
-                          <textarea
-                            value={bounds}
-                            onChange={(e) => setBounds(e.target.value)}
-                          />
-                        </label>
-                        <button onClick={() => void run(() => chain(false))}>
-                          この連鎖を明示的に再開
-                        </button>
-                      </fieldset>
-                    )}
-                  </>
-                )}
-                <Disclosure title="固定版・条件・根拠の詳細">
-                  {() => <pre>{JSON.stringify(selected, null, 2)}</pre>}
-                </Disclosure>
-                {detail && (
-                  <details open>
-                    <summary>選択した固定版の内容</summary>
-                    <pre>{JSON.stringify(detail, null, 2)}</pre>
-                  </details>
-                )}
-              </section>
             )}
             {view === "rules" && role !== "viewer" && (
               <fieldset disabled={busy}>
@@ -940,6 +608,7 @@ export function Hopper({
                     }
                   >
                     <button
+                      data-variant="secondary"
                       onClick={() =>
                         void run(async () => {
                           setConnections(
@@ -950,17 +619,15 @@ export function Hopper({
                     >
                       サーバーのモデル接続を取得
                     </button>
-                    {connections.length === 0 && (
+                    {connections && !connections.length && (
                       <p>利用できるサーバー接続がありません。</p>
                     )}
                     <button
-                      disabled={
-                        !draft || connections.length === 0 || !!semantic
-                      }
+                      disabled={!draft || !connections?.length || !!semantic}
                       onClick={() =>
                         void run(async () => {
                           const value = JSON.parse(applyFields(draft, fields)),
-                            connection = connections[0],
+                            connection = connections![0],
                             model = connection.models[0];
                           value.semantic = {
                             ...(await call<SemanticSettings>(
@@ -986,7 +653,7 @@ export function Hopper({
                         <legend>サーバーモデルによる意味判断</legend>
                         <ServerModelFields
                           settings={semantic}
-                          connections={connections}
+                          connections={connections ?? []}
                           onChange={editSemantic}
                         />
                         <label>
@@ -1017,21 +684,20 @@ export function Hopper({
                 >
                   項目をJSONへ反映
                 </button>
-                <details>
-                  <summary>定義のJSON原文を確認・編集（詳細操作）</summary>
-                  <label>
-                    条件・発行先・連鎖上限・重複の設定（JSON）
-                    <textarea
-                      aria-label="条件・発行先・連鎖上限・重複の設定（JSON）"
-                      rows={16}
+                <Disclosure title="定義のJSON原文">
+                  {() => (
+                    <Field
+                      label="条件・発行先・連鎖上限・重複の設定（JSON）"
                       value={draft}
-                      onChange={(e) => {
-                        setDraft(e.target.value);
+                      rows={16}
+                      onChange={(next) => {
+                        setDraft(next);
                         setFields({});
                       }}
+                      error={jsonError(draft)}
                     />
-                  </label>
-                </details>
+                  )}
+                </Disclosure>
                 <button
                   disabled={!id || !composed}
                   onClick={() =>
@@ -1056,9 +722,7 @@ export function Hopper({
                           },
                           { replace: true },
                         );
-                      setNotice(
-                        "新しい版を保存しました。有効な版はまだ切り替わっていません。",
-                      );
+                      setNotice("定義の版を保存しました。");
                     })
                   }
                 >
@@ -1085,6 +749,7 @@ export function Hopper({
             {view === "trial" && admin && (
               <fieldset disabled={busy || !saved}>
                 <legend>過去の結果を発行せずに試す</legend>
+                {!saved && <p>保存した定義が未選択です。</p>}
                 <label>
                   結果の種類
                   <select
@@ -1100,7 +765,7 @@ export function Hopper({
                   </select>
                 </label>
                 <label>
-                  対象（全ては *）
+                  対象
                   <input
                     value={pastTarget}
                     onChange={(e) => {
@@ -1168,6 +833,7 @@ export function Hopper({
                       <pre>{JSON.stringify(trial.value, null, 2)}</pre>
                     </details>
                     <button
+                      data-variant="secondary"
                       onClick={() => {
                         setPastAfter((trial.value as { after: number }).after);
                         setTrial(null);
@@ -1179,9 +845,350 @@ export function Hopper({
                 )}
               </fieldset>
             )}
-          </section>
+          </TabPanel>
         </section>
       }
+      {selected && (
+        <DetailPane>
+          <section
+            aria-label={`選択した${kinds[selected.kind] ?? selected.kind}の詳細`}
+          >
+            <h4>{selected.id}</h4>
+            {selected.kind === "evaluation" &&
+              (() => {
+                const e = selected.value as Evaluation;
+                return (
+                  <>
+                    <p>{reasons[e.reason] ?? e.reason}</p>
+                    {e.semantic && (
+                      <section aria-label="意味判断の根拠と消費">
+                        <h5>
+                          意味判断：
+                          {states[e.semantic.state] ?? e.semantic.state}
+                        </h5>
+                        <p>
+                          {reasons[e.semantic.reason ?? ""] ??
+                            e.semantic.reason}
+                        </p>
+                        <p>
+                          この評価のモデル消費：{e.semantic.usage.length}件 /
+                          費用：
+                          {e.semantic.usage_state === "complete"
+                            ? "算定済み"
+                            : e.semantic.usage_state === "not_applicable"
+                              ? "要求なし"
+                              : "欠測・未算定あり"}
+                        </p>
+                        {e.semantic.decision && (
+                          <>
+                            <p>{e.semantic.decision.reason}</p>
+                            <pre>
+                              {JSON.stringify(
+                                {
+                                  candidate: e.semantic.decision.candidate,
+                                  evidence: e.semantic.decision.evidence,
+                                  unknown: e.semantic.decision.unknown,
+                                },
+                                null,
+                                2,
+                              )}
+                            </pre>
+                          </>
+                        )}
+                        {e.semantic.input && (
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void run(() => fixedDetail(e.semantic!.input!))
+                            }
+                          >
+                            固定した評価入力を確認
+                          </button>
+                        )}
+                        {e.semantic.response && (
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void run(() => fixedDetail(e.semantic!.response!))
+                            }
+                          >
+                            採用したモデルの原応答を確認
+                          </button>
+                        )}
+                        <button
+                          data-variant="secondary"
+                          disabled={busy}
+                          onClick={() => void run(() => loadAttempts(selected))}
+                        >
+                          この評価の試行・消費履歴を取得
+                        </button>
+                        {attempts && (
+                          <>
+                            <ul>
+                              {attempts.items.map((a) => (
+                                <li key={`${a.id}/${a.version}`}>
+                                  <button
+                                    disabled={busy}
+                                    onClick={() =>
+                                      void run(() => fixedDetail(a))
+                                    }
+                                  >
+                                    試行{" "}
+                                    {(a.value as { number: number }).number} ·{" "}
+                                    {a.id}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                            {attempts.items.length === 50 && (
+                              <button
+                                data-variant="secondary"
+                                disabled={busy}
+                                aria-busy={busy}
+                                onClick={() =>
+                                  void run(() =>
+                                    loadAttempts(
+                                      selected,
+                                      attempts.after,
+                                      attempts.after_id,
+                                    ),
+                                  )
+                                }
+                              >
+                                {busy ? "試行を取得中…" : "試行の次のページ"}
+                              </button>
+                            )}
+                          </>
+                        )}
+                        {admin && (
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              void run(() => decide(selected, "reevaluate"))
+                            }
+                          >
+                            同じ結果を新しい履歴で再評価
+                          </button>
+                        )}
+                      </section>
+                    )}
+                    {e.source.previous_evaluation && (
+                      <button
+                        disabled={busy}
+                        onClick={() =>
+                          void run(async () => {
+                            await fixedDetail(e.source.previous_evaluation!);
+                          })
+                        }
+                      >
+                        前の評価と発行先を確認
+                      </button>
+                    )}
+                    {e.reevaluation && (
+                      <p>再評価を受付済み：{e.reevaluation}</p>
+                    )}
+                    {e.cost && (
+                      <p>
+                        記録済み費用（{e.cost.valuation}）：
+                        {e.cost.amount === null
+                          ? "未確定"
+                          : `${e.cost.amount} ${e.cost.currency}`}
+                      </p>
+                    )}
+                    <p>
+                      条件の判定：
+                      {e.verdict === "true"
+                        ? "成立"
+                        : e.verdict === "false"
+                          ? "不成立"
+                          : "判断不能"}{" "}
+                      / 深度：{e.depth}
+                    </p>
+                    <div className="team-controls">
+                      <StatusBadge
+                        label="発行"
+                        value={states[e.state] ?? e.state}
+                      />
+                      <StatusBadge
+                        label="評価方法"
+                        value={e.dry_run ? "試行・発行なし" : "本番の結果"}
+                      />
+                      <NavigationLink
+                        to={{
+                          workspace,
+                          screen: e.source.target.id.startsWith("run:")
+                            ? "work"
+                            : "hopper",
+                          target: {
+                            ...e.source.target,
+                            kind: e.source.target.id.startsWith("run:")
+                              ? "run"
+                              : "hopper-source",
+                          },
+                          view: e.source.target.id.startsWith("run:")
+                            ? "evidence"
+                            : "evaluations",
+                        }}
+                        related
+                      >
+                        元の固定結果を確認
+                      </NavigationLink>
+                      <NavigationLink
+                        to={{
+                          workspace,
+                          screen: "hopper",
+                          view: "rules",
+                          target: {
+                            ...e.definition,
+                            kind: "hopper-definition",
+                          },
+                        }}
+                        related
+                      >
+                        使用したルールの固定版
+                      </NavigationLink>
+                      {e.destination && (
+                        <NavigationLink
+                          to={{
+                            workspace,
+                            screen: e.destination.id.startsWith("run:")
+                              ? "work"
+                              : e.destination.id.startsWith("scope:")
+                                ? "priority"
+                                : "publications",
+                            target: {
+                              ...e.destination,
+                              kind: e.destination.id.startsWith("run:")
+                                ? "run"
+                                : e.destination.id.startsWith("scope:")
+                                  ? "scope"
+                                  : "publication",
+                            },
+                            view: e.destination.id.startsWith("run:")
+                              ? "overview"
+                              : undefined,
+                          }}
+                          related
+                        >
+                          発行先を確認
+                        </NavigationLink>
+                      )}
+                      {!e.destination && <p>発行先は未確定です。</p>}
+                    </div>
+                    <button
+                      disabled={busy}
+                      onClick={() => {
+                        navigation?.navigate({
+                          workspace,
+                          screen: "hopper",
+                          view: "chains",
+                          query: e.root,
+                          target: {
+                            ...hopperRef(selected),
+                            kind: "hopper-evaluation",
+                          },
+                        });
+                      }}
+                    >
+                      この起点の連鎖を絞り込む
+                    </button>
+                    {admin && !e.dry_run && (
+                      <>
+                        {e.state === "published" &&
+                          e.destination?.id.startsWith("run:") && (
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                void run(() => decide(selected, "resume"))
+                              }
+                            >
+                              割当の保留を再開
+                            </button>
+                          )}
+                        {[
+                          "proposal",
+                          "held",
+                          "blocked",
+                          "input_waiting",
+                        ].includes(e.state) &&
+                          (!e.semantic || e.semantic.state === "complete") && (
+                            <button
+                              disabled={busy}
+                              onClick={() =>
+                                void run(() => decide(selected, "publish"))
+                              }
+                            >
+                              この提案・保留を発行する
+                            </button>
+                          )}
+                        <button
+                          disabled={busy}
+                          onClick={() => void run(() => chain(true))}
+                        >
+                          この連鎖を停止
+                        </button>
+                        {boundsField}
+                        <button
+                          disabled={busy || !!boundsError}
+                          onClick={() => void run(() => chain(false))}
+                        >
+                          この連鎖を明示的に再開
+                        </button>
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+            {selected.kind === "source" && <p>版：{selected.version}</p>}
+            {selected.kind === "chain" && (
+              <>
+                <StatusBadge
+                  label="連鎖"
+                  value={
+                    (selected.value as { stopped: boolean }).stopped
+                      ? "停止"
+                      : "再開を許可"
+                  }
+                />
+                <p>起点：{(selected.value as { root: string }).root}</p>
+                <NavigationLink
+                  to={{
+                    workspace,
+                    screen: "hopper",
+                    view: "chains",
+                    query: (selected.value as { root: string }).root,
+                  }}
+                  related
+                >
+                  この起点の評価・発行を確認
+                </NavigationLink>
+                {admin && (
+                  <fieldset disabled={busy}>
+                    <button onClick={() => void run(() => chain(true))}>
+                      この連鎖を停止
+                    </button>
+                    {boundsField}
+                    <button
+                      disabled={!!boundsError}
+                      onClick={() => void run(() => chain(false))}
+                    >
+                      この連鎖を明示的に再開
+                    </button>
+                  </fieldset>
+                )}
+              </>
+            )}
+            <Disclosure title="固定版・条件・根拠の詳細">
+              {() => <pre>{JSON.stringify(selected, null, 2)}</pre>}
+            </Disclosure>
+            {detail && (
+              <Disclosure title="選択した固定版の内容" defaultOpen>
+                {() => <pre>{JSON.stringify(detail, null, 2)}</pre>}
+              </Disclosure>
+            )}
+          </section>
+        </DetailPane>
+      )}
     </ScreenContent>
   );
 }

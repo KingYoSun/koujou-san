@@ -6,6 +6,7 @@ import { fieldSource } from "./workflow-json";
 import type { VersionRef } from "./model-connections";
 import { linkChatTarget } from "./chat-api";
 import { useNavigation } from "./navigation";
+import { Field, jsonError } from "./field";
 
 export function DefinitionRun({
   native,
@@ -85,14 +86,12 @@ export function DefinitionRun({
           );
         }
         setPending(undefined);
-        setNotice(
-          "未割当のRunを作成しました。「作業と判断」のRunで確認し、通常の割当・開始を行えます。",
-        );
+        setNotice("未割当のRunを作成しました。");
       }
     } catch {
       if (allowAnswerScope(namespace, epoch))
         setNotice(
-          "作成を確認できません。採用版・入力・権限・接続を確認してください。同じ要求で再確認できます。",
+          "Runを作成できませんでした。採用版・入力・権限・接続を確認してください。",
         );
     } finally {
       setBusy(false);
@@ -111,25 +110,21 @@ export function DefinitionRun({
           ) : (
             <>
               <p>
-                宣言された入力:{" "}
+                宣言された入力：
                 {fieldSource(definition.value_utf8, ["inputs"]) || "なし"}
               </p>
-              <label>
-                今回の入力（名前をキーにしたJSON）
-                <textarea
+              <fieldset disabled={busy || !!created}>
+                <Field
+                  label="今回の入力（JSON）"
                   value={pending?.inputs_utf8 ?? inputs}
-                  disabled={busy || !!pending || !!created}
-                  onChange={(e) => setInputs(e.target.value)}
+                  onChange={pending ? () => undefined : setInputs}
+                  rows={3}
+                  error={jsonError(pending?.inputs_utf8 ?? inputs)}
                 />
-              </label>
-              <button
-                disabled={!canEdit || busy || !!created}
-                onClick={() => void create()}
-              >
-                {pending
-                  ? "同じRun作成要求を確認"
-                  : "未割当のRunを作成（開始しない）"}
-              </button>
+                <button disabled={!canEdit} onClick={() => void create()}>
+                  {pending ? "同じRun作成要求を確認" : "Runを作成"}
+                </button>
+              </fieldset>
             </>
           )}
           {created && (

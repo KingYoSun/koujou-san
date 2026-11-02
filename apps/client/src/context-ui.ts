@@ -69,8 +69,9 @@ export const fixedRef = (r: Ref): Ref => ({
   revision: r.revision,
 });
 export const identityKey = (r: Identity) => `${r.kind}:${r.id}`;
-export const refLabel = (r: Ref) =>
-  `${labels[r.kind] ?? r.kind} · ${r.id} · ${r.revision}`;
+export const identityLabel = (r: Identity) =>
+  `${labels[r.kind] ?? r.kind} · ${r.id}`;
+export const refLabel = (r: Ref) => `${identityLabel(r)} · ${r.revision}`;
 export const contextPath = (workspace: string, r: Identity) =>
   `/contexts/workspaces/${encodeURIComponent(workspace)}/${encodeURIComponent(r.kind)}/${encodeURIComponent(r.id)}`;
 export type UIState = {

@@ -31,13 +31,15 @@ export function ComparisonResults({
 }) {
   const navigation = useNavigation();
   const summary = page.data.summary;
+  const measured = (v: string | null | undefined, unit: string) =>
+    v == null ? "未取得" : `${v} ${unit}`;
   return (
     <section aria-label="取得した比較結果">
       <p>
-        集計時点: {page.data.as_of} / 反映位置: {page.data.through} /{" "}
-        {page.data.timezone}
+        集計時点：{page.data.as_of} / 反映位置：{page.data.through} /{" "}
+        {page.data.timezone} / {page.data.items.length}件を表示
+        {page.meta.next_cursor && "（続きあり）"}
       </p>
-      <p>{costLabel(condition.kind)}</p>
       {summary && (
         <>
           <dl>
@@ -49,9 +51,9 @@ export function ComparisonResults({
             <dt>手戻り・再試行</dt>
             <dd>{summary.rework}件</dd>
             <dt>実行時間の取得済み合計</dt>
-            <dd>{summary.execution_seconds ?? "未取得"} 秒</dd>
+            <dd>{measured(summary.execution_seconds, "秒")}</dd>
             <dt>開始までの待機時間の取得済み合計</dt>
-            <dd>{summary.waiting_seconds ?? "未取得"} 秒</dd>
+            <dd>{measured(summary.waiting_seconds, "秒")}</dd>
             <dt>時間・Run情報の未取得</dt>
             <dd>
               {summary.time_unavailable}件 / {summary.run_metadata_unavailable}
@@ -62,7 +64,7 @@ export function ComparisonResults({
             {summary.quality.map((q, i) => (
               <li key={i}>
                 {costLabel(q.source)} · {costLabel(q.state)} ·{" "}
-                {costLabel(q.verdict)}: {q.records}件
+                {costLabel(q.verdict)}：{q.records}件
               </li>
             ))}
           </ul>
@@ -75,9 +77,12 @@ export function ComparisonResults({
         <caption>
           {mode === "compare_quality"
             ? "検品条件ごとの保存時判定"
-            : mode === "compare_details"
-              ? "元計測と費用の根拠"
-              : "費用と計測範囲"}
+            : `${costLabel(condition.kind)}の${
+                mode === "compare_details"
+                  ? "元計測と費用の根拠"
+                  : "費用と計測範囲"
+              }`}
+          （{condition.from.slice(0, 10)}～{condition.until.slice(0, 10)}）
         </caption>
         <thead>
           <tr>
@@ -86,13 +91,13 @@ export function ComparisonResults({
                 <th>検品条件の固定版</th>
                 <th>判定の種類</th>
                 <th>保存時の結果</th>
-                <th>件数</th>
+                <th data-numeric>件数</th>
               </>
             ) : (
               <>
                 <th>帰属・モデル</th>
                 <th>数量・範囲</th>
-                <th>評価・金額</th>
+                <th data-numeric>評価・金額</th>
                 <th>根拠・操作</th>
               </>
             )}
@@ -112,7 +117,7 @@ export function ComparisonResults({
                   <td>
                     {costLabel(r.state)} / {costLabel(r.verdict)}
                   </td>
-                  <td>{r.records}</td>
+                  <td data-numeric>{r.records}</td>
                 </>
               ) : (
                 <>
@@ -123,7 +128,7 @@ export function ComparisonResults({
                     <br />
                     {r.model ?? "モデル未取得"}
                     <br />
-                    {r.records == null ? "" : `${r.records}計測範囲`}
+                    {r.records == null ? "" : `計測範囲 ${r.records}件`}
                   </td>
                   <td>
                     <details>
@@ -131,10 +136,10 @@ export function ComparisonResults({
                       {r.quantities && Array.isArray(r.quantities)
                         ? r.quantities.map((q) => (
                             <p key={q.category}>
-                              {costLabel(q.category)}: {q.value ?? "未取得"}{" "}
-                              {q.unit}（実測 {q.reported}、推定 {q.estimated}
-                              、確認対象 {q.uncertain ?? 0}、未取得 {q.missing}
-                              、非該当 {q.not_applicable}）
+                              {costLabel(q.category)}：
+                              {measured(q.value, q.unit)}（実測 {q.reported}
+                              、推定 {q.estimated}、確認対象 {q.uncertain ?? 0}
+                              、未取得 {q.missing}、非該当 {q.not_applicable}）
                             </p>
                           ))
                         : null}
@@ -161,7 +166,7 @@ export function ComparisonResults({
                       )}
                     </details>
                   </td>
-                  <td>
+                  <td data-numeric>
                     {costLabel(condition.kind)}
                     <br />
                     {amountLabel(r.amount, r.currency)}
@@ -226,7 +231,7 @@ export function ComparisonResults({
                           onReevaluate({ ...r, refs: distinctCostRefs(r.refs) })
                         }
                       >
-                        この計測範囲を明示再評価
+                        計測範囲を再評価
                       </button>
                     )}
                   </td>
@@ -237,13 +242,18 @@ export function ComparisonResults({
         </tbody>
       </table>
       {page.meta.next_cursor && (
-        <button disabled={busy} onClick={onNext}>
-          比較結果の次の50件
+        <button disabled={busy} data-variant="secondary" onClick={onNext}>
+          比較結果の次のページ
         </button>
       )}
       {mode === "compare" && (
-        <button disabled={busy} onClick={onDetails}>
-          この条件の元計測・料金を50件取得
+        <button
+          disabled={busy}
+          aria-busy={busy}
+          data-variant="secondary"
+          onClick={onDetails}
+        >
+          元計測・料金を取得
         </button>
       )}
       <a

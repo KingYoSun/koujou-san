@@ -34,8 +34,8 @@ export function Field({
       </label>
       {rows ? <textarea {...props} rows={rows} /> : <input {...props} />}
       {error && (
-        <small id={id + "-help"}>
-          <span role="alert">{error}</span>
+        <small id={id + "-help"} role="alert">
+          {error}
         </small>
       )}
     </div>
@@ -47,6 +47,6 @@ export function jsonError(value: string) {
     JSON.parse(value);
     return undefined;
   } catch {
-    return "JSONの形式を確認してください。引用符・区切り・括弧を修正してください。";
+    return "JSONの形式を確認してください。入力は保持しています。";
   }
 }

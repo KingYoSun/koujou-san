@@ -6,6 +6,7 @@ import type { VersionRef } from "./model-connections";
 import type { Ref } from "./context-ui";
 import { allowAnswerScope, answerScopeEpoch } from "./sync-store";
 import { NavigationLink } from "./navigation";
+import { StatusBadge } from "./status-badge";
 import {
   sourceKey,
   sourceRoute,
@@ -52,7 +53,7 @@ export function ContextGenerationResults({
         setNotice("");
       }
     } catch {
-      setNotice("現在の権限で生成結果を取得できません。");
+      setNotice("生成結果を取得できませんでした。");
     }
   }
   useEffect(() => {
@@ -60,7 +61,7 @@ export function ContextGenerationResults({
   }, [result.id, result.version, ui.api, ui.user, ui.workspace]);
   return (
     <section aria-label="保存したContextと由来">
-      <h3>保存したContextと由来</h3>
+      <h4>保存したContextと由来</h4>
       {page && source && sourceKey(page.source) !== sourceKey(source) && (
         <p role="status">
           この結果は別の固定出力から作られています。
@@ -72,18 +73,30 @@ export function ContextGenerationResults({
       {page && (!source || sourceKey(page.source) === sourceKey(source)) && (
         <>
           <p>
-            元Run: {page.source.run.id} · {page.source.run.version} · 出力:{" "}
-            {page.source.output.id} · {page.source.output.version} · 箇所: /
+            元Run：{page.source.run.id} · {page.source.run.version} · 出力：
+            {page.source.output.id} · {page.source.output.version} · 箇所：/
             {page.source.path.join("/")}
+          </p>
+          <p>
+            {page.items.length
+              ? `${page.items.length}件を表示${page.next ? "（続きあり）" : ""}`
+              : "保存したContextはありません。"}
           </p>
           <ul>
             {page.items.map((item) => (
               <li key={item.key}>
-                <button onClick={() => onOpen(item.ref)}>
+                <button
+                  data-variant="secondary"
+                  onClick={() => onOpen(item.ref)}
+                >
                   {item.name || item.key}
                 </button>
                 <p>
-                  {contextStates[item.state] ?? item.state} · {item.reason}
+                  <StatusBadge
+                    label="状態"
+                    value={contextStates[item.state] ?? item.state}
+                  />{" "}
+                  {item.reason}
                 </p>
                 <small>
                   {item.ref.kind} · {item.ref.revision}
@@ -91,9 +104,14 @@ export function ContextGenerationResults({
               </li>
             ))}
           </ul>
-          <p>所属の変更: {page.memberships}件</p>
+          <p>所属の変更：{page.memberships}件</p>
           {page.next && (
-            <button onClick={() => void load(page.next)}>結果の次の50件</button>
+            <button
+              data-variant="secondary"
+              onClick={() => void load(page.next)}
+            >
+              結果の次のページ
+            </button>
           )}
         </>
       )}
