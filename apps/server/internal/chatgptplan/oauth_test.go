@@ -28,6 +28,7 @@ func TestOwnedRegistrationRefreshAndRevocation(t *testing.T) {
 	var nonce, challenge, redirect string
 	var fieldsMu sync.Mutex
 	var refreshed atomic.Int32
+	registered := false
 	var server *httptest.Server
 	encode := func(v any) string { b, _ := json.Marshal(v); return base64.RawURLEncoding.EncodeToString(b) }
 	sign := func(audience, tokenNonce string) string {
@@ -74,6 +75,11 @@ func TestOwnedRegistrationRefreshAndRevocation(t *testing.T) {
 				t.Error("wrong revocation")
 			}
 			w.WriteHeader(200)
+		case "/v1/models":
+			if r.Header.Get("Authorization") != "Bearer access-owned" {
+				t.Error("model listing lost dedicated credential")
+			}
+			json.NewEncoder(w).Encode(map[string]any{"models": []Model{{Slug: "visible", Visibility: "list"}, {Slug: "hidden", Visibility: "hidden"}}})
 		default:
 			t.Errorf("unexpected provider request %s", r.URL.Path)
 			w.WriteHeader(404)
@@ -88,8 +94,14 @@ func TestOwnedRegistrationRefreshAndRevocation(t *testing.T) {
 		fieldsMu.Lock()
 		nonce, challenge, redirect = q.Get("nonce"), q.Get("code_challenge"), q.Get("redirect_uri")
 		fieldsMu.Unlock()
-		if q.Get("client_id") != "dynamic_agent_client" || q.Get("agent_name_hint") != "koujou-san" || !strings.HasPrefix(q.Get("ext_agent_host_id"), "urn:uuid:") {
+		if !strings.HasPrefix(q.Get("ext_agent_host_id"), "urn:uuid:") {
+			t.Error("missing host identity")
+		}
+		if !registered && (q.Get("client_id") != "dynamic_agent_client" || q.Get("agent_name_hint") != "koujou-san") {
 			t.Error("missing first-registration metadata")
+		}
+		if registered && (q.Get("client_id") != "owned-issued-client" || q.Get("agent_name_hint") != "") {
+			t.Error("reauthentication lost issued registration")
 		}
 		callback, _ := url.Parse(redirect)
 		bad := url.Values{"state": {"wrong"}, "code": {"owned"}, "client_id": {"owned-issued-client"}}
@@ -119,6 +131,18 @@ func TestOwnedRegistrationRefreshAndRevocation(t *testing.T) {
 		t.Fatalf("registration not validated: %v", err)
 	}
 	host := c.HostID
+	registered = true
+	if err = p.Login(ctx, file, 0, prompt); err != nil {
+		t.Fatal("reauthentication failed", err)
+	}
+	c, err = Read(file)
+	if err != nil || c.HostID != host || c.ClientID != "owned-issued-client" || c.Subject != "owned-subject" {
+		t.Fatal("reauthentication changed registration")
+	}
+	models, err := p.Models(ctx, file)
+	if err != nil || len(models) != 1 || models[0].Slug != "visible" {
+		t.Fatal("account model listing failed", err)
+	}
 	for _, invalid := range []struct{ name, token, nonce, subject string }{
 		{"nonce", c.IDToken, "different-nonce", c.Subject},
 		{"audience", sign("other-client", nonce), nonce, c.Subject},

@@ -87,6 +87,16 @@ func TestPrivateInitializationAndVerifiedRelease(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(root, "config/connectors/chatgpt")); err != nil {
 		t.Fatal("private credential directory missing", err)
 	}
+	credential := filepath.Join(root, "config/connectors/chatgpt/account.json")
+	if err := os.WriteFile(credential, []byte(`{"ext_agent_host_id":"owned-host","refresh_token":"owned-rotated"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Render(root, s); err != nil {
+		t.Fatal(err)
+	}
+	if data, err := os.ReadFile(credential); err != nil || !strings.Contains(string(data), "owned-rotated") {
+		t.Fatal("configuration regeneration overwrote credential", err)
+	}
 	for _, key := range []string{"KOUJOU_HYDRA_ADMIN_URL", "KOUJOU_KRATOS_PUBLIC_URL", "KOUJOU_KRATOS_ADMIN_URL"} {
 		if !strings.HasPrefix(c.Services["api"].Environment[key], "http://127.0.0.1:8081/") {
 			t.Errorf("%s cannot reach the loopback-only administration listener", key)
@@ -123,5 +133,40 @@ func TestBackupCannotWriteOutsideNewRestoreRoot(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(base, "escaped")); !os.IsNotExist(err) {
 		t.Fatal("outside file created")
+	}
+}
+
+func TestBackupRestoresNestedCredential(t *testing.T) {
+	base := t.TempDir()
+	file := filepath.Join(base, "owned.tgz")
+	f, err := os.Create(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	z := gzip.NewWriter(f)
+	a := tar.NewWriter(z)
+	credential := `{"ext_agent_host_id":"owned-host","client_id":"owned-client","refresh_token":"owned-rotated"}`
+	name := "config/connectors/chatgpt/account.json"
+	if err := a.WriteHeader(&tar.Header{Name: name, Typeflag: tar.TypeReg, Mode: 0600, Size: int64(len(credential))}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := a.Write([]byte(credential)); err != nil {
+		t.Fatal(err)
+	}
+	for _, close := range []func() error{a.Close, z.Close, f.Close} {
+		if err := close(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	root := filepath.Join(base, "restore")
+	if err := unpack(file, root); err != nil {
+		t.Fatal(err)
+	}
+	restored := filepath.Join(root, filepath.FromSlash(name))
+	if data, err := os.ReadFile(restored); err != nil || string(data) != credential {
+		t.Fatal("credential registration or rotated token lost in restore", err)
+	}
+	if info, err := os.Stat(restored); err != nil || runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
+		t.Fatal("restored credential is not private", err)
 	}
 }
