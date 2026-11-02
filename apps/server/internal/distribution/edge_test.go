@@ -43,6 +43,8 @@ func TestEdgePublicAndAdministrationStaySeparate(t *testing.T) {
 		{front, "/inspections/workspaces/owned", "api:/inspections/", 200},
 		{front, "/publications/workspaces/owned", "api:/publications/", 200},
 		{front, "/workbench/workspaces/owned/query", "api:/workbench/", 200},
+		{front, "/forge/workspaces/owned/observations", "api:/forge/", 200},
+		{front, "/gitea/webhook/owned-instance", "api:/gitea/", 200},
 	} {
 		r := httptest.NewRequest("GET", test.path, nil)
 		r.Header.Set("X-Forwarded-Proto", "http")
