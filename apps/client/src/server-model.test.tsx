@@ -25,6 +25,32 @@ describe("server model output limits", () => {
     expect(html).toContain("出力上限（token）");
     expect(html).toContain('value="4096"');
     expect(html).not.toContain("上限なし");
+    expect(html).toContain('<option value="owned" selected="">owned</option>');
+  });
+
+  it.each([
+    ["api", "API fixture"],
+    ["plan", "ChatGPTプラン fixture"],
+  ])("keeps the selected connection name for %s", (id, name) => {
+    const html = renderToStaticMarkup(
+      <ServerModelFields
+        settings={{ ...base, connection: id }}
+        connections={[
+          {
+            id,
+            name,
+            revision: "owned-revision",
+            models: [
+              { requested: base.model, allowed_actual: base.allowed_models },
+            ],
+          },
+        ]}
+        onChange={() => {}}
+      />,
+    );
+    expect(html).toContain(
+      `<option value="${id}" selected="">${name}</option>`,
+    );
   });
 
   it("shows unlimited output for the saved ChatGPT policy while retaining input and time bounds", () => {

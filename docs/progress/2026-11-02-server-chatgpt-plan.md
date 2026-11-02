@@ -60,3 +60,7 @@ UIの実表示は、実データ・外部通信のない固定フォームを用
 別コンテキストの独立検品で、`Response.Request`と`Response.Reply`がHopper/Triageの一覧に残るAC-4の回帰を確認した。追加したDB試験が修正前に両方のheads一覧で失敗した。Hopperの共通圧縮処理とTriageのheads・records・attemptsのSQLで、原応答に加えて送信本文・解析応答も除去した。固定記録では三つとも保持する。修正後はHopperのheads・history、Triageの三経路の検査を含む両DB suiteが成功した。
 
 独立検品者`chatgpt_plan_audit`は、会話履歴を継承しないコンテキストで`749e26f`と`3ec7675`を検品し、上記1件をblockerとした。`2b128e5`の差分再検品で解消を確認し、追加blockerはなしと判定した。AC-1/2/3/5はPASS、AC-4は実装・回帰修正PASS、実表示を含む条件全体はINCONCLUSIVE。CI成功やfixture成功を実表示・本人認証の代わりにはしない。
+
+2026年11月3日、本人から切替できるが選択後に接続名がIDへ変わるとの報告を受けた。選択中のoptionにも取得済み接続名を使い、一覧未取得時のID表示は維持した。API・ChatGPTの名前保持を検査する2件が修正前に失敗、修正後は静的描画4件とclient型検査が成功。修正済みフォームの再読込み、出力表示と1440px／1024pxの確認を再依頼した。
+
+`83d4b9a`のCIはShared UI and server、Windows native client、GitGuardianのすべて成功した。これにより全体check・test・buildと標準配布の検査を補完した。接続名修正後のcommitは、別途CIの結果を確認する。

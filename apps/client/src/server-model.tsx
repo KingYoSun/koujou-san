@@ -141,7 +141,10 @@ export function ServerModelFields({
               });
           }}
         >
-          <option value={settings.connection}>{settings.connection}</option>
+          <option value={settings.connection}>
+            {connections.find((c) => c.id === settings.connection)?.name ??
+              settings.connection}
+          </option>
           {connections
             .filter((c) => c.id !== settings.connection)
             .map((c) => (
