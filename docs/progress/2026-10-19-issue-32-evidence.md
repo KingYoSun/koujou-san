@@ -30,7 +30,7 @@ Tabで固定版入力から集計ボタンへ進み、Enterで取得・保存・
 
 ## 回帰確認
 
-`issue32-ui-local2.log` の画面回帰試験、`issue32-build5.log` の型/共通UI build、`issue32-check1.log` のGo vet/型/format、`issue32-test1.log` のGo全packageとUI 19ファイル70試験はPASS。以後の数量未確定分岐と根拠表示の変更は最終検査で再確認する。
+画面回帰試験、`issue32-build5.log` の型/共通UI build、`issue32-check1.log` のGo vet/型/format、`issue32-test1.log` のGo全packageとUI 19ファイル70試験はPASS。以後の数量未確定分岐と根拠表示の変更は最終検査で再確認する。
 
 ## 最終候補の照合
 
