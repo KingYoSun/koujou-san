@@ -69,7 +69,7 @@ func (s *Service) Finish(ctx context.Context, p access.Principal, w, id string, 
 		turn.Failure = req.Failure
 		turn.State = "response"
 		result, reason := parseReply(req.Response, turn.Model, op.Purpose)
-		if req.Failure != "" {
+		if req.Failure != "" && (req.server == nil || (reason != "model_not_allowed" && reason != "tool_not_allowed")) {
 			reason = "model_connection_failed"
 			if req.server != nil {
 				reason = req.Failure

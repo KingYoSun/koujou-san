@@ -110,7 +110,7 @@ func (s *Service) ServerModel(ctx context.Context, p access.Principal, w, id str
 		if err != nil {
 			return Record{}, err
 		}
-		if live.State != "sending" || live.Client != req.Client || live.Turn == nil || *live.Turn != req.Turn {
+		if live.State != "sending" || live.Client != req.Client || live.Turn == nil || *live.Turn != req.Turn || hash(live.Model) != hash(turn.Model) {
 			return Record{}, ErrState
 		}
 		policy, err := s.currentPolicy(ctx, tx, p, w, live)

@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { operationClientID, operationPort } from "./client-operation-port";
 import { ModelConnectionSettings } from "./model-connection-settings";
 import {
   loadProfiles,
@@ -11,7 +12,7 @@ import {
 } from "./model-connections";
 
 const request = vi.hoisted(() => vi.fn());
-vi.mock("./auth", () => ({ syncRequest: request }));
+vi.mock("./auth", () => ({ syncRequest: request, mcpRequest: vi.fn() }));
 afterEach(() => {
   vi.unstubAllGlobals();
   request.mockReset();
@@ -121,4 +122,44 @@ it("never sends a server connection through the direct browser transport", async
     modelRequest(false, "actor", profile, { model: "owned" }, 1000),
   ).rejects.toThrow("server_operation_transport_required");
   expect(fetch).not.toHaveBeenCalled();
+});
+
+it("routes the current reserved operation to the authenticated API and rejects a changed model before dispatch", async () => {
+  const ui = {
+    native: false,
+    api: "https://app.example",
+    user: "alice",
+    workspace: "one",
+  };
+  const operation = { id: "client-operation:owned", version: "started" };
+  const model = {
+    connection: profile.id,
+    revision: profile.revision,
+    server_connection: profile.server_connection,
+  };
+  const turn = { id: "client-turn:owned", version: "intent" };
+  request
+    .mockResolvedValueOnce({ value: { model, turn } })
+    .mockResolvedValueOnce({ status: 200, body: { id: "owned-result" } });
+  const port = operationPort(ui, profile, operation, () => true);
+  await expect(port.model({ model: "owned" }, 1000)).resolves.toEqual({
+    status: 200,
+    body: { id: "owned-result" },
+  });
+  expect(request).toHaveBeenLastCalledWith(
+    "/client-operations/workspaces/one/operations/client-operation%3Aowned/model",
+    false,
+    {
+      method: "POST",
+      body: { client: operationClientID, turn, body: { model: "owned" } },
+    },
+  );
+  request.mockClear();
+  request.mockResolvedValueOnce({
+    value: { model: { ...model, revision: "changed" }, turn },
+  });
+  await expect(port.model({ model: "owned" }, 1000)).rejects.toThrow(
+    "model_connection_changed",
+  );
+  expect(request).toHaveBeenCalledTimes(1);
 });

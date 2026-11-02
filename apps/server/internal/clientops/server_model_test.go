@@ -54,10 +54,15 @@ func checkServerModel(t *testing.T, s *Service) {
 			if !strings.Contains(string(input), "OPAQUE_REASONING") || !strings.Contains(string(input), "function_call_output") {
 				t.Error("tool history lost")
 			}
-		case "incomplete", "failed":
+		case "incomplete", "failed", "wrong-incomplete":
 			state := mode.Load().(string)
+			actual := "owned-model"
+			if state == "wrong-incomplete" {
+				state = "incomplete"
+				actual = "forbidden-model"
+			}
 			w.Header().Set("Content-Type", "text/event-stream")
-			fmt.Fprintf(w, "data: {\"type\":\"response.%s\",\"response\":{\"id\":\"owned-partial\",\"model\":\"owned-model\",\"status\":\"%s\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Partial text\"}]}],\"usage\":{\"input_tokens\":12,\"output_tokens\":4}}}\n\n", state, state)
+			fmt.Fprintf(w, "data: {\"type\":\"response.%s\",\"response\":{\"id\":\"owned-partial\",\"model\":\"%s\",\"status\":\"%s\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"Partial text\"}]}],\"usage\":{\"input_tokens\":12,\"output_tokens\":4}}}\n\n", state, actual, state)
 			return
 		case "disconnect":
 			w.Header().Set("Content-Type", "text/event-stream")
@@ -223,6 +228,15 @@ func checkServerModel(t *testing.T, s *Service) {
 	if calls.Load() != 1 {
 		t.Fatal("blocked request reached upstream")
 	}
+	changedModel, changedModelReq := newOperation("changed-model-before-send")
+	otherModel := Model{Connection: "direct-model", Revision: "direct-version", Requested: "owned-model", Allowed: []string{"owned-model"}}
+	must(s.Act(ctx, p, "one", changedModel.ID, Action{Mutation: mutation(changedModel.Version), Client: "client", Kind: "takeover", Model: &otherModel}))
+	if _, err := s.ServerModel(ctx, p, "one", changedModel.ID, changedModelReq); err == nil {
+		t.Fatal("old turn accepted after model change")
+	}
+	if calls.Load() != 1 {
+		t.Fatal("model change reached old upstream before rejection")
+	}
 	mode.Store("takeover")
 	taken, takenReq := newOperation("takeover-in-flight")
 	flightOperation.Store(taken.ID)
@@ -234,7 +248,7 @@ func checkServerModel(t *testing.T, s *Service) {
 	if err != nil || decode(r.Value, &op) != nil || op.Client != "new-client" || op.Applied != nil {
 		t.Fatal("takeover boundary", err)
 	}
-	for _, state := range []string{"incomplete", "failed", "disconnect"} {
+	for _, state := range []string{"incomplete", "failed", "disconnect", "wrong-incomplete"} {
 		mode.Store(state)
 		operation, req := newOperation(state)
 		if _, err := s.ServerModel(ctx, p, "one", operation.ID, req); err != nil {
