@@ -1,4 +1,4 @@
-// Package serverllm connects server-owned automation to a configured HTTP gateway.
+// Package serverllm connects server-owned automation to configured model providers.
 // It has no access to client or CLI credentials and owns no business decisions.
 package serverllm
 
@@ -15,8 +15,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/KingYoSun/koujou-san/apps/server/internal/chatgptplan"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/modelreply"
 )
 
 var ErrUnavailable = errors.New("server_model_connection_unavailable")
@@ -26,15 +30,23 @@ type Model struct {
 	Actual    []string `json:"allowed_actual"`
 }
 type Connection struct {
-	ID       string  `json:"id"`
-	Name     string  `json:"name"`
-	Endpoint string  `json:"endpoint"`
-	Revision string  `json:"revision"`
-	Models   []Model `json:"models"`
-	KeyFile  string  `json:"-"`
-	CAFile   string  `json:"-"`
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	Endpoint       string  `json:"endpoint"`
+	Revision       string  `json:"revision"`
+	Models         []Model `json:"models"`
+	KeyFile        string  `json:"-"`
+	CAFile         string  `json:"-"`
+	Type           string  `json:"type,omitempty"`
+	CredentialFile string  `json:"-"`
+	identity       string
+	provider       *chatgptplan.Provider
+	httpClient     *http.Client
 }
-type Gateway struct{ ConfigFile string }
+type Gateway struct {
+	ConfigFile string
+	HTTP       *http.Client
+}
 
 func (g *Gateway) Connections(workspace string) ([]Connection, error) {
 	out := []Connection{}
@@ -47,15 +59,20 @@ func (g *Gateway) Connections(workspace string) ([]Connection, error) {
 	}
 	var entries []struct {
 		Connection
-		Workspaces []string `json:"workspaces"`
-		KeyFile    string   `json:"key_file"`
-		CAFile     string   `json:"ca_file"`
+		Workspaces     []string `json:"workspaces"`
+		KeyFile        string   `json:"key_file"`
+		CAFile         string   `json:"ca_file"`
+		CredentialFile string   `json:"credential_file"`
 	}
 	if json.Unmarshal(b, &entries) != nil {
 		return nil, ErrUnavailable
 	}
 	for _, e := range entries {
 		p := e.Connection
+		p.httpClient = g.HTTP
+		if p.Type == "chatgpt" && p.Endpoint == "" {
+			p.Endpoint = chatgptplan.Resource
+		}
 		u, err := url.Parse(p.Endpoint)
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || p.ID == "" || len(p.Models) == 0 {
 			return nil, ErrUnavailable
@@ -65,11 +82,24 @@ func (g *Gateway) Connections(workspace string) ([]Connection, error) {
 		}
 		p.KeyFile = e.KeyFile
 		p.CAFile = e.CAFile
+		p.CredentialFile = e.CredentialFile
+		if p.Type != "" && p.Type != "chatgpt" {
+			return nil, ErrUnavailable
+		}
+		if p.Type == "chatgpt" {
+			if p.Endpoint != chatgptplan.Resource || !filepath.IsAbs(p.CredentialFile) {
+				return nil, ErrUnavailable
+			}
+			if credential, err := chatgptplan.Read(p.CredentialFile); err == nil && credential.Issuer == chatgptplan.Issuer {
+				p.identity = credential.Identity()
+			}
+		}
 		p.Revision = ""
 		value, _ := json.Marshal(struct {
 			Connection
-			KeyFile, CAFile string
-		}{p, e.KeyFile, e.CAFile})
+			KeyFile, CAFile          string
+			CredentialFile, Identity string `json:",omitempty"`
+		}{p, e.KeyFile, e.CAFile, e.CredentialFile, p.identity})
 		sum := sha256.Sum256(value)
 		p.Revision = hex.EncodeToString(sum[:])
 		out = append(out, p)
@@ -94,6 +124,9 @@ func (p Connection) Allows(requested string, actual []string) bool {
 	return p.AllowsChain(requested, nil, actual)
 }
 func (p Connection) AllowsChain(requested string, fallbacks, actual []string) bool {
+	if p.Type == "chatgpt" && len(fallbacks) != 0 {
+		return false
+	}
 	allowed := []string{}
 	for _, request := range append([]string{requested}, fallbacks...) {
 		found := false
@@ -120,13 +153,20 @@ func (p Connection) AllowsChain(requested string, fallbacks, actual []string) bo
 }
 
 type Response struct {
-	Status    int             `json:"status"`
-	Body      json.RawMessage `json:"body"`
-	RequestID string          `json:"request_id,omitempty"`
-	TraceID   string          `json:"trace_id,omitempty"`
+	Status    int               `json:"status"`
+	Body      json.RawMessage   `json:"body"`
+	RequestID string            `json:"request_id,omitempty"`
+	TraceID   string            `json:"trace_id,omitempty"`
+	Protocol  string            `json:"protocol,omitempty"`
+	Request   json.RawMessage   `json:"request,omitempty"`
+	Reply     *modelreply.Reply `json:"reply,omitempty"`
+	Error     string            `json:"error,omitempty"`
 }
 
 func (p Connection) Call(ctx context.Context, request json.RawMessage, requestID string) (Response, error) {
+	if p.Type == "chatgpt" {
+		return p.responses(ctx, request, requestID)
+	}
 	key, err := os.ReadFile(p.KeyFile)
 	if err != nil || len(bytes.TrimSpace(key)) == 0 {
 		return Response{}, ErrUnavailable

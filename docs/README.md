@@ -19,7 +19,7 @@ UI/UX作業の視覚仕様は[DESIGN.md](../DESIGN.md)を入口に、[基礎](de
 
 Contextの自動選択とモデル接続は[選択・保存・中断再開](runbooks/client-context-selection.md)、契約は[ADR 0026](adr/0026-client-context-selection.md)を参照する。
 
-サーバーLLMによるHopperの意味判断と任意Bifrostは[サーバーモデル接続](runbooks/server-models.md)、契約は[ADR 0027](adr/0027-server-hopper-semantics.md)を参照する。
+サーバーLLMによるHopper・Triageの意味判断、ChatGPTプラン接続と任意Bifrostは[サーバーモデル接続](runbooks/server-models.md)、契約は[ADR 0027](adr/0027-server-hopper-semantics.md)と[ADR 0035](adr/0035-server-chatgpt-plan.md)を参照する。
 
 設計書第14章の段階A〜Dは開発の順序を示す。環境が起動するだけで、段階Aや初期リリースの受入条件を達成したとは扱わない。
 

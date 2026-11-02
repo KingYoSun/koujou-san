@@ -16,6 +16,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -59,6 +60,7 @@ func TestPrivateInitializationAndVerifiedRelease(t *testing.T) {
 			Network     string `json:"network_mode"`
 			Command     []string
 			Environment map[string]string
+			Volumes     []string
 		}
 	}
 	raw, _ := os.ReadFile(filepath.Join(root, "compose.json"))
@@ -77,6 +79,13 @@ func TestPrivateInitializationAndVerifiedRelease(t *testing.T) {
 	}
 	if c.Services["api"].Network != "service:edge" || strings.Contains(string(raw), "password$$") {
 		t.Fatal("private layout or SMTP isolation")
+	}
+	credentialMount := filepath.Join(root, "config/connectors/chatgpt") + ":/config/connectors/chatgpt"
+	if !slices.Contains(c.Services["api"].Volumes, credentialMount) || !slices.Contains(c.Services["api"].Volumes, filepath.Join(root, "config")+":/config:ro") {
+		t.Fatal("credential refresh mount must be writable while ordinary configuration stays read-only")
+	}
+	if _, err := os.Stat(filepath.Join(root, "config/connectors/chatgpt")); err != nil {
+		t.Fatal("private credential directory missing", err)
 	}
 	for _, key := range []string{"KOUJOU_HYDRA_ADMIN_URL", "KOUJOU_KRATOS_PUBLIC_URL", "KOUJOU_KRATOS_ADMIN_URL"} {
 		if !strings.HasPrefix(c.Services["api"].Environment[key], "http://127.0.0.1:8081/") {

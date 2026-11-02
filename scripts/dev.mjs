@@ -552,7 +552,10 @@ const tasks = {
   "test:clientops": () =>
     testDatabase("clientops", "TestClientOperationsPostgres"),
   "test:hopper": () =>
-    testDatabase("hopper", "TestHopper(Postgres|SemanticPostgres)"),
+    testDatabase(
+      "hopper",
+      "TestHopper(Postgres|SemanticPostgres|ChatGPTPostgres)",
+    ),
   "test:hopper:live": () => {
     if (!process.argv[3] || !existsSync(path.resolve(root, process.argv[3])))
       throw new Error(
@@ -639,7 +642,10 @@ const tasks = {
   "test:runs": () => testDatabase("runs", "TestRunsPostgres"),
   "test:workflows": () => testDatabase("workflows", "TestWorkflowsPostgres"),
   "test:automation": () =>
-    testDatabase("automation", "TestAutomationPostgres|TestTriagePostgres"),
+    testDatabase(
+      "automation",
+      "(TestAutomationPostgres|TestTriage(Postgres|ChatGPTPostgres))",
+    ),
   "test:usage": () => testDatabase("usage", "TestUsagePostgres"),
   "test:github": () => testDatabase("githubobserve"),
   "test:forge": () => testDatabase("githubobserve"),
@@ -765,6 +771,33 @@ const tasks = {
       "koujou-san-runner",
     ]);
     await client("tauri:dev");
+  },
+  "server-model:login": async () => {
+    await resolveGo();
+    await goRun([
+      "run",
+      "./cmd/koujou",
+      "model-login",
+      ...process.argv.slice(3),
+    ]);
+  },
+  "server-model:models": async () => {
+    await resolveGo();
+    await goRun([
+      "run",
+      "./cmd/koujou",
+      "model-models",
+      ...process.argv.slice(3),
+    ]);
+  },
+  "server-model:logout": async () => {
+    await resolveGo();
+    await goRun([
+      "run",
+      "./cmd/koujou",
+      "model-logout",
+      ...process.argv.slice(3),
+    ]);
   },
   "auth:bootstrap": async () => {
     await prepareAuth();

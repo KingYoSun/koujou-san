@@ -21,6 +21,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/graphindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/modelreply"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/modeltest"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/publications"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
@@ -31,12 +32,23 @@ import (
 )
 
 func TestHopperSemanticPostgres(t *testing.T) {
+	testHopperSemanticPostgres(t, false)
+}
+
+func TestHopperChatGPTPostgres(t *testing.T) {
+	testHopperSemanticPostgres(t, true)
+}
+
+func testHopperSemanticPostgres(t *testing.T, plan bool) {
 	dsn := os.Getenv("KOUJOU_TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("run pnpm run test:hopper")
 	}
 	ctx := context.Background()
 	live := os.Getenv("KOUJOU_TEST_HOPPER_LIVE_CONFIG") != ""
+	if plan && live {
+		t.Skip("owned plan fixture is separate from real provider tests")
+	}
 	schema := "semantic_" + fmt.Sprintf("%x", time.Now().UnixNano())
 	admin, err := pgx.Connect(ctx, dsn)
 	if err != nil {
@@ -110,15 +122,23 @@ func TestHopperSemanticPostgres(t *testing.T) {
 	responseMode.Store("")
 	model := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if r.Header.Get("x-bf-vk") != "owned-semantic-key" || r.Header.Get("Cookie") != "" || r.Header.Get("Authorization") != "" {
+		if (!plan && (r.Header.Get("x-bf-vk") != "owned-semantic-key" || r.Header.Get("Authorization") != "")) || (plan && (r.Header.Get("Authorization") != "Bearer owned-semantic-key" || r.Header.Get("x-bf-vk") != "")) || r.Header.Get("Cookie") != "" {
 			t.Error("incorrect model credential separation")
 		}
 		var request struct {
 			Model    string                           `json:"model"`
 			Messages []struct{ Role, Content string } `json:"messages"`
 			Format   json.RawMessage                  `json:"response_format"`
+			Input    []struct{ Role, Content string } `json:"input"`
+			Text     struct {
+				Format json.RawMessage `json:"format"`
+			} `json:"text"`
 		}
-		if json.NewDecoder(r.Body).Decode(&request) != nil || len(request.Messages) != 2 || !strings.Contains(string(request.Format), "hopper_semantic_v1") {
+		decodeErr := json.NewDecoder(r.Body).Decode(&request)
+		if plan {
+			request.Messages, request.Format = request.Input, request.Text.Format
+		}
+		if decodeErr != nil || len(request.Messages) != 2 || !strings.Contains(string(request.Format), "hopper_semantic_v1") {
 			t.Error("invalid semantic request")
 			w.WriteHeader(400)
 			return
@@ -158,6 +178,10 @@ func TestHopperSemanticPostgres(t *testing.T) {
 		if action := onResponse.Swap(nil); action != nil {
 			(*action)()
 		}
+		if plan {
+			modeltest.Completed(w, content, "preserved")
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("x-bifrost-request-id", r.Header.Get("x-request-id"))
 		_ = json.NewEncoder(w).Encode(map[string]any{"id": "owned-model-response", "model": "owned-model", "choices": []any{map[string]any{"message": map[string]any{"content": content}, "finish_reason": "stop"}}, "usage": map[string]any{"prompt_tokens": 23, "completion_tokens": 9, "prompt_tokens_details": map[string]int{"cached_tokens": 0}, "completion_tokens_details": map[string]int{"reasoning_tokens": 0}}, "owned_raw_marker": "preserved"})
@@ -174,6 +198,9 @@ func TestHopperSemanticPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	s.Gateway = &serverllm.Gateway{ConfigFile: configFile}
+	if plan {
+		s.Gateway = modeltest.Plan(t, configFile, model.URL, "owned-semantic-key")
+	}
 	if live {
 		s.Gateway.ConfigFile = os.Getenv("KOUJOU_TEST_HOPPER_LIVE_CONFIG")
 		defer func() {
@@ -222,6 +249,9 @@ func TestHopperSemanticPostgres(t *testing.T) {
 	sem.Model = connections[0].Models[0].Requested
 	sem.Allowed = connections[0].Models[0].Actual
 	sem.Limits.Seconds = 5
+	if plan {
+		sem.UnlimitedOutput, sem.Limits.OutputTokens = true, 0
+	}
 	price := must(s.Usage.Put(ctx, p, "one", "price:owned-semantic", usage.Write{Mutation: m("0"), Value: raw(usage.Price{Connection: "owned", Model: "owned-model", Currency: "USD", From: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC), Source: "owned fictional tariff", Scale: 2, Rounding: "half_up", Rates: map[string]usage.Rate{"input": {Amount: "1", Per: "1", Unit: "token"}, "output": {Amount: "1", Per: "1", Unit: "token"}, "cache_read": {Amount: "0", Per: "1", Unit: "token"}, "reasoning": {Amount: "0", Per: "1", Unit: "token"}}})}))
 	sem.Prices = map[string]usage.Ref{"owned-model": {ID: price.ID, Version: price.Version}}
 	if live {
@@ -334,6 +364,13 @@ process.stdout.write([
 		t.Fatal("usage", count, tokens, err)
 	}
 	t.Log("real owned Node output -> fixed model evidence -> server HTTP -> saved decision -> queued Run; original success, one model call and Hopper-only usage retained")
+	if plan {
+		var protocol string
+		if err := store.Database().QueryRow(ctx, `SELECT payload->'measurement'->>'protocol' FROM usage_records WHERE workspace_id='one' AND kind='usage' ORDER BY position DESC LIMIT 1`).Scan(&protocol); err != nil || protocol != "openai-responses" {
+			t.Fatal("plan measurement", protocol, err)
+		}
+		return
+	}
 	for _, scenario := range []string{"stopped", "depth", "evaluations", "period"} {
 		t.Run("no-send-"+scenario, func(t *testing.T) {
 			root := "owned-blocked-" + scenario

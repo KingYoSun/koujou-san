@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/chatgptplan"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/distribution"
 	"os"
 	"os/signal"
@@ -12,6 +13,15 @@ import (
 )
 
 func main() {
+	if len(os.Args) >= 2 && (os.Args[1] == "model-login" || os.Args[1] == "model-models" || os.Args[1] == "model-logout") {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		if err := chatgptplan.Command(ctx, os.Args[1], os.Args[2:], os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if runtime.GOOS != "linux" || runtime.GOARCH != "amd64" {
 		fmt.Fprintln(os.Stderr, "Linux x86_64 required")
 		os.Exit(2)

@@ -9,6 +9,9 @@
     "pnpm": "10.16.1"
   },
   "scripts": {
+    "server-model:login": "node scripts/dev.mjs server-model:login",
+    "server-model:models": "node scripts/dev.mjs server-model:models",
+    "server-model:logout": "node scripts/dev.mjs server-model:logout",
     "test:forge": "node scripts/dev.mjs test:forge",
     "test:gitea:live": "node scripts/dev.mjs test:gitea:live",
     "test:gitea:ui": "node scripts/dev.mjs test:gitea:ui",

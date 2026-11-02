@@ -11,9 +11,22 @@ import (
 // its returned bytes is independent of cancellation and business adoption.
 func Dispatch(ctx context.Context, c Connection, spec *Spec, request json.RawMessage, id string, save func(context.Context, Response, modelreply.Reply, string) error) error {
 	call, cancel := context.WithTimeout(ctx, time.Duration(spec.Limits.Seconds)*time.Second)
-	response, err := c.Call(call, request, id)
+	var response Response
+	var err error
+	if (c.Type == "chatgpt") != spec.UnlimitedOutput {
+		err = ErrUnavailable
+	} else {
+		response, err = c.Call(call, request, id)
+	}
 	cancel()
-	reply, reason := modelreply.Parse(response.Body, spec.Allowed)
+	parsed := response.Body
+	if response.Reply != nil {
+		parsed, _ = json.Marshal(response.Reply)
+	}
+	reply, reason := modelreply.Parse(parsed, spec.Allowed)
+	if response.Error != "" {
+		reason = response.Error
+	}
 	if err != nil || response.Status != 200 {
 		reason = "model_request_failed"
 	}
