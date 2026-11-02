@@ -46,7 +46,7 @@ Goの共通認証部品でSIWCのファイル保存・更新と管理コマン�
 | AC-4 | 専用PostgreSQLのHopper/Triage試験で新接続から業務結果と利用量を保存。型検査・静的描画2件は成功。実表示は下記のとおり確認待ち |
 | AC-5 | Composeの資格情報用RW mountと通常設定RO mountを照合。設定の再生成で最新tokenを維持し、所有archiveからhost・client登録・回転済tokenを復元。既存snapshotがconfig配下を再帰収録する経路を確認 |
 
-実行結果:
+主な検証結果は次のとおり。
 
 - `go test ./...`、`go vet ./...`、`go test -race ./internal/chatgptplan ./internal/serverllm ./internal/distribution -count=1`は成功。
 - `pnpm run test:hopper`、`pnpm run test:automation`は新しいChatGPT fixtureのDB試験を含め成功。
@@ -56,3 +56,5 @@ Goの共通認証部品でSIWCのファイル保存・更新と管理コマン�
 - Windowsのstandalone `pnpm.exe`をNodeとして起動する既存helperで最初のroot buildは失敗。同じ固定版`pnpm@10.16.1`のJS入口をGit管理外cacheに用意し、root buildの成功を確認した。配布helper自体の変更は行わない。
 
 UIの実表示は、実データ・外部通信のない固定フォームを用意したが、ブラウザのorigin承認が拒否されたため未確認。別経路での観測は行わず、本人へAPI→ChatGPT→APIの切替と1440px／1024pxの表示確認を依頼した。回答まではAC-4の実表示を達成済みとしない。
+
+別コンテキストの独立検品で、`Response.Request`と`Response.Reply`がHopper/Triageの一覧に残るAC-4の回帰を確認した。追加したDB試験が修正前に両方のheads一覧で失敗した。Hopperの共通圧縮処理とTriageのheads・records・attemptsのSQLで、原応答に加えて送信本文・解析応答も除去した。固定記録では三つとも保持する。修正後はHopperのheads・history、Triageの三経路の検査を含む両DB suiteが成功した。修正差分を再検品へ回す。

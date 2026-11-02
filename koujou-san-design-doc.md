@@ -580,6 +580,8 @@ AstrLinkは、依存を含む配布条件を理由に今回の採用候補から
 
 ### 6.12 Hopperのサーバー処理とBifrost
 
+確定したChatGPTプラン接続は[ADR 0035](docs/adr/0035-server-chatgpt-plan.md)を参照する。サーバー専用のSign in with ChatGPT認証でResponses APIへ直接接続し、Hopper・Triageの共通モデル接続から選ぶ。この接続では出力token上限を設けず、入力サイズと時間を制限する。以下のGateway構成と既存接続の出力上限は維持する。
+
 Hopperの処理はGoのWorkerとして実装し、クライアントの起動状態に依存させない。WorkerとAPIを同じプロセスに置くかは配置上の選択とし、永続キュー・実行中の処理・再開位置をPostgreSQLで管理する。Runの結果が共有状態へ反映された時点で評価要求を残す方式を基本とする。
 
 サーバー側LLM Gatewayの第一候補にはBifrost（`maximhq/bifrost`）のOSS版を提案する。公式リポジトリのライセンスはApache 2.0であり、OpenAI互換のHTTP GatewayとGo SDKを提供している。Goバックエンドと接続しやすく、独立したサービスとして配置できる点が今回の用途に合う。初期の接続案はHTTPとし、ゲートウェイを交換できる境界を保つ。

@@ -30,6 +30,8 @@ func compactSemanticRecord(r Record) Record {
 		}
 		if attempt.Response != nil {
 			attempt.Response.Body = nil
+			attempt.Response.Request = nil
+			attempt.Response.Reply = nil
 		}
 		r.Value = raw(attempt)
 	default:

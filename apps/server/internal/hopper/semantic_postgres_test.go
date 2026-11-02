@@ -369,6 +369,29 @@ process.stdout.write([
 		if err := store.Database().QueryRow(ctx, `SELECT payload->'measurement'->>'protocol' FROM usage_records WHERE workspace_id='one' AND kind='usage' ORDER BY position DESC LIMIT 1`).Scan(&protocol); err != nil || protocol != "openai-responses" {
 			t.Fatal("plan measurement", protocol, err)
 		}
+		for _, mode := range []string{"heads", "history"} {
+			page, err := s.Query(ctx, p, "one", Request{Mode: mode, Kind: "model-attempt", Limit: 10})
+			if err != nil || len(page.Items) == 0 {
+				t.Fatal("plan attempt query", mode, err)
+			}
+			for _, item := range page.Items {
+				var compact modelAttempt
+				if json.Unmarshal(item.Value, &compact) != nil {
+					t.Fatal("invalid attempt metadata", mode)
+				}
+				if compact.Response == nil {
+					continue // The intent version predates the observed response.
+				}
+				if len(compact.Response.Request) != 0 || compact.Response.Reply != nil || len(compact.Response.Body) != 0 && string(compact.Response.Body) != "null" {
+					t.Fatal("attempt list returned model body", mode)
+				}
+				fixed, err := record(ctx, store.Database(), "one", item.Ref)
+				var full modelAttempt
+				if err != nil || json.Unmarshal(fixed.Value, &full) != nil || full.Response == nil || len(full.Response.Request) == 0 || full.Response.Reply == nil || len(full.Response.Body) == 0 {
+					t.Fatal("fixed attempt lost original transport", mode, err)
+				}
+			}
+		}
 		return
 	}
 	for _, scenario := range []string{"stopped", "depth", "evaluations", "period"} {

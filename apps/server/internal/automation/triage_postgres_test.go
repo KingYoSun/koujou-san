@@ -259,6 +259,32 @@ func testTriagePostgres(t *testing.T, plan bool) {
 				if err := store.Database().QueryRow(ctx, `SELECT payload->'measurement'->>'protocol' FROM usage_records WHERE workspace_id='one' AND kind='usage' ORDER BY position DESC LIMIT 1`).Scan(&protocol); err != nil || protocol != "openai-responses" {
 					t.Fatal("plan measurement", protocol, err)
 				}
+				for _, mode := range []string{"heads", "records", "attempts"} {
+					page, err := s.Query(ctx, p, "one", Request{Mode: mode, Kind: "model-attempt", Limit: 10})
+					if err != nil || page.Data == nil || len(page.Data.Items) == 0 {
+						t.Fatal("plan attempt query", mode, err)
+					}
+					for _, item := range page.Data.Items {
+						var compact struct {
+							Ref
+							Value TriageAttempt
+						}
+						if json.Unmarshal(item, &compact) != nil {
+							t.Fatal("invalid attempt metadata", mode)
+						}
+						if compact.Value.Response == nil {
+							continue // The intent version predates the observed response.
+						}
+						if len(compact.Value.Response.Request) != 0 || compact.Value.Response.Reply != nil || len(compact.Value.Response.Body) != 0 {
+							t.Fatal("attempt list returned model body", mode)
+						}
+						fixed, err := record(ctx, store.Database(), "one", compact.Ref)
+						var full TriageAttempt
+						if err != nil || json.Unmarshal(fixed.Value, &full) != nil || full.Response == nil || len(full.Response.Request) == 0 || full.Response.Reply == nil || len(full.Response.Body) == 0 {
+							t.Fatal("fixed attempt lost original transport", mode, err)
+						}
+					}
+				}
 				return
 			}
 			if auto && origin == "human" {
