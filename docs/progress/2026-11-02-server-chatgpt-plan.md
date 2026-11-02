@@ -36,4 +36,23 @@ Goの共通認証部品でSIWCのファイル保存・更新と管理コマン�
 
 ## 現在の状態
 
-実装中。出力上限についての本人判断を受領し、範囲を確定した。新しい製品判断が必要になった場合は、その判断に依存する変更を止める。
+独立検品中。実装本体は`749e26f`、追加の再認証・復元試験は`3ec7675`へ固定した。実accountへの認証・推論は未実施。
+
+| 条件 | 観測結果 |
+| --- | --- |
+| AC-1 | 所有RSA署名・JWKS・callback・token endpointで登録と再認証が成功。誤state・nonce・audience・subject・署名と利用scope欠落を拒否。専用Bearerによるモデル一覧で非表示モデルを除外 |
+| AC-2 | Windowsのprivateな一時credentialを使用。期限切れへの6並列要求でrefreshは1回。token回転後も接続revisionを維持し、account変更では旧revisionを拒否。公開メタデータに秘密値・path・他Workspaceの許可を含めない |
+| AC-3 | 所有SSE fixtureで完了・失敗・未完了・切断・時間切れ・許可外モデルを検査。送信本文、原stream、報告model・usageを保存。出力12345 tokenも従来の4096制限へ切り詰めず、追加要求やredirect先への転送なし |
+| AC-4 | 専用PostgreSQLのHopper/Triage試験で新接続から業務結果と利用量を保存。型検査・静的描画2件は成功。実表示は下記のとおり確認待ち |
+| AC-5 | Composeの資格情報用RW mountと通常設定RO mountを照合。設定の再生成で最新tokenを維持し、所有archiveからhost・client登録・回転済tokenを復元。既存snapshotがconfig配下を再帰収録する経路を確認 |
+
+実行結果:
+
+- `go test ./...`、`go vet ./...`、`go test -race ./internal/chatgptplan ./internal/serverllm ./internal/distribution -count=1`は成功。
+- `pnpm run test:hopper`、`pnpm run test:automation`は新しいChatGPT fixtureのDB試験を含め成功。
+- clientの`check`、対象`server-model.test.tsx`、rootの`build`・`format:check`、`cargo fmt --all -- --check`、Git管理対象Goファイルのgofmt、`git diff --check`は成功。
+- rootの`check`は、既存のGit管理外`apps/server/.cache/issue33-config/main.go`が未整形のため停止。そのファイルは変更せず、後続検査を個別実行した。
+- UI全体試験は未変更の`sync-store.test.ts`2件が5秒でtimeout。他32ファイル118件は成功。同期ストアの単独実行でも同じ2件がtimeout。対象変更の試験成功とは区別し、CIで全体結果を確認する。
+- Windowsのstandalone `pnpm.exe`をNodeとして起動する既存helperで最初のroot buildは失敗。同じ固定版`pnpm@10.16.1`のJS入口をGit管理外cacheに用意し、root buildの成功を確認した。配布helper自体の変更は行わない。
+
+UIの実表示は、実データ・外部通信のない固定フォームを用意したが、ブラウザのorigin承認が拒否されたため未確認。別経路での観測は行わず、本人へAPI→ChatGPT→APIの切替と1440px／1024pxの表示確認を依頼した。回答まではAC-4の実表示を達成済みとしない。
