@@ -35,14 +35,14 @@ func TestResponsesToolsKeepNamespacedCallsAndReasoningHistory(t *testing.T) {
 	var sent struct {
 		Input []json.RawMessage `json:"input"`
 		Tools []struct {
-			Type, Name string
-			Tools      []struct{ Type, Name string }
+			Type, Name, Description string
+			Tools                   []struct{ Type, Name string }
 		} `json:"tools"`
 		Include []string `json:"include"`
 		Store   bool     `json:"store"`
 		Stream  bool     `json:"stream"`
 	}
-	if json.Unmarshal(wire, &sent) != nil || len(sent.Input) != 5 || sent.Store || !sent.Stream || len(sent.Tools) != 1 || sent.Tools[0].Type != "namespace" || sent.Tools[0].Name != "koujou" || len(sent.Tools[0].Tools) != 1 || sent.Tools[0].Tools[0].Name != "context_search" || len(sent.Include) != 1 || sent.Include[0] != "reasoning.encrypted_content" {
+	if json.Unmarshal(wire, &sent) != nil || len(sent.Input) != 5 || sent.Store || !sent.Stream || len(sent.Tools) != 1 || sent.Tools[0].Type != "namespace" || sent.Tools[0].Name != "koujou" || sent.Tools[0].Description == "" || len(sent.Tools[0].Tools) != 1 || sent.Tools[0].Tools[0].Name != "context_search" || len(sent.Include) != 1 || sent.Include[0] != "reasoning.encrypted_content" {
 		t.Fatalf("wire: %s", wire)
 	}
 	for i, expected := range envelope.Output {

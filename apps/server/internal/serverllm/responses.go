@@ -102,7 +102,7 @@ func responsesRequest(body json.RawMessage) (json.RawMessage, error) {
 			}
 			tools = append(tools, map[string]any{"type": "function", "name": tool.Function.Name, "description": tool.Function.Description, "parameters": tool.Function.Parameters, "strict": false})
 		}
-		value["tools"] = []any{map[string]any{"type": "namespace", "name": "koujou", "tools": tools}}
+		value["tools"] = []any{map[string]any{"type": "namespace", "name": "koujou", "description": "Read-only tools for the current operation.", "tools": tools}}
 		value["include"] = []string{"reasoning.encrypted_content"}
 	}
 	if request.Format.Type != "" {
