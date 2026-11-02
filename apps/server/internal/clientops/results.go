@@ -32,6 +32,7 @@ func parseReply(b json.RawMessage, m Model, purpose ...string) (Reply, string) {
 }
 
 type Finish struct {
+	server *serverObservation
 	apicontract.Mutation
 	Client   string          `json:"client"`
 	Turn     Ref             `json:"turn"`
@@ -57,15 +58,27 @@ func (s *Service) Finish(ctx context.Context, p access.Principal, w, id string, 
 		if decode(intent.Value, &turn) != nil || turn.State != "intent" || turn.Client != req.Client {
 			return Record{}, access.ErrForbidden
 		}
+		if (turn.Model.ServerConnection != "") != (req.server != nil) {
+			return Record{}, access.ErrForbidden
+		}
+		if req.server != nil {
+			turn.ServerResponse, turn.ServerProtocol, turn.ServerDigest = &req.server.Ref, req.server.Protocol, req.server.Digest
+		}
 		turn.Response = req.Response
 		turn.Status = req.Status
 		turn.Failure = req.Failure
 		turn.State = "response"
 		result, reason := parseReply(req.Response, turn.Model, op.Purpose)
-		if req.Failure != "" {
+		if req.Failure != "" && (req.server == nil || (reason != "model_not_allowed" && reason != "tool_not_allowed")) {
 			reason = "model_connection_failed"
+			if req.server != nil {
+				reason = req.Failure
+			}
 		}
 		deps := unique(append(append([]Ref{}, old.Refs...), intent.Refs...))
+		if turn.ServerResponse != nil {
+			deps = unique(append(deps, *turn.ServerResponse))
+		}
 		observedRefs, err := s.mcpSources(ctx, tx, w, op.ReadOperation, nil, false)
 		if err != nil {
 			return Record{}, err
@@ -80,6 +93,12 @@ func (s *Service) Finish(ctx context.Context, p access.Principal, w, id string, 
 			return Record{}, err
 		}
 		policy, policyErr := s.currentPolicy(ctx, tx, p, w, op)
+		if req.server != nil && policyErr == nil {
+			_, policyErr = s.serverConnection(w, turn.Model)
+			if policyErr == nil {
+				policyErr = s.modelSources(ctx, tx, p, w, op, policy)
+			}
+		}
 		if policyErr == nil {
 			for _, budget := range budgets(policy, op.Model) {
 				cost, err := usage.ObserveCosts(ctx, tx, p, w, "operation", []string{id}, budget)
@@ -195,6 +214,14 @@ func (s *Service) observe(ctx context.Context, tx pgx.Tx, p access.Principal, w 
 		state = "provisional"
 	}
 	o := usage.Observation{Source: "client-model:" + p.UserID + "/" + turn.Model.Connection, Transform: "client-chat-v1", Event: intent.ID, Series: intent.ID, Mode: "delta", Group: intent.ID, Request: reply.ID, Covers: []string{}, Coverage: coverage, Connection: turn.Model.Connection, Contract: turn.Model.Contract, RequestedModel: turn.Model.Requested, ActualModel: actual, At: time.Now().UTC(), Attribution: usage.Attribution{Kind: "operation", ID: operation.ID, Resource: operation.ID, Scopes: []string{}}, Quantities: quantities, Measurement: &usage.Measurement{State: state, Protocol: "openai-chat-completions", Scope: "client_operation_request", Generation: intent.ID, Billing: "unknown", SourceRef: intent.ID, SourceDigest: hash(turn.Response)}}
+	if turn.ServerResponse != nil {
+		o.Transform = "client-server-v1"
+		o.Connection = turn.Model.ServerConnection
+		o.Measurement.SourceRef, o.Measurement.SourceDigest = turn.ServerResponse.ID, turn.ServerDigest
+		if turn.ServerProtocol != "" {
+			o.Measurement.Protocol = turn.ServerProtocol
+		}
+	}
 	deps := []usage.Ref{}
 	for _, r := range append(append([]Ref{}, intent.Refs...), intent.Ref) {
 		deps = append(deps, usage.Ref{ID: r.ID, Version: r.Version})

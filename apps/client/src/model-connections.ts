@@ -1,4 +1,5 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
+import { syncRequest } from "./auth";
 export type VersionRef = { id: string; version: string };
 export type ModelAuthPrompt = {
   url?: string;
@@ -34,6 +35,8 @@ export async function openModelAuthorization(native: boolean, url: string) {
   return invoke("model_connection_open_authorization", { url });
 }
 export type ModelProfile = {
+  server_connection?: string;
+  server_workspace?: string;
   id: string;
   name: string;
   endpoint: string;
@@ -49,8 +52,11 @@ export type ModelProfile = {
   cost?: { amount: string; currency: string; valuation: string } | null;
 };
 export function modelSnapshot(p: ModelProfile, workspace: string) {
+  if (p.server_connection && p.server_workspace !== workspace)
+    throw Error("server_model_workspace_changed");
   const prefix = workspace + "\0";
   return {
+    ...(p.server_connection ? { server_connection: p.server_connection } : {}),
     connection: p.id,
     revision: p.revision,
     endpoint: p.endpoint,
@@ -76,6 +82,7 @@ export function modelReady(
   actor: string,
   profile: ModelProfile,
 ) {
+  if (profile.server_connection) return !native;
   if (profile.auth === "oauth") return native && !!profile.credentials_saved;
   return (
     native ||
@@ -99,10 +106,50 @@ export function modelEndpoint(value: string) {
 export async function loadProfiles(
   native: boolean,
   actor: string,
+  workspace?: string,
 ): Promise<ModelProfile[]> {
   if (native) return invoke("model_connection_load");
   const value = localStorage.getItem(`koujou-model-profiles:${actor}`);
-  return value ? (JSON.parse(value) as ModelProfile[]) : [];
+  const saved = value ? (JSON.parse(value) as ModelProfile[]) : [];
+  const direct = saved.filter((p) => !p.server_connection);
+  if (!workspace) return direct;
+  const connections = (await syncRequest(
+    `/hopper/workspaces/${encodeURIComponent(workspace)}/model-connections`,
+    false,
+    { method: "GET" },
+  )) as {
+    id: string;
+    name: string;
+    revision: string;
+    models: { requested: string; allowed_actual: string[] }[];
+  }[];
+  const server = connections.flatMap((c) =>
+    c.models.map((m): ModelProfile => {
+      const id = `server:${c.id}:${m.requested}`;
+      const old = saved.find(
+        (p) =>
+          p.id === id &&
+          p.revision === c.revision &&
+          p.server_workspace === workspace,
+      );
+      return {
+        id,
+        name: c.name,
+        endpoint: actor.split("\0")[0],
+        model: m.requested,
+        allowed_models: m.allowed_actual,
+        auth: "none",
+        server_connection: c.id,
+        server_workspace: workspace,
+        revision: c.revision,
+        contract: old?.contract ?? "",
+        prices: old?.prices ?? {},
+        valuation: old?.valuation ?? "estimated",
+        cost: old?.cost ?? null,
+      };
+    }),
+  );
+  return [...direct, ...server];
 }
 export async function saveProfile(
   native: boolean,
@@ -111,6 +158,8 @@ export async function saveProfile(
   key: string,
 ) {
   modelEndpoint(profile.endpoint);
+  if (profile.server_connection && native)
+    throw Error("web_server_model_required");
   if (native)
     return invoke<ModelProfile>("model_connection_save", { profile, key });
   if (
@@ -118,7 +167,8 @@ export async function saveProfile(
     (profile.provider && profile.provider !== "compatible")
   )
     throw new Error("native_model_auth_required");
-  const profiles = await loadProfiles(false, actor);
+  const stored = localStorage.getItem(`koujou-model-profiles:${actor}`);
+  const profiles: ModelProfile[] = stored ? JSON.parse(stored) : [];
   const old = profiles.find((p) => p.id === profile.id);
   if (profile.auth === "bearer") {
     if (key)
@@ -133,7 +183,12 @@ export async function saveProfile(
     )
       throw new Error("model_key_required");
   } else keys.delete(memoryKey(actor, profile.id));
-  const saved = { ...profile, revision: crypto.randomUUID() };
+  const saved = {
+    ...profile,
+    revision: profile.server_connection
+      ? profile.revision
+      : crypto.randomUUID(),
+  };
   localStorage.setItem(
     `koujou-model-profiles:${actor}`,
     JSON.stringify([...profiles.filter((p) => p.id !== profile.id), saved]),
@@ -148,6 +203,8 @@ export async function modelRequest(
   body: unknown,
   timeout_ms: number,
 ): Promise<ModelHTTP> {
+  if (profile.server_connection)
+    throw Error("server_operation_transport_required");
   const input = body as { model?: unknown; stream?: unknown } | null;
   if (
     !input ||

@@ -13,8 +13,10 @@ type Reply struct {
 	Model   string `json:"model"`
 	Choices []struct {
 		Message struct {
-			Content *string `json:"content"`
-			Calls   []struct {
+			Role         string          `json:"role,omitempty"`
+			ServerOutput json.RawMessage `json:"server_output,omitempty"`
+			Content      *string         `json:"content"`
+			Calls        []struct {
 				ID       string `json:"id"`
 				Type     string `json:"type"`
 				Function struct {

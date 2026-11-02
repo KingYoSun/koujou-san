@@ -160,6 +160,39 @@ function fixture(
   };
 }
 describe("client selection Host", () => {
+  it("reads the server-saved result without a second browser finish", async () => {
+    const f = fixture();
+    const serverProfile = {
+      ...profile,
+      server_connection: "owned-server",
+      server_workspace: "one",
+    };
+    const original = f.model.getMockImplementation()!;
+    f.model.mockImplementation(async () => {
+      const response = await original();
+      await f.write(
+        f.start.id,
+        "finish",
+        "sending",
+        { response: response.body },
+        "server-only-finish",
+      );
+      return response;
+    });
+    const result = await runSelection(
+      f.start,
+      policy,
+      serverProfile,
+      "client",
+      f.port,
+      () => {},
+    );
+    expect(result.value.state).toBe("applied");
+    expect(f.model).toHaveBeenCalledTimes(1);
+    const finished = f.write.mock.calls.filter((args) => args[1] === "finish");
+    expect(finished).toHaveLength(1);
+    expect(finished[0][4]).toBe("server-only-finish");
+  });
   it("uses only selected conversation versions and one request across lost acknowledgements", async () => {
     const f = fixture(true, true, false, "chat");
     const selected = { id: "chat-message:selected", version: "fixed-message" };
@@ -397,100 +430,123 @@ describe("client selection Host", () => {
       exclude: [],
     });
   });
-  it("uses stateless MCP metadata and continues a normal authorized search page", async () => {
-    const f = fixture();
-    f.rpc.mockImplementation(
-      async (wire: { method: string; params: Record<string, unknown> }) => {
-        expect(wire.params._meta).toEqual({
-          "io.modelcontextprotocol/protocolVersion": "2026-07-28",
-          "io.modelcontextprotocol/clientInfo": {
-            name: "koujou-san-client",
-            version: "1",
-          },
-          "io.modelcontextprotocol/clientCapabilities": {},
-        });
-        if (wire.method === "server/discover")
-          return { status: 200, body: { result: {} } };
-        if (wire.method === "tools/list")
+  it.each([false, true])(
+    "uses stateless MCP metadata and continues a normal authorized search page (server=%s)",
+    async (server) => {
+      const f = fixture();
+      if (server) {
+        const model = f.port.model;
+        f.port.model = async (body, timeout) => {
+          const response = await model(body, timeout);
+          await f.write(
+            f.start.id,
+            "finish",
+            "sending",
+            { response: response.body },
+            "server-only-finish",
+          );
+          return response;
+        };
+      }
+      f.rpc.mockImplementation(
+        async (wire: { method: string; params: Record<string, unknown> }) => {
+          expect(wire.params._meta).toEqual({
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientInfo": {
+              name: "koujou-san-client",
+              version: "1",
+            },
+            "io.modelcontextprotocol/clientCapabilities": {},
+          });
+          if (wire.method === "server/discover")
+            return { status: 200, body: { result: {} } };
+          if (wire.method === "tools/list")
+            return {
+              status: 200,
+              body: {
+                result: {
+                  tools: [
+                    "context_search",
+                    "context_get",
+                    "context_graph",
+                    "context_resolve",
+                  ].map((name) => ({ name, inputSchema: { type: "object" } })),
+                },
+              },
+            };
           return {
             status: 200,
             body: {
               result: {
-                tools: [
-                  "context_search",
-                  "context_get",
-                  "context_graph",
-                  "context_resolve",
-                ].map((name) => ({ name, inputSchema: { type: "object" } })),
+                content: [
+                  {
+                    type: "text",
+                    text: JSON.stringify({
+                      data: { items: [] },
+                      meta: {
+                        next_cursor: "owned-page",
+                        completeness: {
+                          state: "partial",
+                          reason: "limit_reached",
+                        },
+                      },
+                    }),
+                  },
+                ],
               },
             },
           };
-        return {
-          status: 200,
-          body: {
-            result: {
-              content: [
-                {
-                  type: "text",
-                  text: JSON.stringify({
-                    data: { items: [] },
-                    meta: {
-                      next_cursor: "owned-page",
-                      completeness: {
-                        state: "partial",
-                        reason: "limit_reached",
-                      },
+        },
+      );
+      f.model.mockResolvedValueOnce({
+        status: 200,
+        body: {
+          model: "fixed",
+          choices: [
+            {
+              message: {
+                role: "assistant",
+                content: null,
+                tool_calls: [
+                  {
+                    id: "search",
+                    type: "function",
+                    function: {
+                      name: "context_search",
+                      arguments: '{"limit":2}',
                     },
-                  }),
-                },
-              ],
-            },
-          },
-        };
-      },
-    );
-    f.model.mockResolvedValueOnce({
-      status: 200,
-      body: {
-        model: "fixed",
-        choices: [
-          {
-            message: {
-              role: "assistant",
-              content: null,
-              tool_calls: [
-                {
-                  id: "search",
-                  type: "function",
-                  function: {
-                    name: "context_search",
-                    arguments: '{"limit":2}',
                   },
-                },
-              ],
+                ],
+              },
+              finish_reason: "tool_calls",
             },
-            finish_reason: "tool_calls",
-          },
-        ],
-        usage: { prompt_tokens: 1, completion_tokens: 1 },
-      },
-    });
-    const result = await runSelection(
-      f.start,
-      { ...policy, fixed: { mode: "select" } },
-      profile,
-      "client",
-      f.port,
-      () => {},
-    );
-    expect(result.value.state).toBe("applied");
-    expect(f.model).toHaveBeenCalledTimes(2);
-    expect(f.rpc.mock.calls.map((c) => c[0].method)).toEqual([
-      "server/discover",
-      "tools/list",
-      "tools/call",
-    ]);
-  });
+          ],
+          usage: { prompt_tokens: 1, completion_tokens: 1 },
+        },
+      });
+      const result = await runSelection(
+        f.start,
+        { ...policy, fixed: { mode: "select" } },
+        server
+          ? {
+              ...profile,
+              server_connection: "owned-server",
+              server_workspace: "one",
+            }
+          : profile,
+        "client",
+        f.port,
+        () => {},
+      );
+      expect(result.value.state).toBe("applied");
+      expect(f.model).toHaveBeenCalledTimes(2);
+      expect(f.rpc.mock.calls.map((c) => c[0].method)).toEqual([
+        "server/discover",
+        "tools/list",
+        "tools/call",
+      ]);
+    },
+  );
   it("sends only the explicit goal and positive fixed refs, without hidden cache or exclusions", () => {
     const f = fixture();
     const op = { ...f.start.value, implementation_dialogue: "FORBIDDEN_IMPL" };

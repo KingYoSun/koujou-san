@@ -5,7 +5,7 @@ import {
   type ModelProfile,
   type VersionRef,
 } from "./model-connections";
-import type { HostPort, Saved } from "./client-selection-host";
+import type { HostPort, Saved, ClientOperation } from "./client-selection-host";
 
 export const operationClientID = crypto.randomUUID();
 export type OperationAddress = {
@@ -72,8 +72,27 @@ export function operationPort(
       ).handle;
       return mcpRequest(native, workspace, handle, body, operationClientID);
     },
-    model: (body, timeout) => {
+    model: async (body, timeout) => {
       if (!active()) throw Error("operation_scope_changed");
+      if (profile.server_connection) {
+        if (native || profile.server_workspace !== workspace)
+          throw Error("operation_scope_changed");
+        const current = await call<Saved<ClientOperation>>(
+          `/records/${encodeURIComponent(operation.id)}?version=head`,
+        );
+        if (!active()) throw Error("operation_scope_changed");
+        if (
+          current.value.model.connection !== profile.id ||
+          current.value.model.revision !== profile.revision ||
+          current.value.model.server_connection !== profile.server_connection
+        )
+          throw Error("model_connection_changed");
+        return call(`/operations/${encodeURIComponent(operation.id)}/model`, {
+          client: operationClientID,
+          turn: current.value.turn,
+          body,
+        });
+      }
       return modelRequest(native, api + "\0" + user, profile, body, timeout);
     },
   };

@@ -51,7 +51,11 @@ export function useContextGenerationWorker(
             );
           return;
         }
-        const profiles = await loadProfiles(ui.native, ui.api + "\0" + ui.user);
+        const profiles = await loadProfiles(
+          ui.native,
+          ui.api + "\0" + ui.user,
+          op.value.model.server_connection ? ui.workspace : undefined,
+        );
         const profile = profiles.find(
           (p) =>
             p.id === op.value.model.connection &&

@@ -42,6 +42,7 @@ func (s *Service) Register(mux *http.ServeMux) {
 	root := "/client-operations/workspaces/{workspace}"
 	s.registerGeneration(mux)
 	s.registerChat(mux)
+	s.registerServerModels(mux)
 	mux.HandleFunc("GET "+root+"/origins/{id}", func(w http.ResponseWriter, r *http.Request) {
 		p, ok := s.user(w, r)
 		if !ok {

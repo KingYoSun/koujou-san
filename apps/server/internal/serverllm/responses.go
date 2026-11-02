@@ -24,10 +24,27 @@ func RequestBytes(spec *Spec, body json.RawMessage) (int, error) {
 
 func responsesRequest(body json.RawMessage) (json.RawMessage, error) {
 	var request struct {
-		Model     string                           `json:"model"`
-		Messages  []struct{ Role, Content string } `json:"messages"`
-		MaxTokens int                              `json:"max_completion_tokens"`
-		Fallbacks []string                         `json:"fallbacks"`
+		Model    string `json:"model"`
+		Messages []struct {
+			Role         string            `json:"role"`
+			Content      *string           `json:"content"`
+			CallID       string            `json:"tool_call_id"`
+			ServerOutput []json.RawMessage `json:"server_output"`
+			Calls        []struct {
+				ID       string                           `json:"id"`
+				Type     string                           `json:"type"`
+				Function struct{ Name, Arguments string } `json:"function"`
+			} `json:"tool_calls"`
+		} `json:"messages"`
+		Tools []struct {
+			Type     string `json:"type"`
+			Function struct {
+				Name, Description string
+				Parameters        json.RawMessage `json:"parameters"`
+			} `json:"function"`
+		} `json:"tools"`
+		MaxTokens int      `json:"max_completion_tokens"`
+		Fallbacks []string `json:"fallbacks"`
 		Format    struct {
 			Type   string `json:"type"`
 			Schema struct {
@@ -42,16 +59,52 @@ func responsesRequest(body json.RawMessage) (json.RawMessage, error) {
 	}
 	input := []any{}
 	for _, message := range request.Messages {
+		if message.Role == "tool" {
+			if message.CallID == "" || message.Content == nil {
+				return nil, ErrUnavailable
+			}
+			input = append(input, map[string]any{"type": "function_call_output", "call_id": message.CallID, "output": *message.Content})
+			continue
+		}
+		if message.Role == "assistant" && len(message.ServerOutput) > 0 {
+			for _, output := range message.ServerOutput {
+				var item struct{ Type string }
+				if json.Unmarshal(output, &item) != nil || (item.Type != "reasoning" && item.Type != "message" && item.Type != "function_call") {
+					return nil, ErrUnavailable
+				}
+				input = append(input, output)
+			}
+			continue
+		}
 		role := message.Role
 		if role == "system" {
 			role = "developer"
 		}
-		if role != "developer" && role != "user" {
+		if role != "developer" && role != "user" && role != "assistant" {
 			return nil, ErrUnavailable
 		}
-		input = append(input, map[string]string{"role": role, "content": message.Content})
+		if message.Content != nil {
+			input = append(input, map[string]string{"role": role, "content": *message.Content})
+		}
+		for _, call := range message.Calls {
+			if role != "assistant" || call.Type != "function" || call.ID == "" || call.Function.Name == "" || !json.Valid([]byte(call.Function.Arguments)) {
+				return nil, ErrUnavailable
+			}
+			input = append(input, map[string]any{"type": "function_call", "call_id": call.ID, "name": call.Function.Name, "namespace": "koujou", "arguments": call.Function.Arguments})
+		}
 	}
 	value := map[string]any{"model": request.Model, "input": input, "store": false, "stream": true}
+	if len(request.Tools) > 0 {
+		tools := []any{}
+		for _, tool := range request.Tools {
+			if tool.Type != "function" || tool.Function.Name == "" || !json.Valid(tool.Function.Parameters) {
+				return nil, ErrUnavailable
+			}
+			tools = append(tools, map[string]any{"type": "function", "name": tool.Function.Name, "description": tool.Function.Description, "parameters": tool.Function.Parameters, "strict": false})
+		}
+		value["tools"] = []any{map[string]any{"type": "namespace", "name": "koujou", "tools": tools}}
+		value["include"] = []string{"reasoning.encrypted_content"}
+	}
 	if request.Format.Type != "" {
 		if request.Format.Type != "json_schema" || request.Format.Schema.Name == "" || !json.Valid(request.Format.Schema.Schema) {
 			return nil, ErrUnavailable
@@ -63,11 +116,8 @@ func responsesRequest(body json.RawMessage) (json.RawMessage, error) {
 
 type responseEnvelope struct {
 	ID, Model, Status string
-	Output            []struct {
-		Type, Role string
-		Content    []struct{ Type, Text string }
-	}
-	Usage struct {
+	Output            []json.RawMessage
+	Usage             struct {
 		Input        *uint64 `json:"input_tokens"`
 		Output       *uint64 `json:"output_tokens"`
 		InputDetails struct {
@@ -81,9 +131,27 @@ type responseEnvelope struct {
 
 func (e responseEnvelope) parsed() (*modelreply.Reply, string) {
 	var text strings.Builder
+	calls := []any{}
 	reason := ""
-	for _, item := range e.Output {
+	for _, output := range e.Output {
+		var item struct {
+			Type, Role, Name, Namespace, Arguments string
+			CallID                                 string `json:"call_id"`
+			Content                                []struct{ Type, Text string }
+		}
+		if json.Unmarshal(output, &item) != nil {
+			reason = "invalid_model_response"
+			continue
+		}
 		if item.Type == "reasoning" {
+			continue
+		}
+		if item.Type == "function_call" {
+			if item.CallID == "" || item.Name == "" || (item.Namespace != "" && item.Namespace != "koujou") || !json.Valid([]byte(item.Arguments)) {
+				reason = "invalid_model_response"
+				continue
+			}
+			calls = append(calls, map[string]any{"id": item.CallID, "type": "function", "function": map[string]string{"name": item.Name, "arguments": item.Arguments}})
 			continue
 		}
 		if item.Type != "message" || item.Role != "assistant" {
@@ -99,10 +167,15 @@ func (e responseEnvelope) parsed() (*modelreply.Reply, string) {
 		}
 	}
 	finish := "stop"
+	message := map[string]any{"role": "assistant", "content": text.String()}
+	if len(calls) > 0 {
+		finish = "tool_calls"
+		message["tool_calls"], message["server_output"] = calls, e.Output
+	}
 	if e.Status != "completed" {
 		finish = "length"
 	}
-	value := map[string]any{"id": e.ID, "model": e.Model, "choices": []any{map[string]any{"message": map[string]string{"content": text.String()}, "finish_reason": finish}}, "usage": map[string]any{"prompt_tokens": e.Usage.Input, "completion_tokens": e.Usage.Output, "prompt_tokens_details": map[string]any{"cached_tokens": e.Usage.InputDetails.Cached}, "completion_tokens_details": map[string]any{"reasoning_tokens": e.Usage.OutputDetails.Reasoning}}}
+	value := map[string]any{"id": e.ID, "model": e.Model, "choices": []any{map[string]any{"message": message, "finish_reason": finish}}, "usage": map[string]any{"prompt_tokens": e.Usage.Input, "completion_tokens": e.Usage.Output, "prompt_tokens_details": map[string]any{"cached_tokens": e.Usage.InputDetails.Cached}, "completion_tokens_details": map[string]any{"reasoning_tokens": e.Usage.OutputDetails.Reasoning}}}
 	b, _ := json.Marshal(value)
 	var reply modelreply.Reply
 	_ = json.Unmarshal(b, &reply)
@@ -185,12 +258,14 @@ func (p Connection) responses(ctx context.Context, body json.RawMessage, request
 			}
 			switch event.Type {
 			case "response.completed", "response.failed", "response.incomplete":
+				result.Terminal = event.Type
 				result.Reply, result.Error = event.Response.parsed()
 				terminal = true
 				if event.Type != "response.completed" || event.Response.Status != "completed" {
 					result.Error = "incomplete_model_response"
 				}
 			case "error":
+				result.Terminal = event.Type
 				result.Error = "model_request_failed"
 				terminal = true
 			}

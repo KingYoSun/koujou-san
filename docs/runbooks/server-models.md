@@ -33,6 +33,8 @@ ssh -L 14557:127.0.0.1:14557 USER@SERVER
 
 ## ChatGPT接続の登録
 
+登録済みの接続は、Webの「設定 → クライアントLLM接続」からも取得・選択できる。Projectチャット、Context選択等のモデル要求をサーバーが中継し、資格情報はブラウザへ返さない。使い方は[クライアント接続](client-context-selection.md)、契約は[ADR 0036](../adr/0036-web-server-models.md)を参照する。登録・ログインは下記の運用者設定を用いる。
+
 `KOUJOU_SERVER_LLM_CONFIG`の接続一覧へ追加する。要求モデル名は`model-models`が返す現在のaccountのslugから選び、許可する実モデル名も明示する。モデル名をSDKの例だけで決めない。
 
 ```json

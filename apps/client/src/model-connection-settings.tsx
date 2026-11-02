@@ -43,20 +43,47 @@ export function ModelConnectionSettings({
   selectionOnly?: boolean;
 }) {
   const [profiles, setProfiles] = useState<ModelProfile[]>([]),
-    [draft, setDraft] = useState<ModelProfile>(fresh),
+    [draft, setDraft] = useState<ModelProfile>(() =>
+      selected?.server_connection ? selected : fresh(),
+    ),
     [secret, setSecret] = useState(""),
-    [allowed, setAllowed] = useState(""),
+    [allowed, setAllowed] = useState(
+      selected?.server_connection ? selected.allowed_models.join("\n") : "",
+    ),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
   const [prompt, setPrompt] = useState<ModelAuthPrompt>();
+  const [reload, setReload] = useState(0);
   const [priceModel, setPriceModel] = useState(""),
     [priceID, setPriceID] = useState(""),
     [priceVersion, setPriceVersion] = useState("");
   useEffect(() => {
-    void loadProfiles(native, actor)
-      .then(setProfiles)
-      .catch(() => setNotice("接続設定を取得できませんでした。"));
-  }, [native, actor]);
+    let active = true;
+    setProfiles((current) =>
+      current.filter(
+        (p) => !p.server_connection || p.server_workspace === workspace,
+      ),
+    );
+    void loadProfiles(native, actor, workspace)
+      .then((profiles) => {
+        if (active) setProfiles(profiles);
+      })
+      .catch(() => {
+        if (!active) return;
+        setNotice(
+          native
+            ? "接続設定を取得できませんでした。"
+            : "サーバー接続を取得できませんでした。",
+        );
+        if (native) return;
+        void loadProfiles(native, actor).then((profiles) => {
+          if (active) setProfiles(profiles);
+        });
+      });
+    return () => {
+      active = false;
+    };
+  }, [native, actor, workspace, reload]);
   function edit(p: ModelProfile) {
     setPrompt(undefined);
     setDraft(p);
@@ -89,7 +116,7 @@ export function ModelConnectionSettings({
       );
       setSecret("");
       setDraft(result);
-      setProfiles(await loadProfiles(native, actor));
+      setProfiles(await loadProfiles(native, actor, workspace));
       onSelected(result);
       setNotice("接続設定を保存しました。");
     } catch {
@@ -122,7 +149,7 @@ export function ModelConnectionSettings({
             : "端末の認証情報を削除しました。提供元側の失効は確認できていません。",
         );
       }
-      setProfiles(await loadProfiles(native, actor));
+      setProfiles(await loadProfiles(native, actor, workspace));
       setPrompt(undefined);
     } catch {
       setNotice(
@@ -149,6 +176,7 @@ export function ModelConnectionSettings({
         <option value="">未選択</option>
         {profiles.map((p) => (
           <option key={p.id} value={p.id}>
+            {p.server_connection ? "サーバー · " : ""}
             {p.name} · {p.model}
             {modelReady(native, actor, p)
               ? ""
@@ -160,11 +188,24 @@ export function ModelConnectionSettings({
       </select>
     </label>
   );
+  const reloadButton = !native && (
+    <button
+      data-variant="secondary"
+      disabled={busy}
+      onClick={() => {
+        setNotice("");
+        setReload((n) => n + 1);
+      }}
+    >
+      サーバー接続を再取得
+    </button>
+  );
   if (selectionOnly)
     return (
       <>
         <div className="model-selector">
           {selector}
+          {reloadButton}
           <NavigationLink to={{ workspace, screen: "models" }} related>
             クライアントLLM接続を設定
           </NavigationLink>
@@ -176,6 +217,7 @@ export function ModelConnectionSettings({
     <ScreenContent>
       <section className="workspace-management">
         {selector}
+        {reloadButton}
         <button
           data-variant="secondary"
           disabled={busy}
@@ -188,100 +230,117 @@ export function ModelConnectionSettings({
         </button>
         <fieldset disabled={busy}>
           <legend>接続の設定</legend>
-          {native && (
-            <label>
-              接続先の種類
-              <select
-                value={draft.provider ?? "compatible"}
-                onChange={(e) => {
-                  const provider = e.target.value as NonNullable<
-                    ModelProfile["provider"]
-                  >;
-                  setDraft({
-                    ...draft,
-                    provider,
-                    auth: provider === "compatible" ? "bearer" : "oauth",
-                    endpoint:
-                      provider === "chatgpt"
-                        ? "https://chatgpt.com/backend-api/codex"
-                        : provider === "copilot"
-                          ? "https://api.githubcopilot.com"
-                          : "https://api.openai.com/v1",
-                    model: "",
-                    credentials_saved: false,
-                  });
-                  setAllowed("");
-                  setSecret("");
-                  setPrompt(undefined);
-                }}
-              >
-                <option value="compatible">
-                  APIキー・互換API・ローカルAPI
-                </option>
-                <option value="chatgpt">ChatGPTログイン</option>
-                <option value="copilot">GitHub Copilotログイン</option>
-              </select>
-            </label>
-          )}
-          <Field
-            label="接続名"
-            value={draft.name}
-            onChange={(name) => setDraft({ ...draft, name })}
-            required
-          />
-          <label>
-            接続先URL（必須）
-            <input
-              value={draft.endpoint}
-              required
-              readOnly={
-                native &&
-                draft.provider !== undefined &&
-                draft.provider !== "compatible"
-              }
-              onChange={(e) => setDraft({ ...draft, endpoint: e.target.value })}
-            />
-          </label>
-          <Field
-            label="要求するモデル名"
-            value={draft.model}
-            onChange={(model) => setDraft({ ...draft, model })}
-            required
-          />
-          <Field
-            label="応答で確認する実モデル名"
-            value={allowed}
-            onChange={setAllowed}
-            rows={3}
-            required
-          />
-          {draft.auth !== "oauth" && (
-            <label>
-              認証方法
-              <select
-                value={draft.auth}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    auth: e.target.value as ModelProfile["auth"],
-                  })
-                }
-              >
-                <option value="bearer">接続用キー</option>
-                <option value="none">認証なしのローカル接続</option>
-              </select>
-            </label>
-          )}
-          {draft.auth === "bearer" && (
-            <label>
-              接続用キー
-              <input
-                type="password"
-                autoComplete="off"
-                value={secret}
-                onChange={(e) => setSecret(e.target.value)}
+          {draft.server_connection ? (
+            <dl>
+              <dt>接続先</dt>
+              <dd>サーバー</dd>
+              <dt>接続名</dt>
+              <dd>{draft.name}</dd>
+              <dt>要求モデル</dt>
+              <dd>{draft.model}</dd>
+              <dt>許可された実モデル</dt>
+              <dd>{draft.allowed_models.join("、")}</dd>
+            </dl>
+          ) : (
+            <>
+              {native && (
+                <label>
+                  接続先の種類
+                  <select
+                    value={draft.provider ?? "compatible"}
+                    onChange={(e) => {
+                      const provider = e.target.value as NonNullable<
+                        ModelProfile["provider"]
+                      >;
+                      setDraft({
+                        ...draft,
+                        provider,
+                        auth: provider === "compatible" ? "bearer" : "oauth",
+                        endpoint:
+                          provider === "chatgpt"
+                            ? "https://chatgpt.com/backend-api/codex"
+                            : provider === "copilot"
+                              ? "https://api.githubcopilot.com"
+                              : "https://api.openai.com/v1",
+                        model: "",
+                        credentials_saved: false,
+                      });
+                      setAllowed("");
+                      setSecret("");
+                      setPrompt(undefined);
+                    }}
+                  >
+                    <option value="compatible">
+                      APIキー・互換API・ローカルAPI
+                    </option>
+                    <option value="chatgpt">ChatGPTログイン</option>
+                    <option value="copilot">GitHub Copilotログイン</option>
+                  </select>
+                </label>
+              )}
+              <Field
+                label="接続名"
+                value={draft.name}
+                onChange={(name) => setDraft({ ...draft, name })}
+                required
               />
-            </label>
+              <label>
+                接続先URL（必須）
+                <input
+                  value={draft.endpoint}
+                  required
+                  readOnly={
+                    native &&
+                    draft.provider !== undefined &&
+                    draft.provider !== "compatible"
+                  }
+                  onChange={(e) =>
+                    setDraft({ ...draft, endpoint: e.target.value })
+                  }
+                />
+              </label>
+              <Field
+                label="要求するモデル名"
+                value={draft.model}
+                onChange={(model) => setDraft({ ...draft, model })}
+                required
+              />
+              <Field
+                label="応答で確認する実モデル名"
+                value={allowed}
+                onChange={setAllowed}
+                rows={3}
+                required
+              />
+              {draft.auth !== "oauth" && (
+                <label>
+                  認証方法
+                  <select
+                    value={draft.auth}
+                    onChange={(e) =>
+                      setDraft({
+                        ...draft,
+                        auth: e.target.value as ModelProfile["auth"],
+                      })
+                    }
+                  >
+                    <option value="bearer">接続用キー</option>
+                    <option value="none">認証なしのローカル接続</option>
+                  </select>
+                </label>
+              )}
+              {draft.auth === "bearer" && (
+                <label>
+                  接続用キー
+                  <input
+                    type="password"
+                    autoComplete="off"
+                    value={secret}
+                    onChange={(e) => setSecret(e.target.value)}
+                  />
+                </label>
+              )}
+            </>
           )}
           <Disclosure title="個別契約単価と費用上限">
             {() => (
@@ -352,7 +411,7 @@ export function ModelConnectionSettings({
             }
             onClick={() => void save()}
           >
-            LLM接続を保存
+            {draft.server_connection ? "利用設定を保存" : "LLM接続を保存"}
           </button>
         </fieldset>
         {native && draft.auth === "oauth" && (
