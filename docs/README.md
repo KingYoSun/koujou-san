@@ -21,6 +21,8 @@ Contextの自動選択とモデル接続は[選択・保存・中断再開](runb
 
 サーバーLLMによるHopper・Triageの意味判断、ChatGPTプラン接続と任意Bifrostは[サーバーモデル接続](runbooks/server-models.md)、契約は[ADR 0027](adr/0027-server-hopper-semantics.md)と[ADR 0035](adr/0035-server-chatgpt-plan.md)を参照する。
 
+Webのクライアント操作で登録済みサーバー接続を使う場合は[クライアント接続](runbooks/client-context-selection.md)、契約は[ADR 0036](adr/0036-web-server-models.md)を参照する。
+
 設計書第14章の段階A〜Dは開発の順序を示す。環境が起動するだけで、段階Aや初期リリースの受入条件を達成したとは扱わない。
 
 ## 記録の置き場所
