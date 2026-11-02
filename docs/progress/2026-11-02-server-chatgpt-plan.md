@@ -36,7 +36,7 @@ Goの共通認証部品でSIWCのファイル保存・更新と管理コマン�
 
 ## 現在の状態
 
-独立検品中。実装本体は`749e26f`、追加の再認証・復元試験は`3ec7675`へ固定した。実accountへの認証・推論は未実施。
+実装と独立検品を終え、対象フォームの実表示と[PR #90](https://github.com/KingYoSun/koujou-san/pull/90)のCIを確認している。実装本体は`749e26f`、追加の再認証・復元試験は`3ec7675`、一覧への本文混入の修正は`2b128e5`へ固定した。実accountへの認証・推論は未実施。実表示が未確認のため、PRはdraftを維持する。
 
 | 条件 | 観測結果 |
 | --- | --- |
@@ -57,4 +57,6 @@ Goの共通認証部品でSIWCのファイル保存・更新と管理コマン�
 
 UIの実表示は、実データ・外部通信のない固定フォームを用意したが、ブラウザのorigin承認が拒否されたため未確認。別経路での観測は行わず、本人へAPI→ChatGPT→APIの切替と1440px／1024pxの表示確認を依頼した。回答まではAC-4の実表示を達成済みとしない。
 
-別コンテキストの独立検品で、`Response.Request`と`Response.Reply`がHopper/Triageの一覧に残るAC-4の回帰を確認した。追加したDB試験が修正前に両方のheads一覧で失敗した。Hopperの共通圧縮処理とTriageのheads・records・attemptsのSQLで、原応答に加えて送信本文・解析応答も除去した。固定記録では三つとも保持する。修正後はHopperのheads・history、Triageの三経路の検査を含む両DB suiteが成功した。修正差分を再検品へ回す。
+別コンテキストの独立検品で、`Response.Request`と`Response.Reply`がHopper/Triageの一覧に残るAC-4の回帰を確認した。追加したDB試験が修正前に両方のheads一覧で失敗した。Hopperの共通圧縮処理とTriageのheads・records・attemptsのSQLで、原応答に加えて送信本文・解析応答も除去した。固定記録では三つとも保持する。修正後はHopperのheads・history、Triageの三経路の検査を含む両DB suiteが成功した。
+
+独立検品者`chatgpt_plan_audit`は、会話履歴を継承しないコンテキストで`749e26f`と`3ec7675`を検品し、上記1件をblockerとした。`2b128e5`の差分再検品で解消を確認し、追加blockerはなしと判定した。AC-1/2/3/5はPASS、AC-4は実装・回帰修正PASS、実表示を含む条件全体はINCONCLUSIVE。CI成功やfixture成功を実表示・本人認証の代わりにはしない。
