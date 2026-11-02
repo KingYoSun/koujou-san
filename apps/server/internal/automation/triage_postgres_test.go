@@ -18,6 +18,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/modeltest"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/serverllm"
@@ -26,12 +27,23 @@ import (
 )
 
 func TestTriagePostgres(t *testing.T) {
+	testTriagePostgres(t, false)
+}
+
+func TestTriageChatGPTPostgres(t *testing.T) {
+	testTriagePostgres(t, true)
+}
+
+func testTriagePostgres(t *testing.T, plan bool) {
 	dsn := os.Getenv("KOUJOU_TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("run pnpm run test:automation")
 	}
 	ctx := context.Background()
 	liveConfig := os.Getenv("KOUJOU_TEST_TRIAGE_LIVE_CONFIG")
+	if plan && liveConfig != "" {
+		t.Skip("owned plan fixture is separate from real provider tests")
+	}
 	admin, err := pgx.Connect(ctx, dsn)
 	if err != nil {
 		t.Fatal(err)
@@ -89,14 +101,19 @@ func TestTriagePostgres(t *testing.T) {
 	responseMode.Store("")
 	model := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
-		if r.URL.Path != "/v1/chat/completions" || r.Header.Get("x-bf-vk") != "owned-triage" || r.Header.Get("Authorization") != "" {
+		if (!plan && (r.URL.Path != "/v1/chat/completions" || r.Header.Get("x-bf-vk") != "owned-triage" || r.Header.Get("Authorization") != "")) || (plan && (r.URL.Path != "/v1/responses" || r.Header.Get("Authorization") != "Bearer owned-triage" || r.Header.Get("x-bf-vk") != "")) {
 			t.Error("model endpoint/credential contract")
 		}
 		var req struct {
 			Messages []struct{ Role, Content string }
-			Max      int `json:"max_completion_tokens"`
+			Max      int                              `json:"max_completion_tokens"`
+			Input    []struct{ Role, Content string } `json:"input"`
 		}
-		if json.NewDecoder(r.Body).Decode(&req) != nil || len(req.Messages) != 2 {
+		decodeErr := json.NewDecoder(r.Body).Decode(&req)
+		if plan {
+			req.Messages = req.Input
+		}
+		if decodeErr != nil || len(req.Messages) != 2 {
 			t.Error("invalid request")
 			w.WriteHeader(400)
 			return
@@ -105,7 +122,7 @@ func TestTriagePostgres(t *testing.T) {
 			Evidence []Evidence `json:"evidence"`
 		}
 		_ = json.Unmarshal([]byte(req.Messages[1].Content), &input)
-		if (req.Max != 4096 && !(liveConfig != "" && req.Max == 2048)) || len(input.Evidence) == 0 || strings.Contains(req.Messages[0].Content, "OVERRIDE_POLICY") {
+		if ((!plan && req.Max != 4096 && !(liveConfig != "" && req.Max == 2048)) || (plan && req.Max != 0)) || len(input.Evidence) == 0 || strings.Contains(req.Messages[0].Content, "OVERRIDE_POLICY") {
 			t.Error("untrusted input or bounds")
 		}
 		decision := Decision{State: "evaluated", Priority: ptr("P1"), Reason: "user impact in supplied Issue", Evidence: []Citation{{Ref: input.Evidence[0].Ref, Quote: "outage"}}, Unknown: []string{"effort not measured", "affected people not measured"}}
@@ -121,6 +138,10 @@ func TestTriagePostgres(t *testing.T) {
 		if fn := action.Swap(nil); fn != nil {
 			(*fn)()
 		}
+		if plan {
+			modeltest.Completed(w, content, "triage-owned")
+			return
+		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"id": "owned-triage-response", "model": "owned-model", "choices": []any{map[string]any{"message": map[string]any{"content": content}, "finish_reason": "stop"}}, "usage": map[string]any{"prompt_tokens": 23, "completion_tokens": 9, "prompt_tokens_details": map[string]int{"cached_tokens": 0}, "completion_tokens_details": map[string]int{"reasoning_tokens": 0}}, "raw_marker": "triage-owned"})
 	}))
 	defer model.Close()
@@ -134,6 +155,9 @@ func TestTriagePostgres(t *testing.T) {
 		t.Fatal("config")
 	}
 	s.Gateway = &serverllm.Gateway{ConfigFile: config}
+	if plan {
+		s.Gateway = modeltest.Plan(t, config, model.URL, "owned-triage")
+	}
 	if liveConfig != "" && liveConfig != "owned" {
 		s.Gateway.ConfigFile = liveConfig
 	}
@@ -147,6 +171,9 @@ func TestTriagePostgres(t *testing.T) {
 	spec.Model = connections[0].Models[0].Requested
 	spec.Allowed = connections[0].Models[0].Actual
 	spec.Limits.Seconds = 3
+	if plan {
+		spec.UnlimitedOutput, spec.Limits.OutputTokens = true, 0
+	}
 	price := must(s.Usage.Put(ctx, p, "one", "price:triage-owned", usage.Write{Mutation: m("0"), Value: encode(usage.Price{Connection: "owned", Model: "owned-model", Currency: "USD", From: time.Now().Add(-time.Hour), Source: "fictional owned tariff", Scale: 2, Rounding: "half_up", Rates: map[string]usage.Rate{"input": {Amount: "1", Per: "1", Unit: "token"}, "output": {Amount: "1", Per: "1", Unit: "token"}, "cache_read": {Amount: "0", Per: "1", Unit: "token"}, "reasoning": {Amount: "0", Per: "1", Unit: "token"}}})}))
 	spec.Prices = map[string]usage.Ref{"owned-model": {ID: price.ID, Version: price.Version}}
 	contextPut("scope", "project", "0", contexts.Scope{Kind: "milestone", Name: "delivery"})
@@ -226,6 +253,39 @@ func TestTriagePostgres(t *testing.T) {
 			_, value := priority(scope)
 			if value.Recommendation == nil || *value.Recommendation != "P1" || (value.Adopted != nil) != auto || value.State != "evaluated" || calls.Load() != before+1 {
 				t.Fatalf("origin %s auto %v: %+v calls %d", origin, auto, value, calls.Load()-before)
+			}
+			if plan {
+				var protocol string
+				if err := store.Database().QueryRow(ctx, `SELECT payload->'measurement'->>'protocol' FROM usage_records WHERE workspace_id='one' AND kind='usage' ORDER BY position DESC LIMIT 1`).Scan(&protocol); err != nil || protocol != "openai-responses" {
+					t.Fatal("plan measurement", protocol, err)
+				}
+				for _, mode := range []string{"heads", "records", "attempts"} {
+					page, err := s.Query(ctx, p, "one", Request{Mode: mode, Kind: "model-attempt", Limit: 10})
+					if err != nil || page.Data == nil || len(page.Data.Items) == 0 {
+						t.Fatal("plan attempt query", mode, err)
+					}
+					for _, item := range page.Data.Items {
+						var compact struct {
+							Ref
+							Value TriageAttempt
+						}
+						if json.Unmarshal(item, &compact) != nil {
+							t.Fatal("invalid attempt metadata", mode)
+						}
+						if compact.Value.Response == nil {
+							continue // The intent version predates the observed response.
+						}
+						if len(compact.Value.Response.Request) != 0 || compact.Value.Response.Reply != nil || len(compact.Value.Response.Body) != 0 {
+							t.Fatal("attempt list returned model body", mode)
+						}
+						fixed, err := record(ctx, store.Database(), "one", compact.Ref)
+						var full TriageAttempt
+						if err != nil || json.Unmarshal(fixed.Value, &full) != nil || full.Response == nil || len(full.Response.Request) == 0 || full.Response.Reply == nil || len(full.Response.Body) == 0 {
+							t.Fatal("fixed attempt lost original transport", mode, err)
+						}
+					}
+				}
+				return
 			}
 			if auto && origin == "human" {
 				// The target owns its latest request. A superseded historical

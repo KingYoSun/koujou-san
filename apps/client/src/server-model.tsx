@@ -6,6 +6,7 @@ export type ModelConnection = {
   id: string;
   name: string;
   revision: string;
+  type?: "chatgpt";
   models: { requested: string; allowed_actual: string[] }[];
 };
 
@@ -65,6 +66,7 @@ export function ServerModelConnections({
             {connections.map((c) => (
               <li key={c.id}>
                 {c.name} / 接続：{c.id} / 版：{c.revision}
+                {c.type === "chatgpt" && " / ChatGPTプラン"}
                 <ul>
                   {c.models.map((m) => (
                     <li key={m.requested}>
@@ -101,6 +103,7 @@ export type SemanticSettings = {
   instructions: string;
   limits: { input_bytes: number; output_tokens: number; seconds: number };
   reevaluate_evidence: boolean;
+  unlimited_output?: boolean;
 };
 
 export function ServerModelFields({
@@ -127,17 +130,25 @@ export function ServerModelFields({
                 model: c.models[0].requested,
                 allowed_models: c.models[0].allowed_actual,
                 fallbacks: [],
+                unlimited_output: c.type === "chatgpt",
+                limits: {
+                  ...settings.limits,
+                  output_tokens:
+                    c.type === "chatgpt"
+                      ? 0
+                      : settings.limits.output_tokens || 4096,
+                },
               });
           }}
         >
-          <option value={settings.connection}>{settings.connection}</option>
-          {connections
-            .filter((c) => c.id !== settings.connection)
-            .map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+          {!connections.some((c) => c.id === settings.connection) && (
+            <option value={settings.connection}>{settings.connection}</option>
+          )}
+          {connections.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
         </select>
       </label>
       <label>
@@ -183,19 +194,23 @@ export function ServerModelFields({
       ).map(([key, label]) => (
         <label key={key}>
           {label}
-          <input
-            type="number"
-            min={1}
-            value={settings.limits[key]}
-            onChange={(e) =>
-              onChange({
-                limits: {
-                  ...settings.limits,
-                  [key]: Number(e.target.value),
-                },
-              })
-            }
-          />
+          {key === "output_tokens" && settings.unlimited_output ? (
+            <output>上限なし</output>
+          ) : (
+            <input
+              type="number"
+              min={1}
+              value={settings.limits[key]}
+              onChange={(e) =>
+                onChange({
+                  limits: {
+                    ...settings.limits,
+                    [key]: Number(e.target.value),
+                  },
+                })
+              }
+            />
+          )}
         </label>
       ))}
     </>

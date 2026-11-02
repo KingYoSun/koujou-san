@@ -1,6 +1,62 @@
 # サーバーのモデル接続とHopperの意味判断
 
-クライアントのモデル接続と別に設定する。サーバーの意味判断にCLIや個人の既存認証ファイルを流用しない。
+クライアントのモデル接続と別に設定する。サーバーの意味判断にCLIや個人の既存認証ファイルを流用しない。HTTP GatewayとChatGPTプラン接続を選べる。契約は[ADR 0035](../adr/0035-server-chatgpt-plan.md)を参照する。
+
+## ChatGPTプランへのログイン
+
+サーバー専用のSign in with ChatGPT登録を作り、GoからResponses APIへ直接接続する。Codexは使わない。次のコマンドは本人認証用で、モデルへの推論要求は行わない。
+
+開発checkoutでは、privateな保存先を絶対パスで指定する。
+
+```powershell
+pnpm run server-model:login --credentials-file C:/private/koujou-chatgpt/account.json
+pnpm run server-model:models --credentials-file C:/private/koujou-chatgpt/account.json
+pnpm run server-model:logout --credentials-file C:/private/koujou-chatgpt/account.json
+```
+
+標準Linux配布では同じ操作を`./koujou model-login`、`model-models`、`model-logout`で行う。例の保存先は導入先に置き換える。
+
+```sh
+./koujou model-login --credentials-file /private/deployment/config/connectors/chatgpt/account.json
+./koujou model-models --credentials-file /private/deployment/config/connectors/chatgpt/account.json
+```
+
+表示された「Continue with ChatGPT」のURLを本人のブラウザで開き、accountとworkspaceを選び、プラン利用へ同意する。callbackは`http://127.0.0.1:14557/auth/callback`。別のportを使う場合は`--callback-port`で指定する。新規登録には安定したhost IDを保存し、発行client ID・ID tokenの署名・issuer・audience・nonce・subject・利用scopeを検証してから認証情報を保存する。
+
+リモートサーバー上の認証コマンドへ本人のブラウザから戻す場合は、事前に本人の端末からloopback portを転送する。下の`USER@SERVER`は実際の接続先に置き換える。
+
+```sh
+ssh -L 14557:127.0.0.1:14557 USER@SERVER
+```
+
+このSSH sessionでサーバーの`model-login`を実行し、表示URLを本人の端末で開く。公開HTTPS callbackへ置き換えない。別のaccountを追加するときは別のcredentialファイルを使う。同じファイルへの再認証で別のsubjectへ置き換えない。別ホストへ移設するときは新しいcredentialファイルでホスト専用の登録を作る。
+
+## ChatGPT接続の登録
+
+`KOUJOU_SERVER_LLM_CONFIG`の接続一覧へ追加する。要求モデル名は`model-models`が返す現在のaccountのslugから選び、許可する実モデル名も明示する。モデル名をSDKの例だけで決めない。
+
+```json
+[
+  {
+    "type": "chatgpt",
+    "id": "server-chatgpt",
+    "name": "サーバーのChatGPTプラン",
+    "credential_file": "/config/connectors/chatgpt/account.json",
+    "workspaces": ["WORKSPACE_ID"],
+    "models": [{ "requested": "MODEL_SLUG", "allowed_actual": ["ACTUAL_MODEL"] }]
+  }
+]
+```
+
+標準配布ではhost側の`config/connectors/chatgpt/`が、上のcontainer内pathへ書込み可能にmountされる。その他の実行方式ではAPI実行者だけが読み書きできる保存先を指定する。OAuth tokenの更新・回転はAPIがファイルロックで直列化し、成功した一組を原子的に保存する。同じcredentialを複製して複数のruntimeからrefreshしない。資格情報と認証URLをチャット・Issue・Context・共有ログへ貼らない。
+
+接続のrevisionはaccount登録とhostに結び付く。token更新では変わらず、別登録へ切り替えた場合はHopper・Triageの定義で接続を選び直す。サーバーのモデル一覧から接続を選ぶと、出力上限は「上限なし」になる。保存する定義は`unlimited_output=true`、`limits.output_tokens=0`とし、入力byteと時間の上限は従来どおり指定する。API接続の出力上限は維持する。
+
+この接続は`store=false`・`stream=true`で推論し、terminalの`response.completed`まで成功にしない。原stream、送信用本文、実モデルと報告usageを保存する。未算定の費用やサブスク利用量を0へ置き換えない。fallbackは空で使う。ChatGPTの利用権限や上限に達した際は失敗・保留として確認し、APIキーへ自動で切り替えない。
+
+認証が失効した場合は、本人が`model-login`を再実行する。Workerから対話ログインは始まらない。`model-logout`はrefresh tokenの失効を試し、確認できたかを表示したうえでローカルのtokenを削除する。失効未確認の場合はChatGPT設定から接続も確認する。登録とhost IDは再ログイン用に保持する。既に送信済みの推論が取り消されたとは扱わない。
+
+標準backupは`config/`内のcredentialも含む。APIの書込みを停止した一貫したbackupと、対応するCA・秘密値をprivateな保存先で保全する。実accountでの認証・推論の成功は、所有HTTP/JWKS/SSE fixtureの成功と区別する。[公式の登録手順](https://developers.openai.com/siwc/token-sharing-open-source/sign-in)と[preview制約](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations)も参照する。
 
 ## 任意Gatewayの起動
 

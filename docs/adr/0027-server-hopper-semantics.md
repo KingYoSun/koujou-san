@@ -1,5 +1,7 @@
 # ADR 0027: サーバーLLMによるHopperの意味判断
 
+サーバーのChatGPTプラン接続と、その接続の出力token上限は[ADR 0035](0035-server-chatgpt-plan.md)で追加・変更した。既存Gateway接続については本ADRを維持する。
+
 - 状態: Accepted。2026-10-18の本人回答を反映。
 - 対象: Issue #27。[受入条件と対象外](../progress/2026-10-18-issue-27-plan.md)。
 

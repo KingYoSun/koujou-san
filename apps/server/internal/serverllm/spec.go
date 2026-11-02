@@ -27,9 +27,10 @@ type Spec struct {
 	Contract           string               `json:"contract,omitempty"`
 	Valuation          string               `json:"valuation,omitempty"`
 	Cost               *usage.CostBudget    `json:"cost,omitempty"`
+	UnlimitedOutput    bool                 `json:"unlimited_output,omitempty"`
 	ReevaluateEvidence bool                 `json:"reevaluate_evidence"`
 }
 
 func Valid(s *Spec) bool {
-	return s != nil && s.Connection != "" && s.Revision != "" && s.Model != "" && len(s.Allowed) > 0 && s.Instructions != "" && s.Limits.InputBytes > 0 && s.Limits.OutputTokens > 0 && s.Limits.Seconds > 0 && (s.Cost == nil || usage.ValidCostBudget(*s.Cost))
+	return s != nil && s.Connection != "" && s.Revision != "" && s.Model != "" && len(s.Allowed) > 0 && s.Instructions != "" && s.Limits.InputBytes > 0 && ((!s.UnlimitedOutput && s.Limits.OutputTokens > 0) || (s.UnlimitedOutput && s.Limits.OutputTokens == 0)) && s.Limits.Seconds > 0 && (s.Cost == nil || usage.ValidCostBudget(*s.Cost))
 }

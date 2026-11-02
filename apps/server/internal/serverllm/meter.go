@@ -77,7 +77,11 @@ func Observe(ctx context.Context, tx pgx.Tx, p access.Principal, w, owner, evalu
 			state = "unavailable"
 		}
 	}
-	observation := usage.Observation{Source: "server-model:" + spec.Connection, Transform: "server-chat-v1", Event: intent.ID, Series: intent.ID, Mode: "delta", Group: intent.ID, Request: request, Covers: []string{}, Coverage: coverage, Connection: spec.Connection, Contract: spec.Contract, RequestedModel: spec.Model, ActualModel: actual, At: time.Now().UTC(), Attribution: usage.Attribution{Kind: owner, ID: evaluation, Resource: input.ID, Scopes: []string{}}, Quantities: quantities, Measurement: &usage.Measurement{State: state, Protocol: "openai-chat-completions", Scope: owner + "_evaluation_request", Generation: intent.ID, Billing: "unknown", SourceRef: intent.ID, SourceDigest: Digest(response)}}
+	protocol, transform := "openai-chat-completions", "server-chat-v1"
+	if response != nil && response.Protocol == "openai-responses" {
+		protocol, transform = "openai-responses", "server-responses-v1"
+	}
+	observation := usage.Observation{Source: "server-model:" + spec.Connection, Transform: transform, Event: intent.ID, Series: intent.ID, Mode: "delta", Group: intent.ID, Request: request, Covers: []string{}, Coverage: coverage, Connection: spec.Connection, Contract: spec.Contract, RequestedModel: spec.Model, ActualModel: actual, At: time.Now().UTC(), Attribution: usage.Attribution{Kind: owner, ID: evaluation, Resource: input.ID, Scopes: []string{}}, Quantities: quantities, Measurement: &usage.Measurement{State: state, Protocol: protocol, Scope: owner + "_evaluation_request", Generation: intent.ID, Billing: "unknown", SourceRef: intent.ID, SourceDigest: Digest(response)}}
 	id := usage.ObservationID(observation)
 	var expected string
 	if err := tx.QueryRow(ctx, `SELECT COALESCE((SELECT version FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2),'0')`, w, id).Scan(&expected); err != nil {
