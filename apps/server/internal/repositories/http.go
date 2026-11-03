@@ -71,6 +71,13 @@ func (s *Service) Register(mux *http.ServeMux) {
 			return s.PutRepository(ctx, p, w, r.PathValue("id"), req, action == "create")
 		})
 	}
+	route("POST", "/repositories/{id}/delete", func(ctx context.Context, p access.Principal, w string, r *http.Request) (any, error) {
+		var req apicontract.Mutation
+		if err := body(r, &req); err != nil {
+			return nil, err
+		}
+		return s.DeleteRejected(ctx, p, w, r.PathValue("id"), req)
+	})
 	route("POST", "/repositories/{id}/reconcile", func(ctx context.Context, p access.Principal, w string, r *http.Request) (any, error) {
 		var req apicontract.Mutation
 		if err := body(r, &req); err != nil {

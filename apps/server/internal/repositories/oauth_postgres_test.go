@@ -211,6 +211,10 @@ func TestWorkspaceSetupPostgres(t *testing.T) {
 				Private bool
 			}
 			json.NewDecoder(r.Body).Decode(&input)
+			if input.Name == "rejected-repo" {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
 			if input.Name != "new-repo" || !input.Private {
 				http.Error(w, "wrong repository", 400)
 				return

@@ -14,6 +14,8 @@ Workspace管理者は同じ「共有接続」でGiteaを選び、「Giteaにロ�
 
 「リポジトリ」では、既存repoの登録と新規作成を分けて操作する。新規作成では共有接続、所有者、名前、公開範囲を指定する。本人所有の作成は[`POST /user/repos`](https://docs.gitea.com/api/operations/create-current-user-repo/)、組織所有は[`POST /orgs/{org}/repos`](https://docs.gitea.com/api/operations/create-org-repo/)を使う。READMEによる初期化は任意。送信意図を先に保存し、同じ意図は一度だけ送信する。「作成結果未確認」では作成を繰り返さず「作成結果を照合」で取得する。照合による存在確認は、その要求が作成した証明とは区別する。
 
+「作成拒否」の記録は、Workspace管理者が選択して「作成拒否の記録を削除」から一覧を片付けられる。対象の更新権限が必要。Giteaのrepoと成功済みの接続は変更せず、共有履歴と再送防止の記録を保持する。「作成結果未確認」や送信途中の要求は削除せず、既存の照合操作で結果を確認する。
+
 repoには任意のProjectを関連付けられ、一つのWorkspace・Projectで複数repoを扱える。関連付けは権限付与やRunの入力注入ではない。ProjectチャットとWorkspaceの設定から同じ画面へ進める。Run割当・独立Runnerでは登録したrepoを選び、固定commitと端末内のpathをそれぞれ指定する。登録・保存だけではcloneやCLI実行を始めない。
 
 登録したrepoの「観測対象を追加」でIssue・PR・commit・Actions・statusを設定する。外部起票では登録済みrepoと既存のファイル設定から候補を選べる。これらは現在のWorkspace・資源権限で絞り込む。GitHub Appの秘密鍵とインストール許可は従来の運用設定で管理し、「GitHub接続の引継ぎ」から担当者用のWorkspace設定JSONを出力する。出力だけでは他Workspaceの許可を追加しない。

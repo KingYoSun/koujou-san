@@ -296,6 +296,30 @@ it.skipIf(!api)(
       await settled(() =>
         expect(host.textContent).toContain("owner/new-repo · 作成済み"),
       );
+      expect(host.textContent).not.toContain("作成拒否の記録を削除");
+      await click("Giteaリポジトリを作成");
+      await click("所有者を取得");
+      await settled(() =>
+        expect(
+          field("所有者").querySelector('option[value="owner"]'),
+        ).toBeTruthy(),
+      );
+      await change("所有者", "owner");
+      await change("リポジトリ名", "rejected-repo");
+      await change("公開範囲", "private");
+      await submit("リポジトリを作成");
+      await settled(() =>
+        expect(button("owner/rejected-repo · 作成拒否")).toBeTruthy(),
+      );
+      await click("owner/rejected-repo · 作成拒否");
+      await click("作成拒否の記録を削除");
+      await settled(() => {
+        expect(host.textContent).not.toContain("owner/rejected-repo");
+        expect(button("owner/new-repo · 作成済み")).toBeTruthy();
+        expect(host.textContent).toContain("作成拒否の記録を削除しました。");
+      });
+      await click("リポジトリを再取得");
+      expect(host.textContent).not.toContain("owner/rejected-repo");
       await link("Projectチャット");
       await settled(() => expect(button("Owned Project")).toBeTruthy());
       await click("Owned Project");

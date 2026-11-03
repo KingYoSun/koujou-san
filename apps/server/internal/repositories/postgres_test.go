@@ -106,10 +106,12 @@ func TestRepositoryNavigationPostgres(t *testing.T) {
 	project := mutation("0")
 	project["value"] = map[string]any{"kind": "project", "name": "Project"}
 	request("alice", "POST", "/contexts/workspaces/one/scope/project", project, 200)
-	var creates atomic.Int64
+	var creates, remoteCalls atomic.Int64
+	var rejectCreates atomic.Bool
 	var mu sync.Mutex
 	repos := map[string]remoteRepository{}
 	forge := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		remoteCalls.Add(1)
 		if r.Header.Get("Authorization") != "token fixture-private-token" {
 			w.WriteHeader(401)
 			return
@@ -128,6 +130,10 @@ func TestRepositoryNavigationPostgres(t *testing.T) {
 				Private bool   `json:"private"`
 			}
 			json.NewDecoder(r.Body).Decode(&input)
+			if rejectCreates.Load() {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
 			owner := "owner"
 			if strings.Contains(r.URL.Path, "/orgs/") {
 				owner = "team"
@@ -204,6 +210,7 @@ func TestRepositoryNavigationPostgres(t *testing.T) {
 	if err != nil || repo.State != "created" || !repo.Private || repo.Project != "project" {
 		t.Fatalf("created repo not registered: %+v %v", repo, err)
 	}
+	request("alice", "POST", base+"/repositories/first/delete", mutation(repo.Version), 409)
 	request("alice", "GET", base+"/repositories?project=project", nil, 200)
 	request("bob", "GET", base+"/repositories/first", nil, 200)
 	request("outsider", "GET", "/forge/workspaces/two/repositories/first", nil, 403)
@@ -217,11 +224,13 @@ func TestRepositoryNavigationPostgres(t *testing.T) {
 	if unknown.State != "unknown" {
 		t.Fatalf("lost response state: %s", unknown.State)
 	}
+	request("alice", "POST", base+"/repositories/lost/delete", mutation(unknown.Version), 409)
 	accepted(request("alice", "POST", base+"/repositories/lost/reconcile", mutation(unknown.Version), 200))
 	confirmed, _ := s.Read(ctx, access.Principal{UserID: "alice"}, "one", "lost")
 	if confirmed.State != "confirmed" {
 		t.Fatal("explicit reconciliation did not register repo")
 	}
+	request("alice", "POST", base+"/repositories/lost/delete", mutation(confirmed.Version), 409)
 	observe := mutation("0")
 	observe["kind"] = "actions"
 	observe["workflow"] = "build.yml"
@@ -268,6 +277,55 @@ func TestRepositoryNavigationPostgres(t *testing.T) {
 	accepted(request("alice", "POST", resourceBase, grant, 200))
 	request("bob", "GET", base+"/repositories/first", nil, 200)
 	request("bob", "GET", resourceBase, nil, 403)
+	// Discard only a refused intent, keeping the successful same-name repo and receipts.
+	rejectCreates.Store(true)
+	refused := create("rejected", "first", "owner", true)
+	accepted(request("alice", "POST", base+"/repositories/rejected/create", refused, 200))
+	rejectCreates.Store(false)
+	rejected, err := s.Read(ctx, access.Principal{UserID: "alice"}, "one", "rejected")
+	if err != nil || rejected.State != "rejected" {
+		t.Fatalf("missing refused intent: %+v %v", rejected, err)
+	}
+	remove := mutation(rejected.Version)
+	removePath := base + "/repositories/rejected/delete"
+	for _, actor := range []string{"bob", "carol", "outsider"} {
+		request(actor, "POST", removePath, remove, 403)
+	}
+	request("alice", "POST", removePath, mutation("0"), 409)
+	restricted := mutation("0")
+	restricted["restricted"] = true
+	rejectedPolicy := "/access/workspaces/one/resources/forge-repository:rejected"
+	policyHead := accepted(request("alice", "POST", rejectedPolicy, restricted, 200))
+	readOnly := mutation(policyHead)
+	readOnly["grant"] = map[string]any{"user": "alice", "read": true, "update": false}
+	policyHead = accepted(request("alice", "POST", rejectedPolicy, readOnly, 200))
+	request("alice", "POST", removePath, remove, 403)
+	allow := mutation(policyHead)
+	allow["grant"] = map[string]any{"user": "alice", "read": true, "update": true}
+	accepted(request("alice", "POST", rejectedPolicy, allow, 200))
+	beforeRemoval := remoteCalls.Load()
+	removed := accepted(request("alice", "POST", removePath, remove, 200))
+	if accepted(request("alice", "POST", removePath, remove, 200)) != removed {
+		t.Fatal("delete replay changed its receipt")
+	}
+	listed := request("alice", "GET", base+"/repositories", nil, 200)
+	if bytes.Contains(listed, []byte(`"id":"rejected"`)) {
+		t.Fatal("removed refused intent remained in the current catalog")
+	}
+	request("bob", "GET", base+"/repositories/first", nil, 200)
+	accepted(request("alice", "POST", base+"/repositories/rejected/create", refused, 200))
+	request("alice", "POST", base+"/repositories/rejected/create", create("rejected", "first", "owner", true), 409)
+	if remoteCalls.Load() != beforeRemoval || creates.Load() != 2 {
+		t.Fatal("removal or an old create intent contacted Gitea")
+	}
+	var deleted bool
+	if err = store.Database().QueryRow(ctx, `SELECT deleted FROM shared_versions WHERE workspace_id='one' AND resource_id='forge-repository:rejected'`).Scan(&deleted); err != nil || !deleted {
+		t.Fatal("deletion tombstone was not committed")
+	}
+	var priorRejected int
+	if err = store.Database().QueryRow(ctx, `SELECT count(*) FROM shared_changes WHERE workspace_id='one' AND resource_id='forge-repository:rejected' AND payload->>'state'='rejected' AND NOT deleted`).Scan(&priorRejected); err != nil || priorRejected == 0 {
+		t.Fatal("refused intent history was erased")
+	}
 	revoked := mutation(connectionVersion)
 	revoked["name"] = "Shared Gitea"
 	revoked["instance"] = forge.URL

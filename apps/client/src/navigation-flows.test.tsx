@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { syncRequest } from "./auth";
 import { RepositorySettings } from "./repository-settings";
@@ -120,6 +121,14 @@ async function submit(label: string) {
       .dispatchEvent(new Event("submit", { bubbles: true, cancelable: true })),
   );
 }
+
+it("keeps record deletion absent until a refused repository is selected", () => {
+  const html = renderToStaticMarkup(
+    <RepositorySettings native={false} workspace="one" role="admin" />,
+  );
+  expect(html).toContain('aria-label="リポジトリ設定"');
+  expect(html).not.toContain("作成拒否の記録を削除");
+});
 
 it("configures a shared Gitea connection and creates/registers a repository from the actual forms", async () => {
   let connections: unknown[] = [],

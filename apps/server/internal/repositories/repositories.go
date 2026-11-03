@@ -116,7 +116,7 @@ func (s *Service) Repositories(ctx context.Context, p access.Principal, w, proje
 	return out, rows.Err()
 }
 func (s *Service) saveRepository(ctx context.Context, p access.Principal, w string, r Repository, m apicontract.Mutation, payload any) (apicontract.Response[apicontract.Reference], error) {
-	return s.mutate(ctx, p, w, "forge-repository:"+r.ID, "forge-repository", m, payload, func(tx pgx.Tx, ref apicontract.Reference) (any, error) {
+	return s.mutate(ctx, p, w, "forge-repository:"+r.ID, "forge-repository", m, false, payload, func(tx pgx.Tx, ref apicontract.Reference) (any, error) {
 		if r.Project != "" {
 			if err := s.Access.CheckTx(ctx, tx, p, w, "scope:"+r.Project, "update"); err != nil {
 				return nil, err
@@ -229,6 +229,20 @@ func (s *Service) PutRepository(ctx context.Context, p access.Principal, w, id s
 	}
 	return accepted, nil
 }
+func (s *Service) DeleteRejected(ctx context.Context, p access.Principal, w, id string, m apicontract.Mutation) (apicontract.Response[apicontract.Reference], error) {
+	payload := map[string]string{"id": id}
+	return s.mutate(ctx, p, w, "forge-repository:"+id, "forge-repository", m, true, payload, func(tx pgx.Tx, _ apicontract.Reference) (any, error) {
+		tag, err := tx.Exec(ctx, `DELETE FROM forge_repositories WHERE workspace_id=$1 AND id=$2 AND state='rejected'`, w, id)
+		if err != nil {
+			return nil, err
+		}
+		if tag.RowsAffected() != 1 {
+			return nil, ErrState
+		}
+		return payload, nil
+	})
+}
+
 func (s *Service) Reconcile(ctx context.Context, p access.Principal, w, id string, m apicontract.Mutation) (apicontract.Response[apicontract.Reference], error) {
 	if err := s.Access.Check(ctx, p, w, "", "manage"); err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err

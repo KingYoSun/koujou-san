@@ -167,7 +167,7 @@ func (s *Service) PutConnection(ctx context.Context, p access.Principal, w, id s
 			current.Name = req.Name
 			current.AllowCreate = req.AllowCreate
 			current.Version = ""
-			return s.mutate(ctx, p, w, "forge-connection:"+id, "forge-connection", req.Mutation, current, func(tx pgx.Tx, ref apicontract.Reference) (any, error) {
+			return s.mutate(ctx, p, w, "forge-connection:"+id, "forge-connection", req.Mutation, false, current, func(tx pgx.Tx, ref apicontract.Reference) (any, error) {
 				current.Version = ref.Version
 				_, err := tx.Exec(ctx, `UPDATE forge_connections SET spec=$3 WHERE workspace_id=$1 AND id=$2`, w, id, raw(current))
 				return current, err
@@ -236,13 +236,13 @@ func (s *Service) saveConnection(ctx context.Context, p access.Principal, w stri
 		Connection
 		Digest string
 	}{c, hex.EncodeToString(mac.Sum(nil))}
-	return s.mutate(ctx, p, w, "forge-connection:"+id, "forge-connection", m, payload, func(tx pgx.Tx, ref apicontract.Reference) (any, error) {
+	return s.mutate(ctx, p, w, "forge-connection:"+id, "forge-connection", m, false, payload, func(tx pgx.Tx, ref apicontract.Reference) (any, error) {
 		_, err := tx.Exec(ctx, `INSERT INTO forge_connections VALUES($1,$2,$3,$4) ON CONFLICT(workspace_id,id) DO UPDATE SET spec=excluded.spec,credential=excluded.credential`, w, id, raw(c), encrypted)
 		c.Version = ref.Version
 		return c, err
 	}, within...)
 }
-func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, kind string, m apicontract.Mutation, payload any, apply func(pgx.Tx, apicontract.Reference) (any, error), within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
+func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, kind string, m apicontract.Mutation, deleted bool, payload any, apply func(pgx.Tx, apicontract.Reference) (any, error), within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
 	if err := s.Access.Check(ctx, p, w, "", "manage"); err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err
 	}
@@ -250,9 +250,12 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, kind st
 		if err := s.Access.CheckTx(ctx, tx, p, w, "", "manage"); err != nil {
 			return &apicontract.Problem{Code: "forbidden"}
 		}
+		if deleted && s.Access.CheckTx(ctx, tx, p, w, id, "update") != nil {
+			return &apicontract.Problem{Code: "forbidden"}
+		}
 		return nil
 	}}
-	return s.Store.Apply(ctx, scope, persistence.Command{WorkspaceID: w, ResourceID: id, Kind: kind, Mutation: m, Payload: raw(payload)}, func(tx pgx.Tx, ref apicontract.Reference) (json.RawMessage, error) {
+	return s.Store.Apply(ctx, scope, persistence.Command{WorkspaceID: w, ResourceID: id, Kind: kind, Deleted: deleted, Mutation: m, Payload: raw(payload)}, func(tx pgx.Tx, ref apicontract.Reference) (json.RawMessage, error) {
 		value, err := apply(tx, ref)
 		if err != nil {
 			return nil, err
