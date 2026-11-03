@@ -69,7 +69,7 @@ func (r *Remote) ReadPriority(ctx context.Context, w, id string, number int64, p
 		return out, ErrState
 	}
 	for _, row := range rows {
-		own := row.App != nil && strconv.FormatInt(row.App.ID, 10) == r.config.AppID
+		own := row.App != nil && r.config != nil && strconv.FormatInt(row.App.ID, 10) == r.config.AppID
 		if c.Provider == "gitea" {
 			if row.Type != "label" {
 				continue

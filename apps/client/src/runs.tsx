@@ -1,4 +1,5 @@
 import { Field, jsonError } from "./field";
+import { RepositoryPicker } from "./repository-picker";
 import { NavigationLink, useNavigation } from "./navigation";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -516,11 +517,21 @@ export function RunRecords({
                       value={deviceID}
                       onChange={setDeviceID}
                     />
-                    <Field
-                      label="repositoryの論理ID"
+                    <RepositoryPicker
+                      native={native}
+                      workspace={workspace}
                       value={repoID}
                       onChange={setRepoID}
                     />
+                    <Disclosure title="リポジトリをIDで指定">
+                      {() => (
+                        <Field
+                          label="repositoryの論理ID"
+                          value={repoID}
+                          onChange={setRepoID}
+                        />
+                      )}
+                    </Disclosure>
                     {repoID && (
                       <Field
                         label="作成元の固定commit"

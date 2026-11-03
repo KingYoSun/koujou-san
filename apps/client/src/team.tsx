@@ -434,6 +434,12 @@ export function Team({
     return (
       <section aria-label="Workspaceへの参加">
         {account}
+        {native && (
+          <details>
+            <summary>API接続</summary>
+            {connection}
+          </details>
+        )}
         {notice && <p role="status">{notice}</p>}
         {invitation && <p>招待リンクを保持しています。</p>}
       </section>
@@ -505,6 +511,12 @@ export function Team({
   );
   return (
     <section className={current ? undefined : "team"} aria-label="Workspace">
+      {native && !current && (
+        <details>
+          <summary>API接続</summary>
+          {connection}
+        </details>
+      )}
       {notice && <p role="status">{notice}</p>}
       {current ? (
         <NavigationProvider

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchHealth } from "./health";
 import { Account } from "./auth";
 import { Team } from "./team";
+import { DesktopConnection } from "./desktop-connection";
 
 type AppProps = {
   apiBaseUrl: string;
@@ -36,6 +37,14 @@ export function App({ apiBaseUrl, native }: AppProps) {
           </dd>
         </div>
       </dl>
+      {native ? (
+        <DesktopConnection settings />
+      ) : (
+        <p>
+          {apiBaseUrl ||
+            (typeof location !== "undefined" ? location.origin : "")}
+        </p>
+      )}
     </section>
   );
   return (

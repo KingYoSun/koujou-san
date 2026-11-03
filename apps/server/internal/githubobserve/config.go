@@ -15,18 +15,20 @@ import (
 )
 
 type Target struct {
-	Provider       string `json:"provider,omitempty"`
-	Instance       string `json:"instance,omitempty"`
-	Workflow       string `json:"workflow,omitempty"`
-	ID             string `json:"id"`
-	InstallationID int64  `json:"installation_id"`
-	RepositoryID   int64  `json:"repository_id"`
-	Repository     string `json:"repository"`
-	Kind           string `json:"kind"`
-	ExternalID     string `json:"external_id"`
-	Attempt        int    `json:"attempt,omitempty"`
-	WorkflowID     int64  `json:"workflow_id,omitempty"`
-	Event          string `json:"event,omitempty"`
+	Workspace          string `json:"workspace_id,omitempty"`
+	RegistryRepository string `json:"registry_repository,omitempty"`
+	Provider           string `json:"provider,omitempty"`
+	Instance           string `json:"instance,omitempty"`
+	Workflow           string `json:"workflow,omitempty"`
+	ID                 string `json:"id"`
+	InstallationID     int64  `json:"installation_id"`
+	RepositoryID       int64  `json:"repository_id"`
+	Repository         string `json:"repository"`
+	Kind               string `json:"kind"`
+	ExternalID         string `json:"external_id"`
+	Attempt            int    `json:"attempt,omitempty"`
+	WorkflowID         int64  `json:"workflow_id,omitempty"`
+	Event              string `json:"event,omitempty"`
 }
 type Binding struct {
 	WorkspaceID    string   `json:"workspace_id"`

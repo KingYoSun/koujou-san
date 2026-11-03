@@ -2,6 +2,8 @@ import { ScreenContent } from "./navigation";
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Field } from "./field";
+import { RepositoryPicker } from "./repository-picker";
+import { Disclosure } from "./disclosure";
 
 const words = (s: string) => s.split(/[\s,]+/).filter(Boolean);
 export function RunnerSettings({
@@ -114,11 +116,21 @@ export function RunnerSettings({
             />
             この版・環境で接続能力を確認済み
           </label>
-          <Field
-            label="repositoryの論理ID"
+          <RepositoryPicker
+            native
+            workspace={workspace}
             value={repository}
             onChange={setRepository}
           />
+          <Disclosure title="リポジトリをIDで指定">
+            {() => (
+              <Field
+                label="repositoryの論理ID"
+                value={repository}
+                onChange={setRepository}
+              />
+            )}
+          </Disclosure>
           {repository && (
             <Field
               label="この端末内のrepositoryのpath"

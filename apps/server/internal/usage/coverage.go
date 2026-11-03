@@ -10,9 +10,15 @@ import (
 
 type Record struct {
 	Ref
-	Kind     string          `json:"kind"`
-	Position int64           `json:"position"`
-	Value    json.RawMessage `json:"value"`
+	Kind         string          `json:"kind"`
+	Position     int64           `json:"position"`
+	Value        json.RawMessage `json:"value"`
+	Dependencies []Ref           `json:"-"`
+	Origins      []Origin        `json:"origins,omitempty"`
+}
+type Origin struct {
+	Kind string `json:"kind"`
+	Ref
 }
 type consumption struct {
 	Observation

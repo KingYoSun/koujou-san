@@ -25,12 +25,13 @@ type Backend interface {
 	Observe(context.Context, Connection, string, int64) Outcome
 }
 type Service struct {
-	Automation *automation.Service
-	tx         pgx.Tx
-	Store      *persistence.Store
-	Access     *access.Service
-	Runs       *runs.Service
-	Backend    Backend
+	ListConnections func(context.Context, access.Principal, string, string) (any, error)
+	Automation      *automation.Service
+	tx              pgx.Tx
+	Store           *persistence.Store
+	Access          *access.Service
+	Runs            *runs.Service
+	Backend         Backend
 }
 
 func New(store *persistence.Store, a *access.Service, r *runs.Service, b Backend) *Service {
@@ -117,6 +118,9 @@ func (s *Service) Read(ctx context.Context, p access.Principal, w string, ref Re
 	return r, nil
 }
 func (s *Service) save(ctx context.Context, tx pgx.Tx, w string, ref Ref, owner, kind string, v any, refs []Ref) (Record, error) {
+	if request, ok := v.(Request); ok {
+		refs = append(refs, connectionRefs(request.Connection)...)
+	}
 	r := Record{Ref: ref, Owner: owner, Kind: kind, Value: raw(v), Refs: unique(refs)}
 	err := tx.QueryRow(ctx, `INSERT INTO publication_records SELECT $1,$2,$3,$4,$5,sequence+1,$6,$7 FROM shared_streams WHERE workspace_id=$1 RETURNING position::text`, w, r.ID, r.Version, r.Owner, r.Kind, r.Value, raw(r.Refs)).Scan(&r.Position)
 	if err == nil {
@@ -236,6 +240,9 @@ func (s *Service) authority(ctx context.Context, q query, w string, r Request, o
 	if c, ok := s.Backend.Connection(w, r.Input.Connection); !ok || c != r.Connection {
 		return access.ErrForbidden
 	}
+	if err := s.refs(ctx, q, p, w, connectionRefs(r.Connection)); err != nil {
+		return err
+	}
 	return nil
 }
 func (s *Service) Preview(ctx context.Context, p access.Principal, w, id string, draft Ref) (Request, error) {
@@ -254,6 +261,9 @@ func (s *Service) Preview(ctx context.Context, p access.Principal, w, id string,
 	connection, ok := s.Backend.Connection(w, d.Connection)
 	if !ok {
 		return Request{}, access.ErrForbidden
+	}
+	if err = s.refs(ctx, s.database(), p, w, connectionRefs(connection)); err != nil {
+		return Request{}, err
 	}
 	return Request{Draft: draft, Input: d, Connection: connection, Actor: Actor{Kind: "human", User: p.UserID}, Marker: tag, Body: d.Body + "\n\n" + tag, Run: "run:" + id, State: "preview", At: time.Now().UTC()}, nil
 }

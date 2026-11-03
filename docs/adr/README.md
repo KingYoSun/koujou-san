@@ -63,3 +63,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0035: サーバーのChatGPTプラン接続](0035-server-chatgpt-plan.md)
 
 - [0036: Webのクライアント操作でサーバーLLM接続を使う](0036-web-server-models.md)
+
+- [0037: Workspaceの共有接続とrepoの初期設定](0037-workspace-repositories.md)

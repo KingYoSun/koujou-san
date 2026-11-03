@@ -1,6 +1,7 @@
 import {
   Screen,
   ScreenContent,
+  NavigationLink,
   useNavigation,
   useScreenActive,
 } from "./navigation";
@@ -312,6 +313,56 @@ export function ContextWorkspace({
                 )
               }
             />
+            {role === "admin" && record && selected && (
+              <NavigationLink
+                related
+                to={{
+                  workspace,
+                  screen: "workspace",
+                  view: "resource-policy",
+                  target: {
+                    kind: "resource",
+                    id: `${["sentence", "paragraph", "section", "document"].includes(selected.kind) ? "context" : selected.kind}:${selected.id}`,
+                    version: "head",
+                  },
+                }}
+              >
+                共有設定を開く
+              </NavigationLink>
+            )}
+            {record?.ref.kind === "scope" &&
+              (record.value as { kind?: string }).kind === "project" && (
+                <>
+                  <NavigationLink
+                    related
+                    to={{
+                      workspace,
+                      screen: "chat",
+                      target: {
+                        kind: "scope",
+                        id: record.ref.id,
+                        version: record.ref.revision,
+                      },
+                    }}
+                  >
+                    Projectで相談
+                  </NavigationLink>
+                  <NavigationLink
+                    related
+                    to={{
+                      workspace,
+                      screen: "repositories",
+                      target: {
+                        kind: "scope",
+                        id: record.ref.id,
+                        version: record.ref.revision,
+                      },
+                    }}
+                  >
+                    Projectのリポジトリを設定
+                  </NavigationLink>
+                </>
+              )}
             {navigation?.route.origin && (
               <details>
                 <summary>呼び出し元の固定版</summary>

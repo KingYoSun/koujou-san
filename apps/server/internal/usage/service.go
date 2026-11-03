@@ -368,6 +368,7 @@ func (s *Service) read(ctx context.Context, q query, p access.Principal, w strin
 	}
 	var refs []Ref
 	_ = json.Unmarshal(deps, &refs)
+	out.Dependencies = refs
 	refs = append(refs, out.Ref)
 	for _, r := range refs {
 		var tx pgx.Tx
@@ -389,7 +390,67 @@ func (s *Service) read(ctx context.Context, q query, p access.Principal, w strin
 	return out, nil
 }
 func (s *Service) Read(ctx context.Context, p access.Principal, w string, ref Ref) (Record, error) {
-	return s.read(ctx, s.Store.Database(), p, w, ref)
+	out, err := s.read(ctx, s.Store.Database(), p, w, ref)
+	if err != nil {
+		return out, err
+	}
+	for _, dep := range out.Dependencies {
+		kind := kindOf(dep.ID)
+		switch kind {
+		case "context", "scope":
+			var actual string
+			if err = s.Store.Database().QueryRow(ctx, `SELECT kind FROM context_records WHERE workspace_id=$1 AND resource_id=$2 AND revision=$3`, w, dep.ID, dep.Version).Scan(&actual); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					continue
+				}
+				return Record{}, err
+			}
+			_, id, _ := strings.Cut(dep.ID, ":")
+			out.Origins = append(out.Origins, Origin{Kind: actual, Ref: Ref{ID: id, Version: dep.Version}})
+		case "run-definition", "workflow-definition":
+			out.Origins = append(out.Origins, Origin{Kind: kind, Ref: dep})
+		case "client-turn":
+			var raw []byte
+			if err = s.Store.Database().QueryRow(ctx, `SELECT payload->'model' FROM client_operation_records WHERE workspace_id=$1 AND id=$2 AND version=$3`, w, dep.ID, dep.Version).Scan(&raw); err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					continue
+				}
+				return Record{}, err
+			}
+			var model struct {
+				Connection string `json:"connection"`
+				Revision   string `json:"revision"`
+			}
+			if json.Unmarshal(raw, &model) != nil {
+				continue
+			}
+			if model.Connection != "" && model.Revision != "" {
+				out.Origins = append(out.Origins, Origin{Kind: "model-connection", Ref: Ref{ID: model.Connection, Version: model.Revision}})
+			}
+		}
+	}
+	var source struct {
+		Connection string `json:"connection"`
+		Source     string `json:"source"`
+	}
+	if err = json.Unmarshal(out.Value, &source); err != nil {
+		return Record{}, err
+	}
+	if source.Connection != "" {
+		modelFound := false
+		for _, origin := range out.Origins {
+			if origin.Kind == "model-connection" {
+				modelFound = true
+			}
+		}
+		if !modelFound && (strings.HasPrefix(source.Source, "client-model:") || out.Kind == "price") {
+			out.Origins = append(out.Origins, Origin{Kind: "model-connection", Ref: Ref{ID: source.Connection, Version: "head"}})
+		}
+		if strings.HasPrefix(source.Source, "server-model:") {
+			out.Origins = append(out.Origins, Origin{Kind: "server-model-connection", Ref: Ref{ID: source.Connection, Version: "head"}})
+		}
+	}
+	return out, nil
 }
 func (s *Service) evaluate(ctx context.Context, tx pgx.Tx, p access.Principal, w string, e Evaluation) (Evaluation, []Ref, error) {
 	if e.Kind != "reported" && e.Kind != "estimated" && e.Kind != "api_equivalent" && e.Kind != "allocated" {

@@ -1,4 +1,9 @@
-import { NavigationLink, ScreenContent } from "./navigation";
+import {
+  NavigationLink,
+  ScreenContent,
+  useNavigation,
+  useScreenActive,
+} from "./navigation";
 import { useEffect, useState } from "react";
 import {
   loadProfiles,
@@ -42,6 +47,8 @@ export function ModelConnectionSettings({
   onSelected: (p: ModelProfile) => void;
   selectionOnly?: boolean;
 }) {
+  const navigation = useNavigation(),
+    visible = useScreenActive();
   const [profiles, setProfiles] = useState<ModelProfile[]>([]),
     [draft, setDraft] = useState<ModelProfile>(() =>
       selected?.server_connection ? selected : fresh(),
@@ -94,6 +101,71 @@ export function ModelConnectionSettings({
     setPriceID(r?.id ?? "");
     setPriceVersion(r?.version ?? "");
   }
+  useEffect(() => {
+    const target =
+      navigation?.route.screen === "models"
+        ? navigation.route.target
+        : undefined;
+    if (
+      selectionOnly ||
+      !visible ||
+      target?.kind !== "model-connection" ||
+      !profiles.length
+    )
+      return;
+    const profile = profiles.find(
+      (p) =>
+        (p.id === target.id || p.server_connection === target.id) &&
+        (target.version === "head" || p.revision === target.version),
+    );
+    if (profile) {
+      edit(profile);
+      onSelected(profile);
+      setNotice("");
+    } else setNotice("指定されたモデル接続の版は見つかりません。");
+  }, [
+    visible,
+    selectionOnly,
+    navigation?.route.target?.id,
+    navigation?.route.target?.version,
+    profiles,
+  ]);
+  const requested =
+    navigation?.route.screen === "models" ? navigation.route.target : undefined;
+  if (
+    !selectionOnly &&
+    requested?.kind === "model-connection" &&
+    profiles.length &&
+    !profiles.some(
+      (p) =>
+        (p.id === requested.id || p.server_connection === requested.id) &&
+        (requested.version === "head" || p.revision === requested.version),
+    )
+  )
+    return (
+      <ScreenContent>
+        <p role="status">指定されたモデル接続の版は見つかりません。</p>
+        <NavigationLink
+          related
+          to={{
+            ...navigation!.route,
+            target: profiles.some(
+              (p) =>
+                p.id === requested.id || p.server_connection === requested.id,
+            )
+              ? { ...requested, version: "head" }
+              : undefined,
+          }}
+        >
+          {profiles.some(
+            (p) =>
+              p.id === requested.id || p.server_connection === requested.id,
+          )
+            ? "現在の接続を開く"
+            : "モデル接続を設定"}
+        </NavigationLink>
+      </ScreenContent>
+    );
   async function save() {
     setBusy(true);
     setNotice("");

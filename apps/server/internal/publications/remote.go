@@ -19,6 +19,8 @@ import (
 )
 
 type Connection struct {
+	Resource       Ref    `json:"resource,omitzero"`
+	Credential     Ref    `json:"credential,omitzero"`
 	Provider       string `json:"provider,omitempty"`
 	Instance       string `json:"instance,omitempty"`
 	ActorID        int64  `json:"actor_id,omitempty"`
@@ -86,6 +88,7 @@ func Environment() (*Config, error) {
 }
 
 type Remote struct {
+	Lookup   func(string, string) (Connection, *gitea.Client, bool)
 	config   *Config
 	client   *http.Client
 	base     string
@@ -99,15 +102,38 @@ func NewRemote(c *Config) *Remote {
 	return &Remote{config: c, client: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}, base: "https://api.github.com", tokens: map[string]githubapp.Token{}}
 }
 func (r *Remote) Connection(w, id string) (Connection, bool) {
-	if r == nil || r.config == nil {
+	if r == nil {
 		return Connection{}, false
 	}
-	for _, c := range r.config.Connections {
-		if c.Workspace == w && c.ID == id {
-			return c, true
+	if r.config != nil {
+		for _, c := range r.config.Connections {
+			if c.Workspace == w && c.ID == id {
+				return c, true
+			}
 		}
 	}
+	if r.Lookup != nil {
+		c, _, ok := r.Lookup(w, id)
+		return c, ok
+	}
 	return Connection{}, false
+}
+func (r *Remote) giteaClient(c Connection) (*gitea.Client, error) {
+	if r.Lookup != nil {
+		found, client, ok := r.Lookup(c.Workspace, c.ID)
+		if ok {
+			if found.RepositoryID != c.RepositoryID || found.Repository != c.Repository || found.Instance != c.Instance {
+				return nil, ErrState
+			}
+			return client, nil
+		}
+	}
+	if r.config != nil {
+		if client := r.config.clients[c.Instance]; client != nil {
+			return client, nil
+		}
+	}
+	return nil, ErrInvalid
 }
 func (r *Remote) request(ctx context.Context, method, path, token string, body io.Reader) (*http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, method, r.base+path, body)
@@ -136,9 +162,9 @@ func (r *Remote) request(ctx context.Context, method, path, token string, body i
 }
 func (r *Remote) token(ctx context.Context, c Connection) (string, error) {
 	if c.Provider == "gitea" {
-		client := r.config.clients[c.Instance]
-		if client == nil {
-			return "", ErrInvalid
+		client, err := r.giteaClient(c)
+		if err != nil {
+			return "", err
 		}
 		return "", client.Repository(ctx, c.Repository, c.RepositoryID)
 	}
@@ -169,7 +195,11 @@ func plainIssue(c Connection, i Issue) bool {
 
 func (r *Remote) send(ctx context.Context, c Connection, method, path, token string, body io.Reader) (*http.Response, error) {
 	if c.Provider == "gitea" {
-		return r.config.clients[c.Instance].Request(ctx, method, path, body)
+		client, err := r.giteaClient(c)
+		if err != nil {
+			return nil, err
+		}
+		return client.Request(ctx, method, path, body)
 	}
 	return r.request(ctx, method, path, token, body)
 }

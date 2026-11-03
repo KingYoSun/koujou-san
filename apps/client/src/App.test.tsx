@@ -15,7 +15,8 @@ it.each([false, true])(
 
     expect(html).toContain("<h1>koujou-san</h1>");
     expect(html).toContain("Workspace");
-    expect(html).not.toContain('aria-label="API接続"');
+    if (native) expect(html).toContain('aria-label="API接続"');
+    else expect(html).not.toContain('aria-label="API接続"');
     queryClient.clear();
   },
 );

@@ -33,6 +33,7 @@ export type GraphRequest = {
   cursor?: string;
 };
 export type GraphEdge = {
+  origin?: Record<string, unknown>;
   id: string;
   kind: string;
   from: Ref;

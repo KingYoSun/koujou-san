@@ -1,4 +1,5 @@
 import { Disclosure } from "./disclosure";
+import { PublicationConnectionPicker } from "./publication-connection-picker";
 import { Field, jsonError } from "./field";
 import { PageList } from "./page-list";
 import { DetailPane, SidebarPane } from "./panes";
@@ -686,7 +687,6 @@ export function Publications({
             {(
               [
                 ["name", "下書きの名前"],
-                ["connection", "起票接続ID"],
                 ["title", "外部Issueのタイトル"],
               ] as const
             ).map(([key, label]) => (
@@ -697,6 +697,12 @@ export function Publications({
                 onChange={(v) => edit({ ...editor.value, [key]: v })}
               />
             ))}
+            <PublicationConnectionPicker
+              native={native}
+              workspace={workspace}
+              value={editor.value.connection}
+              onChange={(connection) => edit({ ...editor.value, connection })}
+            />
             <Field
               label="外部Issueの本文"
               rows={6}

@@ -121,6 +121,16 @@ export async function syncRequest(
   return body;
 }
 
+export async function connectMCP(native: boolean): Promise<void> {
+  if (native) await invoke("mcp_login");
+  else
+    window.open(
+      "/auth/mcp/start",
+      "koujou-mcp-login",
+      "popup,width=700,height=760",
+    );
+}
+
 export async function mcpRequest(
   native: boolean,
   workspace: string,

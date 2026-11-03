@@ -60,30 +60,21 @@ func SourceURL(instance, repository, source string) bool {
 }
 
 func (i Instance) Open() (*Client, error) {
-	origin, err := Origin(i.URL)
-	if err != nil {
-		return nil, err
-	}
 	token, err := os.ReadFile(i.TokenFile)
 	if err != nil || len(strings.TrimSpace(string(token))) == 0 {
 		return nil, ErrConfig
 	}
-	transport := http.DefaultTransport.(*http.Transport).Clone()
+	var cert []byte
 	if i.CAFile != "" {
-		cert, err := os.ReadFile(i.CAFile)
+		cert, err = os.ReadFile(i.CAFile)
 		if err != nil {
 			return nil, ErrConfig
 		}
-		roots, _ := x509.SystemCertPool()
-		if roots == nil {
-			roots = x509.NewCertPool()
-		}
-		if !roots.AppendCertsFromPEM(cert) {
-			return nil, ErrConfig
-		}
-		transport.TLSClientConfig = &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}
 	}
-	c := &Client{URL: origin, token: strings.TrimSpace(string(token)), http: &http.Client{Transport: transport, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+	c, err := FromCredentials(i.URL, string(token), string(cert))
+	if err != nil {
+		return nil, err
+	}
 	if i.WebhookSecretFile != "" {
 		c.Secret, err = os.ReadFile(i.WebhookSecretFile)
 		if err != nil || len(c.Secret) == 0 {
@@ -91,6 +82,25 @@ func (i Instance) Open() (*Client, error) {
 		}
 	}
 	return c, nil
+}
+
+func FromCredentials(instance, token, certificate string) (*Client, error) {
+	origin, err := Origin(instance)
+	if err != nil || strings.TrimSpace(token) == "" {
+		return nil, ErrConfig
+	}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	if certificate != "" {
+		roots, _ := x509.SystemCertPool()
+		if roots == nil {
+			roots = x509.NewCertPool()
+		}
+		if !roots.AppendCertsFromPEM([]byte(certificate)) {
+			return nil, ErrConfig
+		}
+		transport.TLSClientConfig = &tls.Config{RootCAs: roots, MinVersion: tls.VersionTLS12}
+	}
+	return &Client{URL: origin, token: strings.TrimSpace(token), http: &http.Client{Transport: transport, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 
 func (c *Client) ResumeAt() time.Time { return time.Unix(0, c.resumeAt.Load()) }

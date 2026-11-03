@@ -79,6 +79,7 @@ type appToken = githubapp.Token
 // Remote is owned by the single observation worker. HTTP calls are serialized,
 // including token exchange, page retrieval and webhook-triggered reconciliations.
 type Remote struct {
+	Lookup       func(context.Context, Target) (*gitea.Client, error)
 	config       *Config
 	client       *http.Client
 	base         string
@@ -150,7 +151,11 @@ func (r *Remote) limit(resp *http.Response) {
 }
 func (r *Remote) get(ctx context.Context, t Target, path string, into any) error {
 	if t.Provider == "gitea" {
-		return r.config.clients[t.Instance].Get(ctx, path, into)
+		client, err := r.giteaClient(ctx, t)
+		if err != nil {
+			return err
+		}
+		return client.Get(ctx, path, into)
 	}
 	if time.Now().Before(r.resumeAt) {
 		return errors.New("rate_limited")
@@ -198,9 +203,9 @@ func (r *Remote) observe(ctx context.Context, t Target) (Snapshot, error) {
 	var s Snapshot
 	pageSize := "per_page"
 	if t.Provider == "gitea" {
-		client := r.config.clients[t.Instance]
-		if client == nil {
-			return s, errors.New("not_configured")
+		client, err := r.giteaClient(ctx, t)
+		if err != nil {
+			return s, err
 		}
 		if err := client.Repository(ctx, t.Repository, t.RepositoryID); err != nil {
 			return s, err
