@@ -198,6 +198,17 @@ export function RepositorySettings({
     if (saved.repository_id > 0) setMode("register");
     await loadRepositories();
   }
+  async function deleteRejectedRepository() {
+    if (!repository) return;
+    await write(
+      `/repositories/${encodeURIComponent(repository.id)}/delete`,
+      repository.version,
+      {},
+    );
+    setRepository(undefined);
+    await loadRepositories();
+    setNotice("作成拒否の記録を削除しました。");
+  }
   async function openRepository(value: Repository) {
     setRepository(value);
     setMode("register");
@@ -684,6 +695,15 @@ export function RepositorySettings({
                     ) : (
                       <button disabled={!connection}>
                         リポジトリ設定を保存
+                      </button>
+                    )}
+                    {repository.state === "rejected" && (
+                      <button
+                        type="button"
+                        data-variant="secondary"
+                        onClick={() => void work(deleteRejectedRepository)}
+                      >
+                        作成拒否の記録を削除
                       </button>
                     )}
                     {["intent", "unknown"].includes(repository.state) && (
