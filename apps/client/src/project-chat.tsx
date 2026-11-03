@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { syncRequest, workspaceAccessLost } from "./auth";
+import { connectMCP, syncRequest, workspaceAccessLost } from "./auth";
 import { SyncHTTPError } from "./sync-error";
 import { allowAnswerScope, answerScopeEpoch, syncStorage } from "./sync-store";
 import {
@@ -36,6 +36,8 @@ import {
   type ChatThread,
 } from "./chat-api";
 import { ChatWork } from "./chat-work";
+import { useScopePicker } from "./scope-picker";
+import { ChatOperationControls } from "./chat-operation-controls";
 
 export function ProjectChat({
   native,
@@ -64,14 +66,7 @@ export function ProjectChat({
   const navigation = useNavigation(),
     visible = useScreenActive();
   const [project, setProject] = useState<VersionRef>();
-  const [projects, setProjects] = useState<
-    {
-      ref: { id: string; revision: string };
-      name: string;
-      scope_kind: string;
-    }[]
-  >();
-  const [projectNext, setProjectNext] = useState("");
+  const [projectName, setProjectName] = useState("");
   const [threads, setThreads] = useState<ChatPage>();
   const [thread, setThread] = useState<Saved<ChatThread>>();
   const [timeline, setTimeline] = useState<ChatPage>();
@@ -105,7 +100,19 @@ export function ProjectChat({
     currentThread = useRef(thread);
   currentThread.current = thread;
   const ids = useRef(new Map<string, string>());
+  const stopped = useRef(new Set<string>());
   const canEdit = role !== "viewer";
+  const projectPicker = useScopePicker({
+    native,
+    workspace,
+    kind: "project",
+    value: project?.id.replace(/^scope:/, "") ?? "",
+    channels: true,
+    onChange: (id, ref) =>
+      void act(() =>
+        selectProject({ id: "scope:" + id, version: ref?.revision ?? "head" }),
+      ),
+  });
   useEffect(() => {
     lifetime.current = true;
     return () => {
@@ -147,6 +154,8 @@ export function ProjectChat({
       if (error instanceof SyncHTTPError && [401, 403].includes(error.status)) {
         ++serial.current;
         setThread(undefined);
+        setProject(undefined);
+        setProjectName("");
         setTimeline(undefined);
         setThreads(undefined);
         setOperations([]);
@@ -163,34 +172,56 @@ export function ProjectChat({
       setBusy(false);
     }
   }
-  async function listProjects(after = "") {
-    const page = await call<{
-      data: { items: NonNullable<typeof projects> };
-      meta: { next_cursor?: string };
-    }>(`/contexts/workspaces/${encodeURIComponent(workspace)}/catalog`, {
-      kind: "scope",
-      after,
-    });
-    setProjects(page.data.items.filter((p) => p.scope_kind === "project"));
-    setProjectNext(page.meta.next_cursor ?? "");
-  }
-  async function listThreads(after?: ChatPage, selected = project) {
+  async function listThreads(
+    after?: ChatPage,
+    selected = project,
+    mine = serial.current,
+  ) {
     if (!selected) return;
-    setThreads(
-      await call<ChatPage>("/query", {
-        kind: "chat-thread",
-        root: selected.id,
-        search,
-        limit: 50,
-        descending: true,
-        after: after?.after ?? 0,
-        after_id: after?.after_id ?? "",
-      }),
+    const page = await call<ChatPage>("/query", {
+      kind: "chat-thread",
+      root: selected.id,
+      search,
+      limit: 50,
+      descending: true,
+      after: after?.after ?? 0,
+      after_id: after?.after_id ?? "",
+    });
+    if (mine === serial.current) setThreads(page);
+  }
+  async function selectProject(ref: VersionRef, current?: number) {
+    const mine = current ?? ++serial.current;
+    if (current === undefined) {
+      setThread(undefined);
+      setTimeline(undefined);
+      setOperations([]);
+      setChosen([]);
+      setFocused(undefined);
+      setExcerpt(undefined);
+    }
+    const scoped = await call<{
+      data: {
+        ref: { id: string; revision: string };
+        value: { name: string; kind: string };
+      };
+    }>(
+      `/contexts/workspaces/${encodeURIComponent(workspace)}/scope/${encodeURIComponent(ref.id.replace(/^scope:/, ""))}?revision=${encodeURIComponent(ref.version)}`,
     );
+    if (scoped.data.value.kind !== "project") throw Error("project_required");
+    if (mine !== serial.current) return;
+    const project = {
+      id: "scope:" + scoped.data.ref.id,
+      version: scoped.data.ref.revision,
+    };
+    setProject(project);
+    setProjectName(scoped.data.value.name);
+    await listThreads(undefined, project, mine);
   }
   async function refresh(ref: VersionRef, after?: ChatPage) {
     const mine = ++serial.current;
     const saved = await read<ChatThread>(ref);
+    if (currentThread.current?.id !== saved.id)
+      await selectProject(saved.value.project, mine);
     const page = await call<ChatPage>("/query", {
       root: saved.id,
       limit: 50,
@@ -237,6 +268,8 @@ export function ProjectChat({
     const target = navigation?.route.target;
     if (visible && target?.kind === "chat-thread")
       void act(() => refresh(target));
+    else if (visible && target?.kind === "scope")
+      void act(() => selectProject(target));
   }, [
     visible,
     navigation?.route.target?.id,
@@ -245,9 +278,6 @@ export function ProjectChat({
   useEffect(() => {
     if (embedded && initialThread) void act(() => refresh(initialThread));
   }, []);
-  useEffect(() => {
-    if (visible && !projects) void act(() => listProjects());
-  }, [visible]);
   useEffect(() => {
     const element = scroller.current;
     if (!element) return;
@@ -320,28 +350,7 @@ export function ProjectChat({
         },
       );
       const operation = await read<ClientOperation>(ref);
-      const port = operationPort(
-        { native, api, user, workspace },
-        profile!,
-        ref,
-        () => lifetime.current,
-      );
-      setOperations((current) => [
-        operation,
-        ...current.filter((r) => r.id !== operation.id),
-      ]);
-      await runSelection(
-        operation,
-        policy,
-        profile!,
-        operationClientID,
-        port,
-        (update) =>
-          setOperations((current) => [
-            update,
-            ...current.filter((r) => r.id !== update.id),
-          ]),
-      );
+      await run(operation, policy);
     }
     if (currentThread.current?.id === target.id) {
       setText("");
@@ -350,6 +359,58 @@ export function ProjectChat({
       await refresh(target);
     }
     ids.current.delete("message:" + key);
+  }
+  function updateOperation(update: Saved<ClientOperation>) {
+    setOperations((current) => [
+      update,
+      ...current.filter((r) => r.id !== update.id),
+    ]);
+  }
+  async function run(
+    operation: Saved<ClientOperation>,
+    policy: SelectionPolicy,
+  ) {
+    if (!profile) throw Error("model_required");
+    updateOperation(operation);
+    stopped.current.delete(operation.id);
+    await runSelection(
+      operation,
+      policy,
+      profile,
+      operationClientID,
+      operationPort(
+        { native, api, user, workspace },
+        profile,
+        operation,
+        () => lifetime.current && !stopped.current.has(operation.id),
+      ),
+      updateOperation,
+    );
+  }
+  async function recover(operation: Saved<ClientOperation>, action: string) {
+    if (operation.value.user !== user) return;
+    if (action === "cancel") stopped.current.add(operation.id);
+    let current = operation;
+    if (action !== "continue") {
+      const ref = await mutate(
+        `/operations/${encodeURIComponent(operation.id)}/actions`,
+        {
+          kind: action,
+          client: operationClientID,
+          ...(action === "takeover" && profile
+            ? { model: modelSnapshot(profile, workspace) }
+            : {}),
+        },
+        operation.version,
+      );
+      current = await read<ClientOperation>(ref);
+      updateOperation(current);
+    }
+    if (action === "resume" || action === "continue") {
+      const policy = await read<SelectionPolicy>(current.value.policy);
+      await run(current, policy.value);
+    }
+    if (thread) await refresh(thread);
   }
   async function adopt() {
     if (!excerpt || !thread) return;
@@ -392,55 +453,57 @@ export function ProjectChat({
       <div className="chat-layout" data-embedded={embedded || undefined}>
         <aside className="chat-sidebar" aria-label="Projectとスレッド">
           <div className="chat-sidebar-section">
-            <p className="chat-sidebar-title">Project</p>
-            <button
-              data-variant="secondary"
-              disabled={busy}
-              aria-busy={busy}
-              onClick={() => void act(() => listProjects())}
-            >
-              Projectを再取得
-            </button>
-            {projects && (
-              <p>
-                {projects.length
-                  ? `${projects.length}件を表示${projectNext ? "（続きあり）" : ""}`
-                  : "Projectはありません。"}
-              </p>
-            )}
-            <ul className="chat-channels">
-              {projects?.map((p) => (
-                <li key={p.ref.id}>
-                  <button
-                    aria-current={
-                      project?.id === "scope:" + p.ref.id ? "true" : undefined
-                    }
-                    onClick={() => {
-                      const ref = {
-                        id: "scope:" + p.ref.id,
-                        version: p.ref.revision,
-                      };
-                      setProject(ref);
-                      void act(() => listThreads(undefined, ref));
-                    }}
-                  >
-                    {p.name || p.ref.id}
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {projectNext && (
-              <button
-                data-variant="secondary"
-                onClick={() => void act(() => listProjects(projectNext))}
+            {canEdit && (
+              <NavigationLink
+                related
+                to={{
+                  workspace,
+                  screen: "context",
+                  view: "scopes",
+                  query: "project",
+                }}
               >
-                Project候補の次のページ
-              </button>
+                Projectを作成
+              </NavigationLink>
             )}
+            {projectPicker}
           </div>
           {project && (
             <div className="chat-sidebar-section">
-              <p className="chat-sidebar-title">スレッド</p>
+              <p className="chat-sidebar-title">
+                {projectName ? `${projectName}のスレッド` : "スレッド"}
+              </p>
+              <NavigationLink
+                related
+                to={{
+                  workspace,
+                  screen: "repositories",
+                  target: {
+                    kind: "scope",
+                    id: project.id.replace(/^scope:/, ""),
+                    version: project.version,
+                  },
+                }}
+              >
+                Projectのリポジトリを設定
+              </NavigationLink>
+              {role === "admin" && (
+                <NavigationLink
+                  related
+                  to={{
+                    workspace,
+                    screen: "workspace",
+                    view: "resource-policy",
+                    target: {
+                      kind: "resource",
+                      id: project.id,
+                      version: "head",
+                    },
+                  }}
+                >
+                  Projectの共有設定
+                </NavigationLink>
+              )}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -641,6 +704,24 @@ export function ProjectChat({
                       op.value.client !== operationClientID && (
                         <p>別クライアントで送信中</p>
                       )}
+                    {canEdit && (
+                      <ChatOperationControls
+                        operation={op.value}
+                        user={user}
+                        client={operationClientID}
+                        busy={busy}
+                        modelMatches={
+                          !!profile &&
+                          modelReady(native, api + "\0" + user, profile) &&
+                          profile.id === op.value.model.connection &&
+                          profile.revision === op.value.model.revision &&
+                          profile.model === op.value.model.requested
+                        }
+                        onAction={(action) =>
+                          void act(() => recover(op, action))
+                        }
+                      />
+                    )}
                     <Disclosure title="操作と原応答を確認">
                       {() => (
                         <>
@@ -715,6 +796,16 @@ export function ProjectChat({
                           />
                           Contextを参照
                         </label>
+                        {context && (
+                          <button
+                            type="button"
+                            data-variant="secondary"
+                            disabled={busy}
+                            onClick={() => void act(() => connectMCP(native))}
+                          >
+                            MCPへ接続
+                          </button>
+                        )}
                         <ModelConnectionSettings
                           native={native}
                           actor={api + "\0" + user}

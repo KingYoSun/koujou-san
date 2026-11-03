@@ -2,6 +2,7 @@ package contexts
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
@@ -41,9 +42,11 @@ func CandidateOf(record Record) Candidate {
 }
 
 type CatalogRequest struct {
-	Kind  string `json:"kind"`
-	ID    string `json:"id,omitempty"`
-	After string `json:"after,omitempty"`
+	Kind      string `json:"kind"`
+	ID        string `json:"id,omitempty"`
+	After     string `json:"after,omitempty"`
+	ScopeKind string `json:"scope_kind,omitempty"`
+	Search    string `json:"search,omitempty"`
 }
 type CatalogPage struct {
 	Items []Candidate `json:"items"`
@@ -52,6 +55,12 @@ type CatalogPage struct {
 func (s *Service) Catalog(ctx context.Context, p access.Principal, w string, r CatalogRequest) (apicontract.Response[CatalogPage], error) {
 	if err := s.check(ctx, s.Store.Database(), p, w, "", "read"); err != nil {
 		return apicontract.Response[CatalogPage]{}, err
+	}
+	if r.ScopeKind != "" || r.Search != "" {
+		if r.Kind != "scope" || r.ID != "" || scopeLevel(r.ScopeKind) == 0 {
+			return apicontract.Response[CatalogPage]{}, invalid("invalid_request", nil)
+		}
+		return s.scopeCatalog(ctx, p, w, r)
 	}
 	history := r.ID != ""
 	if (!history && r.Kind != "scope") || (history && unitLevel(r.Kind) == 0 && r.Kind != "scope" && r.Kind != "membership") {
@@ -148,6 +157,10 @@ func (s *Service) Catalog(ctx context.Context, p access.Principal, w string, r C
 			break
 		}
 	}
+	return s.catalogResult(ctx, w, page, next)
+}
+
+func (s *Service) catalogResult(ctx context.Context, w string, page CatalogPage, next *string) (apicontract.Response[CatalogPage], error) {
 	var position string
 	if err := s.Store.Database().QueryRow(ctx, "SELECT position FROM shared_streams WHERE workspace_id=$1", w).Scan(&position); err != nil {
 		return apicontract.Response[CatalogPage]{}, err
@@ -158,6 +171,60 @@ func (s *Service) Catalog(ctx context.Context, p access.Principal, w string, r C
 		meta.Completeness = apicontract.Completeness{State: "partial", Reason: "page_remaining"}
 	}
 	return apicontract.Response[CatalogPage]{Data: &page, Meta: meta}, nil
+}
+
+func (s *Service) scopeCatalog(ctx context.Context, p access.Principal, w string, r CatalogRequest) (apicontract.Response[CatalogPage], error) {
+	type cursor struct{ Kind, Search, Name, ID string }
+	c := cursor{Kind: r.ScopeKind, Search: r.Search}
+	if r.After != "" {
+		raw, err := base64.RawURLEncoding.DecodeString(r.After)
+		if err != nil || json.Unmarshal(raw, &c) != nil || c.Kind != r.ScopeKind || c.Search != r.Search {
+			return apicontract.Response[CatalogPage]{}, invalid("invalid_cursor", nil)
+		}
+	}
+	pattern := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(r.Search) + "%"
+	rows, err := s.Store.Database().Query(ctx, `SELECT r.resource_id,r.revision,left(r.payload->>'name',160),r.payload->'parent',c.sort_name
+ FROM context_scope_catalog c JOIN context_records r ON r.workspace_id=c.workspace_id AND r.resource_id=c.resource_id AND r.revision=c.revision
+ WHERE c.workspace_id=$1 AND c.scope_kind=$4 AND c.sort_name LIKE lower($5) AND (c.sort_name,c.resource_id)>($6,$7)
+ AND `+access.ReadFilterSQL(`jsonb_build_array(jsonb_build_object('id',r.resource_id,'version',r.revision))`)+`
+ ORDER BY c.sort_name,c.resource_id LIMIT 101`, w, p.UserID, p.OperationID, r.ScopeKind, pattern, c.Name, c.ID)
+	if err != nil {
+		return apicontract.Response[CatalogPage]{}, err
+	}
+	defer rows.Close()
+	page := CatalogPage{Items: []Candidate{}}
+	var next *string
+	last := c
+	for rows.Next() {
+		var item Candidate
+		var parent []byte
+		var id, name string
+		if err = rows.Scan(&id, &item.Ref.Revision, &item.Name, &parent, &name); err != nil {
+			return apicontract.Response[CatalogPage]{}, err
+		}
+		if len(page.Items) == 100 {
+			raw, _ := json.Marshal(last)
+			value := base64.RawURLEncoding.EncodeToString(raw)
+			next = &value
+			break
+		}
+		item.Ref.Kind = "scope"
+		item.Ref.ID = strings.TrimPrefix(id, "scope:")
+		item.ScopeKind = r.ScopeKind
+		if string(parent) != "null" && len(parent) > 0 {
+			if err = json.Unmarshal(parent, &item.Parent); err != nil {
+				return apicontract.Response[CatalogPage]{}, err
+			}
+		}
+		page.Items = append(page.Items, item)
+		last.Name = name
+		last.ID = id
+	}
+	if err = rows.Err(); err != nil {
+		return apicontract.Response[CatalogPage]{}, err
+	}
+	rows.Close()
+	return s.catalogResult(ctx, w, page, next)
 }
 func (s *Service) catalogHTTP(w http.ResponseWriter, r *http.Request) {
 	p, ok := s.principal(w, r)

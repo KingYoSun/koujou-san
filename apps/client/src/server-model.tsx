@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { syncRequest } from "./auth";
-import { NavigationLink, ScreenContent, useScreenActive } from "./navigation";
+import {
+  NavigationLink,
+  ScreenContent,
+  useNavigation,
+  useScreenActive,
+} from "./navigation";
 
 export type ModelConnection = {
   id: string;
@@ -21,6 +26,19 @@ export function ServerModelConnections({
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const active = useScreenActive();
+  const navigation = useNavigation();
+  const requested =
+    navigation?.route.screen === "serverModels"
+      ? navigation.route.target
+      : undefined;
+  const shown =
+    requested?.kind === "server-model-connection"
+      ? connections?.filter(
+          (c) =>
+            c.id === requested.id &&
+            (requested.version === "head" || c.revision === requested.version),
+        )
+      : connections;
   const load = async () => {
     setBusy(true);
     setNotice("");
@@ -61,9 +79,12 @@ export function ServerModelConnections({
               : "サーバーLLM接続はありません。"}
           </p>
         )}
-        {!!connections?.length && (
+        {requested && connections && !shown?.length && (
+          <p role="status">指定されたサーバーLLM接続の版は見つかりません。</p>
+        )}
+        {!!shown?.length && (
           <ul>
-            {connections.map((c) => (
+            {shown.map((c) => (
               <li key={c.id}>
                 {c.name} / 接続：{c.id} / 版：{c.revision}
                 {c.type === "chatgpt" && " / ChatGPTプラン"}

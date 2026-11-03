@@ -231,6 +231,11 @@ func (s *Service) Put(ctx context.Context, p access.Principal, w string, i Ident
 		if _, err = tx.Exec(ctx, "INSERT INTO context_records SELECT $1,$2,$3,$4,$5,sequence+1 FROM shared_streams WHERE workspace_id=$1", w, resource(i), i.Kind, version.Version, value); err != nil {
 			return nil, err
 		}
+		if i.Kind == "scope" {
+			if _, err = tx.Exec(ctx, `INSERT INTO context_scope_catalog SELECT $1,$2,$3,$4::jsonb->>'kind',lower($4::jsonb->>'name') ON CONFLICT(workspace_id,resource_id) DO UPDATE SET revision=excluded.revision,scope_kind=excluded.scope_kind,sort_name=excluded.sort_name`, w, resource(i), version.Version, value); err != nil {
+				return nil, err
+			}
+		}
 		// Existing resource policy belongs to access. A content edit must not replace
 		// restricted grants with the default shared policy.
 		if request.ExpectedVersion == "0" {

@@ -22,22 +22,23 @@ import (
 )
 
 type Service struct {
-	Accepted func(context.Context, pgx.Tx, Target, Snapshot, int64) error
-	store    *persistence.Store
-	access   *access.Service
-	config   *Config
-	remote   *Remote
-	wake     chan struct{}
-	mu       sync.Mutex
+	AuthorizeTarget func(context.Context, access.Principal, string, Target) error
+	Accepted        func(context.Context, pgx.Tx, Target, Snapshot, int64) error
+	store           *persistence.Store
+	access          *access.Service
+	config          *Config
+	remote          *Remote
+	wake            chan struct{}
+	mu              sync.Mutex
 }
 
 func New(ctx context.Context, store *persistence.Store, a *access.Service, c *Config) (*Service, error) {
 	if c == nil {
-		return &Service{store: store, access: a}, nil
+		c = &Config{IntervalSeconds: 60, clients: map[string]*gitea.Client{}}
 	}
 	s := &Service{store: store, access: a, config: c, remote: newRemote(c), wake: make(chan struct{}, 1)}
 	err := pgx.BeginFunc(ctx, store.Database(), func(tx pgx.Tx) error {
-		if _, e := tx.Exec(ctx, "UPDATE github_targets SET active=false; DELETE FROM github_bindings"); e != nil {
+		if _, e := tx.Exec(ctx, "UPDATE github_targets SET active=false WHERE NOT managed; DELETE FROM github_bindings WHERE target_id IN (SELECT id FROM github_targets WHERE NOT managed)"); e != nil {
 			return e
 		}
 		for _, t := range c.Targets {
@@ -178,6 +179,11 @@ func (s *Service) Current(ctx context.Context, p access.Principal, w, id string)
 	if json.Unmarshal(source, &target) != nil {
 		return Snapshot{}, errors.New("invalid_target")
 	}
+	if s.AuthorizeTarget != nil {
+		if err := s.AuthorizeTarget(ctx, p, w, target); err != nil {
+			return Snapshot{}, err
+		}
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.remote.observe(ctx, target)
@@ -210,6 +216,14 @@ func (s *Service) authorized(w http.ResponseWriter, r *http.Request, target stri
 	if s.access.Check(r.Context(), access.Principal{UserID: id}, r.PathValue("workspace"), target, action) != nil {
 		send(w, 403, map[string]string{"error": "forbidden"})
 		return false
+	}
+	if target != "" && s.AuthorizeTarget != nil {
+		var spec []byte
+		var t Target
+		if err := s.store.Database().QueryRow(r.Context(), `SELECT spec FROM github_targets WHERE id=$1`, strings.TrimPrefix(target, "github:")).Scan(&spec); err != nil || json.Unmarshal(spec, &t) != nil || s.AuthorizeTarget(r.Context(), access.Principal{UserID: id}, r.PathValue("workspace"), t) != nil {
+			send(w, 403, map[string]string{"error": "forbidden"})
+			return false
+		}
 	}
 	return true
 }
@@ -249,6 +263,9 @@ func (s *Service) listHTTP(w http.ResponseWriter, r *http.Request) {
 		count++
 		cursor = v.Target.ID
 		if s.access.Check(r.Context(), access.Principal{UserID: id}, workspace, gitea.Resource(v.Target.ID), "get") != nil {
+			continue
+		}
+		if s.AuthorizeTarget != nil && s.AuthorizeTarget(r.Context(), access.Principal{UserID: id}, workspace, v.Target) != nil {
 			continue
 		}
 		_ = json.Unmarshal(jobs, &v.RequiredJobs)

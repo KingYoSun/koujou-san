@@ -181,6 +181,44 @@ func TestContextsPostgres(t *testing.T) {
 		t.Fatal("Scope catalog continuation repeated or lost Scope")
 	}
 	catalog("bob", "two", CatalogRequest{Kind: "scope"}, 403)
+	var lastProject Ref
+	for i := 0; i < 101; i++ {
+		lastProject = put("two", "scope", fmt.Sprintf("catalog-project-%03d", i), "0", Scope{Kind: "project", Name: fmt.Sprintf("Project %03d", i)})
+	}
+	put("two", "scope", "catalog-project-literal", "0", Scope{Kind: "project", Name: "Project%literal"})
+	projects := catalog("alice", "two", CatalogRequest{Kind: "scope", ScopeKind: "project", Search: "Project"}, 200)
+	if len(projects.Data.Items) != 100 || projects.Meta.NextCursor == nil {
+		t.Fatal("Project filter scanned other Scope kinds or lost its page")
+	}
+	for _, candidate := range projects.Data.Items {
+		if candidate.ScopeKind != "project" {
+			t.Fatal("non-Project returned in Project candidates")
+		}
+	}
+	remainingProjects := catalog("alice", "two", CatalogRequest{Kind: "scope", ScopeKind: "project", Search: "Project", After: *projects.Meta.NextCursor}, 200)
+	if len(remainingProjects.Data.Items) != 2 || remainingProjects.Meta.NextCursor != nil {
+		t.Fatal("Project pagination repeated or dropped a candidate")
+	}
+	literal := catalog("alice", "two", CatalogRequest{Kind: "scope", ScopeKind: "project", Search: "Project%"}, 200)
+	if len(literal.Data.Items) != 1 || literal.Data.Items[0].Name != "Project%literal" {
+		t.Fatal("Project name was interpreted as a wildcard")
+	}
+	put("two", "scope", lastProject.ID, lastProject.Revision, Scope{Kind: "project", Name: "Renamed Project"})
+	renamed := catalog("alice", "two", CatalogRequest{Kind: "scope", ScopeKind: "project", Search: "Renamed"}, 200)
+	if len(renamed.Data.Items) != 1 || renamed.Data.Items[0].Ref.ID != lastProject.ID {
+		t.Fatal("Scope rename did not update current Project metadata")
+	}
+	oldName := catalog("alice", "two", CatalogRequest{Kind: "scope", ScopeKind: "project", Search: "Project 100"}, 200)
+	if len(oldName.Data.Items) != 0 {
+		t.Fatal("historical name remained in current Project metadata")
+	}
+	policyBody := map[string]any{"operation_id": "hide-project", "expected_version": "0", "restricted": true}
+	request("alice", "POST", "/access/workspaces/two/resources/scope:"+lastProject.ID, policyBody, 200)
+	hiddenProject := catalog("alice", "two", CatalogRequest{Kind: "scope", ScopeKind: "project", Search: "Renamed"}, 200)
+	if len(hiddenProject.Data.Items) != 0 {
+		t.Fatal("restricted Project leaked through filtered catalog")
+	}
+	catalog("alice", "two", CatalogRequest{Kind: "scope", ScopeKind: "unknown"}, 400)
 	memberHistory := catalog("bob", "one", CatalogRequest{Kind: "membership", ID: documentMembership.ID}, 200)
 	if memberHistory.Data == nil || len(memberHistory.Data.Items) != 1 || memberHistory.Data.Items[0].Ref != documentMembership {
 		t.Fatal("per-identity history did not preserve fixed version")

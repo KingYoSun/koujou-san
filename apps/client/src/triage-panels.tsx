@@ -250,6 +250,9 @@ export function TriageIssue({
   const content = (
     <fieldset>
       <legend>Issueの本文・期限・依存</legend>
+      {canEdit && !loaded && (
+        <button onClick={() => setLoaded(true)}>Issue情報を新規作成</button>
+      )}
       <button
         data-variant="secondary"
         onClick={() =>

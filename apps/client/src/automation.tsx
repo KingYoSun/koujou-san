@@ -1,3 +1,4 @@
+import { ScopePicker } from "./scope-picker";
 import {
   ScreenContent,
   NavigationLink,
@@ -1335,6 +1336,43 @@ export function Automation({
             {surface === "priorities" && view === "queue" && (
               <fieldset id="triage-priority-editor" disabled={busy}>
                 <legend>Issueの優先度</legend>
+                <ScopePicker
+                  native={native}
+                  workspace={workspace}
+                  kind="issue"
+                  value={issueID.replace(/^scope:/, "")}
+                  onChange={(value) => {
+                    setIssueID(value);
+                    setPriority(null);
+                    setSelected(null);
+                    setScopeTarget(null);
+                    if (value)
+                      navigation?.navigate(
+                        {
+                          ...navigation.route,
+                          target: {
+                            kind: "scope",
+                            id: "scope:" + value,
+                            version: "head",
+                          },
+                        },
+                        { related: true },
+                      );
+                  }}
+                />
+                {canEdit && (
+                  <NavigationLink
+                    related
+                    to={{
+                      workspace,
+                      screen: "context",
+                      view: "scopes",
+                      query: "issue",
+                    }}
+                  >
+                    Issue Scopeを作成
+                  </NavigationLink>
+                )}
                 <details>
                   <summary>IssueをIDで指定</summary>
                   <label>

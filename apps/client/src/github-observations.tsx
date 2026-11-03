@@ -1,4 +1,4 @@
-import { ScreenContent, useScreenActive } from "./navigation";
+import { NavigationLink, ScreenContent, useScreenActive } from "./navigation";
 import { useEffect, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
@@ -335,6 +335,9 @@ export function GithubObservations({
   return (
     <ScreenContent>
       <section className="workspace-management github-observations">
+        <NavigationLink related to={{ workspace, screen: "repositories" }}>
+          観測接続を設定
+        </NavigationLink>
         <button
           data-variant="secondary"
           aria-busy={query.isFetching}

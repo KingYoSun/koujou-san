@@ -23,6 +23,7 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/mcpapi"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/publications"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/repositories"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/runs"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/searchindex"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/sharedsync"
@@ -75,6 +76,9 @@ func main() {
 				os.Exit(1)
 			}
 			routes = append(routes, observer.Register)
+			repositoryService := repositories.New(store, accessService, service.Config.Key)
+			repositoryService.AttachObserver(observer)
+			routes = append(routes, repositoryService.Register)
 			limits, err := contexts.EnvironmentLimits()
 			if err != nil {
 				slog.Error("Context configuration invalid")
@@ -127,6 +131,7 @@ func main() {
 				automationService.PriorityIntervalSeconds = publicationConfig.PriorityIntervalSeconds
 			}
 			publicationService := publications.New(store, accessService, runService, publicationBackend)
+			repositoryService.AttachPublication(publicationBackend, publicationService)
 			hopperService := hopper.New(store, accessService, automationService, runService, workflowService, publicationService, graphService)
 			observer.Accepted = hopperService.GitHubAccepted
 			observer.Start(ctx)

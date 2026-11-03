@@ -166,6 +166,15 @@ func (s *Service) Register(mux *http.ServeMux) {
 		}
 		return nil
 	}
+	route("GET", "/connections", func(ctx context.Context, p access.Principal, w string, r *http.Request) (any, error) {
+		if err := s.Access.Check(ctx, p, w, "", "read"); err != nil {
+			return nil, err
+		}
+		if s.ListConnections == nil {
+			return map[string]any{"items": []Connection{}}, nil
+		}
+		return s.ListConnections(ctx, p, w, r.URL.Query().Get("after"))
+	})
 	route("GET", "/records/{id}", func(ctx context.Context, p access.Principal, w string, r *http.Request) (any, error) {
 		version := r.URL.Query().Get("version")
 		if version == "" {

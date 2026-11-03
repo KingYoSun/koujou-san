@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useScreenActive } from "./navigation";
+import { useNavigation, useScreenActive } from "./navigation";
 import { SidebarPane } from "./panes";
 import { TabPanel, Tabs } from "./tabs";
 import { Field } from "./field";
@@ -24,6 +24,8 @@ import {
   recordName,
 } from "./context-ui";
 import { EnvelopeStatus, ListCount } from "./context-status";
+import { GraphRelationEditor } from "./graph-relation-editor";
+import type { GraphEdge } from "./context-ui";
 
 type Search = {
   text?: string;
@@ -45,6 +47,13 @@ export function ContextExplorer({
   mode?: string;
 }) {
   const visible = useScreenActive() && active;
+  const navigation = useNavigation();
+  const requestedKind =
+    navigation?.route.screen === "context" &&
+    mode === "scopes" &&
+    scopeKinds.includes(navigation.route.query ?? "")
+      ? navigation.route.query
+      : undefined;
   const state = useStore(ui.store);
   const [tab, setTab] = useState("search");
   useEffect(() => {
@@ -62,6 +71,7 @@ export function ContextExplorer({
   const [scopeBack, setScopeBack] = useState<string[]>([]);
   const [back, setBack] = useState<Search[]>([]);
   const [graph, setGraph] = useState<GraphRequest>();
+  const [editingRelation, setEditingRelation] = useState<GraphEdge>();
   const [graphSource, setGraphSource] = useState("");
   const [graphBack, setGraphBack] = useState<GraphRequest[]>([]);
   const [direction, setDirection] = useState("in");
@@ -69,7 +79,10 @@ export function ContextExplorer({
   const [depth, setDepth] = useState(1);
   const [history, setHistory] = useState(false);
   const [newKind, setNewKind] = useState("sentence");
-  const [newScopeKind, setNewScopeKind] = useState("issue");
+  const [newScopeKind, setNewScopeKind] = useState(requestedKind ?? "issue");
+  useEffect(() => {
+    if (visible && requestedKind) setNewScopeKind(requestedKind);
+  }, [visible, requestedKind]);
   const [draftAfter, setDraftAfter] = useState("");
   const [draftBack, setDraftBack] = useState<string[]>([]);
   const [draftNext, setDraftNext] = useState<string | null>();
@@ -426,7 +439,7 @@ export function ContextExplorer({
                 disabled={!ui.canCreate || ui.engine.status !== "current"}
                 onClick={() => void create("scope")}
               >
-                Scopeを新規作成
+                {labels[newScopeKind]}を新規作成
               </button>
               <EnvelopeStatus value={scopes.data} error={scopes.error} />
               <ListCount
@@ -485,6 +498,7 @@ export function ContextExplorer({
                     ["uses", "Runでの利用"],
                     ["reference", "参照"],
                     ["generated", "生成の由来"],
+                    ["semantic", "意味の関係"],
                     ["version", "版"],
                     ["", "すべての関係"],
                   ].map(([value, label]) => (
@@ -564,6 +578,14 @@ export function ContextExplorer({
                           <small>
                             由来の版：{item.edge && refLabel(item.edge.source)}
                           </small>
+                          {ui.canCreate &&
+                            item.edge?.source.kind === "relation" && (
+                              <button
+                                onClick={() => setEditingRelation(item.edge)}
+                              >
+                                関係を編集
+                              </button>
+                            )}
                         </li>
                       ),
                     )}
@@ -602,6 +624,17 @@ export function ContextExplorer({
                     関係の次のページ
                   </button>
                 </>
+              )}
+              {ui.canCreate && (
+                <GraphRelationEditor
+                  ui={ui}
+                  selected={record?.ref}
+                  reference={state.reference?.ref}
+                  editing={editingRelation}
+                  onSaved={() => {
+                    void related.refetch();
+                  }}
+                />
               )}
             </>
           )}

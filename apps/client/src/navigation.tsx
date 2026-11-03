@@ -24,6 +24,7 @@ export const destinations = {
   account: ["設定", "アカウント"],
   workspace: ["設定", "Workspace・参加者・招待"],
   devices: ["設定", "端末・共有ポリシー"],
+  repositories: ["設定", "リポジトリ接続"],
   execution: ["設定", "CLI・独立Runner"],
   models: ["設定", "クライアントLLM接続"],
   serverModels: ["設定", "サーバーLLM接続"],

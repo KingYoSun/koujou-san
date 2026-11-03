@@ -21,6 +21,8 @@ import { UsagePricing } from "./usage-pricing";
 import { GithubObservations } from "./github-observations";
 import { ExecutionSettings } from "./execution-settings";
 import { RunnerSettings } from "./runner-settings";
+import { ResourceSharing } from "./resource-sharing";
+import { RepositorySettings } from "./repository-settings";
 import { ModelConnectionSettings } from "./model-connection-settings";
 import type { ModelProfile, VersionRef } from "./model-connections";
 import { ServerModelConnections } from "./server-model";
@@ -75,6 +77,10 @@ export function WorkspaceShell({
   const panes = useMemo<Panes>(() => ({ sidebar, detail }), [sidebar, detail]);
   const [chatOpen, setChatOpen] = useState(false);
   const [chatThread, setChatThread] = useState<VersionRef>();
+  useEffect(
+    () => setChatOpen(false),
+    [route.screen, route.view, route.query, route.target?.id],
+  );
   const launcher = useRef<HTMLButtonElement>(null);
   const [group, title] = destinations[route.screen];
   const groups = [...new Set(Object.values(destinations).map(([g]) => g))];
@@ -285,6 +291,17 @@ export function WorkspaceShell({
           </Screen>
           <ScreenContent screens={["workspace", "devices"]}>
             {management}
+          </ScreenContent>
+          <Screen screens={["workspace"]}>
+            <ResourceSharing {...common} />
+          </Screen>
+          <Screen screens={["repositories"]}>
+            <RepositorySettings {...common} />
+          </Screen>
+          <ScreenContent screens={["workspace"]}>
+            <NavigationLink related to={{ workspace, screen: "repositories" }}>
+              リポジトリを設定
+            </NavigationLink>
           </ScreenContent>
           <ScreenContent screens={["account"]}>{account}</ScreenContent>
           <ScreenContent screens={["connection"]}>{connection}</ScreenContent>

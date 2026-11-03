@@ -2,7 +2,19 @@
 
 観測・起票はサーバー側の既存サービス、PR等の操作は既存RunのCLI/APIを使う。[ADR 0034](../adr/0034-gitea-integration.md)と[受入記録](../progress/2026-11-01-issue-83-evidence.md)を参照する。検証対象はGitea **28.2.0**、Gitea Runner **5.2.0**。他の版は未確認である。
 
-## 観測の設定
+## Webから共有接続とrepoを設定する
+
+Workspace管理者は「設定→リポジトリ接続→共有接続」でGitea URL、専用アクセストークン、必要なCA証明書を保存する。資格情報はWorkspaceに結び付けてサーバーのDBへ暗号化保存し、API応答・共有履歴・Contextへ返さない。暗号化には既存のサーバー認証キーから用途別に導出したキーを使うため、DBの復元には元の認証キーも必要となる。
+
+新規repoを作る場合は、その接続で「このWorkspaceでリポジトリ作成を許可」を有効にする。作成用tokenにはGitea側の対象所有者に対する作成権限も必要であり、観測・起票用の権限だけを作成許可として扱わない。保存済み接続のトークン欄が空なら現在の資格情報を保持する。入力したトークン・CAだけを置き換える。
+
+「リポジトリ」では、既存repoの登録と新規作成を分けて操作する。新規作成では共有接続、所有者、名前、公開範囲を指定する。本人所有の作成は[`POST /user/repos`](https://docs.gitea.com/api/operations/create-current-user-repo/)、組織所有は[`POST /orgs/{org}/repos`](https://docs.gitea.com/api/operations/create-org-repo/)を使う。READMEによる初期化は任意。送信意図を先に保存し、同じ意図は一度だけ送信する。「作成結果未確認」では作成を繰り返さず「作成結果を照合」で取得する。照合による存在確認は、その要求が作成した証明とは区別する。
+
+repoには任意のProjectを関連付けられ、一つのWorkspace・Projectで複数repoを扱える。関連付けは権限付与やRunの入力注入ではない。ProjectチャットとWorkspaceの設定から同じ画面へ進める。Run割当・独立Runnerでは登録したrepoを選び、固定commitと端末内のpathをそれぞれ指定する。登録・保存だけではcloneやCLI実行を始めない。
+
+登録したrepoの「観測対象を追加」でIssue・PR・commit・Actions・statusを設定する。外部起票では登録済みrepoと既存のファイル設定から候補を選べる。これらは現在のWorkspace・資源権限で絞り込む。GitHub Appの秘密鍵とインストール許可は従来の運用設定で管理し、「GitHub接続の引継ぎ」から担当者用のWorkspace設定JSONを出力する。出力だけでは他Workspaceの許可を追加しない。
+
+## 設定ファイルでの観測
 
 一般ユーザーの対象repoへのアクセスと、`read:repository`・`read:issue`を持つtokenを用意する。token、CA、Webhook secretはサーバー実行者だけが読めるGit管理外のファイルへ保存する。秘密値をJSONの値、Context、Run入力、ログへ書かない。
 

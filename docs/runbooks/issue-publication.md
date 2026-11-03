@@ -4,6 +4,8 @@ Workspaceの「外部Issueの起票」から、端末の下書き、共有下書
 
 ## 書込み接続の設定
 
+Webでは下書きの「起票先リポジトリ」から、このWorkspaceで利用できる接続を選ぶ。候補がない場合は「起票接続を設定」から共有接続・repo登録、またはGitHub接続の引継ぎへ進む。Giteaの共有接続と作成権限は[接続手順](gitea.md#webから共有接続とrepoを設定する)を参照する。手入力した接続IDを取得する前提にしない。
+
 サーバーへ`KOUJOU_PUBLICATION_CONFIG`でGit管理外のJSONファイルを指定する。例は次のとおり。実際のApp・installation・repository IDとWorkspace IDへ置き換える。秘密鍵や実設定をリポジトリへ追加しない。
 
 ```json

@@ -7,8 +7,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { SyncHTTPError } from "./sync-error";
 import { useStore } from "zustand";
-import { invoke } from "@tauri-apps/api/core";
-import { syncRequest } from "./auth";
+import { connectMCP, syncRequest } from "./auth";
 import { refKey, refLabel, type UI, type Ref } from "./context-ui";
 import { ModelConnectionSettings } from "./model-connection-settings";
 import {
@@ -757,17 +756,7 @@ export function ClientSelection({
           <button
             data-variant="secondary"
             disabled={busy}
-            onClick={() =>
-              void work(async () => {
-                if (ui.native) await invoke("mcp_login");
-                else
-                  window.open(
-                    "/auth/mcp/start",
-                    "koujou-mcp-login",
-                    "popup,width=700,height=760",
-                  );
-              })
-            }
+            onClick={() => void work(() => connectMCP(ui.native))}
           >
             MCPへ接続
           </button>

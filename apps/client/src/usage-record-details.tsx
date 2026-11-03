@@ -1,4 +1,4 @@
-import { NavigationLink, useNavigation } from "./navigation";
+import { NavigationLink, useNavigation, type Route } from "./navigation";
 import { useEffect, useRef } from "react";
 import { Disclosure } from "./disclosure";
 import { UsageEntryView, type UsageEntry } from "./run-usage";
@@ -7,7 +7,11 @@ export function UsageRecordDetails({
   record,
   onRead,
 }: {
-  record: CostRef & { kind: string; value: unknown };
+  record: CostRef & {
+    kind: string;
+    value: unknown;
+    origins?: (CostRef & { kind: string })[];
+  };
   onRead: (ref: CostRef) => void;
 }) {
   const navigation = useNavigation();
@@ -87,27 +91,49 @@ export function UsageRecordDetails({
           <dd>{String(value.source)}</dd>
         </dl>
       )}
-      <NavigationLink
-        to={{ workspace: navigation?.route.workspace ?? "", screen: "models" }}
-        related
-      >
-        この根拠からモデル接続の編集へ
-      </NavigationLink>
-      <NavigationLink
-        to={{ workspace: navigation?.route.workspace ?? "", screen: "context" }}
-        related
-      >
-        この根拠からContextの編集へ
-      </NavigationLink>
-      <NavigationLink
-        to={{
-          workspace: navigation?.route.workspace ?? "",
-          screen: "workflows",
-        }}
-        related
-      >
-        この根拠から工程定義の編集へ
-      </NavigationLink>
+      {record.origins
+        ?.filter(
+          (origin, index, origins) =>
+            origins.findIndex(
+              (item) =>
+                item.kind === origin.kind &&
+                item.id === origin.id &&
+                item.version === origin.version,
+            ) === index,
+        )
+        .map((origin) => {
+          const screen: Route["screen"] =
+            origin.kind === "model-connection"
+              ? "models"
+              : origin.kind === "server-model-connection"
+                ? "serverModels"
+                : ["run-definition", "workflow-definition"].includes(
+                      origin.kind,
+                    )
+                  ? "workflows"
+                  : "context";
+          return (
+            <NavigationLink
+              key={`${origin.kind}:${origin.id}@${origin.version}`}
+              related
+              to={{
+                workspace: navigation?.route.workspace ?? "",
+                screen,
+                target: origin,
+                ...(origin.kind === "scope" ? { view: "scopes" } : {}),
+              }}
+            >
+              {["model-connection", "server-model-connection"].includes(
+                origin.kind,
+              )
+                ? "モデル接続"
+                : screen === "workflows"
+                  ? "工程定義"
+                  : "Context"}
+              を開く · {origin.id} @ {origin.version}
+            </NavigationLink>
+          );
+        })}
       <Disclosure title="記録の全項目（JSON）">
         {() => <pre>{JSON.stringify(record, null, 2)}</pre>}
       </Disclosure>

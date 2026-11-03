@@ -56,6 +56,7 @@ func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 func (s *Service) Register(mux *http.ServeMux) {
+	s.registerResourcePolicy(mux)
 	mux.HandleFunc("GET /access/workspaces", s.listWorkspaces)
 	mux.HandleFunc("GET /access/workspaces/{workspace}/{kind}", s.list)
 	mux.HandleFunc("POST /access/workspaces/{workspace}/{kind}", s.write)

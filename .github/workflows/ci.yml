@@ -67,7 +67,7 @@ jobs:
         run: pnpm run test:access
 
       - name: Test read-only GitHub observation and recovery
-        run: pnpm run test:github
+        run: pnpm run test:forge
 
       - name: Test Run records, pauses and export
         run: pnpm run test:runs
