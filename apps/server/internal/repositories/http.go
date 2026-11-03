@@ -12,6 +12,7 @@ import (
 )
 
 func (s *Service) Register(mux *http.ServeMux) {
+	s.registerOAuth(mux)
 	base := "/forge/workspaces/{workspace}"
 	route := func(method, path string, f func(context.Context, access.Principal, string, *http.Request) (any, error)) {
 		mux.HandleFunc(method+" "+base+path, func(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +39,7 @@ func (s *Service) Register(mux *http.ServeMux) {
 		if err := s.Access.Check(ctx, p, w, "forge-connection:"+r.PathValue("id"), "get"); err != nil {
 			return nil, err
 		}
-		c, _, err := s.Connection(ctx, w, r.PathValue("id"))
+		c, _, err := s.connectionRecord(ctx, w, r.PathValue("id"))
 		return c, err
 	})
 	route("POST", "/connections/{id}", func(ctx context.Context, p access.Principal, w string, r *http.Request) (any, error) {

@@ -44,6 +44,7 @@ func TestEdgePublicAndAdministrationStaySeparate(t *testing.T) {
 		{front, "/publications/workspaces/owned", "api:/publications/", 200},
 		{front, "/workbench/workspaces/owned/query", "api:/workbench/", 200},
 		{front, "/forge/workspaces/owned/observations", "api:/forge/", 200},
+		{front, "/server-models/workspaces/owned", "api:/server-models/", 200},
 		{front, "/gitea/webhook/owned-instance", "api:/gitea/", 200},
 	} {
 		r := httptest.NewRequest("GET", test.path, nil)

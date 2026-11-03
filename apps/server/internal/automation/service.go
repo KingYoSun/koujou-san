@@ -9,7 +9,6 @@ import (
 	"github.com/KingYoSun/koujou-san/apps/server/internal/serverllm"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/usage"
 	"math/big"
-	"os"
 	"regexp"
 	"strings"
 
@@ -35,7 +34,7 @@ type Service struct {
 }
 
 func New(store *persistence.Store, a *access.Service) *Service {
-	s := &Service{Store: store, Access: a, Gateway: &serverllm.Gateway{ConfigFile: os.Getenv("KOUJOU_SERVER_LLM_CONFIG")}, Contexts: contexts.New(store, a, contexts.DefaultLimits()), Usage: usage.New(store, a)}
+	s := &Service{Store: store, Access: a, Gateway: serverllm.New(store), Contexts: contexts.New(store, a, contexts.DefaultLimits()), Usage: usage.New(store, a)}
 	store.Accepted = s.accepted
 	return s
 }

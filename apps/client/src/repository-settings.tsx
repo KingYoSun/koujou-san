@@ -6,8 +6,11 @@ import { Tabs } from "./tabs";
 import { ScopePicker } from "./scope-picker";
 import { RepositoryObservations } from "./repository-observations";
 import { repositoryStates, type Repository } from "./repository-picker";
+import { GiteaOAuth } from "./gitea-oauth";
 
 type Connection = {
+  auth?: string;
+  account?: string;
   id: string;
   name: string;
   instance: string;
@@ -19,10 +22,12 @@ export function RepositorySettings({
   native,
   workspace,
   role,
+  serverAdmin = false,
 }: {
   native: boolean;
   workspace: string;
   role: string;
+  serverAdmin?: boolean;
 }) {
   const active = useScreenActive(),
     navigation = useNavigation();
@@ -115,6 +120,7 @@ export function RepositorySettings({
       ),
     );
   useEffect(() => {
+    if (active && projectScope) setTab("repositories");
     if (active)
       void work(async () => {
         await Promise.all([loadConnections(), loadRepositories()]);
@@ -289,6 +295,16 @@ export function RepositorySettings({
               )}
               {admin && (
                 <>
+                  <GiteaOAuth
+                    native={native}
+                    workspace={workspace}
+                    serverAdmin={serverAdmin}
+                    selected={connectionDraft}
+                    onSaved={async () => {
+                      setConnectionDraft(undefined);
+                      await loadConnections();
+                    }}
+                  />
                   <button
                     onClick={() => {
                       setConnectionDraft({
@@ -302,7 +318,7 @@ export function RepositorySettings({
                       setCA("");
                     }}
                   >
-                    Gitea接続を追加
+                    トークンでGitea接続を追加
                   </button>
                   {connectionDraft && (
                     <form
@@ -341,26 +357,32 @@ export function RepositorySettings({
                             }
                           />
                         </label>
-                        <label>
-                          {connectionDraft.version === "0"
-                            ? "アクセストークン"
-                            : "アクセストークンを置換"}
-                          <input
-                            type="password"
-                            autoComplete="new-password"
-                            required={connectionDraft.version === "0"}
-                            value={token}
-                            onChange={(event) => setToken(event.target.value)}
-                          />
-                        </label>
-                        <label>
-                          CA証明書（PEM）
-                          <textarea
-                            rows={3}
-                            value={ca}
-                            onChange={(event) => setCA(event.target.value)}
-                          />
-                        </label>
+                        {connectionDraft.auth === "oauth" ? (
+                          <output>{connectionDraft.account}</output>
+                        ) : (
+                          <label>
+                            {connectionDraft.version === "0"
+                              ? "アクセストークン"
+                              : "アクセストークンを置換"}
+                            <input
+                              type="password"
+                              autoComplete="new-password"
+                              required={connectionDraft.version === "0"}
+                              value={token}
+                              onChange={(event) => setToken(event.target.value)}
+                            />
+                          </label>
+                        )}
+                        {connectionDraft.auth !== "oauth" && (
+                          <label>
+                            CA証明書（PEM）
+                            <textarea
+                              rows={3}
+                              value={ca}
+                              onChange={(event) => setCA(event.target.value)}
+                            />
+                          </label>
+                        )}
                         <label>
                           <input
                             type="checkbox"

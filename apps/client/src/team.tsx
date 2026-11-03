@@ -96,7 +96,7 @@ export function Team({
   connection: ReactNode;
   health: string;
 }) {
-  const [me, setMe] = useState<{ id: string }>();
+  const [me, setMe] = useState<{ id: string; administrator?: boolean }>();
   const [workspaces, setWorkspaces] = useState<Page<Workspace>>(empty);
   const [selected, setSelected] = useState("");
   const selectedRef = useRef(selected);
@@ -532,6 +532,7 @@ export function Team({
             workspace={selected}
             name={current.name}
             role={current.role}
+            serverAdmin={me.administrator === true}
             canExecute={current.can_execute}
             members={pageWorkspace === selected ? members.items : []}
             membersNext={

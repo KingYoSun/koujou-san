@@ -3,7 +3,6 @@ package clientops
 import (
 	"context"
 	"encoding/json"
-	"os"
 	"strings"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
@@ -33,7 +32,7 @@ type Service struct {
 
 func New(s *persistence.Store, a *access.Service, c *contexts.Service, u *usage.Service) *Service {
 	service := &Service{Store: s, Access: a, Contexts: c, Usage: u, Runs: runs.New(s, a, c)}
-	service.Gateway = &serverllm.Gateway{ConfigFile: os.Getenv("KOUJOU_SERVER_LLM_CONFIG")}
+	service.Gateway = serverllm.New(s)
 	previous := s.Accepted
 	s.Accepted = func(ctx context.Context, tx pgx.Tx, command persistence.Command, ref apicontract.Reference, value json.RawMessage) error {
 		if previous != nil {

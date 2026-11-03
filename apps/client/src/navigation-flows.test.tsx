@@ -185,7 +185,7 @@ it("configures a shared Gitea connection and creates/registers a repository from
       .mock.calls.filter(([, , options]) => options.method === "POST"),
   ).toHaveLength(0);
   await click("共有接続");
-  await click("Gitea接続を追加");
+  await click("トークンでGitea接続を追加");
   await change("接続名", "Shared Gitea");
   await change("Gitea URL", "https://forge.fixture.test");
   await change("アクセストークン", "synthetic-token");
