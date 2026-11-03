@@ -650,7 +650,11 @@ const tasks = {
   "test:github": () => testDatabase("githubobserve"),
   "test:forge": async () => {
     await testDatabase("githubobserve");
-    await testDatabase("repositories", "TestRepositoryNavigationPostgres");
+    env.KOUJOU_SETUP_UI_TEST = "1";
+    await testDatabase(
+      "repositories",
+      "(TestRepositoryNavigationPostgres|TestWorkspaceSetupPostgres)",
+    );
   },
   "test:github:live": async () => {
     await resolveGo();

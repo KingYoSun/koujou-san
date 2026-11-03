@@ -32,6 +32,7 @@ type Client struct {
 	Secret   []byte
 	resumeAt atomic.Int64
 	token    string
+	bearer   bool
 	http     *http.Client
 }
 
@@ -85,8 +86,15 @@ func (i Instance) Open() (*Client, error) {
 }
 
 func FromCredentials(instance, token, certificate string) (*Client, error) {
+	if strings.TrimSpace(token) == "" {
+		return nil, ErrConfig
+	}
+	return newClient(instance, token, certificate)
+}
+
+func newClient(instance, token, certificate string) (*Client, error) {
 	origin, err := Origin(instance)
-	if err != nil || strings.TrimSpace(token) == "" {
+	if err != nil {
 		return nil, ErrConfig
 	}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
@@ -103,6 +111,15 @@ func FromCredentials(instance, token, certificate string) (*Client, error) {
 	return &Client{URL: origin, token: strings.TrimSpace(token), http: &http.Client{Transport: transport, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
 }
 
+// OAuth bearer credentials use the same explicit origin, CA and redirect policy.
+func FromOAuthCredentials(instance, token, certificate string) (*Client, error) {
+	c, err := FromCredentials(instance, token, certificate)
+	if err == nil {
+		c.bearer = true
+	}
+	return c, err
+}
+
 func (c *Client) ResumeAt() time.Time { return time.Unix(0, c.resumeAt.Load()) }
 
 func (c *Client) Request(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
@@ -113,7 +130,11 @@ func (c *Client) Request(ctx context.Context, method, path string, body io.Reade
 	if err != nil {
 		return nil, errors.New("invalid_gitea_request")
 	}
-	r.Header.Set("Authorization", "token "+c.token)
+	prefix := "token "
+	if c.bearer {
+		prefix = "Bearer "
+	}
+	r.Header.Set("Authorization", prefix+c.token)
 	r.Header.Set("Accept", "application/json")
 	r.Header.Set("User-Agent", "koujou-san-gitea")
 	if body != nil {

@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"os"
 	"strings"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
@@ -42,7 +41,7 @@ type Service struct {
 }
 
 func New(store *persistence.Store, a *access.Service, auto *automation.Service, r *runs.Service, w *workflows.Service, p *publications.Service, g *graphindex.Service) *Service {
-	s := &Service{Store: store, Access: a, Automation: auto, Runs: r, Workflows: w, Publications: p, Graph: g, Gateway: &serverllm.Gateway{ConfigFile: os.Getenv("KOUJOU_SERVER_LLM_CONFIG")}, Usage: usage.New(store, a)}
+	s := &Service{Store: store, Access: a, Automation: auto, Runs: r, Workflows: w, Publications: p, Graph: g, Gateway: serverllm.New(store), Usage: usage.New(store, a)}
 	auto.AttachRuns(r)
 	if p != nil {
 		p.Automation = auto

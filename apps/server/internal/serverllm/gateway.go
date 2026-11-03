@@ -18,9 +18,11 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/chatgptplan"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/modelreply"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
 )
 
 var ErrUnavailable = errors.New("server_model_connection_unavailable")
@@ -46,9 +48,17 @@ type Connection struct {
 type Gateway struct {
 	ConfigFile string
 	HTTP       *http.Client
+	Store      *persistence.Store
+}
+
+func New(store *persistence.Store) *Gateway {
+	return &Gateway{Store: store, ConfigFile: os.Getenv("KOUJOU_SERVER_LLM_CONFIG")}
 }
 
 func (g *Gateway) Connections(workspace string) ([]Connection, error) {
+	return g.connections(workspace, false)
+}
+func (g *Gateway) connections(workspace string, catalog bool) ([]Connection, error) {
 	out := []Connection{}
 	if g == nil || g.ConfigFile == "" {
 		return out, nil
@@ -67,6 +77,27 @@ func (g *Gateway) Connections(workspace string) ([]Connection, error) {
 	if json.Unmarshal(b, &entries) != nil {
 		return nil, ErrUnavailable
 	}
+	grants := map[string]bool{}
+	if !catalog && g.Store != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		rows, err := g.Store.Database().Query(ctx, `SELECT connection_id,allowed FROM server_model_workspace_grants WHERE workspace_id=$1`, workspace)
+		if err != nil {
+			return nil, ErrUnavailable
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var id string
+			var allowed bool
+			if rows.Scan(&id, &allowed) != nil {
+				return nil, ErrUnavailable
+			}
+			grants[id] = allowed
+		}
+		if rows.Err() != nil {
+			return nil, ErrUnavailable
+		}
+	}
 	for _, e := range entries {
 		p := e.Connection
 		p.httpClient = g.HTTP
@@ -77,7 +108,11 @@ func (g *Gateway) Connections(workspace string) ([]Connection, error) {
 		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || p.ID == "" || len(p.Models) == 0 {
 			return nil, ErrUnavailable
 		}
-		if !slices.Contains(e.Workspaces, workspace) && !slices.Contains(e.Workspaces, "*") {
+		allowed := slices.Contains(e.Workspaces, workspace) || slices.Contains(e.Workspaces, "*")
+		if granted, ok := grants[p.ID]; ok {
+			allowed = granted
+		}
+		if !catalog && !allowed {
 			continue
 		}
 		p.KeyFile = e.KeyFile

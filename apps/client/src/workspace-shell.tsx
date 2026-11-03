@@ -35,6 +35,7 @@ export function WorkspaceShell({
   workspace,
   name,
   role,
+  serverAdmin = false,
   canExecute,
   members,
   membersNext,
@@ -52,6 +53,7 @@ export function WorkspaceShell({
   workspace: string;
   name: string;
   role: string;
+  serverAdmin?: boolean;
   canExecute: boolean;
   members: { id: string; name: string; role: string; active: boolean }[];
   membersNext?: string;
@@ -296,7 +298,7 @@ export function WorkspaceShell({
             <ResourceSharing {...common} />
           </Screen>
           <Screen screens={["repositories"]}>
-            <RepositorySettings {...common} />
+            <RepositorySettings {...common} serverAdmin={serverAdmin} />
           </Screen>
           <ScreenContent screens={["workspace"]}>
             <NavigationLink related to={{ workspace, screen: "repositories" }}>
@@ -331,7 +333,11 @@ export function WorkspaceShell({
             />
           </Screen>
           <Screen screens={["serverModels"]}>
-            <ServerModelConnections native={native} workspace={workspace} />
+            <ServerModelConnections
+              native={native}
+              workspace={workspace}
+              serverAdmin={serverAdmin}
+            />
           </Screen>
         </PaneProvider>
       </section>

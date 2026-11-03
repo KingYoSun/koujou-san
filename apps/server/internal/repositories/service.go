@@ -25,6 +25,7 @@ var ErrInvalid = errors.New("invalid_repository_request")
 var ErrState = errors.New("repository_state_conflict")
 
 type Service struct {
+	Site     string
 	Observer *githubobserve.Service
 	Store    *persistence.Store
 	Access   *access.Service
@@ -32,6 +33,8 @@ type Service struct {
 	key      []byte
 }
 type Connection struct {
+	Auth        string `json:"auth,omitempty"`
+	Account     string `json:"account,omitempty"`
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Instance    string `json:"instance"`
@@ -40,8 +43,9 @@ type Connection struct {
 	Version     string `json:"version"`
 }
 type credential struct {
-	Token string `json:"token"`
-	CA    string `json:"ca,omitempty"`
+	Token string           `json:"token"`
+	CA    string           `json:"ca,omitempty"`
+	OAuth *oauthCredential `json:"oauth,omitempty"`
 }
 type ConnectionWrite struct {
 	apicontract.Mutation
@@ -63,7 +67,7 @@ func New(store *persistence.Store, a *access.Service, key []byte) *Service {
 	return &Service{Store: store, Access: a, crypt: crypt, key: hash[:]}
 }
 func raw(value any) []byte { b, _ := json.Marshal(value); return b }
-func (s *Service) seal(w, id string, value credential) ([]byte, error) {
+func (s *Service) seal(w, id string, value any) ([]byte, error) {
 	nonce := make([]byte, s.crypt.NonceSize())
 	if _, err := rand.Read(nonce); err != nil {
 		return nil, err
@@ -72,17 +76,33 @@ func (s *Service) seal(w, id string, value credential) ([]byte, error) {
 }
 func (s *Service) open(w, id string, value []byte) (credential, error) {
 	var out credential
+	err := s.openValue(w, id, value, &out)
+	return out, err
+}
+func (s *Service) openValue(w, id string, value []byte, out any) error {
 	n := s.crypt.NonceSize()
 	if len(value) < n {
-		return out, ErrInvalid
+		return ErrInvalid
 	}
 	plain, err := s.crypt.Open(nil, value[:n], value[n:], []byte(w+"\x00"+id))
 	if err == nil {
-		err = json.Unmarshal(plain, &out)
+		err = json.Unmarshal(plain, out)
 	}
-	return out, err
+	return err
 }
 func (s *Service) Connection(ctx context.Context, w, id string) (Connection, *gitea.Client, error) {
+	c, secret, err := s.connectionRecord(ctx, w, id)
+	if err != nil {
+		return c, nil, err
+	}
+	credentials, err := s.open(w, id, secret)
+	if err != nil {
+		return c, nil, err
+	}
+	client, err := s.oauthClient(ctx, w, id, c, credentials)
+	return c, client, err
+}
+func (s *Service) connectionRecord(ctx context.Context, w, id string) (Connection, []byte, error) {
 	var c Connection
 	var spec, secret []byte
 	err := s.Store.Database().QueryRow(ctx, `SELECT c.spec,c.credential,v.version FROM forge_connections c JOIN shared_versions v ON v.workspace_id=c.workspace_id AND v.resource_id='forge-connection:'||c.id WHERE c.workspace_id=$1 AND c.id=$2`, w, id).Scan(&spec, &secret, &c.Version)
@@ -94,12 +114,7 @@ func (s *Service) Connection(ctx context.Context, w, id string) (Connection, *gi
 		return c, nil, ErrInvalid
 	}
 	c.Version = version
-	credentials, err := s.open(w, id, secret)
-	if err != nil {
-		return c, nil, err
-	}
-	client, err := gitea.FromCredentials(c.Instance, credentials.Token, credentials.CA)
-	return c, client, err
+	return c, secret, nil
 }
 func (s *Service) Connections(ctx context.Context, p access.Principal, w, after string) (Page[Connection], error) {
 	out := Page[Connection]{Items: []Connection{}}
@@ -138,15 +153,28 @@ func (s *Service) PutConnection(ctx context.Context, p access.Principal, w, id s
 	if err != nil || id == "" || strings.TrimSpace(req.Name) == "" {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
-	credentials := credential{req.Token, req.CA}
+	credentials := credential{Token: req.Token, CA: req.CA}
 	actorID := int64(0)
 	if req.ExpectedVersion != "0" {
-		current, _, err := s.Connection(ctx, w, id)
+		current, _, err := s.connectionRecord(ctx, w, id)
 		if err != nil {
 			return apicontract.Response[apicontract.Reference]{}, err
 		}
 		if current.Instance != origin {
 			return apicontract.Response[apicontract.Reference]{}, ErrState
+		}
+		if req.Token == "" && req.CA == "" {
+			current.Name = req.Name
+			current.AllowCreate = req.AllowCreate
+			current.Version = ""
+			return s.mutate(ctx, p, w, "forge-connection:"+id, "forge-connection", req.Mutation, current, func(tx pgx.Tx, ref apicontract.Reference) (any, error) {
+				current.Version = ref.Version
+				_, err := tx.Exec(ctx, `UPDATE forge_connections SET spec=$3 WHERE workspace_id=$1 AND id=$2`, w, id, raw(current))
+				return current, err
+			})
+		}
+		if current.Auth == "oauth" && req.Token == "" {
+			return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 		}
 		actorID = current.ActorID
 		{
@@ -161,6 +189,7 @@ func (s *Service) PutConnection(ctx context.Context, p access.Principal, w, id s
 			}
 			if req.Token == "" {
 				credentials.Token = saved.Token
+				credentials.OAuth = saved.OAuth
 			}
 			if req.CA == "" {
 				credentials.CA = saved.CA
@@ -168,6 +197,9 @@ func (s *Service) PutConnection(ctx context.Context, p access.Principal, w, id s
 		}
 	}
 	client, err := gitea.FromCredentials(origin, credentials.Token, credentials.CA)
+	if credentials.OAuth != nil {
+		client, err = gitea.FromOAuthCredentials(origin, credentials.Token, credentials.CA)
+	}
 	if err != nil {
 		return apicontract.Response[apicontract.Reference]{}, ErrInvalid
 	}
@@ -180,24 +212,37 @@ func (s *Service) PutConnection(ctx context.Context, p access.Principal, w, id s
 		}
 		actorID = actor.ID
 	}
+	c := Connection{ID: id, Name: req.Name, Instance: origin, AllowCreate: req.AllowCreate, ActorID: actorID}
+	if credentials.OAuth != nil {
+		c.Auth = "oauth"
+		old, _, err := s.connectionRecord(ctx, w, id)
+		if err != nil {
+			return apicontract.Response[apicontract.Reference]{}, err
+		}
+		c.Account = old.Account
+	}
+	return s.saveConnection(ctx, p, w, c, credentials, req.Mutation)
+}
+
+func (s *Service) saveConnection(ctx context.Context, p access.Principal, w string, c Connection, credentials credential, m apicontract.Mutation, within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
+	id := c.ID
 	encrypted, err := s.seal(w, id, credentials)
 	if err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err
 	}
-	c := Connection{ID: id, Name: req.Name, Instance: origin, AllowCreate: req.AllowCreate, ActorID: actorID}
 	mac := hmac.New(sha256.New, s.key)
 	mac.Write(raw(credentials))
 	payload := struct {
 		Connection
 		Digest string
 	}{c, hex.EncodeToString(mac.Sum(nil))}
-	return s.mutate(ctx, p, w, "forge-connection:"+id, "forge-connection", req.Mutation, payload, func(tx pgx.Tx, ref apicontract.Reference) (any, error) {
+	return s.mutate(ctx, p, w, "forge-connection:"+id, "forge-connection", m, payload, func(tx pgx.Tx, ref apicontract.Reference) (any, error) {
 		_, err := tx.Exec(ctx, `INSERT INTO forge_connections VALUES($1,$2,$3,$4) ON CONFLICT(workspace_id,id) DO UPDATE SET spec=excluded.spec,credential=excluded.credential`, w, id, raw(c), encrypted)
 		c.Version = ref.Version
 		return c, err
-	})
+	}, within...)
 }
-func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, kind string, m apicontract.Mutation, payload any, apply func(pgx.Tx, apicontract.Reference) (any, error)) (apicontract.Response[apicontract.Reference], error) {
+func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, kind string, m apicontract.Mutation, payload any, apply func(pgx.Tx, apicontract.Reference) (any, error), within ...pgx.Tx) (apicontract.Response[apicontract.Reference], error) {
 	if err := s.Access.Check(ctx, p, w, "", "manage"); err != nil {
 		return apicontract.Response[apicontract.Reference]{}, err
 	}
@@ -218,7 +263,7 @@ func (s *Service) mutate(ctx context.Context, p access.Principal, w, id, kind st
 			}
 		}
 		return raw(value), nil
-	})
+	}, within...)
 }
 func send(w http.ResponseWriter, value any, err error) {
 	w.Header().Set("Content-Type", "application/json")

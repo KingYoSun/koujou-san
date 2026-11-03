@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { syncRequest } from "./auth";
+import { ServerModelAssignments } from "./server-model-assignments";
 import {
   NavigationLink,
   ScreenContent,
@@ -18,9 +19,11 @@ export type ModelConnection = {
 export function ServerModelConnections({
   native,
   workspace,
+  serverAdmin = false,
 }: {
   native: boolean;
   workspace: string;
+  serverAdmin?: boolean;
 }) {
   const [connections, setConnections] = useState<ModelConnection[]>();
   const [notice, setNotice] = useState("");
@@ -64,6 +67,13 @@ export function ServerModelConnections({
   return (
     <ScreenContent>
       <section aria-label="サーバーLLM接続">
+        {serverAdmin && (
+          <ServerModelAssignments
+            native={native}
+            workspace={workspace}
+            onSaved={load}
+          />
+        )}
         <button
           data-variant="secondary"
           disabled={busy}

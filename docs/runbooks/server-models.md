@@ -33,6 +33,8 @@ ssh -L 14557:127.0.0.1:14557 USER@SERVER
 
 ## ChatGPT接続の登録
 
+認証済み接続を初回登録した後、サーバー管理者は「設定→サーバーLLM接続→Workspaceへの割当」で、現在のWorkspaceへの許可・取消を保存できる。通常のWorkspace追加では設定ファイルを書き換えない。明示した割当・取消はファイルの`workspaces`より優先し、UIで未設定の組は既存設定を維持する。Workspace管理者だけではサーバー接続を割り当てられない。資格情報の登録と本人ログインは下記の初回運用手順で行う。
+
 登録済みの接続は、Webの「設定 → クライアントLLM接続」からも取得・選択できる。Projectチャット、Context選択等のモデル要求をサーバーが中継し、資格情報はブラウザへ返さない。使い方は[クライアント接続](client-context-selection.md)、契約は[ADR 0036](../adr/0036-web-server-models.md)を参照する。登録・ログインは下記の運用者設定を用いる。
 
 `KOUJOU_SERVER_LLM_CONFIG`の接続一覧へ追加する。要求モデル名は`model-models`が返す現在のaccountのslugから選び、許可する実モデル名も明示する。モデル名をSDKの例だけで決めない。
@@ -45,7 +47,9 @@ ssh -L 14557:127.0.0.1:14557 USER@SERVER
     "name": "サーバーのChatGPTプラン",
     "credential_file": "/config/connectors/chatgpt/account.json",
     "workspaces": ["WORKSPACE_ID"],
-    "models": [{ "requested": "MODEL_SLUG", "allowed_actual": ["ACTUAL_MODEL"] }]
+    "models": [
+      { "requested": "MODEL_SLUG", "allowed_actual": ["ACTUAL_MODEL"] }
+    ]
   }
 ]
 ```
@@ -86,7 +90,12 @@ pnpm run infra:llm:stop
     "endpoint": "http://127.0.0.1:18080/v1",
     "key_file": "C:/Users/USER/koujou-san/.cache/bifrost/worker-key",
     "workspaces": ["WORKSPACE_ID"],
-    "models": [{ "requested": "openai/PROVIDER_MODEL", "allowed_actual": ["ACTUAL_MODEL"] }]
+    "models": [
+      {
+        "requested": "openai/PROVIDER_MODEL",
+        "allowed_actual": ["ACTUAL_MODEL"]
+      }
+    ]
   }
 ]
 ```

@@ -72,7 +72,7 @@ func Edge(web, site, api, hydra, kratos, hydraAdmin, kratosAdmin string) (http.H
 			}
 		}
 		isAPI := false
-		for _, prefix := range []string{"/healthz", "/readyz", "/access/", "/contexts/", "/client-operations/", "/sync/", "/search/", "/graph/", "/github/", "/forge/", "/gitea/", "/usage/", "/automation/", "/runs/", "/workflows/", "/hopper/", "/inspections/", "/publications/", "/workbench/", "/mcp", "/.well-known/oauth-protected-resource/"} {
+		for _, prefix := range []string{"/healthz", "/readyz", "/access/", "/contexts/", "/client-operations/", "/sync/", "/search/", "/graph/", "/github/", "/forge/", "/gitea/", "/usage/", "/automation/", "/runs/", "/workflows/", "/hopper/", "/inspections/", "/publications/", "/workbench/", "/server-models/", "/mcp", "/.well-known/oauth-protected-resource/"} {
 			isAPI = isAPI || strings.HasPrefix(path, prefix)
 		}
 		for _, name := range []string{"config", "csrf", "start", "callback", "me", "logout", "broker/", "flow/", "mcp/"} {

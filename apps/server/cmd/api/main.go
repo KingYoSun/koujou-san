@@ -77,6 +77,7 @@ func main() {
 			}
 			routes = append(routes, observer.Register)
 			repositoryService := repositories.New(store, accessService, service.Config.Key)
+			repositoryService.Site = service.Config.Site
 			repositoryService.AttachObserver(observer)
 			routes = append(routes, repositoryService.Register)
 			limits, err := contexts.EnvironmentLimits()
@@ -110,6 +111,7 @@ func main() {
 			usageService := usage.New(store, accessService)
 			routes = append(routes, usageService.Register)
 			clientOperations := clientops.New(store, accessService, contextService, usageService)
+			routes = append(routes, func(mux *http.ServeMux) { clientOperations.Gateway.Register(mux, accessService) })
 			routes = append(routes, clientOperations.Register)
 			automationService := automation.New(store, accessService)
 			automationService.Contexts = contextService
