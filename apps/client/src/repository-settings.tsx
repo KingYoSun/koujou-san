@@ -293,18 +293,21 @@ export function RepositorySettings({
                   共有接続の次のページ
                 </button>
               )}
+              {(admin || serverAdmin) && (
+                <GiteaOAuth
+                  native={native}
+                  workspace={workspace}
+                  serverAdmin={serverAdmin}
+                  canManage={admin}
+                  selected={connectionDraft}
+                  onSaved={async () => {
+                    setConnectionDraft(undefined);
+                    await loadConnections();
+                  }}
+                />
+              )}
               {admin && (
                 <>
-                  <GiteaOAuth
-                    native={native}
-                    workspace={workspace}
-                    serverAdmin={serverAdmin}
-                    selected={connectionDraft}
-                    onSaved={async () => {
-                      setConnectionDraft(undefined);
-                      await loadConnections();
-                    }}
-                  />
                   <button
                     onClick={() => {
                       setConnectionDraft({

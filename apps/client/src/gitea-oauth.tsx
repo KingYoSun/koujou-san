@@ -29,12 +29,14 @@ export function GiteaOAuth({
   native,
   workspace,
   serverAdmin,
+  canManage = true,
   selected,
   onSaved,
 }: {
   native: boolean;
   workspace: string;
   serverAdmin: boolean;
+  canManage?: boolean;
   selected?: Connection;
   onSaved: () => Promise<void>;
 }) {
@@ -90,6 +92,7 @@ export function GiteaOAuth({
   useEffect(() => {
     if (
       !active ||
+      !canManage ||
       !session ||
       !["started", "exchanging"].includes(session.state)
     )
@@ -115,7 +118,7 @@ export function GiteaOAuth({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [active, session]);
+  }, [active, session, canManage]);
   async function start(reconnect?: Connection) {
     const chosen = apps?.items.find((item) => item.id === app);
     if (!chosen) return;
@@ -190,21 +193,74 @@ export function GiteaOAuth({
   }
   return (
     <section aria-label="Gitea OAuth">
-      <label>
-        Gitea
-        <select
-          value={app}
-          disabled={busy}
-          onChange={(e) => setApp(e.target.value)}
-        >
-          <option value="">選択してください</option>
-          {apps?.items.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {canManage && (
+        <>
+          <label>
+            Gitea
+            <select
+              value={app}
+              disabled={busy}
+              onChange={(e) => setApp(e.target.value)}
+            >
+              <option value="">選択してください</option>
+              {apps?.items.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button disabled={busy || !app} onClick={() => void start()}>
+            Giteaにログイン
+          </button>
+          {selected &&
+            apps?.items.some(
+              (item) => item.id === app && item.instance === selected.instance,
+            ) && (
+              <button disabled={busy} onClick={() => void start(selected)}>
+                選択した接続を再認証
+              </button>
+            )}
+          {session?.state === "authenticated" && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void work(accept);
+              }}
+            >
+              <fieldset disabled={busy}>
+                <legend>共有するGiteaアカウント</legend>
+                <output>{session.account?.login}</output>
+                <label>
+                  共有接続名
+                  <input
+                    required
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </label>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={allow}
+                    onChange={(e) => setAllow(e.target.checked)}
+                  />
+                  このWorkspaceでリポジトリ作成を許可
+                </label>
+                <button>認証した接続を共有</button>
+              </fieldset>
+            </form>
+          )}
+          {session && ["started", "exchanging"].includes(session.state) && (
+            <p role="status">Giteaのログインを待っています。</p>
+          )}
+          {session && ["failed", "expired"].includes(session.state) && (
+            <p role="status">
+              Gitea認証が完了していません。ログインをやり直してください。
+            </p>
+          )}
+        </>
+      )}
       {apps?.next && (
         <button
           disabled={busy}
@@ -212,55 +268,6 @@ export function GiteaOAuth({
         >
           Giteaの次のページ
         </button>
-      )}
-      <button disabled={busy || !app} onClick={() => void start()}>
-        Giteaにログイン
-      </button>
-      {selected &&
-        apps?.items.some(
-          (item) => item.id === app && item.instance === selected.instance,
-        ) && (
-          <button disabled={busy} onClick={() => void start(selected)}>
-            選択した接続を再認証
-          </button>
-        )}
-      {session?.state === "authenticated" && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            void work(accept);
-          }}
-        >
-          <fieldset disabled={busy}>
-            <legend>共有するGiteaアカウント</legend>
-            <output>{session.account?.login}</output>
-            <label>
-              共有接続名
-              <input
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={allow}
-                onChange={(e) => setAllow(e.target.checked)}
-              />
-              このWorkspaceでリポジトリ作成を許可
-            </label>
-            <button>認証した接続を共有</button>
-          </fieldset>
-        </form>
-      )}
-      {session && ["started", "exchanging"].includes(session.state) && (
-        <p role="status">Giteaのログインを待っています。</p>
-      )}
-      {session && ["failed", "expired"].includes(session.state) && (
-        <p role="status">
-          Gitea認証が完了していません。ログインをやり直してください。
-        </p>
       )}
       {serverAdmin && (
         <details>

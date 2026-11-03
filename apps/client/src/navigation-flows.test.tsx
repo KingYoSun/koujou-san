@@ -227,6 +227,29 @@ it("configures a shared Gitea connection and creates/registers a repository from
   expect(localStorage.length).toBe(0);
 });
 
+it("lets a server administrator configure OAuth apps without Workspace management rights", async () => {
+  vi.mocked(syncRequest).mockResolvedValue({ items: [] });
+  await act(() =>
+    root.render(
+      <RepositorySettings
+        native={false}
+        workspace="one"
+        role="viewer"
+        serverAdmin
+      />,
+    ),
+  );
+  await click("共有接続");
+  expect(button("OAuthアプリを追加")).toBeTruthy();
+  expect(host.textContent).not.toContain("Giteaにログイン");
+  expect(host.textContent).not.toContain("トークンでGitea接続を追加");
+  expect(
+    vi
+      .mocked(syncRequest)
+      .mock.calls.some(([path]) => path.startsWith("/forge/oauth/apps")),
+  ).toBe(true);
+});
+
 it("opens new Issue information without a query and saves with the new-record version", async () => {
   const call = vi.fn(),
     write = vi.fn(async () => ({

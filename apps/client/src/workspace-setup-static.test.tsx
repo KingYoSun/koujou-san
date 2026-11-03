@@ -26,6 +26,17 @@ it("separates server administration, account authorization and Workspace sharing
   expect(admin).toContain("OAuthアプリを追加");
   expect(admin).toContain("コールバックURL");
   expect(admin).not.toContain("共有するGiteaアカウント");
+  const serverOnly = renderToStaticMarkup(
+    <GiteaOAuth
+      native={false}
+      workspace="owned"
+      serverAdmin
+      canManage={false}
+      onSaved={async () => {}}
+    />,
+  );
+  expect(serverOnly).toContain("OAuthアプリを追加");
+  expect(serverOnly).not.toContain("Giteaにログイン");
   expect(
     renderToStaticMarkup(
       <ServerModelConnections native={false} workspace="owned" />,
