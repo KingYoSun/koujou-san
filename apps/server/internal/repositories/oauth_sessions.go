@@ -85,7 +85,7 @@ func (s *Service) StartOAuth(ctx context.Context, p access.Principal, w, appID s
 	if err != nil {
 		return nil, err
 	}
-	query := url.Values{"client_id": {app.ClientID}, "redirect_uri": {callback}, "response_type": {"code"}, "state": {state}, "code_challenge_method": {"S256"}, "code_challenge": {base64.RawURLEncoding.EncodeToString(challenge[:])}, "scope": {"read:user write:repository write:issue"}}
+	query := url.Values{"client_id": {app.ClientID}, "redirect_uri": {callback}, "response_type": {"code"}, "state": {state}, "code_challenge_method": {"S256"}, "code_challenge": {base64.RawURLEncoding.EncodeToString(challenge[:])}, "scope": {"read:user write:repository write:issue read:organization"}}
 	return map[string]string{"id": id, "authorization_url": app.Instance + "/login/oauth/authorize?" + query.Encode()}, nil
 }
 func (s *Service) OAuthStatus(ctx context.Context, p access.Principal, w, id string) (OAuthSession, error) {
