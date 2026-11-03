@@ -267,7 +267,7 @@ it("starts a consultation from the fixed Project reached through Scope editing w
     "?workspace=one&screen=chat&kind=scope&id=project&version=project-fixed",
   );
   let threadID = "";
-  vi.mocked(syncRequest).mockImplementation(async (path, _native, options) => {
+  vi.mocked(syncRequest).mockImplementation(async (path) => {
     if (path.endsWith("/catalog")) return { data: { items: [] }, meta: {} };
     if (path.includes("/contexts/") && path.includes("/scope/"))
       return {
