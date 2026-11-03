@@ -44,7 +44,7 @@ Desktop API切替は現在のauth・Runner・cacheの所有境界を確認し、
 
 ## 現在の判定
 
-Inspection pending。13項目の実装を独立検品へ渡す段階である。PR・merge・配備はまだ行っていない。
+13項目の実装・独立検品・局所検証を完了した。リモートの最終CIとmergeの判定は[PR #93](https://github.com/KingYoSun/koujou-san/pull/93)に記録する。独立検品は[固定成果物と追加差分の記録](2026-11-03-navigation-inspection.md)を参照する。
 
 | 条件 | 実装した操作と証跡 |
 | --- | --- |
@@ -63,5 +63,9 @@ Inspection pending。13項目の実装を独立検品へ渡す段階である。
 | N13 | Issue Scopeを候補から選び、作成画面へも進める。Issue情報は取得前に「新規作成」で開ける。DOMで読み取りなしの新規入力とversion 0による明示保存、静的描画で閲覧者制限を確認 |
 
 最新差分の型検査、整形、全Vitest、Go test/vet、必要な専用DB試験と独立検品・CIの結果を下へ追記する。実表示の1440px/1024px、focus・文字切れ・横スクロールは未測定。DOM試験は実レイアウトの測定とは区別する。以前拒否されたoriginへの迂回や、本人への手動確認依頼は行っていない。
+
+局所検証ではclient 39ファイル142テスト、Go全unit/vet、Web・Go build、Prettier、変更Goファイルのgofmt、`git diff --check`が成功した。Desktopは33 passed・実環境専用12 ignored。専用DBの`test:contexts / test:clientops / test:forge / test:publications / test:usage / test:graph`も成功した。
+
+既存のIndexedDB 1万件移行は、全体実行中に既定の5秒でタイムアウトすることがあった。当該実装・試験は基準から変更しておらず、同じ6試験の単独実行は既定予算で成功した。ローカルの全体再検証ではCLIだけで実行予算を20秒へ設定し、件数・検査内容を変えず142試験の成功を確認した。CIでは既定設定のTestも成功している。最初の固定HEAD`11c4278`に対する[CI run 181](https://github.com/KingYoSun/koujou-san/actions/runs/41591162386)は、LinuxとWindowsの両ジョブで全工程成功した。以後の検証記録だけの差分にも、PRで発生した最終HEADの必須CIを確認してからmergeする。
 
 `pnpm run check`は開始前から存在するGit管理外の`apps/server/.cache/issue33-config/main.go`の未整形で停止する。当該ファイルは変更せず、Go test/vet、変更ファイルのgofmt、client型検査、PrettierとCIで補完する。REFACTORING.mdに記載された`cargo xtask oversized-files`は本checkoutにcommand・xtask自体がなく実行できなかった。新規ファイルを1000行未満とし、Project探索は既存のScope選択へ統合して重複を削除した。
