@@ -91,7 +91,7 @@ func (s *Service) Repositories(ctx context.Context, p access.Principal, w, proje
 	if err := s.Access.Check(ctx, p, w, "", "read"); err != nil {
 		return out, err
 	}
-	rows, err := s.Store.Database().Query(ctx, `SELECT r.spec,v.version FROM forge_repositories r JOIN shared_versions v ON v.workspace_id=r.workspace_id AND v.resource_id='forge-repository:'||r.id WHERE r.workspace_id=$1 AND r.id>$4 AND ($5='' OR r.project_id=$5) AND `+access.ReadFilterSQL(`jsonb_build_array(jsonb_build_object('id','forge-repository:'||r.id,'version',v.version),jsonb_build_object('id','forge-connection:'||r.connection_id,'version',''))||CASE WHEN r.project_id='' THEN '[]'::jsonb ELSE jsonb_build_array(jsonb_build_object('id','scope:'||r.project_id,'version','')) END`)+` ORDER BY r.id LIMIT 51`, w, p.UserID, p.OperationID, after, project)
+	rows, err := s.Store.Database().Query(ctx, `SELECT r.spec,v.version FROM shared_versions v JOIN forge_repositories r ON r.workspace_id=v.workspace_id AND v.resource_id='forge-repository:'||r.id WHERE v.workspace_id=$1 AND NOT v.deleted AND v.resource_id LIKE 'forge-repository:%' AND v.resource_id>'forge-repository:'||$4 AND ($5='' OR r.project_id=$5) AND `+access.ReadFilterSQL(`jsonb_build_array(jsonb_build_object('id','forge-repository:'||r.id,'version',v.version),jsonb_build_object('id','forge-connection:'||r.connection_id,'version',''))||CASE WHEN r.project_id='' THEN '[]'::jsonb ELSE jsonb_build_array(jsonb_build_object('id','scope:'||r.project_id,'version','')) END`)+` ORDER BY v.resource_id LIMIT 51`, w, p.UserID, p.OperationID, after, project)
 	if err != nil {
 		return out, err
 	}
@@ -115,8 +115,15 @@ func (s *Service) Repositories(ctx context.Context, p access.Principal, w, proje
 	}
 	return out, rows.Err()
 }
-func (s *Service) saveRepository(ctx context.Context, p access.Principal, w string, r Repository, m apicontract.Mutation, payload any) (apicontract.Response[apicontract.Reference], error) {
-	return s.mutate(ctx, p, w, "forge-repository:"+r.ID, "forge-repository", m, false, payload, func(tx pgx.Tx, ref apicontract.Reference) (any, error) {
+func (s *Service) saveRepository(ctx context.Context, p access.Principal, w string, r Repository, m apicontract.Mutation, deleted bool, payload any) (apicontract.Response[apicontract.Reference], error) {
+	return s.mutate(ctx, p, w, "forge-repository:"+r.ID, "forge-repository", m, deleted, payload, func(tx pgx.Tx, ref apicontract.Reference) (any, error) {
+		var unregistered bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM shared_versions WHERE workspace_id=$1 AND resource_id=$2 AND deleted)`, w, ref.ID).Scan(&unregistered); err != nil {
+			return nil, err
+		}
+		if unregistered != deleted {
+			return nil, ErrState
+		}
 		if r.Project != "" {
 			if err := s.Access.CheckTx(ctx, tx, p, w, "scope:"+r.Project, "update"); err != nil {
 				return nil, err
@@ -175,14 +182,14 @@ func (s *Service) PutRepository(ctx context.Context, p access.Principal, w, id s
 		r.RepositoryID = remote.ID
 		r.Private = remote.Private
 	}
-	accepted, err := s.saveRepository(ctx, p, w, r, req.Mutation, req)
+	accepted, err := s.saveRepository(ctx, p, w, r, req.Mutation, false, req)
 	if err != nil || accepted.Error != nil || !create {
 		return accepted, err
 	}
 	// A durable, single-use dispatch claim survives a lost HTTP response or restart.
 	// Repeated create requests can only read/reconcile this same repository intent.
 	var claimed string
-	err = s.Store.Database().QueryRow(ctx, `UPDATE forge_repositories SET dispatched=true WHERE workspace_id=$1 AND id=$2 AND state='intent' AND NOT dispatched RETURNING id`, w, id).Scan(&claimed)
+	err = s.Store.Database().QueryRow(ctx, `UPDATE forge_repositories r SET dispatched=true FROM shared_versions v WHERE r.workspace_id=$1 AND r.id=$2 AND r.state='intent' AND NOT r.dispatched AND v.workspace_id=r.workspace_id AND v.resource_id='forge-repository:'||r.id AND NOT v.deleted RETURNING r.id`, w, id).Scan(&claimed)
 	if err == pgx.ErrNoRows {
 		return accepted, nil
 	}
@@ -220,7 +227,19 @@ func (s *Service) PutRepository(ctx context.Context, p access.Principal, w, id s
 			r.State = "rejected"
 		}
 	}
-	finished, finishErr := s.saveRepository(ctx, p, w, r, apicontract.Mutation{OperationID: "forge-result:" + accepted.Data.Version, ExpectedVersion: accepted.Data.Version}, r)
+	resultMutation := apicontract.Mutation{OperationID: "forge-result:" + accepted.Data.Version, ExpectedVersion: accepted.Data.Version}
+	finished, finishErr := s.saveRepository(ctx, p, w, r, resultMutation, false, r)
+	if finishErr == nil && finished.Error != nil && finished.Error.Code == "version_conflict" {
+		// A reply to an already-dispatched request remains historical after unregistration.
+		var current string
+		lookupErr := s.Store.Database().QueryRow(ctx, `SELECT v.version FROM forge_repositories r JOIN shared_versions v ON v.workspace_id=r.workspace_id AND v.resource_id='forge-repository:'||r.id WHERE r.workspace_id=$1 AND r.id=$2 AND v.deleted`, w, id).Scan(&current)
+		if lookupErr == nil {
+			resultMutation.ExpectedVersion = current
+			finished, finishErr = s.saveRepository(ctx, p, w, r, resultMutation, true, r)
+		} else if lookupErr != pgx.ErrNoRows {
+			return accepted, lookupErr
+		}
+	}
 	if finishErr != nil {
 		return accepted, finishErr
 	}
@@ -229,14 +248,14 @@ func (s *Service) PutRepository(ctx context.Context, p access.Principal, w, id s
 	}
 	return accepted, nil
 }
-func (s *Service) DeleteRejected(ctx context.Context, p access.Principal, w, id string, m apicontract.Mutation) (apicontract.Response[apicontract.Reference], error) {
+func (s *Service) Unregister(ctx context.Context, p access.Principal, w, id string, m apicontract.Mutation) (apicontract.Response[apicontract.Reference], error) {
 	payload := map[string]string{"id": id}
 	return s.mutate(ctx, p, w, "forge-repository:"+id, "forge-repository", m, true, payload, func(tx pgx.Tx, _ apicontract.Reference) (any, error) {
-		tag, err := tx.Exec(ctx, `DELETE FROM forge_repositories WHERE workspace_id=$1 AND id=$2 AND state='rejected'`, w, id)
-		if err != nil {
+		var registered bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM forge_repositories r JOIN shared_versions v ON v.workspace_id=r.workspace_id AND v.resource_id='forge-repository:'||r.id WHERE r.workspace_id=$1 AND r.id=$2 AND NOT v.deleted)`, w, id).Scan(&registered); err != nil {
 			return nil, err
 		}
-		if tag.RowsAffected() != 1 {
+		if !registered {
 			return nil, ErrState
 		}
 		return payload, nil
@@ -267,7 +286,7 @@ func (s *Service) Reconcile(ctx context.Context, p access.Principal, w, id strin
 	}
 	r.RepositoryID = remote.ID
 	r.State = "confirmed"
-	return s.saveRepository(ctx, p, w, r, m, r)
+	return s.saveRepository(ctx, p, w, r, m, false, r)
 }
 
 type Owner struct {

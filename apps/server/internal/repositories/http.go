@@ -76,7 +76,7 @@ func (s *Service) Register(mux *http.ServeMux) {
 		if err := body(r, &req); err != nil {
 			return nil, err
 		}
-		return s.DeleteRejected(ctx, p, w, r.PathValue("id"), req)
+		return s.Unregister(ctx, p, w, r.PathValue("id"), req)
 	})
 	route("POST", "/repositories/{id}/reconcile", func(ctx context.Context, p access.Principal, w string, r *http.Request) (any, error) {
 		var req apicontract.Mutation

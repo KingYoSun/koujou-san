@@ -13,8 +13,10 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/KingYoSun/koujou-san/apps/server/internal/access"
+	"github.com/KingYoSun/koujou-san/apps/server/internal/apicontract"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/contexts"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/githubobserve"
 	"github.com/KingYoSun/koujou-san/apps/server/internal/persistence"
@@ -108,6 +110,7 @@ func TestRepositoryNavigationPostgres(t *testing.T) {
 	request("alice", "POST", "/contexts/workspaces/one/scope/project", project, 200)
 	var creates, remoteCalls atomic.Int64
 	var rejectCreates atomic.Bool
+	creationStarted, finishCreation := make(chan struct{}, 1), make(chan struct{})
 	var mu sync.Mutex
 	repos := map[string]remoteRepository{}
 	forge := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -142,10 +145,17 @@ func TestRepositoryNavigationPostgres(t *testing.T) {
 			mu.Lock()
 			repos[value.FullName] = value
 			mu.Unlock()
-			if input.Name == "lost" {
+			if strings.HasPrefix(input.Name, "lost") {
 				connection, _, _ := w.(http.Hijacker).Hijack()
 				connection.Close()
 				return
+			}
+			if input.Name == "in-flight" {
+				select {
+				case creationStarted <- struct{}{}:
+				default:
+				}
+				<-finishCreation
 			}
 			w.WriteHeader(201)
 			json.NewEncoder(w).Encode(value)
@@ -210,7 +220,6 @@ func TestRepositoryNavigationPostgres(t *testing.T) {
 	if err != nil || repo.State != "created" || !repo.Private || repo.Project != "project" {
 		t.Fatalf("created repo not registered: %+v %v", repo, err)
 	}
-	request("alice", "POST", base+"/repositories/first/delete", mutation(repo.Version), 409)
 	request("alice", "GET", base+"/repositories?project=project", nil, 200)
 	request("bob", "GET", base+"/repositories/first", nil, 200)
 	request("outsider", "GET", "/forge/workspaces/two/repositories/first", nil, 403)
@@ -224,13 +233,11 @@ func TestRepositoryNavigationPostgres(t *testing.T) {
 	if unknown.State != "unknown" {
 		t.Fatalf("lost response state: %s", unknown.State)
 	}
-	request("alice", "POST", base+"/repositories/lost/delete", mutation(unknown.Version), 409)
 	accepted(request("alice", "POST", base+"/repositories/lost/reconcile", mutation(unknown.Version), 200))
 	confirmed, _ := s.Read(ctx, access.Principal{UserID: "alice"}, "one", "lost")
 	if confirmed.State != "confirmed" {
 		t.Fatal("explicit reconciliation did not register repo")
 	}
-	request("alice", "POST", base+"/repositories/lost/delete", mutation(confirmed.Version), 409)
 	observe := mutation("0")
 	observe["kind"] = "actions"
 	observe["workflow"] = "build.yml"
@@ -274,10 +281,10 @@ func TestRepositoryNavigationPostgres(t *testing.T) {
 	}
 	grant := mutation(policyVersion)
 	grant["grant"] = map[string]any{"user": "bob", "read": true, "update": false, "execute": false}
-	accepted(request("alice", "POST", resourceBase, grant, 200))
+	policyVersion = accepted(request("alice", "POST", resourceBase, grant, 200))
 	request("bob", "GET", base+"/repositories/first", nil, 200)
 	request("bob", "GET", resourceBase, nil, 403)
-	// Discard only a refused intent, keeping the successful same-name repo and receipts.
+	// Unregister without losing identity, existing references or dispatch receipts.
 	rejectCreates.Store(true)
 	refused := create("rejected", "first", "owner", true)
 	accepted(request("alice", "POST", base+"/repositories/rejected/create", refused, 200))
@@ -312,6 +319,7 @@ func TestRepositoryNavigationPostgres(t *testing.T) {
 	if bytes.Contains(listed, []byte(`"id":"rejected"`)) {
 		t.Fatal("removed refused intent remained in the current catalog")
 	}
+	request("alice", "GET", base+"/repositories/rejected", nil, 200)
 	request("bob", "GET", base+"/repositories/first", nil, 200)
 	accepted(request("alice", "POST", base+"/repositories/rejected/create", refused, 200))
 	request("alice", "POST", base+"/repositories/rejected/create", create("rejected", "first", "owner", true), 409)
@@ -326,13 +334,127 @@ func TestRepositoryNavigationPostgres(t *testing.T) {
 	if err = store.Database().QueryRow(ctx, `SELECT count(*) FROM shared_changes WHERE workspace_id='one' AND resource_id='forge-repository:rejected' AND payload->>'state'='rejected' AND NOT deleted`).Scan(&priorRejected); err != nil || priorRejected == 0 {
 		t.Fatal("refused intent history was erased")
 	}
+	ownerGrant := mutation(policyVersion)
+	ownerGrant["grant"] = map[string]any{"user": "alice", "read": true, "update": true}
+	accepted(request("alice", "POST", resourceBase, ownerGrant, 200))
+	registered := mutation("0")
+	registered["connection"], registered["full_name"], registered["project"] = "shared", "owner/first", "project"
+	request("alice", "POST", base+"/repositories/registered/register", registered, 200)
+	request("alice", "POST", base+"/repositories/unknown/create", create("unknown", "lost-unregister", "team", true), 200)
+	for _, id := range []string{"first", "lost", "registered", "unknown"} {
+		prior, err := s.Read(ctx, access.Principal{UserID: "alice"}, "one", id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		before := remoteCalls.Load()
+		request("alice", "POST", base+"/repositories/"+id+"/delete", mutation(prior.Version), 200)
+		retained, err := s.Read(ctx, access.Principal{UserID: "alice"}, "one", id)
+		if err != nil || retained.FullName != prior.FullName || retained.RepositoryID != prior.RepositoryID || retained.State != prior.State || remoteCalls.Load() != before {
+			t.Fatalf("unregistration changed the referenced repository: %+v %v", retained, err)
+		}
+		edit := mutation(retained.Version)
+		edit["connection"], edit["full_name"], edit["project"] = "shared", prior.FullName, "project"
+		if prior.RepositoryID > 0 {
+			request("alice", "POST", base+"/repositories/"+id+"/register", edit, 409)
+		}
+	}
+	resolved, _, _, err := s.Resolve(ctx, "one", "first")
+	if err != nil || resolved.RepositoryID != repo.RepositoryID || resolved.Version != repo.Version {
+		t.Fatal("an existing repository reference stopped resolving")
+	}
+	if retained, ok := backend.Connection("one", "repository:first"); !ok || retained.Resource != remote.Resource {
+		t.Fatal("an existing publication lost its fixed repository reference")
+	}
+	candidates := request("alice", "GET", "/publications/workspaces/one/connections", nil, 200)
+	if bytes.Contains(candidates, []byte("owner/first")) {
+		t.Fatal("unregistered repository remained a new publication candidate")
+	}
+	private := true
+	pending := RepositoryWrite{Mutation: apicontract.Mutation{OperationID: "unstarted", ExpectedVersion: "0"}, Connection: "shared", FullName: "owner/pending", Private: &private, Project: "project"}
+	pendingRepo := Repository{ID: "pending", Connection: "shared", ConnectionVersion: connectionVersion, Instance: forge.URL, FullName: pending.FullName, Private: true, Project: "project", State: "intent"}
+	pendingAck, err := s.saveRepository(ctx, access.Principal{UserID: "alice"}, "one", pendingRepo, pending.Mutation, false, pending)
+	if err != nil || pendingAck.Error != nil {
+		t.Fatal("pending intent fixture failed", err)
+	}
+	beforePending := remoteCalls.Load()
+	request("alice", "POST", base+"/repositories/pending/delete", mutation(pendingAck.Data.Version), 200)
+	request("alice", "POST", base+"/repositories/pending/create", pending, 200)
+	if remoteCalls.Load() != beforePending {
+		t.Fatal("an unregistered, undispatched intent contacted Gitea")
+	}
+	var release sync.Once
+	defer release.Do(func() { close(finishCreation) })
+	inFlight := create("in-flight", "in-flight", "owner", true)
+	result, failed := make(chan *http.Response, 1), make(chan error, 1)
+	go func() {
+		req, _ := http.NewRequest("POST", api.URL+base+"/repositories/in-flight/create", bytes.NewReader(raw(inFlight)))
+		req.Header.Set("Authorization", "Bearer alice")
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			failed <- err
+		} else {
+			result <- res
+		}
+	}()
+	select {
+	case <-creationStarted:
+	case err := <-failed:
+		t.Fatal(err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("in-flight creation did not reach owned Gitea")
+	}
+	activeIntent, _ := s.Read(ctx, access.Principal{UserID: "alice"}, "one", "in-flight")
+	request("alice", "POST", base+"/repositories/in-flight/delete", mutation(activeIntent.Version), 200)
+	release.Do(func() { close(finishCreation) })
+	select {
+	case res := <-result:
+		body, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if res.StatusCode != 200 {
+			t.Fatalf("in-flight creation response: %d %s", res.StatusCode, body)
+		}
+	case err := <-failed:
+		t.Fatal(err)
+	case <-time.After(5 * time.Second):
+		t.Fatal("in-flight creation did not finish")
+	}
+	archivedResult, _ := s.Read(ctx, access.Principal{UserID: "alice"}, "one", "in-flight")
+	if archivedResult.State != "created" || archivedResult.RepositoryID == 0 {
+		t.Fatal("the result of an unregistered in-flight request was lost")
+	}
+	if err = store.Database().QueryRow(ctx, `SELECT deleted FROM shared_versions WHERE workspace_id='one' AND resource_id='forge-repository:in-flight'`).Scan(&deleted); err != nil || !deleted {
+		t.Fatal("a late creation result registered the repository again")
+	}
+	listed = request("alice", "GET", base+"/repositories", nil, 200)
+	var page Page[Repository]
+	json.Unmarshal(listed, &page)
+	if len(page.Items) != 0 {
+		t.Fatal("unregistered repositories remained in the current catalog")
+	}
+	for i := range 52 {
+		id := fmt.Sprintf("page-%02d", i)
+		r := Repository{ID: id, Connection: "shared", Instance: forge.URL, FullName: "owner/" + id, RepositoryID: int64(100 + i), Private: true, State: "registered"}
+		if out, err := s.saveRepository(ctx, access.Principal{UserID: "alice"}, "one", r, apicontract.Mutation{OperationID: id, ExpectedVersion: "0"}, false, r); err != nil || out.Error != nil {
+			t.Fatal("catalog fixture failed", err)
+		}
+	}
+	json.Unmarshal(request("alice", "GET", base+"/repositories", nil, 200), &page)
+	if len(page.Items) != 50 || page.Next != "page-49" {
+		t.Fatalf("first active catalog page: %d %s", len(page.Items), page.Next)
+	}
+	var next Page[Repository]
+	json.Unmarshal(request("alice", "GET", base+"/repositories?after="+page.Next, nil, 200), &next)
+	if len(next.Items) != 2 || next.Items[0].ID != "page-50" || next.Next != "" {
+		t.Fatal("active catalog pagination lost or repeated records")
+	}
+	beforeRevocation := creates.Load()
 	revoked := mutation(connectionVersion)
 	revoked["name"] = "Shared Gitea"
 	revoked["instance"] = forge.URL
 	revoked["allow_create"] = false
 	accepted(request("alice", "POST", base+"/connections/shared", revoked, 200))
 	request("alice", "POST", base+"/repositories/denied/create", create("denied", "denied", "owner", true), 400)
-	if creates.Load() != 2 {
+	if creates.Load() != beforeRevocation {
 		t.Fatal("revoked create permission dispatched")
 	}
 	var history string
