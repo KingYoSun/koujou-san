@@ -296,7 +296,7 @@ it.skipIf(!api)(
       await settled(() =>
         expect(host.textContent).toContain("owner/new-repo · 作成済み"),
       );
-      expect(host.textContent).not.toContain("作成拒否の記録を削除");
+      expect(button("リポジトリの登録を解除")).toBeTruthy();
       await click("Giteaリポジトリを作成");
       await click("所有者を取得");
       await settled(() =>
@@ -312,14 +312,22 @@ it.skipIf(!api)(
         expect(button("owner/rejected-repo · 作成拒否")).toBeTruthy(),
       );
       await click("owner/rejected-repo · 作成拒否");
-      await click("作成拒否の記録を削除");
+      await click("リポジトリの登録を解除");
       await settled(() => {
         expect(host.textContent).not.toContain("owner/rejected-repo");
         expect(button("owner/new-repo · 作成済み")).toBeTruthy();
-        expect(host.textContent).toContain("作成拒否の記録を削除しました。");
+        expect(host.textContent).toContain("リポジトリの登録を解除しました。");
       });
       await click("リポジトリを再取得");
       expect(host.textContent).not.toContain("owner/rejected-repo");
+      await click("owner/new-repo · 作成済み");
+      await click("リポジトリの登録を解除");
+      await settled(() => {
+        expect(host.textContent).not.toContain("owner/new-repo");
+        expect(host.textContent).toContain("リポジトリはありません。");
+      });
+      await click("リポジトリを再取得");
+      expect(host.textContent).toContain("リポジトリはありません。");
       await link("Projectチャット");
       await settled(() => expect(button("Owned Project")).toBeTruthy());
       await click("Owned Project");
