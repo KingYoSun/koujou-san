@@ -9,7 +9,7 @@ CREATE TABLE context_scope_catalog (
 INSERT INTO context_scope_catalog
  SELECT r.workspace_id,r.resource_id,r.revision,r.payload->>'kind',lower(r.payload->>'name')
  FROM context_records r JOIN shared_versions v ON v.workspace_id=r.workspace_id AND v.resource_id=r.resource_id AND v.version=r.revision
- WHERE r.kind='scope' AND NOT v.deleted;
+ WHERE v.resource_id LIKE 'scope:%' AND r.kind='scope' AND NOT v.deleted;
 CREATE INDEX context_scope_kind_name ON context_scope_catalog(workspace_id,scope_kind,sort_name,resource_id);
 
 CREATE TABLE forge_connections (
