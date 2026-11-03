@@ -166,6 +166,7 @@ func (s *Service) PutConnection(ctx context.Context, p access.Principal, w, id s
 		if req.Token == "" && req.CA == "" {
 			current.Name = req.Name
 			current.AllowCreate = req.AllowCreate
+			current.Version = ""
 			return s.mutate(ctx, p, w, "forge-connection:"+id, "forge-connection", req.Mutation, current, func(tx pgx.Tx, ref apicontract.Reference) (any, error) {
 				current.Version = ref.Version
 				_, err := tx.Exec(ctx, `UPDATE forge_connections SET spec=$3 WHERE workspace_id=$1 AND id=$2`, w, id, raw(current))

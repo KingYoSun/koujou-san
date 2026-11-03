@@ -298,6 +298,7 @@ func TestWorkspaceSetupPostgres(t *testing.T) {
 	update["instance"] = forge.URL
 	update["allow_create"] = false
 	request("setup-manager", "POST", "/forge/workspaces/setup/connections/"+id, update, 200)
+	request("setup-manager", "POST", "/forge/workspaces/setup/connections/"+id, update, 200)
 	connection, _, _ = s.Connection(ctx, "setup", id)
 	var reauth map[string]string
 	json.Unmarshal(request("setup-manager", "POST", base+"/owned/start", map[string]any{"connection": id, "expected_version": connection.Version}, 200), &reauth)
