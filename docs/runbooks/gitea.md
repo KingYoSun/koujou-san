@@ -10,7 +10,7 @@ Workspace管理者は同じ「共有接続」でGiteaを選び、「Giteaにロ�
 
 従来のPATは「トークンでGitea接続を追加」から設定できる。資格情報はWorkspaceに結び付けてサーバーのDBへ暗号化保存し、API応答・共有履歴・Contextへ返さない。暗号化には既存のサーバー認証キーから用途別に導出したキーを使うため、DBの復元には元の認証キーも必要となる。
 
-新規repoを作る場合は、その接続で「このWorkspaceでリポジトリ作成を許可」を有効にする。認証したアカウントにはGitea側の対象所有者に対する作成権限も必要であり、観測・起票用の権限だけを作成許可として扱わない。OAuthでは`read:user write:repository write:issue`を要求し、期限切れtokenをサーバーが更新する。PATのトークン欄が空なら現在の資格情報を保持し、入力したトークン・CAだけを置き換える。
+新規repoを作る場合は、その接続で「このWorkspaceでリポジトリ作成を許可」を有効にする。認証したアカウントにはGitea側の対象所有者に対する作成権限も必要であり、観測・起票用の権限だけを作成許可として扱わない。OAuthでは`read:user write:repository write:issue read:organization`を要求し、期限切れtokenをサーバーが更新する。`read:organization`は所有者候補の組織一覧を取得するために必要となる。この権限を持たない既存のOAuth共有接続は「選択した接続を再認証」から権限を許可する。PATのトークン欄が空なら現在の資格情報を保持し、入力したトークン・CAだけを置き換える。
 
 「リポジトリ」では、既存repoの登録と新規作成を分けて操作する。新規作成では共有接続、所有者、名前、公開範囲を指定する。本人所有の作成は[`POST /user/repos`](https://docs.gitea.com/api/operations/create-current-user-repo/)、組織所有は[`POST /orgs/{org}/repos`](https://docs.gitea.com/api/operations/create-org-repo/)を使う。READMEによる初期化は任意。送信意図を先に保存し、同じ意図は一度だけ送信する。「作成結果未確認」では作成を繰り返さず「作成結果を照合」で取得する。照合による存在確認は、その要求が作成した証明とは区別する。
 

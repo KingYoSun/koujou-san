@@ -120,18 +120,23 @@ func TestWorkspaceSetupPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	var mu sync.Mutex
-	challenges := map[string]string{}
+	type grant struct {
+		challenge        string
+		organizationRead bool
+	}
+	challenges := map[string]grant{}
+	var organizationRead atomic.Bool
 	var exchanges, refreshes, creates atomic.Int64
 	forge := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/login/oauth/authorize" {
 			q := r.URL.Query()
-			if q.Get("client_id") != "owned-client" || q.Get("code_challenge_method") != "S256" || q.Get("scope") != "read:user write:repository write:issue" {
+			if q.Get("client_id") != "owned-client" || q.Get("code_challenge_method") != "S256" || !strings.HasPrefix(q.Get("scope"), "read:user write:repository write:issue") {
 				http.Error(w, "bad authorization", 400)
 				return
 			}
 			code := nonce()
 			mu.Lock()
-			challenges[code] = q.Get("code_challenge")
+			challenges[code] = grant{q.Get("code_challenge"), strings.Contains(" "+q.Get("scope")+" ", " read:organization ")}
 			mu.Unlock()
 			callback, _ := url.Parse(q.Get("redirect_uri"))
 			cq := callback.Query()
@@ -154,10 +159,11 @@ func TestWorkspaceSetupPostgres(t *testing.T) {
 				expected := challenges[r.Form.Get("code")]
 				delete(challenges, r.Form.Get("code"))
 				mu.Unlock()
-				if expected == "" || expected != base64.RawURLEncoding.EncodeToString(challenge[:]) {
+				if expected.challenge == "" || expected.challenge != base64.RawURLEncoding.EncodeToString(challenge[:]) {
 					http.Error(w, "bad proof", 400)
 					return
 				}
+				organizationRead.Store(expected.organizationRead)
 				exchanges.Add(1)
 			case "refresh_token":
 				if r.Form.Get("refresh_token") != "owned-refresh-token" {
@@ -182,6 +188,10 @@ func TestWorkspaceSetupPostgres(t *testing.T) {
 		case "/api/v1/user":
 			json.NewEncoder(w).Encode(map[string]any{"id": 77, "login": "owner"})
 		case "/api/v1/user/orgs":
+			if !organizationRead.Load() {
+				http.Error(w, "read:organization required", http.StatusForbidden)
+				return
+			}
 			json.NewEncoder(w).Encode([]any{})
 		case "/api/v1/repos/owner/new-repo":
 			if creates.Load() == 0 {
@@ -253,6 +263,10 @@ func TestWorkspaceSetupPostgres(t *testing.T) {
 	connection, _, err := s.Connection(ctx, "setup", id)
 	if err != nil || connection.Auth != "oauth" || connection.Account != "owner" {
 		t.Fatalf("not stored: %+v %v", connection, err)
+	}
+	owners := request("setup-manager", "GET", "/forge/workspaces/setup/connections/"+id+"/owners", nil, 200)
+	if !bytes.Contains(owners, []byte(`"login":"owner"`)) {
+		t.Fatal("personal owner missing after scoped organization lookup")
 	}
 	// PKCE state is single use, and an already accepted session cannot create another connection.
 	authURL, _ := url.Parse(first["authorization_url"])
