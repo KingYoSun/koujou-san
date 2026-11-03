@@ -32,7 +32,7 @@ Go/TypeScriptの条件別試験、実フォームのDOM試験、専用DBと所�
 
 ## 現在の判定
 
-Inspection pending。実装と所有環境のフォーム・HTTP検証を終え、固定成果物の独立検品とCIを行う。AC-U6は未確認。実環境のアプリ操作は、本人が明示許可した後もComputer Useの承認機構が拒否している。アプリへのアクセスを別経路で迂回しない。専用Botと補助provisioning候補は撤回・未実行であり、実環境の依頼済みrepo・新規token・Workspace接続はまだ作成していない。
+Inspection pending。実装と所有環境のフォーム・HTTP検証を終え、`399ad82`の[独立検品](2026-11-03-ui-workspace-setup-inspection.md)でAC-U1〜U5と不変条件に残るblockerがないことを確認した。CIを確認中。AC-U6は未確認。実環境のアプリ操作は、本人が明示許可した後もComputer Useの承認機構が拒否している。アプリへのアクセスを別経路で迂回しない。専用Botと補助provisioning候補は撤回・未実行であり、実環境の依頼済みrepo・新規token・Workspace接続はまだ作成していない。
 
 ## 所有環境の証跡
 
