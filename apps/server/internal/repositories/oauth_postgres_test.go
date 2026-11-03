@@ -123,20 +123,21 @@ func TestWorkspaceSetupPostgres(t *testing.T) {
 	type grant struct {
 		challenge        string
 		organizationRead bool
+		userWrite        bool
 	}
 	challenges := map[string]grant{}
-	var organizationRead atomic.Bool
+	var organizationRead, userWrite atomic.Bool
 	var exchanges, refreshes, creates atomic.Int64
 	forge := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/login/oauth/authorize" {
 			q := r.URL.Query()
-			if q.Get("client_id") != "owned-client" || q.Get("code_challenge_method") != "S256" || !strings.HasPrefix(q.Get("scope"), "read:user write:repository write:issue") {
+			if q.Get("client_id") != "owned-client" || q.Get("code_challenge_method") != "S256" || !strings.Contains(" "+q.Get("scope")+" ", " write:repository write:issue ") {
 				http.Error(w, "bad authorization", 400)
 				return
 			}
 			code := nonce()
 			mu.Lock()
-			challenges[code] = grant{q.Get("code_challenge"), strings.Contains(" "+q.Get("scope")+" ", " read:organization ")}
+			challenges[code] = grant{q.Get("code_challenge"), strings.Contains(" "+q.Get("scope")+" ", " read:organization "), strings.Contains(" "+q.Get("scope")+" ", " write:user ")}
 			mu.Unlock()
 			callback, _ := url.Parse(q.Get("redirect_uri"))
 			cq := callback.Query()
@@ -164,6 +165,7 @@ func TestWorkspaceSetupPostgres(t *testing.T) {
 					return
 				}
 				organizationRead.Store(expected.organizationRead)
+				userWrite.Store(expected.userWrite)
 				exchanges.Add(1)
 			case "refresh_token":
 				if r.Form.Get("refresh_token") != "owned-refresh-token" {
@@ -200,6 +202,10 @@ func TestWorkspaceSetupPostgres(t *testing.T) {
 			}
 			json.NewEncoder(w).Encode(remoteRepository{ID: 99, FullName: "owner/new-repo", Private: true})
 		case "/api/v1/user/repos":
+			if !userWrite.Load() {
+				http.Error(w, "write:user required", http.StatusForbidden)
+				return
+			}
 			var input struct {
 				Name    string
 				Private bool
@@ -323,6 +329,14 @@ func TestWorkspaceSetupPostgres(t *testing.T) {
 	request("setup-manager", "POST", base+"/sessions/"+reauth["id"]+"/accept", renew, 200)
 	if c, _, err := s.Connection(ctx, "setup", id); err != nil || c.Name != "Renewed" {
 		t.Fatal("reconnect replaced stable connection identity")
+	}
+	create := mutation("0")
+	create["connection"], create["full_name"], create["private"] = id, "owner/new-repo", true
+	request("setup-manager", "POST", "/forge/workspaces/setup/repositories/setup-created/create", create, 200)
+	var created Repository
+	json.Unmarshal(request("setup-manager", "GET", "/forge/workspaces/setup/repositories/setup-created", nil, 200), &created)
+	if created.State != "created" || created.RepositoryID != 99 || !created.Private || creates.Load() != 1 {
+		t.Fatalf("private repository not created once after reauthentication: %+v", created)
 	}
 	blocked := start("setup-manager")
 	complete(blocked)
