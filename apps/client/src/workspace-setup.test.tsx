@@ -261,15 +261,33 @@ it.skipIf(!api)(
       await link("Projectチャット");
       await settled(() => expect(host.textContent).toContain("Projectを作成"));
       await link("Projectを作成");
-      await settled(() =>
-        expect(button("Projectを新規作成").disabled).toBe(false),
+      await settled(() => expect(field("Project名")).toBeTruthy());
+      await change("Project名", "Owned Project");
+      await change(
+        "初期Contextの本文",
+        "# 最初の仕様\n\nContextのないWorkspaceから開始する。\n",
       );
-      await click("Projectを新規作成");
-      await settled(() => expect(field("名前")).toBeTruthy());
-      await change("名前", "Owned Project");
-      await click("下書きを共有版へ保存");
+      await settled(() =>
+        expect(button("初期ContextとProjectを保存").disabled).toBe(false),
+      );
+      await submit("初期ContextとProjectを保存");
       await settled(() =>
         expect(host.textContent).toContain("共有版を確認済み"),
+      );
+      expect(host.textContent).toContain(
+        "初期ContextとProjectへの所属を保存しました。",
+      );
+      const contextLink = [...host.querySelectorAll("a")].find(
+        (item) => item.textContent === "初期Contextを編集",
+      )!;
+      const contextParams = new URL(contextLink.href).searchParams;
+      const initialContext = (await syncRequest(
+        `/contexts/workspaces/setup-ui/sentence/${contextParams.get("id")}?revision=${contextParams.get("version")}`,
+        false,
+        { method: "GET" },
+      )) as { data: { value: { text: string } } };
+      expect(initialContext.data.value.text).toBe(
+        "# 最初の仕様\n\nContextのないWorkspaceから開始する。\n",
       );
       await link("Projectのリポジトリを設定");
       await settled(() => expect(button("Giteaリポジトリを作成")).toBeTruthy());

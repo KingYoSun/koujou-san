@@ -441,6 +441,21 @@ export function ContextExplorer({
               >
                 {labels[newScopeKind]}を新規作成
               </button>
+              {newScopeKind === "project" && (
+                <button
+                  data-variant="secondary"
+                  onClick={() =>
+                    navigation?.navigate({
+                      workspace: ui.workspace,
+                      screen: "context",
+                      view: "scopes",
+                      query: "project",
+                    })
+                  }
+                >
+                  テキスト・ファイルからProjectを作成
+                </button>
+              )}
               <EnvelopeStatus value={scopes.data} error={scopes.error} />
               <ListCount
                 label="Scope"
