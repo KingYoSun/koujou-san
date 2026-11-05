@@ -16,6 +16,7 @@ import { editorStore, identityKey, requester } from "./context-ui";
 import type { UI } from "./context-ui";
 import { ContextExplorer } from "./context-explorer";
 import { ContextEditor } from "./context-editor";
+import { ProjectBootstrap } from "./project-bootstrap";
 import { ContextPreview, type DefinitionContextInput } from "./context-preview";
 import {
   ContextGeneration,
@@ -384,6 +385,10 @@ export function ContextWorkspace({
         tabIndex={0}
       >
         <ContextExplorer ui={ui} active={mode !== "generation"} mode={mode} />
+        <ProjectBootstrap
+          ui={ui}
+          active={mode === "scopes" && navigation?.route.query === "project"}
+        />
         <ContextEditor
           ui={ui}
           active={
