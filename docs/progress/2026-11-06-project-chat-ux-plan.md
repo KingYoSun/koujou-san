@@ -57,7 +57,7 @@ UIは1440pxと1024pxで読み順・本文表示・focus・横はみ出しを確�
 
 ## 現在の判定
 
-In progress。AC-1〜5とINVAR-1〜3のローカル実装・検証・独立検品を完了した。AC-6のNAHTLOKA実データでの確認は、共有サーバーとWindowsアプリの更新後に行う。現在稼働中の環境へはまだ反映していない。
+Complete。AC-1〜7とINVAR-1〜3の実装・検証・独立検品を完了し、共有サーバーとWindowsアプリへ反映した。NAHTLOKAの実データで設定・登録ファイルの参照と、履歴を自動で含めた会話の継続を確認した。NAHTLOKA自体の開発準備完了を意味するものではない。
 
 | 条件 | 結果と証跡 |
 | --- | --- |
@@ -85,14 +85,34 @@ AC-7は通常の連続送信、70件の履歴からの限定取得、未完了�
 
 公開Host修正後、MCP discovery・道具一覧の取得は成功したが、Windowsのモデル接続の許可リストが新しい2種類の読取り道具を拒否した。ネイティブ境界の試験で `project_inspect` 拒否を再現し、`project_inspect`・`repository_read` を追加した。Run開始・Context編集・shellは拒否する。モデルへのHTTP送信より前の拒否であり、失敗した要求を完了した推論として扱わない。
 
-## 更新候補
+## 更新候補と反映結果
 
 ローカルcommit `f945f7abbbabc70815219d61f2ea503368cb77b0` から、`corepack pnpm run dist:desktop` と `corepack pnpm run dist:server` を実行して成功した。既存のRust実装を含むWindows release buildとNSIS作成、Linuxサーバーimage・archive作成を完了。外部へのpush・PR・配備は行っていない。
 
 - Windows: `artifacts/desktop-0.1.0-preview.1-f945f7ab/koujou-san_0.1.0-preview.1_x64-setup.exe`。SHA-256: `3e9eea513d6a4a804f4c920ed5b542c5666bd0e87575fcf84e311bae4a4a026b`。
 - サーバー: `artifacts/server-0.1.0-preview.1-f945f7ab/koujou-san-server-linux-amd64-0.1.0-preview.1-f945f7ab.tar.gz`。SHA-256: `94c4586a647d759e620d64272eb14be9776fa0d9e9e229547777f7c87df2e98f`。既存schema 28を維持。
 
-接続先は現在 `https://koujou.kingyosun.com`。共有サーバーの更新には一時停止とbackup、Windows版の更新には現在のRunnerの状態確認とアプリ終了が必要になる。初回観測時のアプリには未送信入力があったため、更新の実施判断をユーザーへ確認する。更新候補の作成はNAHTLOKAの受入確認の代わりにはしない。
+接続先は `https://koujou.kingyosun.com`。初回観測時のアプリには未送信入力があり、サーバーの一時停止とアプリ終了を伴うため更新判断を求め、追加回答で承認された。更新前にはアプリとRunnerの終了状態を確認した。更新候補の作成とNAHTLOKAの受入確認を分けて記録する。
+
+### 最終反映
+
+- 共有サーバー: `45a1a94d73e873eba279b6872350cea23ab0c1b8`。適用image IDは `sha256:a585f9485cf0e73a8beb5a7a9c4ccaf00d6b04dc974e6f7fea81e6315732e72d`。
+- Windows: `63aa8492b8acbfe5145fa2d0924aabc29e020ba8`。インストーラー終了コード0。インストールされたexeのSHA-256は `22168f90fa48040de0aa3d9f88b243b2e4108aa1c2b8b25965bcfca6cab23912`。TauriのNSIS bundle markerの差分だけを反映したbuild成果物と完全一致する。
+- サーバーとWindowsの共通UI assetsは全ファイルで一致。サーバーのcodeはWindows候補の祖先commitと同じ。
+- 更新前のprivate backupを保持した。最終backupは `/home/kingyosun/koujou-local2/private/update-45a1a94d/before-update.tgz`。schema 28、既存設定、本人・Workspace・所属、Context・Run・チャット履歴の保持と7サービスのhealthyを確認した。Gitea・Immichは再起動していない。
+- Docker DesktopのOCI index IDと配備先Dockerのconfig IDの差は、archive checksum、index→manifest→configのhash連鎖、全layerとcommitの一致で確認した。元metadataを保持し、配備先bundleのimage IDだけを同一imageのconfig IDへ正規化した。配備手順とこの照合は独立検品済み。
+
+最終追加検証は共通UI162件成功・専用セットアップ1件skip、Windows native34件成功・専用実接続12件ignore、`check:desktop`成功。公開Hostとloopback転送の試験・実MCP統合試験も成功し、Host修正とネイティブ読取り許可の追加はそれぞれ固定成果物の独立検品でblockerなし。
+
+### NAHTLOKAでの受入結果
+
+更新したWindowsアプリで、既存認証とWorkspaceを保持してProjectチャットを開き、Project・ChatGPT `gpt-6.1-sol` が自動選択されることを確認した。MCPの再認証は製品の「MCPへ接続」から完了した。
+
+「開発の準備を確認する」→「送信」から相談を作成。最初の実相談は `project_inspect` 4回、`repository_read` 3回で設定と固定commit `8f7d9f6071f35e8a0d2e74daca728f66493e6086` の一覧・設計書を取得し、completedになった。登録先には設計書2ファイルだけがあり、README・実装コード・テスト基盤は未登録。Workspaceの実行許可はfalse、RunnerとRunの取得ページは空だった。
+
+続けて「上の確認結果を踏まえて、koujou-san側で不足している設定だけを3点以内で整理」と送信し、前の人間・AI発言と今回の発言の3つの固定参照が送信されたことを保存記録で照合した。2回目もcompletedとなり、入力欄は「履歴4件」に更新された。設定・Runの開始は行わず、不足設定の参照にとどめた。
+
+実画面は `.cache/chat-preview/live-nahtloka.png`、受入の操作・道具回数・参照roleの照合は `.cache/local2/chat-live-summary.json` に保存した。失敗した検証操作は画面の終了操作で閉じ、診断履歴を保持した。新しい相談の返答を表示したままユーザーへ返す。
 
 参照資料: [Slackのスレッド](https://slack.com/help/articles/115000769927-Use-threads-to-organize-discussions)、[サイドバー](https://slack.com/help/articles/212596808-Adjust-your-sidebar-preferences)。Slackのチャンネル構造は採用せず、相談ごとの画面を維持する判断に更新した。
 
