@@ -114,6 +114,12 @@ AC-7は通常の連続送信、70件の履歴からの限定取得、未完了�
 
 実画面は `.cache/chat-preview/live-nahtloka.png`、受入の操作・道具回数・参照roleの照合は `.cache/local2/chat-live-summary.json` に保存した。失敗した検証操作は画面の終了操作で閉じ、診断履歴を保持した。新しい相談の返答を表示したままユーザーへ返す。
 
+### PRとCI
+
+追加依頼に従い、改修ブランチをpushして[PR #101](https://github.com/KingYoSun/koujou-san/pull/101)を作成した。CIとマージの最終結果は同PRを参照する。
+
+初回CIの `test:forge` は、セットアップ試験が旧UIのProject作成リンクの常時表示と手動のスレッド作成を前提にしていたため失敗した。試験をProject切替からの作成、最初の発言の保存による相談作成、モデルの自動選択へ更新した。実APIからスレッドと発言を再取得して保存内容を照合し、専用PostgreSQL・管理下のOAuth/HTTPによる `corepack pnpm run test:forge` が成功した。製品コードや認可条件の変更はない。
+
 参照資料: [Slackのスレッド](https://slack.com/help/articles/115000769927-Use-threads-to-organize-discussions)、[サイドバー](https://slack.com/help/articles/212596808-Adjust-your-sidebar-preferences)。Slackのチャンネル構造は採用せず、相談ごとの画面を維持する判断に更新した。
 
 実装資料: [react-markdown公式](https://github.com/remarkjs/react-markdown)、[GiteaのGit treeページ取得](https://docs.gitea.com/enterprise/api/21/operations/get-tree/)。

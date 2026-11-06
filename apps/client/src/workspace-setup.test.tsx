@@ -49,6 +49,7 @@ vi.mock("./auth", () => ({
   apiRequest: vi.fn(),
   mcpRequest: vi.fn(),
   connectMCP: vi.fn(),
+  mcpIdentity: vi.fn(async () => undefined),
   workspaceAccessLost: vi.fn(),
 }));
 const api = process.env.KOUJOU_SETUP_API;
@@ -259,6 +260,11 @@ it.skipIf(!api)(
           "",
       ).toBe("");
       await link("Projectチャット");
+      await act(() =>
+        [...host.querySelectorAll("summary")]
+          .find((item) => item.textContent === "Projectを選択")!
+          .click(),
+      );
       await settled(() => expect(host.textContent).toContain("Projectを作成"));
       await link("Projectを作成");
       await settled(() => expect(field("Project名")).toBeTruthy());
@@ -347,16 +353,39 @@ it.skipIf(!api)(
       await click("リポジトリを再取得");
       expect(host.textContent).toContain("リポジトリはありません。");
       await link("Projectチャット");
-      await settled(() => expect(button("Owned Project")).toBeTruthy());
-      await click("Owned Project");
-      await settled(() => expect(field("新しい相談の題名")).toBeTruthy());
-      await change("新しい相談の題名", "最初の相談");
-      await submit("スレッドを作成");
-      await settled(() => expect(host.textContent).toContain("# 最初の相談"));
-      await settled(() => expect(button("保存してAIへ相談")).toBeTruthy());
+      await settled(() => expect(button("＋ 新しい相談").disabled).toBe(false));
+      expect(host.textContent).toContain("Owned Project");
+      expect(host.textContent).not.toContain("新しい相談の題名");
+      await change("相談・メッセージ", "最初の相談");
+      await click("保存のみ");
+      await settled(() => expect(field("相談・メッセージ").value).toBe(""));
+      const threads = (await syncRequest(
+        "/client-operations/workspaces/setup-ui/query",
+        false,
+        { method: "POST", body: { kind: "chat-thread", limit: 50 } },
+      )) as { items: { id: string; value: { name: string } }[] };
+      expect(threads.items).toHaveLength(1);
+      expect(threads.items[0].value.name).toBe("最初の相談");
+      const messages = (await syncRequest(
+        "/client-operations/workspaces/setup-ui/query",
+        false,
+        {
+          method: "POST",
+          body: { kind: "chat-message", root: threads.items[0].id, limit: 20 },
+        },
+      )) as {
+        items: { value: { role: string; text: string; state: string } }[];
+      };
+      expect(messages.items.map((row) => row.value)).toEqual([
+        expect.objectContaining({
+          role: "human",
+          text: "最初の相談",
+          state: "complete",
+        }),
+      ]);
       await act(() =>
         [...host.querySelectorAll("summary")]
-          .find((item) => item.textContent?.startsWith("モデル未選択"))!
+          .find((item) => item.textContent?.startsWith("Owned model"))!
           .click(),
       );
       await settled(() =>
@@ -372,10 +401,9 @@ it.skipIf(!api)(
       const model = [...field("利用する接続").querySelectorAll("option")].find(
         (item) => item.textContent?.includes("Owned model"),
       )!;
-      await change("利用する接続", model.value);
+      expect(field("利用する接続").value).toBe(model.value);
       await change("相談・メッセージ", "新しいリポジトリで作業を始めたい");
-      expect(button("保存してAIへ相談").disabled).toBe(false);
-      expect(button("保存してAIへ相談")).toBeTruthy();
+      expect(button("送信").disabled).toBe(false);
       expect(
         [...host.querySelectorAll("a")].some((item) =>
           item.textContent?.includes("Run・Workflow"),
