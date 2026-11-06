@@ -24,7 +24,12 @@ fn text(value: &Value) -> Result<&str, String> {
 fn allowed(name: &str) -> bool {
     matches!(
         name,
-        "context_search" | "context_graph" | "context_get" | "context_resolve"
+        "context_search"
+            | "context_graph"
+            | "context_get"
+            | "context_resolve"
+            | "project_inspect"
+            | "repository_read"
     )
 }
 

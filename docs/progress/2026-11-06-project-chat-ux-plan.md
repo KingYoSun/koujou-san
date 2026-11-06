@@ -83,6 +83,8 @@ AC-7は通常の連続送信、70件の履歴からの限定取得、未完了�
 
 実環境の受入中、MCP認証後の最初のdiscoveryが失敗した。配布edgeが公開Hostを維持してlocalhostのAPIへ転送する構成に、SDKのlocalhost向けHost検査が合っていなかった。loopback接続と公開Hostを組み合わせた試験で403を再現し、設定済み公開Hostとの明示照合へ変更。未設定・別Hostは拒否し、既存のOAuth、操作認可、Origin検査は維持する。モデル要求はこの失敗の時点ではまだ送っていない。修正後のサーバーで同じ相談を再開して確認する。
 
+公開Host修正後、MCP discovery・道具一覧の取得は成功したが、Windowsのモデル接続の許可リストが新しい2種類の読取り道具を拒否した。ネイティブ境界の試験で `project_inspect` 拒否を再現し、`project_inspect`・`repository_read` を追加した。Run開始・Context編集・shellは拒否する。モデルへのHTTP送信より前の拒否であり、失敗した要求を完了した推論として扱わない。
+
 ## 更新候補
 
 ローカルcommit `f945f7abbbabc70815219d61f2ea503368cb77b0` から、`corepack pnpm run dist:desktop` と `corepack pnpm run dist:server` を実行して成功した。既存のRust実装を含むWindows release buildとNSIS作成、Linuxサーバーimage・archive作成を完了。外部へのpush・PR・配備は行っていない。
