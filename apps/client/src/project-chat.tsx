@@ -8,13 +8,12 @@ import {
   useNavigation,
   useScreenActive,
 } from "./navigation";
-import { DetailPane } from "./panes";
+import { DetailPane, SidebarPane } from "./panes";
 import { Disclosure } from "./disclosure";
 import { ModelConnectionSettings } from "./model-connection-settings";
 import {
   modelReady,
   modelSnapshot,
-  type ModelProfile,
   type VersionRef,
 } from "./model-connections";
 import { operationClientID, operationPort } from "./client-operation-port";
@@ -36,8 +35,16 @@ import {
   type ChatThread,
 } from "./chat-api";
 import { ChatWork } from "./chat-work";
-import { useScopePicker } from "./scope-picker";
+import { useChatConnections } from "./chat-connections";
+import { ChatSidebar } from "./chat-sidebar";
+import { ChatHistory, chatHistoryLimit } from "./chat-history";
 import { ChatOperationControls } from "./chat-operation-controls";
+import { ChatMarkdown } from "./chat-markdown";
+import {
+  chatPreferenceKey,
+  chatPreferences,
+  rememberChat,
+} from "./chat-preferences";
 
 export function ProjectChat({
   native,
@@ -59,10 +66,11 @@ export function ProjectChat({
   // Popover use: keep the thread local instead of moving the screen.
   embedded?: boolean;
   initialThread?: VersionRef;
-  onThreadOpened?: (ref: VersionRef) => void;
+  onThreadOpened?: (ref?: VersionRef) => void;
 }) {
   const namespace = { api, user, workspace },
     base = chatBase(workspace);
+  const preferenceKey = chatPreferenceKey(api, user, workspace);
   const navigation = useNavigation(),
     visible = useScreenActive();
   const [project, setProject] = useState<VersionRef>();
@@ -73,10 +81,12 @@ export function ProjectChat({
   const [operations, setOperations] = useState<Saved<ClientOperation>[]>([]);
   const [turns, setTurns] = useState<Record<string, string>>({});
   const [chosen, setChosen] = useState<VersionRef[]>([]);
-  const [profile, setProfile] = useState<ModelProfile>();
-  const [name, setName] = useState(""),
-    [search, setSearch] = useState(""),
-    [text, setText] = useState("");
+  const [recentMessages, setRecentMessages] = useState<Saved<ChatMessage>[]>(
+    [],
+  );
+  const [text, setText] = useState("");
+  const search = useRef("");
+  const [activity, setActivity] = useState("");
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState("");
   const [context, setContext] = useState(true);
@@ -102,17 +112,11 @@ export function ProjectChat({
   const ids = useRef(new Map<string, string>());
   const stopped = useRef(new Set<string>());
   const canEdit = role !== "viewer";
-  const projectPicker = useScopePicker({
-    native,
-    workspace,
-    kind: "project",
-    value: project?.id.replace(/^scope:/, "") ?? "",
-    channels: true,
-    onChange: (id, ref) =>
-      void act(() =>
-        selectProject({ id: "scope:" + id, version: ref?.revision ?? "head" }),
-      ),
-  });
+  const { profile, selectModel, mcp, checkMCP } = useChatConnections(
+    { native, api, user, workspace },
+    visible,
+    setNotice,
+  );
   useEffect(() => {
     lifetime.current = true;
     return () => {
@@ -160,8 +164,10 @@ export function ProjectChat({
         setThreads(undefined);
         setOperations([]);
         setChosen([]);
+        setRecentMessages([]);
         setExcerpt(undefined);
         setFocused(undefined);
+        localStorage.removeItem(preferenceKey);
         if (await workspaceAccessLost(native, workspace, error))
           await syncStorage(native).remove(namespace);
       }
@@ -181,7 +187,7 @@ export function ProjectChat({
     const page = await call<ChatPage>("/query", {
       kind: "chat-thread",
       root: selected.id,
-      search,
+      search: search.current,
       limit: 50,
       descending: true,
       after: after?.after ?? 0,
@@ -196,6 +202,7 @@ export function ProjectChat({
       setTimeline(undefined);
       setOperations([]);
       setChosen([]);
+      setRecentMessages([]);
       setFocused(undefined);
       setExcerpt(undefined);
     }
@@ -215,9 +222,17 @@ export function ProjectChat({
     };
     setProject(project);
     setProjectName(scoped.data.value.name);
+    rememberChat(preferenceKey, {
+      project,
+      ...(current === undefined ? { thread: undefined } : {}),
+    });
     await listThreads(undefined, project, mine);
   }
-  async function refresh(ref: VersionRef, after?: ChatPage) {
+  async function refresh(
+    ref: VersionRef,
+    after?: ChatPage,
+    keepHistory = false,
+  ) {
     const mine = ++serial.current;
     const saved = await read<ChatThread>(ref);
     if (currentThread.current?.id !== saved.id)
@@ -229,6 +244,15 @@ export function ProjectChat({
       after: after?.after ?? 0,
       after_id: after?.after_id ?? "",
     });
+    const recent =
+      !after && !keepHistory
+        ? await call<ChatPage>("/query", {
+            root: saved.id,
+            kind: "chat-message",
+            descending: true,
+            limit: chatHistoryLimit,
+          })
+        : undefined;
     const ops = await Promise.all(
       page.items
         .filter((r) => r.kind === "chat-operation")
@@ -248,9 +272,26 @@ export function ProjectChat({
     setProject(saved.value.project);
     setTimeline(page);
     setOperations(ops);
+    if (recent) {
+      const messages = recent.items
+        .filter(
+          (r) =>
+            r.kind === "chat-message" &&
+            r.root === saved.id &&
+            (r.value as ChatMessage).state === "complete",
+        )
+        .reverse() as Saved<ChatMessage>[];
+      setRecentMessages(messages);
+      setChosen(messages.map(pin));
+    }
+    rememberChat(preferenceKey, {
+      project: saved.value.project,
+      thread: pin(saved),
+    });
   }
   function open(ref: VersionRef) {
     setChosen([]);
+    setRecentMessages([]);
     setExcerpt(undefined);
     setFocused(undefined);
     setAtBottom(true);
@@ -270,6 +311,7 @@ export function ProjectChat({
       void act(() => refresh(target));
     else if (visible && target?.kind === "scope")
       void act(() => selectProject(target));
+    else if (visible && !project) void act(restoreProject);
   }, [
     visible,
     navigation?.route.target?.id,
@@ -277,7 +319,26 @@ export function ProjectChat({
   ]);
   useEffect(() => {
     if (embedded && initialThread) void act(() => refresh(initialThread));
+    else if (embedded) void act(restoreProject);
   }, []);
+  async function restoreProject() {
+    const saved = chatPreferences(preferenceKey);
+    if (saved.thread) return refresh(saved.thread);
+    if (saved.project)
+      return selectProject({ ...saved.project, version: "head" });
+    const page = await call<{
+      data: { items: { ref: { id: string; revision: string } }[] };
+    }>(`/contexts/workspaces/${encodeURIComponent(workspace)}/catalog`, {
+      kind: "scope",
+      scope_kind: "project",
+    });
+    const first = page.data.items[0];
+    if (first)
+      await selectProject({
+        id: "scope:" + first.ref.id,
+        version: first.ref.revision,
+      });
+  }
   useEffect(() => {
     const element = scroller.current;
     if (!element) return;
@@ -296,27 +357,59 @@ export function ProjectChat({
       );
   };
   async function create() {
-    if (!project || !name.trim()) return;
-    const key = JSON.stringify([project, name]);
+    if (!project) throw Error("project_required");
+    const name = [...text.trim().split(/\r?\n/)[0]].slice(0, 40).join("");
+    const key = JSON.stringify([project, text]);
     if (!ids.current.has("thread:" + key))
       ids.current.set("thread:" + key, `chat-thread:${crypto.randomUUID()}`);
     const id = ids.current.get("thread:" + key)!;
     const ref = await mutate(`/chat/threads/${encodeURIComponent(id)}`, {
       value: { name, project: pin(project) },
     });
-    setName("");
-    ids.current.delete("thread:" + key);
-    await listThreads();
-    open(ref);
+    const saved = await read<ChatThread>(ref);
+    currentThread.current = saved;
+    setThread(saved);
+    rememberChat(preferenceKey, { project, thread: pin(saved) });
+    onThreadOpened?.(pin(saved));
+    return saved;
+  }
+  function newChat() {
+    ++serial.current;
+    currentThread.current = undefined;
+    setThread(undefined);
+    setTimeline(undefined);
+    setOperations([]);
+    setChosen([]);
+    setRecentMessages([]);
+    setFocused(undefined);
+    setExcerpt(undefined);
+    setText("");
+    setNotice("");
+    rememberChat(preferenceKey, { thread: undefined });
+    onThreadOpened?.(undefined);
+    if (navigation && !embedded && project)
+      navigation.navigate({
+        workspace,
+        screen: "chat",
+        target: { ...project, kind: "scope" },
+        view: "new",
+      });
   }
   async function send(ai: boolean) {
-    if (!thread || !text.trim()) return;
+    if (!project || !text.trim()) return;
     if (ai && (!profile || !modelReady(native, api + "\0" + user, profile))) {
       setNotice("利用するモデル接続を設定・選択してください。");
       return;
     }
-    const target = pin(thread),
-      project = thread.value.project;
+    if (ai && context && !(await checkMCP())) {
+      setNotice(
+        "Projectの参照接続を確認してください。未接続の場合はMCPへ接続してください。",
+      );
+      return;
+    }
+    const saved = thread ?? (await create());
+    const target = pin(saved),
+      projectRef = saved.value.project;
     const key = JSON.stringify([target, text]);
     if (!ids.current.has("message:" + key))
       ids.current.set("message:" + key, `chat-message:${crypto.randomUUID()}`);
@@ -329,10 +422,11 @@ export function ProjectChat({
         chat: {
           thread: target,
           messages: [...chosen.filter((r) => r.id !== message.id), message],
+          inspect: context,
         },
         mode: "proposal",
         fixed: { mode: context ? "select" : "none" },
-        scopes: context ? [project.id.replace(/^scope:/, "")] : [],
+        scopes: context ? [projectRef.id.replace(/^scope:/, "")] : [],
         limits: { model_requests: 32, mcp_requests: 256, seconds: 600 },
       };
       const policyRef = await mutate(`/policies/chat-policy:${message.id}`, {
@@ -350,15 +444,28 @@ export function ProjectChat({
         },
       );
       const operation = await read<ClientOperation>(ref);
+      await refresh(target, undefined, true);
       await run(operation, policy);
     }
     if (currentThread.current?.id === target.id) {
       setText("");
       setChosen([]);
+      setRecentMessages([]);
       setAtBottom(true);
       await refresh(target);
+      await listThreads();
+      if (navigation && !embedded)
+        navigation.navigate(
+          {
+            workspace,
+            screen: "chat",
+            target: { ...target, kind: "chat-thread", name: saved.value.name },
+          },
+          { replace: true, focus: false },
+        );
     }
     ids.current.delete("message:" + key);
+    ids.current.delete("thread:" + JSON.stringify([project, text]));
   }
   function updateOperation(update: Saved<ClientOperation>) {
     setOperations((current) => [
@@ -373,19 +480,24 @@ export function ProjectChat({
     if (!profile) throw Error("model_required");
     updateOperation(operation);
     stopped.current.delete(operation.id);
-    await runSelection(
-      operation,
-      policy,
-      profile,
-      operationClientID,
-      operationPort(
-        { native, api, user, workspace },
-        profile,
+    try {
+      await runSelection(
         operation,
-        () => lifetime.current && !stopped.current.has(operation.id),
-      ),
-      updateOperation,
-    );
+        policy,
+        profile,
+        operationClientID,
+        operationPort(
+          { native, api, user, workspace },
+          profile,
+          operation,
+          () => lifetime.current && !stopped.current.has(operation.id),
+        ),
+        updateOperation,
+        setActivity,
+      );
+    } finally {
+      setActivity("");
+    }
   }
   async function recover(operation: Saved<ClientOperation>, action: string) {
     if (operation.value.user !== user) return;
@@ -428,6 +540,15 @@ export function ProjectChat({
     await refresh(thread);
     setNotice("選んだ範囲を版付きContextに保存しました。");
   }
+  async function loadTurn(ref: VersionRef) {
+    const op = await read<ClientOperation>({ id: ref.id, version: "head" });
+    if (!op.value.turn) return;
+    const turn = await read(op.value.turn);
+    setTurns((current) => ({
+      ...current,
+      [op.id]: JSON.stringify(turn.value, null, 2),
+    }));
+  }
   const work = (props: { adoption?: ChatAdoption; link?: ChatLink }) =>
     thread && (
       <ChatWork
@@ -451,397 +572,325 @@ export function ProjectChat({
   return (
     <ScreenContent>
       <div className="chat-layout" data-embedded={embedded || undefined}>
-        <aside className="chat-sidebar" aria-label="Projectとスレッド">
-          <div className="chat-sidebar-section">
-            {canEdit && (
-              <NavigationLink
-                related
-                to={{
-                  workspace,
-                  screen: "context",
-                  view: "scopes",
-                  query: "project",
-                }}
-              >
-                Projectを作成
-              </NavigationLink>
-            )}
-            {projectPicker}
-          </div>
-          {project && (
-            <div className="chat-sidebar-section">
-              <p className="chat-sidebar-title">
-                {projectName ? `${projectName}のスレッド` : "スレッド"}
-              </p>
-              <NavigationLink
-                related
-                to={{
-                  workspace,
-                  screen: "repositories",
-                  target: {
-                    kind: "scope",
-                    id: project.id.replace(/^scope:/, ""),
-                    version: project.version,
-                  },
-                }}
-              >
-                Projectのリポジトリを設定
-              </NavigationLink>
-              {role === "admin" && (
-                <NavigationLink
-                  related
-                  to={{
-                    workspace,
-                    screen: "workspace",
-                    view: "resource-policy",
-                    target: {
-                      kind: "resource",
-                      id: project.id,
-                      version: "head",
-                    },
-                  }}
-                >
-                  Projectの共有設定
-                </NavigationLink>
-              )}
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void act(() => listThreads());
-                }}
-              >
-                <label>
-                  スレッドを検索
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                </label>
-                <button
-                  data-variant="secondary"
-                  disabled={busy}
-                  aria-busy={busy}
-                >
-                  スレッドを検索
-                </button>
-              </form>
-              {threads && (
-                <p>
-                  {threads.items.length
-                    ? `${threads.items.length}件を表示${threads.items.length === 50 ? "（続きあり）" : ""}`
-                    : "スレッドはありません。"}
-                </p>
-              )}
-              <ul className="chat-channels">
-                {threads?.items.map((r) => (
-                  <li key={r.id}>
-                    <button
-                      aria-current={thread?.id === r.id ? "true" : undefined}
-                      onClick={() => open(r)}
-                    >
-                      # {(r.value as ChatThread).name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-              {threads?.items.length === 50 && (
-                <button
-                  data-variant="secondary"
-                  onClick={() => void act(() => listThreads(threads))}
-                >
-                  スレッドの次のページ
-                </button>
-              )}
-              {canEdit && (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void act(create);
-                  }}
-                >
-                  <label>
-                    新しい相談の題名
-                    <input
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                    />
-                  </label>
-                  <button disabled={busy || !name.trim()}>
-                    スレッドを作成
-                  </button>
-                </form>
-              )}
-            </div>
-          )}
-        </aside>
+        <SidebarPane inline={embedded}>
+          <ChatSidebar
+            native={native}
+            workspace={workspace}
+            role={role}
+            project={project}
+            projectName={projectName}
+            thread={thread}
+            threads={threads}
+            busy={busy}
+            embedded={embedded}
+            onProject={(ref) => void act(() => selectProject(ref))}
+            onNew={newChat}
+            onOpen={open}
+            onList={(query, after) => {
+              search.current = query;
+              void act(() => listThreads(after));
+            }}
+          />
+        </SidebarPane>
         <section
           aria-label="会話"
           className="chat-conversation"
           aria-busy={busy}
         >
-          {thread ? (
-            <>
-              <header className="chat-header">
-                <h3># {thread.value.name}</h3>
-                <button
-                  data-variant="secondary"
-                  disabled={busy}
-                  aria-busy={busy}
-                  onClick={() => void act(() => refresh(thread))}
-                >
-                  会話を再取得
-                </button>
-              </header>
-              <div className="chat-scroller" ref={scroller} onScroll={track}>
-                {timeline?.items.length === 50 && (
+          <header className="chat-header">
+            <div>
+              <p className="chat-source">{projectName || "Project未選択"}</p>
+              <h3>{thread?.value.name || "新しい相談"}</h3>
+            </div>
+            {thread && (
+              <button
+                data-variant="secondary"
+                disabled={busy}
+                onClick={() => void act(() => refresh(thread))}
+              >
+                会話を更新
+              </button>
+            )}
+          </header>
+          <div className="chat-scroller" ref={scroller} onScroll={track}>
+            {!thread && (
+              <div className="chat-empty">
+                <h3>
+                  {canEdit
+                    ? "何から始めましょうか"
+                    : "スレッドを開くか、Projectを選択してください。"}
+                </h3>
+                {canEdit && (
                   <button
                     data-variant="secondary"
-                    disabled={busy}
-                    onClick={() => void act(() => refresh(thread, timeline))}
+                    disabled={busy || !project}
+                    onClick={() =>
+                      setText(
+                        "このProjectで開発を開始するために必要な設定が揃っているか、登録リポジトリのREADME・開発手順と現在の実行状態を確認してください。",
+                      )
+                    }
                   >
-                    以前の会話の次のページ
+                    開発の準備を確認する
                   </button>
                 )}
-                <ol className="chat-timeline">
-                  {[...(timeline?.items ?? [])].reverse().map((row) => {
-                    if (row.kind === "chat-message") {
-                      const message = row as Saved<ChatMessage>,
-                        selected = chosen.some(
-                          (r) => r.id === row.id && r.version === row.version,
-                        );
-                      return (
-                        <li
-                          key={row.id}
-                          className={`chat-message chat-${message.value.role}`}
-                          data-focused={focused?.id === row.id || undefined}
-                        >
-                          <p className="chat-source">
-                            <strong>{author(message.value)}</strong>
-                            {message.value.role === "human" &&
-                              message.value.user !== user &&
-                              " · 人間"}
-                            {" · "}
-                            {message.value.state === "complete"
-                              ? "保存済み"
-                              : "応答は未完了"}
-                          </p>
-                          <p className="chat-text">{message.value.text}</p>
-                          <div className="chat-message-actions">
-                            {message.value.state === "complete" && (
-                              <label>
-                                <input
-                                  type="checkbox"
-                                  checked={selected}
-                                  onChange={() =>
-                                    setChosen((current) =>
-                                      selected
-                                        ? current.filter((r) => r.id !== row.id)
-                                        : [...current, pin(row)],
-                                    )
-                                  }
-                                />
-                                次の相談に含める
-                              </label>
-                            )}
-                            <button
-                              data-variant="secondary"
-                              aria-pressed={focused?.id === row.id}
-                              onClick={() =>
-                                setFocused(
-                                  focused?.id === row.id ? undefined : message,
-                                )
-                              }
-                            >
-                              詳細を表示
-                            </button>
-                          </div>
-                        </li>
-                      );
-                    }
-                    if (row.kind === "chat-adoption") {
-                      const value = row.value as ChatAdoption;
-                      return (
-                        <li key={row.id} className="chat-event">
-                          <p>仕様をContextへ採用済み</p>
-                          <NavigationLink
-                            related
-                            to={{
-                              workspace,
-                              screen: "context",
-                              target: {
-                                kind: value.context.kind,
-                                id: value.context.id,
-                                version: value.context.revision,
-                              },
-                            }}
-                          >
-                            保存した仕様を確認
-                          </NavigationLink>
-                          {work({ adoption: value })}
-                        </li>
-                      );
-                    }
-                    if (row.kind === "chat-link")
-                      return (
-                        <li key={row.id} className="chat-event">
-                          {work({ link: row.value as ChatLink })}
-                        </li>
-                      );
-                    return null;
-                  })}
-                </ol>
-                {operations.map((op) => (
-                  <section
-                    key={op.id}
-                    className="chat-operation"
-                    aria-label="モデル操作"
-                  >
-                    <p role="status">
-                      {operationStateLabels[op.value.state] ?? op.value.state}
-                      {op.value.reason && ` · ${op.value.reason}`}
-                    </p>
-                    {op.value.state === "sending" &&
-                      op.value.client !== operationClientID && (
-                        <p>別クライアントで送信中</p>
-                      )}
-                    {canEdit && (
-                      <ChatOperationControls
-                        operation={op.value}
-                        user={user}
-                        client={operationClientID}
-                        busy={busy}
-                        modelMatches={
-                          !!profile &&
-                          modelReady(native, api + "\0" + user, profile) &&
-                          profile.id === op.value.model.connection &&
-                          profile.revision === op.value.model.revision &&
-                          profile.model === op.value.model.requested
-                        }
-                        onAction={(action) =>
-                          void act(() => recover(op, action))
-                        }
-                      />
-                    )}
-                    <Disclosure title="操作と原応答を確認">
-                      {() => (
-                        <>
-                          <p>
-                            {op.id} / {op.version}
-                          </p>
-                          <button
-                            data-variant="secondary"
-                            disabled={busy}
-                            aria-busy={busy}
-                            onClick={() =>
-                              void act(async () => {
-                                if (!op.value.turn) return;
-                                const turn = await read(op.value.turn);
-                                setTurns((current) => ({
-                                  ...current,
-                                  [op.id]: JSON.stringify(turn.value, null, 2),
-                                }));
-                              })
-                            }
-                          >
-                            保存した原応答を取得
-                          </button>
-                          {turns[op.id] && <pre>{turns[op.id]}</pre>}
-                        </>
-                      )}
-                    </Disclosure>
-                  </section>
-                ))}
               </div>
-              {!atBottom && (
-                <button
-                  type="button"
-                  className="chat-jump"
-                  data-variant="secondary"
-                  onClick={() => {
-                    anchor.current = "bottom";
-                    const element = scroller.current;
-                    if (element) element.scrollTop = element.scrollHeight;
-                    setAtBottom(true);
-                  }}
+            )}
+            {timeline?.items.length === 50 && (
+              <button
+                data-variant="secondary"
+                disabled={busy}
+                onClick={() => void act(() => refresh(thread!, timeline))}
+              >
+                以前の会話を表示
+              </button>
+            )}
+            <ol className="chat-timeline">
+              {[...(timeline?.items ?? [])].reverse().map((row) => {
+                if (row.kind === "chat-message") {
+                  const message = row as Saved<ChatMessage>;
+                  return (
+                    <li
+                      key={row.id}
+                      className={`chat-message chat-${message.value.role}`}
+                      data-focused={focused?.id === row.id || undefined}
+                    >
+                      <p className="chat-source">
+                        <strong>{author(message.value)}</strong>
+                        {message.value.state !== "complete" &&
+                          " · 応答は未完了"}
+                      </p>
+                      {message.value.role === "assistant" ? (
+                        <ChatMarkdown text={message.value.text} />
+                      ) : (
+                        <p className="chat-text">{message.value.text}</p>
+                      )}
+                      <div className="chat-message-actions">
+                        <button
+                          data-variant="secondary"
+                          aria-pressed={focused?.id === row.id}
+                          onClick={() =>
+                            setFocused(
+                              focused?.id === row.id ? undefined : message,
+                            )
+                          }
+                        >
+                          詳細・仕様に採用
+                        </button>
+                      </div>
+                    </li>
+                  );
+                }
+                if (row.kind === "chat-adoption") {
+                  const value = row.value as ChatAdoption;
+                  return (
+                    <li key={row.id} className="chat-event">
+                      <p>仕様をContextへ採用済み</p>
+                      <NavigationLink
+                        related
+                        to={{
+                          workspace,
+                          screen: "context",
+                          target: {
+                            kind: value.context.kind,
+                            id: value.context.id,
+                            version: value.context.revision,
+                          },
+                        }}
+                      >
+                        保存した仕様を確認
+                      </NavigationLink>
+                      {work({ adoption: value })}
+                    </li>
+                  );
+                }
+                if (row.kind === "chat-link")
+                  return (
+                    <li key={row.id} className="chat-event">
+                      {work({ link: row.value as ChatLink })}
+                    </li>
+                  );
+                return null;
+              })}
+            </ol>
+            {operations
+              .filter((op) => op.value.state !== "completed")
+              .map((op) => (
+                <section
+                  key={op.id}
+                  className="chat-operation"
+                  aria-label="モデル操作"
                 >
-                  最新のメッセージへ
-                </button>
-              )}
-              {canEdit && (
-                <form
-                  className="chat-composer"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void act(() => send(true));
-                  }}
-                >
-                  <label>
-                    相談・メッセージ
-                    <textarea
-                      rows={2}
-                      value={text}
-                      onChange={(e) => setText(e.target.value)}
+                  <p role="status">
+                    {activity ||
+                      (op.value.state === "sending"
+                        ? "返答を作成中…"
+                        : (operationStateLabels[op.value.state] ??
+                          op.value.state))}
+                    {op.value.reason && ` · ${op.value.reason}`}
+                  </p>
+                  {op.value.state === "sending" &&
+                    op.value.client !== operationClientID && (
+                      <p>別クライアントで送信中</p>
+                    )}
+                  {canEdit && (
+                    <ChatOperationControls
+                      operation={op.value}
+                      user={user}
+                      client={operationClientID}
+                      busy={busy}
+                      modelMatches={
+                        !!profile &&
+                        modelReady(native, api + "\0" + user, profile) &&
+                        profile.id === op.value.model.connection &&
+                        profile.revision === op.value.model.revision &&
+                        profile.model === op.value.model.requested
+                      }
+                      onAction={(action) => void act(() => recover(op, action))}
                     />
-                  </label>
-                  <Disclosure
-                    title={`${profile?.name || "モデル未選択"} · 履歴 ${chosen.length}件 · ${context ? "Context参照" : "Context不参照"}`}
-                  >
+                  )}
+                  <Disclosure title="操作と原応答を確認">
                     {() => (
                       <>
-                        <label>
-                          <input
-                            type="checkbox"
-                            checked={context}
-                            onChange={(e) => setContext(e.target.checked)}
-                          />
-                          Contextを参照
-                        </label>
-                        {context && (
-                          <button
-                            type="button"
-                            data-variant="secondary"
-                            disabled={busy}
-                            onClick={() => void act(() => connectMCP(native))}
-                          >
-                            MCPへ接続
-                          </button>
-                        )}
-                        <ModelConnectionSettings
-                          native={native}
-                          actor={api + "\0" + user}
-                          workspace={workspace}
-                          selected={profile}
-                          onSelected={setProfile}
-                          selectionOnly
-                        />
+                        <button
+                          data-variant="secondary"
+                          disabled={busy}
+                          onClick={() => void act(() => loadTurn(op))}
+                        >
+                          保存した原応答を取得
+                        </button>
+                        {turns[op.id] && <pre>{turns[op.id]}</pre>}
                       </>
                     )}
                   </Disclosure>
-                  <div className="chat-composer-actions">
-                    <button
-                      type="button"
-                      data-variant="secondary"
-                      disabled={busy || !text.trim()}
-                      onClick={() => void act(() => send(false))}
-                    >
-                      メッセージだけを保存
-                    </button>
-                    <button disabled={busy || !text.trim()}>
-                      保存してAIへ相談
-                    </button>
-                  </div>
-                </form>
-              )}
-              {work({})}
-            </>
-          ) : (
-            <p className="chat-empty">
-              スレッドを開くか、新しい相談を始めてください。
-            </p>
+                </section>
+              ))}
+          </div>
+          {!atBottom && (
+            <button
+              type="button"
+              className="chat-jump"
+              data-variant="secondary"
+              onClick={() => {
+                if (scroller.current)
+                  scroller.current.scrollTop = scroller.current.scrollHeight;
+                setAtBottom(true);
+              }}
+            >
+              最新のメッセージへ
+            </button>
           )}
-          <p role="status" className="chat-notice" tabIndex={-1}>
-            {busy ? "取得中…" : notice}
-          </p>
+          {canEdit && (
+            <form
+              className="chat-composer"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void act(() => send(true));
+              }}
+            >
+              <label>
+                相談・メッセージ
+                <textarea
+                  rows={3}
+                  value={text}
+                  onChange={(e) => setText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === "Enter" &&
+                      (e.ctrlKey || e.metaKey) &&
+                      !e.nativeEvent.isComposing &&
+                      !busy
+                    ) {
+                      e.preventDefault();
+                      void act(() => send(true));
+                    }
+                  }}
+                />
+              </label>
+              <div className="chat-composer-toolbar">
+                <Disclosure
+                  title={
+                    profile
+                      ? `${profile.name} · ${profile.model}`
+                      : "モデル接続を選択"
+                  }
+                >
+                  {() => (
+                    <ModelConnectionSettings
+                      native={native}
+                      actor={api + "\0" + user}
+                      workspace={workspace}
+                      selected={profile}
+                      onSelected={selectModel}
+                      selectionOnly
+                    />
+                  )}
+                </Disclosure>
+                <Disclosure
+                  title={
+                    context ? `Project参照 · MCP ${mcp}` : "Project参照なし"
+                  }
+                >
+                  {() => (
+                    <>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={context}
+                          onChange={(e) => setContext(e.target.checked)}
+                        />
+                        Context・設定・登録ファイルを参照
+                      </label>
+                      {context && (
+                        <button
+                          type="button"
+                          data-variant="secondary"
+                          disabled={busy}
+                          onClick={() =>
+                            void act(async () => {
+                              if (mcp === "未接続" || mcp === "別アカウント")
+                                await connectMCP(native);
+                              await checkMCP();
+                            })
+                          }
+                        >
+                          {mcp === "未接続" || mcp === "別アカウント"
+                            ? "MCPへ接続"
+                            : "MCP接続を確認"}
+                        </button>
+                      )}
+                    </>
+                  )}
+                </Disclosure>
+                <ChatHistory
+                  messages={recentMessages}
+                  chosen={chosen}
+                  onChange={setChosen}
+                  disabled={busy}
+                />
+                <div className="chat-composer-actions">
+                  <button
+                    type="button"
+                    data-variant="secondary"
+                    disabled={busy || !project || !text.trim()}
+                    onClick={() => void act(() => send(false))}
+                  >
+                    保存のみ
+                  </button>
+                  <button
+                    disabled={busy || !project || !text.trim() || !profile}
+                  >
+                    {busy ? "処理中…" : "送信"}
+                  </button>
+                </div>
+              </div>
+              {notice && (
+                <p role="status" className="chat-notice">
+                  {notice}
+                </p>
+              )}
+            </form>
+          )}
+          {thread && work({})}
         </section>
       </div>
       {focused && (
@@ -860,20 +909,14 @@ export function ProjectChat({
                 disabled={busy}
                 aria-busy={busy}
                 onClick={() =>
-                  void act(async () => {
-                    const record = await read<ClientOperation>({
-                      id: focused.value.operation!.id,
-                      version: "head",
-                    });
-                    setOperations((current) => [
-                      record,
-                      ...current.filter((r) => r.id !== record.id),
-                    ]);
-                  })
+                  void act(() => loadTurn(focused.value.operation!))
                 }
               >
                 モデル操作の現在の記録を確認
               </button>
+            )}
+            {focused.value.operation && turns[focused.value.operation.id] && (
+              <pre>{turns[focused.value.operation.id]}</pre>
             )}
             {canEdit && focused.value.state === "complete" && (
               <>

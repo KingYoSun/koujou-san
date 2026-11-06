@@ -146,7 +146,7 @@ func main() {
 			workflowService.Observer = observer
 			workflowService.StartWorker(ctx)
 			routes = append(routes, workflowService.Register)
-			routes = append(routes, (&mcpapi.Service{Auth: service, Access: accessService, Contexts: contextService, Search: searchService, Graph: graphService, Usage: usageService, Automation: automationService, Runs: runService, Workflows: workflowService, Hopper: hopperService, ClientOps: clientOperations}).Register)
+			routes = append(routes, (&mcpapi.Service{Auth: service, Access: accessService, Contexts: contextService, Search: searchService, Graph: graphService, Usage: usageService, Automation: automationService, Runs: runService, Workflows: workflowService, Hopper: hopperService, ClientOps: clientOperations, Repositories: repositoryService}).Register)
 		}
 	}
 	address := os.Getenv("KOUJOU_API_ADDR")

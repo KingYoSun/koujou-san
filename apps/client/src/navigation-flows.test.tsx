@@ -23,6 +23,11 @@ import type { UI } from "./context-ui";
 vi.mock("./auth", async (original) => ({
   ...(await original<typeof import("./auth")>()),
   syncRequest: vi.fn(),
+  mcpIdentity: vi.fn(async () => "alice"),
+}));
+vi.mock("./model-connections", async (original) => ({
+  ...(await original<typeof import("./model-connections")>()),
+  loadProfiles: vi.fn(async () => []),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("./client-selection-host", async (original) => ({
@@ -313,6 +318,8 @@ it("starts a consultation from the fixed Project reached through Scope editing w
       threadID = decodeURIComponent(path.split("/").at(-1)!);
       return { data: { id: threadID, version: "thread-fixed" } };
     }
+    if (path.includes("/chat/messages/"))
+      return { data: { id: "chat-message:saved", version: "message-fixed" } };
     if (path.includes("/records/"))
       return {
         id: threadID,
@@ -343,9 +350,9 @@ it("starts a consultation from the fixed Project reached through Scope editing w
       </NavigationProvider>,
     ),
   );
-  expect(host.textContent).toContain("Project Aのスレッド");
-  await change("新しい相談の題名", "相談");
-  await submit("スレッドを作成");
+  expect(host.textContent).toContain("Project A");
+  await change("相談・メッセージ", "相談");
+  await click("保存のみ");
   const created = vi
     .mocked(syncRequest)
     .mock.calls.filter(([path]) => path.includes("/chat/threads/"));
@@ -357,7 +364,7 @@ it("starts a consultation from the fixed Project reached through Scope editing w
       project: { id: "scope:project", version: "project-fixed" },
     },
   });
-  expect(host.textContent).toContain("保存してAIへ相談");
+  expect(host.textContent).toContain("送信");
   expect(runSelection).not.toHaveBeenCalled();
 });
 
@@ -608,7 +615,7 @@ it("takes over and resumes the same chat operation without creating another requ
   expect(button("相談を再開").disabled).toBe(true);
   await act(() => {
     const details = [...host.querySelectorAll("details")].find((item) =>
-      item.querySelector("summary")?.textContent?.includes("モデル未選択"),
+      item.querySelector("summary")?.textContent?.includes("モデル接続を選択"),
     )!;
     details.open = true;
     details.dispatchEvent(new Event("toggle"));

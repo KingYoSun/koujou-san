@@ -253,5 +253,8 @@ func (s *Service) CheckReadTool(ctx context.Context, p access.Principal, w, name
 	if policy.Fixed.Mode == "none" && strings.HasPrefix(name, "context_") {
 		return access.ErrForbidden
 	}
+	if (name == "project_inspect" || name == "repository_read") && (policy.Chat == nil || !policy.Chat.Inspect || policy.Fixed.Mode == "none") {
+		return access.ErrForbidden
+	}
 	return nil
 }

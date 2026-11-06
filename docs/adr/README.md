@@ -67,3 +67,5 @@ ADRには、設計書の方針を具体化した判断と、その理由を記�
 - [0037: Workspaceの共有接続とrepoの初期設定](0037-workspace-repositories.md)
 
 - [0038: UIからのWorkspace認証と接続割当](0038-workspace-oauth-setup.md)
+
+- [0039: 相談開始の自動化とProjectの状態・ファイル参照](0039-project-chat-inspection.md)

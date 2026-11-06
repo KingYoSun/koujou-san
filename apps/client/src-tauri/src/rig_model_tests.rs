@@ -7,6 +7,23 @@ use std::{
     thread,
 };
 
+#[test]
+fn project_chat_read_tools_and_their_results_pass_the_native_model_boundary() {
+    let stored: Stored = serde_json::from_value(json!({"profile":{"id":"owned","name":"owned","endpoint":"https://model.example","model":"owned","allowed_models":["owned"],"auth":"none","revision":"1"},"key":""})).unwrap();
+    for name in ["project_inspect", "repository_read"] {
+        let body = json!({"tools":[{"type":"function","function":{"name":name,"parameters":{"type":"object"}}}],"messages":[{"role":"user","content":"Check development setup"},{"role":"assistant","content":null,"tool_calls":[{"id":"read","function":{"name":name,"arguments":"{}"}}]},{"role":"tool","tool_call_id":"read","content":"observed result"}]});
+        assert!(tools(&body).is_ok(), "read tool rejected: {name}");
+        assert!(
+            messages(&body, &stored.profile).is_ok(),
+            "read history rejected: {name}"
+        );
+    }
+    for name in ["run_start", "context_edit", "shell"] {
+        let body = json!({"tools":[{"type":"function","function":{"name":name,"parameters":{"type":"object"}}}]});
+        assert_eq!(tools(&body).unwrap_err(), "tool_not_allowed");
+    }
+}
+
 fn incoming(stream: &mut TcpStream) -> (String, Value) {
     stream
         .set_read_timeout(Some(Duration::from_secs(5)))

@@ -8,6 +8,8 @@
 
 Projectの永続チャットを既存Context・Run・質問回答へ接続した。本人指定のChatGPTサブスク`gpt-6.1-sol`、#83の準備文書による実行・質問回答・独立検品、GUI閉鎖後の継続を確認した。[条件と現在の判定](2026-10-31-issue-82-plan.md)、[検証記録](2026-10-31-issue-82-evidence.md)を参照する。
 
+2026-11-06に相談開始・返答表示・設定と登録ファイル参照・直近履歴の自動参照を改修した。共有サーバーとWindowsへ反映し、NAHTLOKAで実ファイルの参照と会話の継続を確認した。検証、反映commit、NAHTLOKA側の不足設定は[今回の記録](2026-11-06-project-chat-ux-plan.md)を参照する。
+
 ## Issue #83
 
 self-hosted Giteaを既存の観測・起票・Run・工程へ接続している。[条件と現在の判定](2026-11-01-issue-83-plan.md)、[実Gitea・両OS Runner・共同一巡の記録](2026-11-01-issue-83-evidence.md)、[導入手順](../runbooks/gitea.md)を参照する。

@@ -131,6 +131,24 @@ export async function connectMCP(native: boolean): Promise<void> {
     );
 }
 
+export async function mcpIdentity(
+  native: boolean,
+): Promise<string | undefined> {
+  if (native) {
+    try {
+      return (await invoke<{ user?: User }>("mcp_status")).user?.id;
+    } catch (error) {
+      if (error === "authentication_required" || error === "forbidden")
+        return undefined;
+      throw error;
+    }
+  }
+  const response = await fetch("/auth/mcp/me", { credentials: "same-origin" });
+  if ([401, 403].includes(response.status)) return undefined;
+  if (!response.ok) throw new SyncHTTPError(response.status, null);
+  return ((await response.json()) as { user?: User }).user?.id;
+}
+
 export async function mcpRequest(
   native: boolean,
   workspace: string,

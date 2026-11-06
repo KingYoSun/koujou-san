@@ -20,9 +20,10 @@ function Pane({
 }
 
 /** 左サイドバーへ差し込む（画面の一覧・絞り込みなど）。 */
-export const SidebarPane = (props: { children: ReactNode }) => (
-  <Pane slot="sidebar" {...props} />
-);
+export const SidebarPane = (props: {
+  children: ReactNode;
+  inline?: boolean;
+}) => <Pane slot="sidebar" {...props} />;
 /** 右の詳細ペインへ差し込む。shell外や inline 指定ではその場に描く。 */
 export const DetailPane = (props: {
   children: ReactNode;
