@@ -37,6 +37,7 @@ import {
 import { ChatWork } from "./chat-work";
 import { useChatConnections } from "./chat-connections";
 import { ChatSidebar } from "./chat-sidebar";
+import { ChatHistory, chatHistoryLimit } from "./chat-history";
 import { ChatOperationControls } from "./chat-operation-controls";
 import { ChatMarkdown } from "./chat-markdown";
 import {
@@ -80,6 +81,9 @@ export function ProjectChat({
   const [operations, setOperations] = useState<Saved<ClientOperation>[]>([]);
   const [turns, setTurns] = useState<Record<string, string>>({});
   const [chosen, setChosen] = useState<VersionRef[]>([]);
+  const [recentMessages, setRecentMessages] = useState<Saved<ChatMessage>[]>(
+    [],
+  );
   const [text, setText] = useState("");
   const search = useRef("");
   const [activity, setActivity] = useState("");
@@ -160,6 +164,7 @@ export function ProjectChat({
         setThreads(undefined);
         setOperations([]);
         setChosen([]);
+        setRecentMessages([]);
         setExcerpt(undefined);
         setFocused(undefined);
         localStorage.removeItem(preferenceKey);
@@ -197,6 +202,7 @@ export function ProjectChat({
       setTimeline(undefined);
       setOperations([]);
       setChosen([]);
+      setRecentMessages([]);
       setFocused(undefined);
       setExcerpt(undefined);
     }
@@ -222,7 +228,11 @@ export function ProjectChat({
     });
     await listThreads(undefined, project, mine);
   }
-  async function refresh(ref: VersionRef, after?: ChatPage) {
+  async function refresh(
+    ref: VersionRef,
+    after?: ChatPage,
+    keepHistory = false,
+  ) {
     const mine = ++serial.current;
     const saved = await read<ChatThread>(ref);
     if (currentThread.current?.id !== saved.id)
@@ -234,6 +244,15 @@ export function ProjectChat({
       after: after?.after ?? 0,
       after_id: after?.after_id ?? "",
     });
+    const recent =
+      !after && !keepHistory
+        ? await call<ChatPage>("/query", {
+            root: saved.id,
+            kind: "chat-message",
+            descending: true,
+            limit: chatHistoryLimit,
+          })
+        : undefined;
     const ops = await Promise.all(
       page.items
         .filter((r) => r.kind === "chat-operation")
@@ -253,6 +272,18 @@ export function ProjectChat({
     setProject(saved.value.project);
     setTimeline(page);
     setOperations(ops);
+    if (recent) {
+      const messages = recent.items
+        .filter(
+          (r) =>
+            r.kind === "chat-message" &&
+            r.root === saved.id &&
+            (r.value as ChatMessage).state === "complete",
+        )
+        .reverse() as Saved<ChatMessage>[];
+      setRecentMessages(messages);
+      setChosen(messages.map(pin));
+    }
     rememberChat(preferenceKey, {
       project: saved.value.project,
       thread: pin(saved),
@@ -260,6 +291,7 @@ export function ProjectChat({
   }
   function open(ref: VersionRef) {
     setChosen([]);
+    setRecentMessages([]);
     setExcerpt(undefined);
     setFocused(undefined);
     setAtBottom(true);
@@ -348,6 +380,7 @@ export function ProjectChat({
     setTimeline(undefined);
     setOperations([]);
     setChosen([]);
+    setRecentMessages([]);
     setFocused(undefined);
     setExcerpt(undefined);
     setText("");
@@ -411,12 +444,13 @@ export function ProjectChat({
         },
       );
       const operation = await read<ClientOperation>(ref);
-      await refresh(target);
+      await refresh(target, undefined, true);
       await run(operation, policy);
     }
     if (currentThread.current?.id === target.id) {
       setText("");
       setChosen([]);
+      setRecentMessages([]);
       setAtBottom(true);
       await refresh(target);
       await listThreads();
@@ -613,10 +647,7 @@ export function ProjectChat({
             <ol className="chat-timeline">
               {[...(timeline?.items ?? [])].reverse().map((row) => {
                 if (row.kind === "chat-message") {
-                  const message = row as Saved<ChatMessage>,
-                    selected = chosen.some(
-                      (r) => r.id === row.id && r.version === row.version,
-                    );
+                  const message = row as Saved<ChatMessage>;
                   return (
                     <li
                       key={row.id}
@@ -634,22 +665,6 @@ export function ProjectChat({
                         <p className="chat-text">{message.value.text}</p>
                       )}
                       <div className="chat-message-actions">
-                        {message.value.state === "complete" && (
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={selected}
-                              onChange={() =>
-                                setChosen((current) =>
-                                  selected
-                                    ? current.filter((r) => r.id !== row.id)
-                                    : [...current, pin(row)],
-                                )
-                              }
-                            />
-                            次の相談に含める
-                          </label>
-                        )}
                         <button
                           data-variant="secondary"
                           aria-pressed={focused?.id === row.id}
@@ -843,12 +858,15 @@ export function ProjectChat({
                             : "MCP接続を確認"}
                         </button>
                       )}
-                      <p className="chat-source">
-                        次の相談に含める履歴：{chosen.length}件
-                      </p>
                     </>
                   )}
                 </Disclosure>
+                <ChatHistory
+                  messages={recentMessages}
+                  chosen={chosen}
+                  onChange={setChosen}
+                  disabled={busy}
+                />
                 <div className="chat-composer-actions">
                   <button
                     type="button"

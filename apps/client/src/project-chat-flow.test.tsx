@@ -68,18 +68,22 @@ async function fixture(lostThread = false) {
           value: { kind: "project", name: "NAHTLOKA" },
         },
       };
-    if (path.endsWith("/query"))
+    if (path.endsWith("/query")) {
+      const items = [...records.values()]
+        .filter((r) =>
+          body.kind === "chat-thread"
+            ? r.kind === "chat-thread"
+            : r.root === body.root && r.kind === "chat-message",
+        )
+        .filter((r) => !body.after || r.position < body.after)
+        .sort((a, b) => b.position - a.position)
+        .slice(0, body.limit);
       return {
-        items: [...records.values()]
-          .filter((r) =>
-            body.kind === "chat-thread"
-              ? r.kind === "chat-thread"
-              : r.root === body.root && r.kind === "chat-message",
-          )
-          .reverse(),
-        after: 0,
-        after_id: "",
+        items,
+        after: items.at(-1)?.position ?? 0,
+        after_id: items.at(-1)?.id ?? "",
       };
+    }
     if (path.includes("/records/"))
       return records.get(
         decodeURIComponent(path.split("/records/")[1].split("?")[0]),
@@ -205,7 +209,123 @@ it("starts from a single Project and saved model with one send, then restores th
   const reopened = await f.mount();
   expect(reopened.host.textContent).toContain("READMEを確認済み");
   expect(runSelection).toHaveBeenCalledTimes(1);
+  await reopened.enter("その確認結果を踏まえて次の手順を教えてください");
+  await reopened.send();
+  const source = vi.mocked(runSelection).mock.calls[1][1].chat!.messages;
+  expect(source).toHaveLength(3);
+  expect(source[1]).toEqual({ id: "chat-message:answer", version: "a1" });
 });
+
+it("automatically sends only the current consultation's bounded recent completed messages", async () => {
+  const f = await fixture(),
+    first = await f.mount();
+  await first.enter("最初の相談");
+  await first.send();
+  const thread = chatPreferences(
+    chatPreferenceKey("api", "alice", "w"),
+  ).thread!;
+  for (let i = 0; i < 70; i++)
+    f.records.set(`chat-message:history-${i}`, {
+      id: `chat-message:history-${i}`,
+      version: "h1",
+      root: thread.id,
+      kind: "chat-message",
+      refs: [],
+      position: i + 10,
+      value: {
+        thread,
+        role: i % 2 ? "assistant" : "human",
+        text: `履歴${i}`,
+        state: i === 69 ? "incomplete" : "complete",
+      },
+    });
+  f.records.set("chat-message:foreign", {
+    id: "chat-message:foreign",
+    version: "f1",
+    root: "chat-thread:other",
+    kind: "chat-message",
+    refs: [],
+    position: 100,
+    value: { role: "human", text: "別相談", state: "complete" },
+  });
+  const ui = await f.mount();
+  expect(ui.host.textContent).toContain("履歴 19件");
+  await act(() =>
+    [...ui.host.querySelectorAll("button")]
+      .find((b) => b.textContent === "以前の会話を表示")!
+      .click(),
+  );
+  expect(ui.host.textContent).toContain("履歴 19件");
+  await act(() => {
+    const details = [...ui.host.querySelectorAll("details")].find((d) =>
+      d.querySelector("summary")?.textContent?.startsWith("履歴 19件"),
+    )!;
+    details.open = true;
+    details.dispatchEvent(new Event("toggle"));
+  });
+  await act(() =>
+    ui.host
+      .querySelector<HTMLInputElement>(".chat-history-selection input")!
+      .click(),
+  );
+  await ui.enter("続けてください");
+  await ui.send();
+  const ids = vi
+    .mocked(runSelection)
+    .mock.calls.at(-1)![1]
+    .chat!.messages.map((r) => r.id);
+  expect(ids).toHaveLength(19);
+  expect(ids.slice(0, -1)).toEqual(
+    Array.from({ length: 18 }, (_, i) => `chat-message:history-${i + 51}`),
+  );
+  await act(() =>
+    [...ui.host.querySelectorAll("button")]
+      .find((b) => b.textContent?.includes("新しい相談"))!
+      .click(),
+  );
+  await ui.enter("別の相談です");
+  await ui.send();
+  expect(
+    vi.mocked(runSelection).mock.calls.at(-1)![1].chat!.messages,
+  ).toHaveLength(1);
+});
+it("keeps the same fixed history and policy intent when model startup fails after the message is saved", async () => {
+  const f = await fixture(),
+    first = await f.mount();
+  await first.enter("最初の相談");
+  await first.send();
+  const thread = chatPreferences(
+    chatPreferenceKey("api", "alice", "w"),
+  ).thread!;
+  for (let i = 0; i < 21; i++)
+    f.records.set(`chat-message:retry-${i}`, {
+      id: `chat-message:retry-${i}`,
+      version: "v1",
+      root: thread.id,
+      kind: "chat-message",
+      refs: [],
+      position: i + 10,
+      value: { thread, role: "human", text: `履歴${i}`, state: "complete" },
+    });
+  const ui = await f.mount();
+  expect(ui.host.textContent).toContain("履歴 20件");
+  vi.mocked(runSelection).mockRejectedValueOnce(
+    Error("operation read unavailable"),
+  );
+  await ui.enter("同じ入力を再確認");
+  await ui.send();
+  expect(ui.host.querySelector("textarea")!.value).toBe("同じ入力を再確認");
+  await ui.send();
+  const policies = f.writes
+    .filter((w) => w.path.includes("/policies/"))
+    .slice(-2);
+  expect(policies).toHaveLength(2);
+  expect(policies[0]).toEqual(policies[1]);
+  expect(
+    vi.mocked(runSelection).mock.calls.at(-1)![1].chat!.messages,
+  ).toHaveLength(21);
+});
+
 it("reuses a thread creation intent after a lost acknowledgement and does not create a conversation when MCP is unauthenticated", async () => {
   const f = await fixture(true),
     ui = await f.mount();
