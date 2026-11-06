@@ -81,6 +81,8 @@ In progress。AC-1〜5とINVAR-1〜3のローカル実装・検証・独立検�
 
 AC-7は通常の連続送信、70件の履歴からの限定取得、未完了・別相談の除外、過去ページ表示後の範囲維持、入力欄からの除外を確認した。独立検品で送信途中の再取得が再試行入力を変える問題を確認し、送信中だけ履歴選択を保持するよう修正。20件の履歴でモデル開始に失敗した後も同じpolicy本文・要求IDを使う試験は修正前に失敗し、修正後に成功した。固定3ファイルの再検品はblockerなし、関連4テストも独立実行して成功。
 
+実環境の受入中、MCP認証後の最初のdiscoveryが失敗した。配布edgeが公開Hostを維持してlocalhostのAPIへ転送する構成に、SDKのlocalhost向けHost検査が合っていなかった。loopback接続と公開Hostを組み合わせた試験で403を再現し、設定済み公開Hostとの明示照合へ変更。未設定・別Hostは拒否し、既存のOAuth、操作認可、Origin検査は維持する。モデル要求はこの失敗の時点ではまだ送っていない。修正後のサーバーで同じ相談を再開して確認する。
+
 ## 更新候補
 
 ローカルcommit `f945f7abbbabc70815219d61f2ea503368cb77b0` から、`corepack pnpm run dist:desktop` と `corepack pnpm run dist:server` を実行して成功した。既存のRust実装を含むWindows release buildとNSIS作成、Linuxサーバーimage・archive作成を完了。外部へのpush・PR・配備は行っていない。

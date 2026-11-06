@@ -100,7 +100,8 @@ func (s *Service) Register(mux *http.ServeMux) {
 		raw, _ := json.Marshal(value.Value)
 		return &mcp.ReadResourceResult{Cacheable: mcp.Cacheable{CacheScope: "private"}, Contents: []*mcp.ResourceContents{{URI: r.Params.URI, MIMEType: "application/json", Text: string(raw)}}}, nil
 	})
-	transport := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true, PropagateRequestCancellation: true, MaxRequestBodyBytes: int64(s.Contexts.Limits.Bytes)*2 + 1<<20})
+	origin, _ := url.Parse(s.Auth.Config.Site)
+	transport := mcpTransport(server, origin.Host, int64(s.Contexts.Limits.Bytes)*2+1<<20)
 	bound := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		info := mcpauth.TokenInfoFromContext(r.Context())
 		workspace := r.Header.Get("X-Koujou-Workspace")
