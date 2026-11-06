@@ -76,6 +76,15 @@ In progress。AC-1〜5とINVAR-1〜3のローカル実装・検証・独立検�
 
 同じ相談の過去発言を自動で送信するかは追加の任意質問が未回答のため、既存の手動選択を維持している。
 
+## 更新候補
+
+ローカルcommit `f945f7abbbabc70815219d61f2ea503368cb77b0` から、`corepack pnpm run dist:desktop` と `corepack pnpm run dist:server` を実行して成功した。既存のRust実装を含むWindows release buildとNSIS作成、Linuxサーバーimage・archive作成を完了。外部へのpush・PR・配備は行っていない。
+
+- Windows: `artifacts/desktop-0.1.0-preview.1-f945f7ab/koujou-san_0.1.0-preview.1_x64-setup.exe`。SHA-256: `3e9eea513d6a4a804f4c920ed5b542c5666bd0e87575fcf84e311bae4a4a026b`。
+- サーバー: `artifacts/server-0.1.0-preview.1-f945f7ab/koujou-san-server-linux-amd64-0.1.0-preview.1-f945f7ab.tar.gz`。SHA-256: `94c4586a647d759e620d64272eb14be9776fa0d9e9e229547777f7c87df2e98f`。既存schema 28を維持。
+
+接続先は現在 `https://koujou.kingyosun.com`。共有サーバーの更新には一時停止とbackup、Windows版の更新には現在のRunnerの状態確認とアプリ終了が必要になる。初回観測時のアプリには未送信入力があったため、更新の実施判断をユーザーへ確認する。更新候補の作成はNAHTLOKAの受入確認の代わりにはしない。
+
 参照資料: [Slackのスレッド](https://slack.com/help/articles/115000769927-Use-threads-to-organize-discussions)、[サイドバー](https://slack.com/help/articles/212596808-Adjust-your-sidebar-preferences)。Slackのチャンネル構造は採用せず、相談ごとの画面を維持する判断に更新した。
 
 実装資料: [react-markdown公式](https://github.com/remarkjs/react-markdown)、[GiteaのGit treeページ取得](https://docs.gitea.com/enterprise/api/21/operations/get-tree/)。
