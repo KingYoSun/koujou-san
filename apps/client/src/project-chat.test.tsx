@@ -20,14 +20,14 @@ it("lays the chat out as a thread list beside the conversation, in the screen an
   expect(screen).toContain('class="chat-layout"');
   expect(screen).toContain('aria-label="Projectとスレッド"');
   expect(screen).toContain('aria-label="会話"');
-  expect(screen).toContain("Projectを再取得");
-  expect(screen).toContain("Projectを作成");
-  expect(screen).toContain("screen=context&amp;view=scopes&amp;q=project");
+  expect(screen).toContain("新しい相談");
+  expect(screen).toContain("相談・メッセージ");
+  expect(screen).not.toContain("新しい相談の題名");
+  expect(screen).not.toContain("スレッドを作成");
   expect(screen).not.toContain("data-embedded");
   const popover = render("editor", true);
   expect(popover).toContain('class="chat-layout" data-embedded="true"');
-  expect(popover).toContain("Projectを再取得");
-  expect(popover).toContain("Projectを作成");
+  expect(popover).toContain("相談・メッセージ");
 });
 it("does not render the composer or thread creation for a viewer before a thread is open", () => {
   const html = render("viewer");

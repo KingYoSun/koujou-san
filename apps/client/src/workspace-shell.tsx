@@ -97,7 +97,7 @@ export function WorkspaceShell({
   const to = (screen: ScreenName) => navigation.destination(screen);
   const common = { native, api, user, workspace, role, canExecute };
   return (
-    <div className="workspace-shell">
+    <div className="workspace-shell" data-screen={route.screen}>
       <a className="skip-link" href="#screen-title">
         作業画面へ移動
       </a>
@@ -108,30 +108,33 @@ export function WorkspaceShell({
             API: {health} / 同期: {sync} / {native ? "Windowsアプリ" : "Web"}
           </p>
         </div>
-        <nav className="primary-navigation" aria-label="主な画面">
-          {groups.map((g) => (
-            <section key={g}>
-              <p className="navigation-group">{g}</p>
-              <ul>
-                {Object.entries(destinations)
-                  .filter(([, [category]]) => category === g)
-                  .map(([screen, [, label]]) => (
-                    <li key={screen}>
-                      <NavigationLink
-                        to={to(screen as ScreenName)}
-                        related={g === "設定" && group !== "設定"}
-                        aria-current={
-                          route.screen === screen ? "page" : undefined
-                        }
-                      >
-                        {label}
-                      </NavigationLink>
-                    </li>
-                  ))}
-              </ul>
-            </section>
-          ))}
-        </nav>
+        <details className="screen-navigation" open={route.screen !== "chat"}>
+          <summary>作業・設定</summary>
+          <nav className="primary-navigation" aria-label="主な画面">
+            {groups.map((g) => (
+              <section key={g}>
+                <p className="navigation-group">{g}</p>
+                <ul>
+                  {Object.entries(destinations)
+                    .filter(([, [category]]) => category === g)
+                    .map(([screen, [, label]]) => (
+                      <li key={screen}>
+                        <NavigationLink
+                          to={to(screen as ScreenName)}
+                          related={g === "設定" && group !== "設定"}
+                          aria-current={
+                            route.screen === screen ? "page" : undefined
+                          }
+                        >
+                          {label}
+                        </NavigationLink>
+                      </li>
+                    ))}
+                </ul>
+              </section>
+            ))}
+          </nav>
+        </details>
         <section
           className="sidebar-pane"
           aria-label="画面内の一覧"
@@ -163,12 +166,13 @@ export function WorkspaceShell({
         <p className="breadcrumbs">
           {name} / {group} / {title}
           {route.target &&
+            route.screen !== "chat" &&
             ` / ${route.target.name ?? route.target.id}（${route.target.kind}）`}
         </p>
         <h2 id="screen-title" tabIndex={-1}>
           {title}
         </h2>
-        {route.target && (
+        {route.target && route.screen !== "chat" && (
           <details className="target-reference">
             <summary>対象の固定版を確認</summary>
             <p>版：{route.target.version}</p>

@@ -223,6 +223,7 @@ func checkClientSelectionMCP(t *testing.T, s *Service, p access.Principal, apiTo
 		peer.Close()
 	}
 	checkContextGenerationMCP(t, s, p, generationKey, connect, call)
+	checkChatInspectionMCP(t, s, p, generationKey, connect, call)
 	t.Log("client selection: HTTP/MCP fixed versions/replay, purpose separation, owned-client transport and no excluded metadata passed")
 }
 func mustJSON(v any) string { b, _ := json.Marshal(v); return string(b) }

@@ -385,7 +385,7 @@ func TestMCPIntegration(t *testing.T) {
 		return []byte(text.Text)
 	}
 	listed, err := session.ListTools(ctx, nil)
-	if err != nil || len(listed.Tools) != 30 {
+	if err != nil || len(listed.Tools) != 32 {
 		t.Fatal("tool catalogue", err)
 	}
 	call(session, "context_get", public, false)

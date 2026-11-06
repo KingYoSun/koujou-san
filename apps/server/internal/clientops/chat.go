@@ -30,6 +30,7 @@ type ChatMessage struct {
 type ChatSource struct {
 	Thread   Ref   `json:"thread"`
 	Messages []Ref `json:"messages"`
+	Inspect  bool  `json:"inspect,omitempty"`
 }
 type ChatLink struct {
 	Thread Ref    `json:"thread"`

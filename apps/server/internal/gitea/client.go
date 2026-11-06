@@ -123,6 +123,14 @@ func FromOAuthCredentials(instance, token, certificate string) (*Client, error) 
 func (c *Client) ResumeAt() time.Time { return time.Unix(0, c.resumeAt.Load()) }
 
 func (c *Client) Request(ctx context.Context, method, path string, body io.Reader) (*http.Response, error) {
+	return c.request(ctx, method, path, body, "")
+}
+
+func (c *Client) ReadRange(ctx context.Context, path, byteRange string) (*http.Response, error) {
+	return c.request(ctx, "GET", path, nil, byteRange)
+}
+
+func (c *Client) request(ctx context.Context, method, path string, body io.Reader, byteRange string) (*http.Response, error) {
 	if time.Now().Before(c.ResumeAt()) {
 		return nil, errors.New("rate_limited")
 	}
@@ -137,6 +145,9 @@ func (c *Client) Request(ctx context.Context, method, path string, body io.Reade
 	r.Header.Set("Authorization", prefix+c.token)
 	r.Header.Set("Accept", "application/json")
 	r.Header.Set("User-Agent", "koujou-san-gitea")
+	if byteRange != "" {
+		r.Header.Set("Range", byteRange)
+	}
 	if body != nil {
 		r.Header.Set("Content-Type", "application/json")
 	}
